@@ -1,48 +1,46 @@
-export class DomainError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly status: number = 500,
-    public readonly details?: unknown,
-  ) {
-    super(message);
-    this.name = 'DomainError';
-  }
-}
+/**
+ * `@erp/contracts` — the API↔UI shared contract package (TARGET_ARCHITECTURE §3):
+ * zod DTOs, the stable error-code registry, permission codes, pagination and id rules.
+ */
+export { errorCodes, errorStatus, errorTitle, isErrorCode, statusForCode, titleForCode } from './errors.js';
+export type { ErrorCode } from './errors.js';
 
-export type ProblemError = {
-  field?: string;
-  message?: string;
-};
+export { DomainError, createProblemDetails, problemFromZodError } from './problem.js';
+export type { ProblemDetails, ProblemError } from './problem.js';
 
-export type ProblemDetails = {
-  type: string;
-  title: string;
-  status: number;
-  code: string;
-  detail: string;
-  traceId: string;
-  errors?: ProblemError[];
-};
+export {
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+  buildMeta,
+  listEnvelope,
+  paginationQuerySchema,
+  parseFilters,
+  parseSort,
+} from './pagination.js';
+export type { ListEnvelope, ListMeta, PaginationQuery, SortClause, SortDirection } from './pagination.js';
 
-export function createProblemDetails(error: DomainError | Error, traceId: string): ProblemDetails {
-  const domainError =
-    error instanceof DomainError ? error : new DomainError('INTERNAL_SERVER_ERROR', error.message, 500);
+export { idParamSchema, isUuid, newId, uuidSchema } from './ids.js';
+export type { IdParam } from './ids.js';
 
-  return {
-    type: 'about:blank',
-    title: 'Request failed',
-    status: domainError.status,
-    code: domainError.code,
-    detail: domainError.message,
-    traceId,
-    errors:
-      domainError.details && typeof domainError.details === 'object'
-        ? Array.isArray(domainError.details)
-          ? domainError.details as ProblemError[]
-          : [domainError.details as ProblemError]
-        : undefined,
-  };
-}
+export {
+  AUTHORIZATION_HEADER,
+  BRANCH_ID_HEADER,
+  IDEMPOTENCY_KEY_HEADER,
+  REQUEST_ID_HEADER,
+  newRequestId,
+} from './request-id.js';
+export type { RequestId } from './request-id.js';
 
-export const contractVersion = '0.1.0';
+export {
+  ALL_PERMISSIONS,
+  findPermission,
+  isKnownPermissionCode,
+  permissionModules,
+  permissionRegistry,
+  permissionsForModule,
+} from './permissions.js';
+export type { PermissionDefinition } from './permissions.js';
+
+export * from './platform/index.js';
+
+export const contractVersion = '0.3.0';

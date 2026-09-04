@@ -1,34 +1,28 @@
-import { ValidationPipe } from '@nestjs/common';
+import 'reflect-metadata';
+
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { assertRuntimeEnv, env } from '@erp/config';
 
 import { AppModule } from './app.module.js';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { applyHttpConfiguration, buildOpenApiDocument, registerOpenApi } from './bootstrap.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-  });
+async function bootstrap(): Promise<void> {
+  // PHASE_02 §8: fail fast on a missing runtime variable instead of degrading silently.
+  assertRuntimeEnv();
 
-  app.use(helmet());
-  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
-  app.useGlobalFilters(new AllExceptionsFilter());
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
   app.use(RequestIdMiddleware);
+  applyHttpConfiguration(app);
   app.useLogger(app.get(Logger));
-  app.setGlobalPrefix('/api/v1');
 
-  const config = new DocumentBuilder()
-    .setTitle('ERP API')
-    .setDescription('Backend platform core')
-    .setVersion('1.0')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  registerOpenApi(app, buildOpenApiDocument(app));
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(env.PORT, env.API_HOST);
+
+  console.log(`erp-api listening on http://${env.API_HOST}:${env.PORT} (${env.NODE_ENV})`);
 }
 
-bootstrap();
+void bootstrap();
