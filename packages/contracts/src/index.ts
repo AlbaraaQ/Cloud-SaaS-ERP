@@ -43,4 +43,4 @@ export type { PermissionDefinition } from './permissions.js';
 
 export * from './platform/index.js';
 
-export const contractVersion = '0.3.0';
+export const contractVersion = '0.4.0';

@@ -22,6 +22,8 @@ rules in `docs/MULTI_TENANCY.md`.
 | `configureDatabaseRoles(url?, opts?)`                                                          | grants LOGIN + password from env                                                         |
 | `seedPlatform(url?, opts?)`                                                                    | idempotent permissions / demo tenant / roles / settings seed                             |
 | `rlsProtectedTables`, `createTenantIsolationPolicySql()`, `createParentIsolationPolicySql()`   | RLS helpers                                                                              |
+| `createAuditLogPolicySql()`, `revokeMutationsSql(table, role)`                                 | PHASE_04: nullable-tenant audit policy + append-only hardening                            |
+| `SEQUENCE_SCOPE_NIL_UUID`                                                                      | sentinel used by the `document_sequences` unique index (NULL branch / fiscal year)        |
 | `schema` (`tenants`, `users`, `memberships`, `roles`, …)                                       | Drizzle table objects                                                                    |
 
 ## Why `withTenantTx` and not `withTx`
@@ -34,6 +36,19 @@ another tenant's data.
 
 `refresh_tokens` and the other `DATABASE_DESIGN §1` platform tables have no RLS policy;
 they are reachable through `withTx`.
+
+The PHASE_04 tables (`audit_log`, `files`, `notifications`, `outbox_jobs`,
+`idempotency_keys`, `document_sequences`) are all tenant-scoped and therefore all require
+`withTenantTx` — including from background jobs. That is why `OutboxPublisher` and the
+idempotency sweeper iterate tenants and open one transaction per tenant instead of
+running a single global query: no component of the running system uses BYPASSRLS
+(`PROJECT_CONTRACT §13.4`).
+
+`audit_log` is the one exception to the canonical policy: `tenant_id` is nullable so that
+platform-plane events (a login that never reached a tenant) can be recorded, so its
+`WITH CHECK` uses `IS NOT DISTINCT FROM`. Those rows are write-only for `erp_api` — no
+tenant session can read them back. `UPDATE`, `DELETE` and `TRUNCATE` are revoked from
+`erp_api` entirely.
 
 ## Migrations
 

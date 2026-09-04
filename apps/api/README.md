@@ -39,7 +39,11 @@ src/
 ├── health/            /health/live, /health/ready
 ├── request-context/   AsyncLocalStorage store (traceId, auth, tenant, branchId)
 ├── openapi/           OpenAPI document builder + exporter
-└── modules/platform/  tenancy, identity, auth, RBAC  → see modules/platform/README.md
+├── events/            in-process domain-event bus (global; producers ↔ subscribers)
+├── modules/platform/  tenancy, identity, auth, RBAC  → see modules/platform/README.md
+└── modules/platform-services/
+                       audit, files, notifications, jobs, sequences, idempotency
+                       → see modules/platform-services/README.md
 ```
 
 ## Running
@@ -50,7 +54,15 @@ pnpm --filter @erp/api dev    # tsx watch
 pnpm --filter "@erp/api..." run build   # this app AND its @erp/* dependencies → dist/
 pnpm --filter @erp/api test   # vitest (unit + integration, embedded PostgreSQL fallback)
 pnpm --filter @erp/api test:smoke       # builds, then boots dist/ and probes two routes
+
+WORKER=1 pnpm --filter @erp/api dev     # same image, worker role: queues + outbox, no HTTP
 ```
+
+The worker role (`WORKER=1`) starts BullMQ consumers for `einvoice, notifications,
+reports-export, migration, maintenance`, drains `outbox_jobs` every
+`OUTBOX_POLL_INTERVAL_MS` and logs a health line every `WORKER_HEALTH_LOG_INTERVAL_MS`.
+Without `REDIS_URL` it still starts: the queue driver is inert and outbox rows stay
+`pending` until a queue exists.
 
 `pnpm openapi:export` (repo root) builds the app and writes
 `packages/contracts/openapi.json`; it runs as the last step of `pnpm verify`.

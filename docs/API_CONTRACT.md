@@ -43,10 +43,14 @@ Headers: `Authorization: Bearer`, `X-Branch-Id?`, `Idempotency-Key?`, `X-Request
 | GET/PATCH `/tenant` | read/update own tenant; `GET` needs `platform.tenant.view`, `PATCH` needs `platform.tenant.manage`; bulk `settings` are validated key-by-key | `platform.tenant.view` / `platform.tenant.manage` |
 | GET/POST `/memberships`, GET/PATCH/DELETE `/memberships/{id}` | invite users, branch scope, status. `GET /{id}` added by CR-002 (required by the isolation harness); a foreign id is a 404, not a 403. | `platform.membership.manage` |
 | GET/POST `/roles`, GET/PUT `/roles/{id}`, POST `/roles/{id}/permissions` | RBAC mgmt. `GET /{id}` added by CR-002. System role names are immutable (422). | `platform.role.manage` |
-| GET `/audit-log` | filter entity/actor/date | `platform.audit.view` |
-| POST `/files/presign` `{name,mime,size,entity?}` → `{uploadUrl, fileId}` | `platform.file.upload` |
-| GET `/notifications`, POST `/notifications/{id}/read` | auth |
-| PUT `/settings/{key}` / GET `/settings` | typed tenant settings | `platform.settings.manage` |
+| GET `/audit-log` | filter `entity/entityId/action/actorUserId/from/to`; newest first; read-only (UPDATE/DELETE revoked from the API role) | `platform.audit.view` |
+| POST `/files/presign` `{name,mime,sizeBytes,entity?,entityId?}` → `{fileId, uploadUrl, objectKey, requiredHeaders, expiresAt}` | `platform.file.upload` |
+| GET `/files`, GET `/files/{id}`, POST `/files/{id}/finalize`, GET `/files/{id}/download` | CR-005. `finalize` flips `pending→ready` and validates the attachment target; `download` mints a short-lived app-signed URL | `platform.file.upload` |
+| GET `/files/{id}/content?tenant&expires&signature` | **public by design** — a browser download cannot send a bearer token; the HMAC signature is the capability and carries the tenant. 302 to object storage, 401 on a bad/expired signature | none |
+| GET `/notifications`, GET `/notifications/{id}`, POST `/notifications/{id}/read` | membership inbox (never user-wide); `meta.unread` on the list; mark-read is idempotent | `platform.notification.view` |
+| POST `/notifications` `{membershipId?,type,payload?}` | CR-005; unknown membership in this tenant → 422 | `platform.notification.manage` |
+| GET `/jobs/outbox`, GET `/jobs/health` | CR-005; read-only view of the transactional outbox and the queue driver | `platform.job.view` |
+| PUT `/settings/{key}` / GET `/settings` | typed tenant settings; an unknown key is **400 `VALIDATION_FAILED`** (CR-004), a bad value is 400 | `platform.settings.manage` |
 
 ## 3. Organization
 

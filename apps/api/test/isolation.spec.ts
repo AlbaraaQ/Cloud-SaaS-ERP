@@ -164,6 +164,13 @@ describe('tenant isolation (TESTING_STRATEGY §6)', () => {
       'role_permissions',
       'membership_roles',
       'tenant_settings',
+      // PHASE_04 — platform services.
+      'audit_log',
+      'files',
+      'notifications',
+      'outbox_jobs',
+      'idempotency_keys',
+      'document_sequences',
     ]);
   });
 

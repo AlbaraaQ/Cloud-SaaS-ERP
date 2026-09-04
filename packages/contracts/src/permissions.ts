@@ -25,8 +25,13 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('platform.membership.manage', 'Invite, update and remove tenant memberships.'),
   perm('platform.role.manage', 'Create and maintain roles and their permission sets.'),
   perm('platform.settings.manage', 'Read and write individual typed tenant settings.'),
-  perm('platform.audit.view', 'Read the tenant audit log (PHASE_04 endpoint).'),
-  perm('platform.file.upload', 'Request pre-signed uploads and attach files (PHASE_04 endpoint).'),
+  perm('platform.audit.view', 'Read the tenant audit log.'),
+  perm('platform.file.upload', 'Request pre-signed uploads, attach and download files.'),
+
+  // platform services (PHASE_04)
+  perm('platform.notification.view', 'Read own in-app notifications and mark them read.'),
+  perm('platform.notification.manage', 'Create notifications for other memberships of the tenant.'),
+  perm('platform.job.view', 'Read the transactional outbox and background-queue health.'),
 
   // organization (PHASE_05)
   perm('organization.branch.view', 'List and read branches.'),

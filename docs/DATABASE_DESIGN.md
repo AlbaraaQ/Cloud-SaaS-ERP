@@ -59,7 +59,24 @@ DB: revoke UPDATE/DELETE from api role.
 **notifications** — `tenant_id`, `membership_id`, `type`, `payload jsonb`, `read_at NULL`.
 **outbox_jobs** — `tenant_id`, `queue`, `type`, `payload jsonb`, `status`, `attempts DEF 0`,
 `run_at`, `processed_at NULL`. (Feeds BullMQ; einvoice/notifications/exports.)
-**idempotency_keys** — PK(tenant_id, key), `endpoint`, `response jsonb`, `created_at`, expires 24h.
+**idempotency_keys** — PK(tenant_id, key), `endpoint`, `response`, `created_at`, expires 24h.
+
+> PHASE_04 implementation notes (additive; no frozen column was removed):
+> - `files` also carries `status ('pending'|'ready'|'deleted')` — a presigned row exists
+>   before the bytes do, so "reserved" and "usable" must be distinguishable — plus the
+>   `baseAuditColumns` used by every other table.
+> - `outbox_jobs` also carries `last_error text` (the dead-letter reason) and
+>   `updated_at`; `status` is `pending|published|dead`.
+> - `idempotency_keys.response` is **text, not jsonb**: `API_CONTRACT §0` promises a
+>   byte-identical replay and jsonb normalises key order. It also carries
+>   `request_hash` (same key + different payload → 409 instead of a wrong replay),
+>   `status_code`, `completed_at` and `expires_at`.
+> - `document_sequences` uses a surrogate `id` plus a unique index on
+>   `(tenant_id, coalesce(branch_id, nil-uuid), doc_type, coalesce(fiscal_year_id, nil-uuid))`,
+>   because a PK containing NULLs cannot enforce "one row per scope" in PostgreSQL.
+> - All six tables carry `ENABLE`+`FORCE` RLS. `audit_log` uses a variant policy
+>   (`WITH CHECK (tenant_id IS NOT DISTINCT FROM <guc>)`) so platform-plane rows with a
+>   NULL tenant can be written but never read back through a tenant session.
 
 ## 5. Organization
 

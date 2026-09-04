@@ -5,6 +5,7 @@
 | PHASE_01 | 2026-08-23 | COMPLETE | Repository and engineering standards bootstrap. Re-audited on 2026-09-04: the phase was **present but over-claimed** — `.prettierrc.json`, `.prettierignore`, `.lintstagedrc.json`, `.gitleaksignore`, `.github/workflows/ci.yml` and every `.env.example` were missing from the commit and have since been created. |
 | PHASE_02 | 2026-09-04 | COMPLETE | Backend platform core (NestJS bootstrap, request pipeline, contracts/config/database packages, health probes). Originally reported `IN_PROGRESS` on 2026-09-01; the phase **failed its own acceptance bar** (`npm run verify` never reached lint/unit/integration/build) and was completed during the Phase 03 pass. See `PHASE_02_IMPLEMENTATION_REPORT.md`. |
 | PHASE_03 | 2026-09-04 | COMPLETE | Tenancy, Identity & Access: 9-table platform/tenancy schema with reversible idempotent migration, RLS on all tenant-scoped tables, `api`/`migrator` database roles, auth (login/refresh/logout/change-password), RBAC, typed tenant settings, guard pipeline, isolation harness. `pnpm run verify` exits 0. See `PHASE_03_IMPLEMENTATION_REPORT.md`. |
+| PHASE_04 | 2026-09-04 | COMPLETE | Platform Services: audit trail (interceptor + service API, append-only at the privilege level), files (presign/finalize/app-signed download, MIME+size allow-lists, orphan GC), notifications (membership inbox + settings-updated demo subscription), BullMQ queues with a transactional outbox and a `WORKER=1` bootstrap, `Sequences.next` (64-parallel, no duplicates), DB-backed idempotency keys replacing the Phase-02 in-memory map. 6 new tables, all under FORCE RLS. `pnpm run verify` exits 0 (148 tests). See `PHASE_04_IMPLEMENTATION_REPORT.md`. |
 
 ## Phase-01 Notes
 
@@ -52,6 +53,41 @@
 - Toolchain: workspace packages now emit `dist/` and are consumed as compiled JavaScript at
   runtime (tests still resolve them to TypeScript source through vitest aliases). This is
   what makes `pnpm run build`, `openapi:export` and the entry-point smoke check pass.
+
+## Phase-04 Notes
+
+- Schema: `audit_log, files, notifications, outbox_jobs, idempotency_keys,
+  document_sequences` applied by `packages/database/migrations/0001_platform_services.sql`
+  with a reversible counterpart in `migrations/down/`. All six carry `ENABLE`+`FORCE`
+  RLS; `audit_log` additionally has `UPDATE, DELETE, TRUNCATE` revoked from `erp_api`,
+  so immutability is a privilege, not a convention (proved in `test/audit.spec.ts` by
+  asserting SQLSTATE `42501`).
+- Audit: a global `AuditInterceptor` records every successful mutating request
+  (entity/action/actor/after/meta) and auth events including failures; a service that
+  knows the previous state writes the row itself inside its transaction — with a real
+  `before` — and marks the request audited so exactly one row is produced. Sensitive
+  keys are redacted structurally at any depth before the row is written.
+- Files: `POST /files/presign` → client PUT → `POST /files/{id}/finalize` →
+  `GET /files/{id}/download` → `GET /files/{id}/content` (302). SigV4 is implemented
+  in-repo and verified against the AWS reference vector; object keys are
+  `tenants/{tid}/{yyyy}/{mm}/{fileId}/{name}`. `VirusScanner` and the SMTP mailer are
+  ports with no-op/console adapters, per the phase's out-of-scope list.
+- Jobs: queues `einvoice, notifications, reports-export, migration, maintenance`; nothing
+  publishes from inside a business transaction — services write `outbox_jobs` rows and
+  `OutboxPublisher` drains them per tenant (`FOR UPDATE SKIP LOCKED`, exponential backoff
+  capped at 1 h, dead-letter at `OUTBOX_MAX_ATTEMPTS`). No component uses BYPASSRLS.
+- `WORKER=1` boots the same image as an application context with no HTTP listener; it
+  starts cleanly without Redis (inert driver, outbox rows simply stay `pending`).
+- Idempotency: `idempotency_keys` replaces the Phase-02 in-memory map. The stored
+  response is **text**, so a replay is byte-identical; a reused key with a different
+  payload is a 409 `IDEMPOTENCY_REPLAY`; a failed handler releases the claim.
+- Deviations recorded as CR-004 (unknown setting key on write: 404 → 400) and CR-005
+  (additional file/notification/job endpoints + `platform.notification.view|manage`,
+  `platform.job.view`).
+- Known gap: no Docker in the build environment, so the presign→upload→finalize→download
+  flow was verified against an in-memory storage fake rather than live MinIO, and the
+  BullMQ hop was verified against a recording queue fake. Everything that touches
+  PostgreSQL — including all RLS and concurrency proofs — ran against a real server.
 
 ## Conventions
 
