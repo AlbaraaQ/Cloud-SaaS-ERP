@@ -1,0 +1,16 @@
+{
+  "name": "@erp/config",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --config ../../eslint.config.mjs",
+    "build": "echo 'Config package build is not required in Phase 01.'",
+    "test": "echo 'Config package tests are not required in Phase 01.'"
+  }
+}

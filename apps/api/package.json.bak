@@ -1,0 +1,13 @@
+{
+  "name": "@erp/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'NestJS app is intentionally not created in Phase 01; this is a placeholder.'",
+    "build": "echo 'NestJS build is deferred until Phase 02; placeholder build passes.'",
+    "lint": "echo 'API lint is deferred until Phase 02; placeholder lint passes.'",
+    "test": "echo 'API tests are deferred until Phase 02; placeholder test passes.'",
+    "test:smoke": "node --experimental-strip-types ./scripts/smoke-check.mjs"
+  }
+}

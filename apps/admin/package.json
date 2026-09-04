@@ -1,0 +1,11 @@
+{
+  "name": "@erp/admin",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "echo 'Admin app is deferred to Phase 17.'",
+    "build": "echo 'Admin build is deferred to Phase 17.'",
+    "lint": "echo 'Admin lint is deferred to Phase 17.'",
+    "test": "echo 'Admin tests are deferred to Phase 17.'"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@erp/*": ["packages/*/src/index.ts"],
+      "@erp/config": ["packages/config/src/index.ts"],
+      "@erp/testing": ["packages/testing/src/index.ts"],
+      "@erp/contracts": ["packages/contracts/src/index.ts"],
+      "@erp/database": ["packages/database/src/index.ts"]
+    }
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.js",
+    "apps/**/*.mjs",
+    "packages/**/*.ts",
+    "packages/**/*.js",
+    "packages/**/*.mjs",
+    "scripts/**/*.mjs"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "**/.next"
+  ]
+}

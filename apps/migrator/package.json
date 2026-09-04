@@ -1,0 +1,11 @@
+{
+  "name": "@erp/migrator",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "echo 'Migrator app is deferred to Phase 15.'",
+    "build": "echo 'Migrator build is deferred to Phase 15.'",
+    "lint": "echo 'Migrator lint is deferred to Phase 15.'",
+    "test": "echo 'Migrator tests are deferred to Phase 15.'"
+  }
+}

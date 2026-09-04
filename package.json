@@ -1,0 +1,41 @@
+{
+  "name": "erp-saas",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typegen": "node ./scripts/typegen.mjs",
+    "verify": "pnpm run typegen && pnpm exec tsc --project tsconfig.base.json --noEmit && pnpm -r run lint && pnpm --dir apps/api run test:smoke && pnpm -r run test && pnpm run build",
+    "db:generate": "echo 'Drizzle generation is deferred until Phase 02; the schema is intentionally not created in Phase 01.'",
+    "db:migrate": "echo 'Database migration execution is deferred until Phase 02; the schema is intentionally not created in Phase 01.'",
+    "prepare": "echo 'Git hooks are scaffolded in CI; local hooks are intentionally not enforced in this bootstrap phase.'"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.1.0",
+    "@commitlint/config-conventional": "^19.1.0",
+    "@eslint/js": "^9.16.0",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "eslint": "^9.16.0",
+    "eslint-plugin-boundaries": "^5.0.0",
+    "eslint-plugin-import": "^2.1.0",
+    "globals": "^15.14.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.3.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.5",
+    "zod": "^3.24.0"
+  }
+}

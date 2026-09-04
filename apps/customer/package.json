@@ -1,0 +1,11 @@
+{
+  "name": "@erp/customer",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "echo 'Customer app is deferred to Phase 18.'",
+    "build": "echo 'Customer build is deferred to Phase 18.'",
+    "lint": "echo 'Customer lint is deferred to Phase 18.'",
+    "test": "echo 'Customer tests are deferred to Phase 18.'"
+  }
+}
