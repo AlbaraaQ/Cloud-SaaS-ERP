@@ -29,7 +29,7 @@ Headers: `Authorization: Bearer`, `X-Branch-Id?`, `Idempotency-Key?`, `X-Request
 
 | Method & Path | Body → Response | Perm |
 |---|---|---|
-| POST `/auth/login` | `{email,password,tenantCode, mfaCode?}` → `{data:{accessToken, refreshToken, user, memberships}}` | public |
+| POST `/auth/login` | `{email,password,tenantCode, mfaCode?}` → `{data:{accessToken, refreshToken, user, memberships}}` — `memberships` holds **only** the membership in the authenticated tenant (CR-003: returning the others would enumerate tenants). Wrong password, unknown e-mail and unknown tenant all return the same opaque 401. | public |
 | POST `/auth/refresh` | `{refreshToken}` → rotated pair | public |
 | POST `/auth/logout` | `{}` → 204 | auth |
 | GET `/me` | → user+membership+`permissions[]`+branch scope | auth |
@@ -40,9 +40,9 @@ Headers: `Authorization: Bearer`, `X-Branch-Id?`, `Idempotency-Key?`, `X-Request
 
 | Path | Notes | Perm |
 |---|---|---|
-| GET/PATCH `/tenant` | read/update own tenant settings (typed keys) | `platform.tenant.manage` |
-| GET/POST `/memberships`, PATCH/DELETE `/memberships/{id}` | invite users, branch scope, status | `platform.membership.manage` |
-| GET/POST `/roles`, PUT `/roles/{id}`, POST `/roles/{id}/permissions` | RBAC mgmt | `platform.role.manage` |
+| GET/PATCH `/tenant` | read/update own tenant; `GET` needs `platform.tenant.view`, `PATCH` needs `platform.tenant.manage`; bulk `settings` are validated key-by-key | `platform.tenant.view` / `platform.tenant.manage` |
+| GET/POST `/memberships`, GET/PATCH/DELETE `/memberships/{id}` | invite users, branch scope, status. `GET /{id}` added by CR-002 (required by the isolation harness); a foreign id is a 404, not a 403. | `platform.membership.manage` |
+| GET/POST `/roles`, GET/PUT `/roles/{id}`, POST `/roles/{id}/permissions` | RBAC mgmt. `GET /{id}` added by CR-002. System role names are immutable (422). | `platform.role.manage` |
 | GET `/audit-log` | filter entity/actor/date | `platform.audit.view` |
 | POST `/files/presign` `{name,mime,size,entity?}` → `{uploadUrl, fileId}` | `platform.file.upload` |
 | GET `/notifications`, POST `/notifications/{id}/read` | auth |
