@@ -157,7 +157,11 @@ Acceptance criteria (`PHASE_04 §12`), evidence by test:
 `docs/API_CONTRACT.md §2`, `docs/DATABASE_DESIGN.md §4`,
 `docs/SECURITY_ARCHITECTURE.md §5`, `apps/api/README.md`,
 `apps/api/src/modules/platform-services/README.md` (new),
-`packages/database/README.md`, `apps/api/.env.example`.
+`packages/database/README.md` (sequences usage, per §10),
+`docs/ADMIN_PANEL_MASTER_REQUIREMENTS.md §1` (backend-readiness tick per §10: the audit
+explorer, files manager, notifications centre and feature flags are backed by endpoints;
+**sequences/numbering admin is service-only** — it needs read/update endpoints from
+whichever phase builds the screen), `apps/api/.env.example`.
 
 **CRs opened** — CR-004, CR-005.
 
@@ -170,6 +174,15 @@ existing `.env` keeps working: `S3_REGION`, `S3_FORCE_PATH_STYLE`,
 `IDEMPOTENCY_TTL_HOURS`, `MAIL_TRANSPORT`, `MAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`,
 `FILE_URL_SIGNING_SECRET`. New runtime dependency: `bullmq@^5.34` (loaded lazily).
 `pnpm db:migrate` must be re-run for `0001_platform_services.sql`.
+
+**Carried into later phases (explicit hand-offs)**
+
+- `document_sequences.branch_id` / `fiscal_year_id` carry **no FK**: `branches` arrives in
+  PHASE_05 and the fiscal calendar in PHASE_07. Both migrations must add the constraint —
+  the omission is commented in `0001_platform_services.sql` and in the Drizzle schema.
+- `FileAttachmentRegistry` is empty, so every `entity` on a presign/finalize is a 422
+  today. PHASE_05 registers `company_profiles` (logo) as the first validator.
+- Sequences have no HTTP surface; PHASE_05 consumes them through the service.
 
 **Follow-ups**
 

@@ -50,6 +50,24 @@ platform-plane events (a login that never reached a tenant) can be recorded, so 
 tenant session can read them back. `UPDATE`, `DELETE` and `TRUNCATE` are revoked from
 `erp_api` entirely.
 
+## Allocating document numbers
+
+`document_sequences` is written **only** through `SequencesService` in
+`apps/api/src/modules/platform-services` — never with a hand-rolled `SELECT max()+1`,
+which cannot survive two concurrent callers. Pass the business transaction so the number
+and the document commit or roll back together:
+
+```ts
+await withTenantTx(db, tenantId, async (tx) => {
+  const number = await sequences.next({ tenantId, docType: 'sales_invoice', branchId }, tx);
+  await tx.insert(salesInvoices).values({ /* … */ number: number.display });
+});
+```
+
+The scope is `(tenant_id, branch_id, doc_type, fiscal_year_id)`; NULL branch/fiscal year
+means "tenant-wide"/"does not restart yearly", and the unique index coalesces those NULLs
+to `SEQUENCE_SCOPE_NIL_UUID` so one scope really is one row.
+
 ## Migrations
 
 ```bash

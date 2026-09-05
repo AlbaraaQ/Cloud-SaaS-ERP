@@ -32,6 +32,21 @@ Feature flags (vertical packs).
 Tables: users(email,status,last_login), audit(time,actor,entity,action,diff).
 Perms: platform.*. Actions: invite/reset-password/suspend/resend.
 
+> Backend readiness after PHASE_04 (the screens themselves land in PHASE_17):
+> - Audit log explorer — `GET /audit-log` with `entity/entityId/action/actorUserId/from/to`
+>   filters; each row already carries `before`/`after`, so the diff viewer needs no extra
+>   endpoint.
+> - Files manager — `GET /files` (filter `status`/`entity`, search by name),
+>   `GET /files/{id}`, presign/finalize, and a short-lived signed download link.
+> - Notifications center — `GET /notifications` (+ `meta.unread`), mark-read,
+>   `POST /notifications`.
+> - Sequences/numbering admin — **service only** (`SequencesService.peek/configure`); no
+>   HTTP surface yet, because PHASE_04 §5.6 scopes sequences to the allocation service.
+>   The screen needs read/update endpoints for `document_sequences`; whichever phase
+>   builds it must add them (prefix/padding are editable, `current_value` must not be
+>   rewindable).
+> - Feature flags — already covered by the typed settings editor (`feature.*` keys).
+
 ## 2. Organization module
 
 Screens: Company profile form (+ ZATCA national address sub-form, logo upload to S3) ·
