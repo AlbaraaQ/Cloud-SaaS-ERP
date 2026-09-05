@@ -10,9 +10,13 @@ import {
   tenantSettingsRegistry,
   type TenantSettingsMap,
 } from '@erp/config';
+import { and, eq as eqColumn } from 'drizzle-orm';
 import { tenantSettings, withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { DomainEventsService, domainEventTypes } from '../../../events/domain-events.service.js';
+import { getRequestContext, markRequestAudited } from '../../../request-context/request-context.js';
+import { AuditService } from '../../platform-services/audit/audit.service.js';
 
 export type SettingsListResponse = {
   settings: TenantSettingsMap;
@@ -28,10 +32,22 @@ export type SettingsListResponse = {
  * `GET /settings`, `PUT /settings/{key}` — API_CONTRACT §2, `platform.settings.manage`.
  * Every write is validated against the typed registry in `packages/config`
  * (MULTI_TENANCY §5); an unknown key or a value of the wrong shape is a 400.
+ *
+ * PHASE_04 adds two things to the write path:
+ *
+ * 1. **Audit with a real `before`.** The interceptor can only see the response, so the
+ *    service writes the row itself — old value, new value, same transaction as the write
+ *    — and marks the request audited so the interceptor stands down.
+ * 2. **A domain event** after the transaction commits, which the notifications
+ *    subscriber turns into an inbox entry plus an outbox e-mail job (PHASE_04 §4).
  */
 @Injectable()
 export class SettingsService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly audit: AuditService,
+    private readonly events: DomainEventsService,
+  ) {}
 
   async list(tenantId: string): Promise<SettingsListResponse> {
     const stored = await withTenantTx(this.database.db, tenantId, async (tx) => {
@@ -59,7 +75,10 @@ export class SettingsService {
     value: unknown,
   ): Promise<{ key: string; value: string | boolean | number | null }> {
     if (!isTenantSettingKey(key)) {
-      throw new DomainError(errorCodes.NOT_FOUND, `Unknown tenant setting '${key}'`, 404, {
+      // CR-004: was 404 in PHASE_02. PHASE_04 §5.8 and API_CONTRACT §2 require a 400 —
+      // the key is a *value in the request*, not a missing resource, and answering 404
+      // made a typo indistinguishable from a route that does not exist.
+      throw new DomainError(errorCodes.VALIDATION_FAILED, `Unknown tenant setting '${key}'`, 400, {
         field: 'key',
       });
     }
@@ -79,7 +98,15 @@ export class SettingsService {
       throw error;
     }
 
+    const context = getRequestContext();
+
     await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [existing] = await tx
+        .select({ value: tenantSettings.value })
+        .from(tenantSettings)
+        .where(and(eqColumn(tenantSettings.tenantId, tenantId), eqColumn(tenantSettings.key, key)))
+        .limit(1);
+
       await tx
         .insert(tenantSettings)
         .values({ tenantId, key, value: parsed, updatedAt: new Date() })
@@ -87,6 +114,29 @@ export class SettingsService {
           target: [tenantSettings.tenantId, tenantSettings.key],
           set: { value: parsed, updatedAt: new Date() },
         });
+
+      await this.audit.recordInTx(tx, {
+        tenantId,
+        actorUserId: context.auth?.userId ?? null,
+        membershipId: context.auth?.membershipId ?? null,
+        action: 'update',
+        entity: 'settings',
+        entityId: key,
+        before: { key, value: existing ? (existing.value as unknown) : null },
+        after: { key, value: parsed },
+        meta: { method: 'PUT', path: `settings/${key}`, status: 200, traceId: context.traceId ?? null },
+      });
+    });
+
+    markRequestAudited();
+
+    // After commit: subscribers must never see a state that could still roll back.
+    await this.events.emit({
+      type: domainEventTypes.SETTINGS_UPDATED,
+      tenantId,
+      membershipId: context.auth?.membershipId ?? null,
+      actorUserId: context.auth?.userId ?? null,
+      payload: { key, value: parsed },
     });
 
     return { key, value: parsed };

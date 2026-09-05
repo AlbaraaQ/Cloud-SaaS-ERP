@@ -54,6 +54,34 @@ export function createParentIsolationPolicySql(
 }
 
 /**
+ * `audit_log` policy (PHASE_04 §5.1). Reads are strictly tenant-scoped, but writes also
+ * have to accept the **platform** rows whose `tenant_id` is NULL: a failed login happens
+ * before any tenant context exists (DATABASE_DESIGN §4, "tenant_id NULL (platform
+ * events)"). `IS NOT DISTINCT FROM` expresses exactly that — with the GUC unset only a
+ * NULL-tenant row may be written, with the GUC set only that tenant's rows may be.
+ * Platform rows are therefore write-only for the API role: nothing can read them back
+ * through a tenant session.
+ */
+export function createAuditLogPolicySql(table = 'audit_log', policyName = 'tenant_isolation'): string {
+  const guc = `nullif(current_setting('${TENANT_GUC}', true), '')::uuid`;
+  return [
+    `DROP POLICY IF EXISTS ${policyName} ON ${table};`,
+    `CREATE POLICY ${policyName} ON ${table}`,
+    `  USING (tenant_id = ${guc})`,
+    `  WITH CHECK (tenant_id IS NOT DISTINCT FROM ${guc});`,
+  ].join('\n');
+}
+
+/**
+ * Append-only hardening (SECURITY_ARCHITECTURE §9: "audit log … immutable (no update/
+ * delete grants)"). Enforced by privileges rather than a trigger so that even a SQL
+ * injection through the API role cannot rewrite history.
+ */
+export function revokeMutationsSql(table: string, role: string): string {
+  return `REVOKE UPDATE, DELETE, TRUNCATE ON ${table} FROM ${role};`;
+}
+
+/**
  * Binds the tenant to the current transaction (MULTI_TENANCY §3.3).
  * `is_local = true` → the setting disappears at COMMIT/ROLLBACK, so a pooled connection
  * can never leak a tenant into the next request.
@@ -86,6 +114,24 @@ export const rlsProtectedTables = [
   'role_permissions',
   'membership_roles',
   'tenant_settings',
+  // PHASE_04 — platform services (DATABASE_DESIGN §3–§4).
+  'audit_log',
+  'files',
+  'notifications',
+  'outbox_jobs',
+  'idempotency_keys',
+  'document_sequences',
+  // PHASE_05 — organization (DATABASE_DESIGN §5 + §3 currencies).
+  'company_profiles',
+  'branches',
+  'warehouses',
+  'cash_locations',
+  'cash_location_balances',
+  'currencies',
+  'fx_rates',
+  'price_lists',
+  'price_list_items',
+  'branch_posting_profiles',
 ] as const;
 
 export type QueryRowsOf<T> = QueryRows<T>;

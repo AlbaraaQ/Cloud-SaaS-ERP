@@ -43,8 +43,8 @@ separate Nest module marked `PLATFORM-ONLY` with its own audit channel & reason 
 
 | Module | view | manage | Sensitive extras |
 |---|---|---|---|
-| platform | tenant.view | tenant/membership/role/settings.manage | audit.view, file.upload |
-| organization | org.view | branches/warehouses/cash-locations/currencies.manage | postingprofile.manage |
+| platform | tenant.view, notification.view | tenant/membership/role/settings.manage, notification.manage | audit.view, file.upload, job.view |
+| organization | branch/warehouse/cashlocation/currency/priceList/companyprofile/postingprofile.view | branch/warehouse/cashlocation/currency/priceList.manage | companyprofile.manage, postingprofile.manage |
 | catalog | catalog.view | items/categories/units/taxgroups.manage | price.manage, import.execute |
 | accounting | accounting.view(+reports.view) | account/costcenter/journal.create | journal.post/reverse, period.close/reopen, opening.manage |
 | parties | parties.view | parties.manage | allocations.manage, creditlimit.override |

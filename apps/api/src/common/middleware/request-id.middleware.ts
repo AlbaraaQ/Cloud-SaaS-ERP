@@ -25,6 +25,9 @@ function normaliseRequestId(header: unknown): string {
  *   (`packages/contracts/src/request-id.ts`, PROJECT_CONTRACT §2).
  * - The id is echoed back on the response and published on the `AsyncLocalStorage`
  *   store, which is what `AllExceptionsFilter` reports as RFC 9457 `traceId`.
+ * - Client ip and user agent are captured here too: PHASE_04 writes them into
+ *   `audit_log.meta` (SECURITY_ARCHITECTURE §10) and nothing further down the pipeline
+ *   should have to reach for the raw request again.
  */
 export function RequestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
   const traceId = normaliseRequestId(req.headers['x-request-id']) || newRequestId();
@@ -32,5 +35,14 @@ export function RequestIdMiddleware(req: Request, res: Response, next: NextFunct
   req.headers['x-request-id'] = traceId;
   res.setHeader('x-request-id', traceId);
 
-  requestContextStorage.run({ traceId, startTime: Date.now() }, () => next());
+  const userAgent = req.headers['user-agent'];
+  requestContextStorage.run(
+    {
+      traceId,
+      startTime: Date.now(),
+      clientIp: req.ip ?? req.socket?.remoteAddress ?? undefined,
+      userAgent: typeof userAgent === 'string' ? userAgent.slice(0, 256) : undefined,
+    },
+    () => next(),
+  );
 }

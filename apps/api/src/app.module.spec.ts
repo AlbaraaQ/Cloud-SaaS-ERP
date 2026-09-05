@@ -5,6 +5,8 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor.js';
+import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor.js';
 import {
   AuthGuard,
   BranchScopeGuard,
@@ -12,6 +14,7 @@ import {
   RateLimitGuard,
   TenantGuard,
 } from './modules/platform/index.js';
+import { AuditInterceptor } from './modules/platform-services/index.js';
 
 type ProviderEntry = { provide: string | symbol; useClass?: unknown };
 
@@ -37,7 +40,12 @@ describe('AppModule', () => {
     ]);
 
     expect(orderedTokens(providers, APP_FILTER)).toEqual([AllExceptionsFilter]);
-    expect(orderedTokens(providers, APP_INTERCEPTOR)).toHaveLength(2);
+    // RequestContext → Idempotency → Audit (PHASE_04 §5.2/§5.7).
+    expect(orderedTokens(providers, APP_INTERCEPTOR)).toEqual([
+      RequestContextInterceptor,
+      IdempotencyInterceptor,
+      AuditInterceptor,
+    ]);
   });
 
   it('compiles the module graph', async () => {

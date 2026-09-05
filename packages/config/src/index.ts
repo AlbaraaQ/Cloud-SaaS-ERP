@@ -1,5 +1,13 @@
-export { env, assertRuntimeEnv, normalisePem, REDACTED_LOG_PATHS } from './env.js';
-export type { AppEnv } from './env.js';
+export {
+  env,
+  assertRuntimeEnv,
+  assertObjectStorageEnv,
+  normalisePem,
+  objectStorageGaps,
+  readObjectStorageEnv,
+  REDACTED_LOG_PATHS,
+} from './env.js';
+export type { AppEnv, ObjectStorageEnv } from './env.js';
 export {
   tenantSettingsRegistry,
   tenantSettingKeys,

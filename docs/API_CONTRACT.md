@@ -17,7 +17,8 @@
 
 Stable error codes (seed registry, extend only): `UNAUTHENTICATED, FORBIDDEN,
 TENANT_SUSPENDED, TENANT_CONTEXT_MISSING, VALIDATION_FAILED, FILTER_NOT_ALLOWED,
-NOT_FOUND, VERSION_CONFLICT, IDEMPOTENCY_REPLAY, ACCOUNT_NOT_POSTABLE, JOURNAL_UNBALANCED,
+NOT_FOUND, VERSION_CONFLICT, IDEMPOTENCY_REPLAY, ACCOUNT_NOT_POSTABLE,
+ACCOUNT_PROFILE_MISSING, JOURNAL_UNBALANCED,
 ACCOUNTING_PERIOD_CLOSED, ACCOUNTING_PERIOD_LOCKED_MODULE, DOCUMENT_ALREADY_POSTED,
 DOCUMENT_NOT_DRAFT, PARTY_CREDIT_LIMIT_EXCEEDED, STOCK_INSUFFICIENT, SEQUENCE_EXHAUSTED,
 EINVOICE_REJECTED, MIGRATION_CONFLICT, RATE_LIMITED, INTERNAL`.
@@ -43,16 +44,40 @@ Headers: `Authorization: Bearer`, `X-Branch-Id?`, `Idempotency-Key?`, `X-Request
 | GET/PATCH `/tenant` | read/update own tenant; `GET` needs `platform.tenant.view`, `PATCH` needs `platform.tenant.manage`; bulk `settings` are validated key-by-key | `platform.tenant.view` / `platform.tenant.manage` |
 | GET/POST `/memberships`, GET/PATCH/DELETE `/memberships/{id}` | invite users, branch scope, status. `GET /{id}` added by CR-002 (required by the isolation harness); a foreign id is a 404, not a 403. | `platform.membership.manage` |
 | GET/POST `/roles`, GET/PUT `/roles/{id}`, POST `/roles/{id}/permissions` | RBAC mgmt. `GET /{id}` added by CR-002. System role names are immutable (422). | `platform.role.manage` |
-| GET `/audit-log` | filter entity/actor/date | `platform.audit.view` |
-| POST `/files/presign` `{name,mime,size,entity?}` → `{uploadUrl, fileId}` | `platform.file.upload` |
-| GET `/notifications`, POST `/notifications/{id}/read` | auth |
-| PUT `/settings/{key}` / GET `/settings` | typed tenant settings | `platform.settings.manage` |
+| GET `/audit-log` | filter `entity/entityId/action/actorUserId/from/to`; newest first; read-only (UPDATE/DELETE revoked from the API role) | `platform.audit.view` |
+| POST `/files/presign` `{name,mime,sizeBytes,entity?,entityId?}` → `{fileId, uploadUrl, objectKey, requiredHeaders, expiresAt}` | `platform.file.upload` |
+| GET `/files`, GET `/files/{id}`, POST `/files/{id}/finalize`, GET `/files/{id}/download` | CR-005. `finalize` flips `pending→ready` and validates the attachment target; `download` mints a short-lived app-signed URL | `platform.file.upload` |
+| GET `/files/{id}/content?tenant&expires&signature` | **public by design** — a browser download cannot send a bearer token; the HMAC signature is the capability and carries the tenant. 302 to object storage, 401 on a bad/expired signature | none |
+| GET `/notifications`, GET `/notifications/{id}`, POST `/notifications/{id}/read` | membership inbox (never user-wide); `meta.unread` on the list; mark-read is idempotent | `platform.notification.view` |
+| POST `/notifications` `{membershipId?,type,payload?}` | CR-005; unknown membership in this tenant → 422 | `platform.notification.manage` |
+| GET `/jobs/outbox`, GET `/jobs/health` | CR-005; read-only view of the transactional outbox and the queue driver | `platform.job.view` |
+| PUT `/settings/{key}` / GET `/settings` | typed tenant settings; an unknown key is **400 `VALIDATION_FAILED`** (CR-004), a bad value is 400 | `platform.settings.manage` |
 
 ## 3. Organization
 
-`GET/POST/PATCH /branches` · `/warehouses` · `/cash-locations` · `/currencies` ·
-`/fx-rates` · `/price-lists(+items)` · `/company-profile` (GET/PUT) ·
-`/branch-posting-profiles`. Perms: `organization.{entity}.manage|view`.
+`GET/POST/PATCH/DELETE /branches` · `/warehouses` · `/cash-locations` · `/price-lists`
+(+ `/{id}/items`) · `GET/POST/PATCH /currencies` (keyed by ISO code; deactivated, never
+deleted) · `GET/POST/PATCH/DELETE /fx-rates` · `GET/POST/DELETE
+/branch-posting-profiles` (POST upserts on `(branchId, docType)`) ·
+`/company-profile` (GET/PUT, 1:1 per tenant).
+Perms: `organization.{entity}.manage|view`.
+
+`DELETE` is a **soft delete** on master data and a hard delete on `fx_rates`,
+`price_list_items` and `branch_posting_profiles` (CR-008). Activate/default toggles are
+PATCH fields (`isActive`, `isDefault`), not routes; every PATCH/PUT accepts an optional
+`version` and answers `409 VERSION_CONFLICT` when it is stale.
+
+Read-only resolution surfaces (CR-008):
+
+| Path | Answer |
+|---|---|
+| `GET /cash-locations/{id}/balances` | one row per currency; `0` until PHASE_12 writes them |
+| `GET /fx-rates/resolve?from&to&date` | `{rate, source: identity\|direct\|inverse\|triangulated, effectiveFrom, via}` |
+| `GET /branch-posting-profiles/resolve?branchId&docType` | the winning mapping + which rung matched; `422 ACCOUNT_PROFILE_MISSING` when nothing does |
+
+Lists honour the membership's `branch_scope`; a row outside it is `404`, never `403`.
+Bank IBANs are masked in list responses and returned in full only on the detail read.
+
 
 ## 4. Catalog
 
