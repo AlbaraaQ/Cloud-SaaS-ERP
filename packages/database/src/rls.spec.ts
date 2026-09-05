@@ -39,7 +39,7 @@ describe('RLS SQL builders (MULTI_TENANCY §3.5)', () => {
     expect(sql).toContain('parent.tenant_id = nullif(');
   });
 
-  it('lists exactly the tenant-scoped tables created by PHASE_03 and PHASE_04', () => {
+  it('lists exactly the tenant-scoped tables created by PHASE_03 through PHASE_05', () => {
     expect([...rlsProtectedTables]).toEqual([
       'memberships',
       'roles',
@@ -52,6 +52,17 @@ describe('RLS SQL builders (MULTI_TENANCY §3.5)', () => {
       'outbox_jobs',
       'idempotency_keys',
       'document_sequences',
+      // PHASE_05 — organization structure (DATABASE_DESIGN §5 + §3 currencies).
+      'company_profiles',
+      'branches',
+      'warehouses',
+      'cash_locations',
+      'cash_location_balances',
+      'currencies',
+      'fx_rates',
+      'price_lists',
+      'price_list_items',
+      'branch_posting_profiles',
     ]);
   });
 

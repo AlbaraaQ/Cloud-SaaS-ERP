@@ -46,6 +46,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('organization.priceList.manage', 'Create and update price lists.'),
   perm('organization.postingprofile.manage', 'Maintain branch posting profiles.'),
   perm('organization.companyprofile.manage', 'Maintain the company profile.'),
+  // Added by PHASE_05 (CR-007): the registry shipped write codes for these two
+  // resources but no read code, which would have forced a reader to hold `manage`.
+  perm('organization.companyprofile.view', 'Read the company profile.'),
+  perm('organization.postingprofile.view', 'Read branch posting profiles and resolve them.'),
 
   // catalog (PHASE_06/07)
   perm('catalog.item.view', 'List and read items.'),

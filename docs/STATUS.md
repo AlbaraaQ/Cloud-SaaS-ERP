@@ -6,6 +6,7 @@
 | PHASE_02 | 2026-09-04 | COMPLETE | Backend platform core (NestJS bootstrap, request pipeline, contracts/config/database packages, health probes). Originally reported `IN_PROGRESS` on 2026-09-01; the phase **failed its own acceptance bar** (`npm run verify` never reached lint/unit/integration/build) and was completed during the Phase 03 pass. See `PHASE_02_IMPLEMENTATION_REPORT.md`. |
 | PHASE_03 | 2026-09-04 | COMPLETE | Tenancy, Identity & Access: 9-table platform/tenancy schema with reversible idempotent migration, RLS on all tenant-scoped tables, `api`/`migrator` database roles, auth (login/refresh/logout/change-password), RBAC, typed tenant settings, guard pipeline, isolation harness. `pnpm run verify` exits 0. See `PHASE_03_IMPLEMENTATION_REPORT.md`. |
 | PHASE_04 | 2026-09-04 | COMPLETE | Platform Services: audit trail (interceptor + service API, append-only at the privilege level), files (presign/finalize/app-signed download, MIME+size allow-lists, orphan GC), notifications (membership inbox + settings-updated demo subscription), BullMQ queues with a transactional outbox and a `WORKER=1` bootstrap, `Sequences.next` (64-parallel, no duplicates), DB-backed idempotency keys replacing the Phase-02 in-memory map. 6 new tables, all under FORCE RLS. `pnpm run verify` exits 0 (148 tests). See `PHASE_04_IMPLEMENTATION_REPORT.md`. |
+| PHASE_05 | 2026-09-05 | COMPLETE | Organization Structure: 10 tables (`company_profiles, branches, warehouses, cash_locations, cash_location_balances, currencies, fx_rates, price_lists, price_list_items, branch_posting_profiles`) under `ENABLE`+`FORCE` RLS, applied by `0002_organization.sql` with a reversible down file; CRUD for every `API_CONTRACT §3` resource with soft delete, single-default invariants held by partial unique indexes + an advisory lock, branch-scope-aware reads, IBAN masking, explicit before/after audit on cash locations, posting profiles and the company profile; `resolveFx` (identity/direct/inverse/triangulated, decimal.js) and `resolvePostProfile` (4-rung fallback, `ACCOUNT_PROFILE_MISSING`); idempotent `provisionOrgDefaults`. Deferred FK `document_sequences.branch_id → branches.id` added. `pnpm run verify` exits 0 (268 tests). See `PHASE_05_IMPLEMENTATION_REPORT.md`. |
 
 ## Phase-01 Notes
 
@@ -95,3 +96,34 @@
 - Phase outputs must be self-verifying and must not contradict `PROJECT_CONTRACT.md` or `TARGET_ARCHITECTURE.md`.
 - Implementation for later phases starts from this foundation only.
 - A phase is `COMPLETE` only when `pnpm run verify` exits 0 on a clean checkout.
+
+## Phase-05 Notes
+
+- Schema: ten tables in `packages/database/migrations/0002_organization.sql` (424 lines)
+  with `migrations/down/0002_organization.down.sql` (56 lines). Cycle proved on a real
+  PostgreSQL 16 cluster: `up → 26 tables / 21 policies / 21 FORCE-RLS relations / 73
+  indexes`, `up again → 0 applied, 3 skipped`, `down → 16 tables / 11 policies`,
+  `up again → 26 tables` and `erp_api` still `NOBYPASSRLS`.
+- The Phase-04 hand-off is closed: `document_sequences.branch_id` now carries its
+  deferred FK to `branches (id) ON DELETE RESTRICT`, and the `company_profile` logo is
+  the first entity registered in the `FileAttachmentRegistry` (which PHASE_04 shipped
+  deliberately empty).
+- Defaults: one default branch / warehouse / price list per tenant, one **per kind** for
+  cash locations, one base currency — each enforced by a partial unique index
+  (`… WHERE is_default AND deleted_at IS NULL`) and serialised by a transaction-scoped
+  advisory lock, so eight concurrent "make me the default" requests all return 200 and
+  exactly one default survives.
+- Money and rates are decimal strings end to end (ADR-006). `resolveFx` reports which
+  rung answered (`identity | direct | inverse | triangulated`) and, when triangulated,
+  the pivot and the **staler** of the two legs; intermediate legs keep full precision so
+  a derived rate never rounds twice.
+- `resolvePostProfile(branchId, docType)` walks branch+docType → branch+`'*'` →
+  tenant+docType → tenant+`'*'` and fails hard with `ACCOUNT_PROFILE_MISSING` rather than
+  guessing an account.
+- Account ids (`cash_locations.account_id`, `warehouses.inventory_account_id`, the
+  posting-profile mapping) and `price_list_items.item_id` are shape-validated uuids with
+  no FK until PHASE_07 / PHASE_06 (CR-006); every such column carries a
+  `ValidatedAtRuntime` comment in the migration and the schema.
+- Deviations recorded as CR-006 (deferred FKs), CR-007 (two `.view` permissions),
+  CR-008 (`DELETE` = soft delete + the three read-only resolution routes), CR-009 (the
+  prompt's "+9 tables" is a miscount; §4 and `DATABASE_DESIGN §5` both name ten).

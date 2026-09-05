@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Client } from 'pg';
 import { formatSequenceNumber } from '@erp/contracts';
 
 import { SequencesService } from '../src/modules/platform-services/index.js';
@@ -71,8 +72,10 @@ describe('document sequences (PHASE_04 §5.6)', () => {
   });
 
   it('keeps a separate counter per branch, per fiscal year and per tenant', async () => {
-    const branchA = '11111111-1111-4111-8111-111111111111';
-    const branchB = '22222222-2222-4222-8222-222222222222';
+    // PHASE_05 added the deferred FK `document_sequences.branch_id → branches.id`, so the
+    // scopes have to be real branches now — a numbering row for a branch that does not
+    // exist was exactly the orphan that FK was added to prevent.
+    const [branchA, branchB] = await createBranches(ctx.db.ownerUrl, alpha.tenantId, ['SEQA', 'SEQB']);
     const yearA = '33333333-3333-4333-8333-333333333333';
 
     const scoped = { tenantId: alpha.tenantId, docType: 'receipt' };
@@ -108,3 +111,26 @@ describe('document sequences (PHASE_04 §5.6)', () => {
     expect(formatSequenceNumber(9, '', 3)).toBe('009');
   });
 });
+
+async function createBranches(
+  connectionString: string,
+  tenantId: string,
+  codes: string[],
+): Promise<string[]> {
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    const ids: string[] = [];
+    for (const code of codes) {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO branches (id, tenant_id, code, name_ar)
+         VALUES (gen_random_uuid(), $1, $2, $2) RETURNING id`,
+        [tenantId, code],
+      );
+      ids.push(rows[0]?.id ?? '');
+    }
+    return ids;
+  } finally {
+    await client.end();
+  }
+}

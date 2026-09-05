@@ -55,6 +55,17 @@ CRUD (safe/bank, bank JSON block, balances view) · Currencies & FX rates grid �
 Price lists (items side-panel pricing editor) · Fiscal calendar viewer (link to
 accounting). Empty states guide first-time setup (onboarding checklist widget).
 
+Backend capabilities available to these screens beyond the list above (PHASE_05, aligned
+2026-09-05): a **rate preview** (`GET /fx-rates/resolve`) that reports whether a number is
+direct, inverse or triangulated and through which pivot — the grid should show the source,
+not just the number; a **posting-profile preview** (`GET /branch-posting-profiles/resolve`)
+that shows which rung of the branch→tenant fallback chain a document would actually use;
+IBANs arrive **masked in lists** and unmasked only on the detail read, so a grid must not
+be built to expect the full value; "activate" and "make default" are PATCH fields on the
+row (with an optimistic-concurrency `version`), not separate actions; and delete is a soft
+delete, so the UI should say "archive" and expect the code to become re-usable.
+
+
 ## 3. Catalog module
 
 Screens: Categories tree (drag-reorder, POS flags, kitchen printer) · Items list

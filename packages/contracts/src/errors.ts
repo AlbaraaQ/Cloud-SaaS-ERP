@@ -26,6 +26,8 @@ export const errorCodes = {
   MIGRATION_CONFLICT: 'MIGRATION_CONFLICT',
   RATE_LIMITED: 'RATE_LIMITED',
   INTERNAL: 'INTERNAL',
+  // PHASE_05 §7 — no posting profile answers a (branch, doc_type) lookup.
+  ACCOUNT_PROFILE_MISSING: 'ACCOUNT_PROFILE_MISSING',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -58,6 +60,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   MIGRATION_CONFLICT: 409,
   RATE_LIMITED: 429,
   INTERNAL: 500,
+  ACCOUNT_PROFILE_MISSING: 422,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -84,6 +87,7 @@ export const errorTitle: Record<ErrorCode, string> = {
   MIGRATION_CONFLICT: 'Migration conflict',
   RATE_LIMITED: 'Rate limited',
   INTERNAL: 'Internal error',
+  ACCOUNT_PROFILE_MISSING: 'Posting profile missing',
 };
 
 export function statusForCode(code: string): number {

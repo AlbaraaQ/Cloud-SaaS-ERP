@@ -171,6 +171,17 @@ describe('tenant isolation (TESTING_STRATEGY §6)', () => {
       'outbox_jobs',
       'idempotency_keys',
       'document_sequences',
+      // PHASE_05 — organization structure.
+      'company_profiles',
+      'branches',
+      'warehouses',
+      'cash_locations',
+      'cash_location_balances',
+      'currencies',
+      'fx_rates',
+      'price_lists',
+      'price_list_items',
+      'branch_posting_profiles',
     ]);
   });
 

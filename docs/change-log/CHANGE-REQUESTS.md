@@ -126,6 +126,106 @@ a tampered, expired or cross-tenant signature is a 401. The alternative — prox
 through the API — was rejected because it would put every upload and download on the
 request path of the application process (TARGET_ARCHITECTURE §8).
 
+## 2026-09-05 (Phase 05)
+
+### CR-006 — account ids are unvalidated uuids until PHASE_07 — APPROVED (applied)
+
+| | |
+|---|---|
+| Raised by | Phase 05 implementation |
+| Affects | `DATABASE_DESIGN.md §5`, `packages/database/migrations/0002_organization.sql` |
+| Type | Column nullability / deferred foreign key |
+
+`DATABASE_DESIGN §5` specifies `cash_locations.account_id` and
+`warehouses.inventory_account_id` as `NOT NULL` references to `accounts`, and
+`PHASE_05_PROMPT §4` requires posting-profile account ids to be "only EXISTING and of
+accepted subtypes". No chart of accounts exists before PHASE_07, and a tenant must be
+provisionable **now** — `provisionOrgDefaults` has to create a default safe before any
+account can be chosen for it.
+
+Applied shape, in the migration and in the Drizzle entities:
+
+| Column | PHASE_05 | PHASE_07 |
+|---|---|---|
+| `cash_locations.account_id` | nullable `uuid`, no FK | `NOT NULL` + FK `accounts(id)` |
+| `warehouses.inventory_account_id` | nullable `uuid`, no FK | FK `accounts(id)` |
+| `branch_posting_profiles.mapping.*AccountId` | uuid, shape-validated by `postProfileV1Schema` | + "exists and is postable" (`ACCOUNT_NOT_POSTABLE`) |
+| `price_list_items.item_id` | nullable `uuid`, no FK | FK `items(id)` in **PHASE_06** |
+
+Every such column carries a `ValidatedAtRuntime: P07` (or `P06`) comment in the migration
+and in the schema file, and `POST_PROFILE_ACCOUNT_KEYS` is exported from `@erp/contracts`
+so PHASE_07 can iterate the key list instead of re-deriving it. This is a deferral, not a
+relaxation: the later phases' prompts already own the follow-up.
+
+### CR-007 — two additional organization permission codes — APPROVED (applied)
+
+| | |
+|---|---|
+| Raised by | Phase 05 implementation |
+| Affects | `SECURITY_ARCHITECTURE.md §5`, `packages/contracts/src/permissions.ts` |
+| Type | Additive permission codes |
+
+`SECURITY_ARCHITECTURE §5` gave the organization module a single `org.view` and named
+`postingprofile.manage` as the only sensitive extra, while the registry already carried
+per-entity codes (`organization.branch.view`, `organization.branch.manage`, …). Two read
+permissions were missing entirely, so `GET /company-profile` and
+`GET /branch-posting-profiles` would have had to be gated by a *manage* permission —
+forcing every accountant who merely reads the tax number to hold the right to change it,
+which is the opposite of least privilege.
+
+Added: `organization.companyprofile.view`, `organization.postingprofile.view`. The §5 row
+now lists the per-entity codes that the registry has always used. Permissions are seeded
+from `permissionRegistry` (`packages/database/src/seed.ts`), so no data migration is
+needed — the seed upserts the two new rows.
+
+### CR-008 — `DELETE` on organization master data is a soft delete — APPROVED (applied)
+
+| | |
+|---|---|
+| Raised by | Phase 05 implementation |
+| Affects | `API_CONTRACT.md §3` |
+| Type | Additive method on existing resources |
+
+`API_CONTRACT §3` lists `GET/POST/PATCH` for the organization resources and no `DELETE`,
+while `PROJECT_CONTRACT` freezes **soft delete on master data** and `PHASE_05_PROMPT §5.2`
+and §8 both require soft-delete behaviour and tests for it. Without a route, the frozen
+behaviour would be unreachable.
+
+`DELETE /api/v1/{branches|warehouses|cash-locations|price-lists}/{id}` therefore exists and
+is a **soft delete**: it sets `deleted_at`/`deleted_by`, forces `is_active = false`, bumps
+`version`, and returns `204`. The row stays readable to the migrator role and to audit, and
+its unique code is freed for re-use (the code indexes are partial on
+`deleted_at IS NULL`). Deleting a row that is still the default, or a branch that still
+owns warehouses, cash locations or numbering, is refused with `422`.
+
+Three tables have no soft-delete columns by design and are hard-deleted:
+`fx_rates` (a wrong quote must disappear, not linger where `resolveFx` can still read it),
+`price_list_items` and `branch_posting_profiles` (a "deleted" mapping that still resolved
+would be worse than none). `currencies` are deactivated, never deleted, because rows
+elsewhere reference the code.
+
+Also added, and read-only: `GET /cash-locations/{id}/balances` (required by
+`PHASE_05_PROMPT §5.6`), `GET /fx-rates/resolve` and `GET /branch-posting-profiles/resolve`
+(the two resolution functions the prompt requires, exposed so the admin UI can preview
+what a document will actually post to). Activate/default toggles are PATCH fields
+(`isActive`, `isDefault`), not separate routes, so one optimistic-concurrency token covers
+the whole row.
+
+### CR-009 — the organization phase creates ten tables, not nine — APPROVED (applied)
+
+| | |
+|---|---|
+| Raised by | Phase 05 implementation |
+| Affects | `docs/phases/PHASE_05_PROMPT.md §6` |
+| Type | Documentation correction (count only) |
+
+`PHASE_05_PROMPT §6` says "+9 tables" while `§4` names ten:
+`company_profiles, branches, warehouses, cash_locations, cash_location_balances,
+currencies, fx_rates, price_lists, price_list_items, branch_posting_profiles`.
+`DATABASE_DESIGN §5` (+ §3 for `currencies`/`fx_rates`) lists the same ten. All ten are
+implemented, each with `ENABLE`+`FORCE` RLS and a `tenant_isolation` policy; the "+9" is a
+miscount in the prompt header, and no table was dropped or merged to reach it.
+
 ## Decisions recorded without a change request
 
 These do not contradict any frozen document, but they are load-bearing and later phases

@@ -1409,6 +1409,1952 @@
           "platform-services"
         ]
       }
+    },
+    "/api/v1/company-profile": {
+      "get": {
+        "operationId": "CompanyProfileController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Company profile"
+          },
+          "404": {
+            "description": "The tenant has no profile yet"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read the company profile of the current tenant",
+        "tags": [
+          "organization"
+        ]
+      },
+      "put": {
+        "operationId": "CompanyProfileController_put",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nameAr": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "nameEn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "nullable": true
+                  },
+                  "taxNo": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "nullable": true
+                  },
+                  "crNo": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "nullable": true
+                  },
+                  "logoFileId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "plot": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "building": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "street": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "addStreet": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "district": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "city": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "postal": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "countryCode": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "phones": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 32
+                    },
+                    "maxItems": 10
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320,
+                    "nullable": true
+                  },
+                  "countryCode": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "einvoiceFlags": {
+                    "type": "object",
+                    "properties": {
+                      "zatca": {
+                        "type": "boolean"
+                      },
+                      "eta": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "nameAr"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored company profile"
+          },
+          "409": {
+            "description": "Stale version (VERSION_CONFLICT)"
+          },
+          "422": {
+            "description": "Logo file missing, not finalised, or not an image"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or replace the company profile (upsert)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/branches": {
+      "get": {
+        "operationId": "BranchesController_list",
+        "parameters": [
+          {
+            "name": "filter[isDefault]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[isActive]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List branches visible to the membership branch scope",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "BranchesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  },
+                  "nameAr": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "nameEn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "nullable": true
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "plot": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "building": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "street": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "addStreet": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "district": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "city": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "postal": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "countryCode": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "nullable": true
+                  },
+                  "mobile": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "nullable": true
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320,
+                    "nullable": true
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "nameAr"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Branch created"
+          },
+          "422": {
+            "description": "Duplicate code"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a branch (the first branch of a tenant becomes the default)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/branches/{id}": {
+      "get": {
+        "operationId": "BranchesController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Branch"
+          },
+          "404": {
+            "description": "Not found in this tenant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one branch (404 when out of scope or in another tenant)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "BranchesController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nameAr": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "nameEn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "nullable": true
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "plot": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "building": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "street": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "addStreet": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "district": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "city": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "postal": {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      "countryCode": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "nullable": true
+                  },
+                  "mobile": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "nullable": true
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 320,
+                    "nullable": true
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated branch"
+          },
+          "409": {
+            "description": "Stale version (VERSION_CONFLICT)"
+          },
+          "422": {
+            "description": "Invariant violated (default branch rules)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a branch, including the default and active toggles",
+        "tags": [
+          "organization"
+        ]
+      },
+      "delete": {
+        "operationId": "BranchesController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "422": {
+            "description": "Default branch, or dependants still exist"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete a branch (CR-008)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/warehouses": {
+      "get": {
+        "operationId": "WarehousesController_list",
+        "parameters": [
+          {
+            "name": "filter[isActive]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[branchId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Warehouse page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List warehouses",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "WarehousesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "inventoryAccountId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "branchId",
+                  "code",
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Warehouse created"
+          },
+          "404": {
+            "description": "Branch not found in this tenant"
+          },
+          "422": {
+            "description": "Duplicate code"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a warehouse",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/warehouses/{id}": {
+      "get": {
+        "operationId": "WarehousesController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Warehouse"
+          },
+          "404": {
+            "description": "Not found in this tenant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one warehouse",
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "WarehousesController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "inventoryAccountId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated warehouse"
+          },
+          "409": {
+            "description": "Stale version (VERSION_CONFLICT)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a warehouse, including the default and active toggles",
+        "tags": [
+          "organization"
+        ]
+      },
+      "delete": {
+        "operationId": "WarehousesController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "422": {
+            "description": "The default warehouse cannot be deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete a warehouse (CR-008)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/cash-locations": {
+      "get": {
+        "operationId": "CashLocationsController_list",
+        "parameters": [
+          {
+            "name": "filter[branchId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[kind]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cash-location page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List cash locations (IBAN masked)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "CashLocationsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "safe",
+                      "bank"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "accountId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "currencyCode": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "bank": {
+                    "type": "object",
+                    "properties": {
+                      "bankName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "iban": {
+                        "type": "string",
+                        "maxLength": 42
+                      },
+                      "swift": {
+                        "type": "string"
+                      },
+                      "accountNo": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "bankName"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "changeInPos": {
+                    "type": "boolean"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "branchId",
+                  "kind",
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cash location created"
+          },
+          "422": {
+            "description": "Invalid IBAN, or a safe carrying bank details"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a safe or bank account",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/cash-locations/{id}": {
+      "get": {
+        "operationId": "CashLocationsController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Cash location"
+          },
+          "404": {
+            "description": "Not found in this tenant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one cash location (full bank details)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "CashLocationsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "accountId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "currencyCode": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "bank": {
+                    "type": "object",
+                    "properties": {
+                      "bankName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "iban": {
+                        "type": "string",
+                        "maxLength": 42
+                      },
+                      "swift": {
+                        "type": "string"
+                      },
+                      "accountNo": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "bankName"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "changeInPos": {
+                    "type": "boolean"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated cash location"
+          },
+          "409": {
+            "description": "Stale version (VERSION_CONFLICT)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a cash location (kind is immutable)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "delete": {
+        "operationId": "CashLocationsController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "422": {
+            "description": "The default cash location cannot be deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete a cash location (CR-008)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/cash-locations/{id}/balances": {
+      "get": {
+        "operationId": "CashLocationsController_balances",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Balances"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read the per-currency balances of a cash location (read-only)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/currencies": {
+      "get": {
+        "operationId": "CurrenciesController_list",
+        "parameters": [
+          {
+            "name": "filter[isBase]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Currency page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the currencies enabled for the tenant",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "CurrenciesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "nameAr": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "nameEn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "nullable": true
+                  },
+                  "minorUnits": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4
+                  },
+                  "isBase": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "nameAr"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Currency enabled"
+          },
+          "422": {
+            "description": "Already enabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enable a currency (the first one becomes the base currency)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/currencies/{code}": {
+      "get": {
+        "operationId": "CurrenciesController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Currency"
+          },
+          "404": {
+            "description": "Not enabled for this tenant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one currency by ISO code",
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "CurrenciesController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nameAr": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "nameEn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "nullable": true
+                  },
+                  "minorUnits": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4
+                  },
+                  "isBase": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated currency"
+          },
+          "422": {
+            "description": "Base-currency invariant violated"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a currency, including promoting it to base",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/fx-rates": {
+      "get": {
+        "operationId": "FxRatesController_list",
+        "parameters": [
+          {
+            "name": "filter[toCode]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[fromCode]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "FX-rate page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List stored FX rates (newest effective date first)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "FxRatesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fromCode": {
+                    "type": "string"
+                  },
+                  "toCode": {
+                    "type": "string"
+                  },
+                  "rate": {
+                    "type": "string"
+                  },
+                  "effectiveFrom": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "fromCode",
+                  "toCode",
+                  "rate",
+                  "effectiveFrom"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "FX rate recorded"
+          },
+          "422": {
+            "description": "Duplicate (pair, date) or currency not enabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a rate for a pair on a date",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/fx-rates/resolve": {
+      "get": {
+        "operationId": "FxRatesController_resolve",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved rate with its provenance"
+          },
+          "422": {
+            "description": "No rate available for the pair on that date"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve a rate (direct, inverse or triangulated through base)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/fx-rates/{id}": {
+      "get": {
+        "operationId": "FxRatesController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "FX rate"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one stored FX rate",
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "FxRatesController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rate": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated FX rate"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Correct a stored rate (the pair and date are immutable)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "delete": {
+        "operationId": "FxRatesController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a stored FX rate",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/price-lists": {
+      "get": {
+        "operationId": "PriceListsController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price-list page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List price lists",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "PriceListsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "currencyCode": {
+                    "type": "string"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "currencyCode"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Price list created"
+          },
+          "422": {
+            "description": "Duplicate name, or currency not enabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a price list",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/price-lists/{id}": {
+      "get": {
+        "operationId": "PriceListsController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Price list"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one price list",
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "PriceListsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "currencyCode": {
+                    "type": "string"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated price list"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a price list",
+        "tags": [
+          "organization"
+        ]
+      },
+      "delete": {
+        "operationId": "PriceListsController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete a price list (CR-008)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/price-lists/{id}/items": {
+      "get": {
+        "operationId": "PriceListsController_listItems",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Price-list item page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the priced rows of a list",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "PriceListsController_upsertItem",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "itemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "unitPrice": {
+                    "type": "string"
+                  },
+                  "minQty": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "unitPrice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Priced row stored"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upsert a priced row (item validation lands in PHASE_06 with the items table)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/price-lists/{id}/items/{itemRowId}": {
+      "delete": {
+        "operationId": "PriceListsController_removeItem",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a priced row",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/branch-posting-profiles": {
+      "get": {
+        "operationId": "PostingProfilesController_list",
+        "parameters": [
+          {
+            "name": "filter[docType]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[branchId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Posting-profile page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List posting profiles (tenant defaults included)",
+        "tags": [
+          "organization"
+        ]
+      },
+      "post": {
+        "operationId": "PostingProfilesController_upsert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "docType": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "sales_invoice",
+                          "sales_return",
+                          "credit_note",
+                          "debit_note",
+                          "purchase_invoice",
+                          "purchase_return",
+                          "receipt_voucher",
+                          "payment_voucher",
+                          "journal_entry",
+                          "stock_adjustment",
+                          "stock_transfer",
+                          "cash_transfer",
+                          "payroll_run",
+                          "shift_close",
+                          "progress_bill",
+                          "rent_invoice",
+                          "installment_contract",
+                          "opening_balance"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "*"
+                        ]
+                      }
+                    ]
+                  },
+                  "mapping": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "number",
+                        "enum": [
+                          1
+                        ]
+                      },
+                      "salesAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "salesReturnAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "purchasesAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "purchaseReturnAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "discountGivenAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "discountReceivedAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "vatOutputAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "vatInputAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "inventoryAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "cogsAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "cashAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "bankAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "receivableAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "payableAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "costCenterId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "version"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "docType",
+                  "mapping"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Posting profile stored"
+          },
+          "404": {
+            "description": "Branch not found in this tenant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or replace the profile of one (branch, doc type) scope",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/branch-posting-profiles/resolve": {
+      "get": {
+        "operationId": "PostingProfilesController_resolve",
+        "parameters": [
+          {
+            "name": "docType",
+            "required": true,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved mapping and the rung that answered"
+          },
+          "422": {
+            "description": "No profile resolves (ACCOUNT_PROFILE_MISSING)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve the profile for a (branch, doc type) through the fallback chain",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/v1/branch-posting-profiles/{id}": {
+      "get": {
+        "operationId": "PostingProfilesController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Posting profile"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one posting profile",
+        "tags": [
+          "organization"
+        ]
+      },
+      "delete": {
+        "operationId": "PostingProfilesController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a posting profile",
+        "tags": [
+          "organization"
+        ]
+      }
     }
   },
   "info": {

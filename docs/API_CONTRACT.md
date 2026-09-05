@@ -17,7 +17,8 @@
 
 Stable error codes (seed registry, extend only): `UNAUTHENTICATED, FORBIDDEN,
 TENANT_SUSPENDED, TENANT_CONTEXT_MISSING, VALIDATION_FAILED, FILTER_NOT_ALLOWED,
-NOT_FOUND, VERSION_CONFLICT, IDEMPOTENCY_REPLAY, ACCOUNT_NOT_POSTABLE, JOURNAL_UNBALANCED,
+NOT_FOUND, VERSION_CONFLICT, IDEMPOTENCY_REPLAY, ACCOUNT_NOT_POSTABLE,
+ACCOUNT_PROFILE_MISSING, JOURNAL_UNBALANCED,
 ACCOUNTING_PERIOD_CLOSED, ACCOUNTING_PERIOD_LOCKED_MODULE, DOCUMENT_ALREADY_POSTED,
 DOCUMENT_NOT_DRAFT, PARTY_CREDIT_LIMIT_EXCEEDED, STOCK_INSUFFICIENT, SEQUENCE_EXHAUSTED,
 EINVOICE_REJECTED, MIGRATION_CONFLICT, RATE_LIMITED, INTERNAL`.
@@ -54,9 +55,29 @@ Headers: `Authorization: Bearer`, `X-Branch-Id?`, `Idempotency-Key?`, `X-Request
 
 ## 3. Organization
 
-`GET/POST/PATCH /branches` · `/warehouses` · `/cash-locations` · `/currencies` ·
-`/fx-rates` · `/price-lists(+items)` · `/company-profile` (GET/PUT) ·
-`/branch-posting-profiles`. Perms: `organization.{entity}.manage|view`.
+`GET/POST/PATCH/DELETE /branches` · `/warehouses` · `/cash-locations` · `/price-lists`
+(+ `/{id}/items`) · `GET/POST/PATCH /currencies` (keyed by ISO code; deactivated, never
+deleted) · `GET/POST/PATCH/DELETE /fx-rates` · `GET/POST/DELETE
+/branch-posting-profiles` (POST upserts on `(branchId, docType)`) ·
+`/company-profile` (GET/PUT, 1:1 per tenant).
+Perms: `organization.{entity}.manage|view`.
+
+`DELETE` is a **soft delete** on master data and a hard delete on `fx_rates`,
+`price_list_items` and `branch_posting_profiles` (CR-008). Activate/default toggles are
+PATCH fields (`isActive`, `isDefault`), not routes; every PATCH/PUT accepts an optional
+`version` and answers `409 VERSION_CONFLICT` when it is stale.
+
+Read-only resolution surfaces (CR-008):
+
+| Path | Answer |
+|---|---|
+| `GET /cash-locations/{id}/balances` | one row per currency; `0` until PHASE_12 writes them |
+| `GET /fx-rates/resolve?from&to&date` | `{rate, source: identity\|direct\|inverse\|triangulated, effectiveFrom, via}` |
+| `GET /branch-posting-profiles/resolve?branchId&docType` | the winning mapping + which rung matched; `422 ACCOUNT_PROFILE_MISSING` when nothing does |
+
+Lists honour the membership's `branch_scope`; a row outside it is `404`, never `403`.
+Bank IBANs are masked in list responses and returned in full only on the detail read.
+
 
 ## 4. Catalog
 
