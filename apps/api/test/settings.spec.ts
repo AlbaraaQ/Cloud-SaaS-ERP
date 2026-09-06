@@ -86,13 +86,15 @@ describe('tenant settings', () => {
     expect(badColour.status).toBe(400);
   });
 
+  // CR-004: PHASE_02 answered 404 here; PHASE_04 §5.8 requires 400 VALIDATION_FAILED,
+  // because the unknown key is a value inside the request, not a missing resource.
   it('rejects a key that is not in the registry', async () => {
     const response = await api(ctx.server, 'put', '/api/v1/settings/nope.nope', {
       token: admin.token,
       body: { value: 1 },
     });
-    expect(response.status).toBe(404);
-    expect(response.body.code).toBe('NOT_FOUND');
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('VALIDATION_FAILED');
   });
 
   it('updates settings in bulk through PATCH /tenant', async () => {

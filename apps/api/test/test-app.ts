@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { inject } from 'vitest';
 import { createDatabase, type DatabaseHandle } from '@erp/database';
@@ -30,7 +30,15 @@ export type TestApp = {
 
 let sequence = 0;
 
-export async function createTestApp(nameHint = 'suite'): Promise<TestApp> {
+/**
+ * `configure` lets a suite swap a port for a fake before the module compiles — e.g. the
+ * files suite binds an in-memory `OBJECT_STORAGE` so the presign→finalize→download flow
+ * is exercised end to end without MinIO.
+ */
+export async function createTestApp(
+  nameHint = 'suite',
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<TestApp> {
   process.env.TEST_DATABASE_URL = inject('testDatabaseSuperUserUrl');
   process.env.TEST_DATABASE_ROLE_PASSWORD = inject('testDatabaseRolePassword');
 
@@ -41,10 +49,10 @@ export async function createTestApp(nameHint = 'suite'): Promise<TestApp> {
 
   const handle = createDatabase(db.appUrl, 5);
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const base = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(DATABASE_HANDLE)
-    .useValue(handle)
-    .compile();
+    .useValue(handle);
+  const moduleRef = await (configure ? configure(base) : base).compile();
 
   const app = moduleRef.createNestApplication({ logger: false });
   app.use(RequestIdMiddleware);

@@ -65,9 +65,53 @@ const envSchema = z.object({
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /** SigV4 scope. MinIO ignores it but still signs with it, so it must match on both ends. */
+  S3_REGION: z.string().default('us-east-1'),
+  /** MinIO and most self-hosted gateways only serve path-style (`/bucket/key`) URLs. */
+  S3_FORCE_PATH_STYLE: booleanish.default(true),
+  /** Lifetime of a pre-signed PUT/GET URL (SECURITY: keep it short). */
+  S3_PRESIGN_EXPIRY_SECONDS: z.coerce.number().int().positive().max(604_800).default(900),
+
+  /** PHASE_04 files — size/mime allow-lists are enforced before a presign is issued. */
+  FILES_MAX_UPLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(25 * 1024 * 1024),
+  FILES_ALLOWED_MIME_TYPES: csv.default(
+    'image/png,image/jpeg,image/webp,image/gif,application/pdf,text/csv,text/plain,' +
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+      'application/vnd.ms-excel,application/zip,application/xml,text/xml',
+  ),
+  /** Lifetime of the app-signed download URL handed to a browser. */
+  FILES_DOWNLOAD_URL_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(300),
+  /** A `pending` file older than this is an abandoned upload and is collected. */
+  FILES_ORPHAN_GC_HOURS: z.coerce.number().int().positive().default(24),
+
+  /** PHASE_04 jobs — BullMQ is only wired up when a Redis URL is present. */
+  WORKER: booleanish.default(false),
+  JOBS_ENABLED: booleanish.default(true),
+  JOB_QUEUE_PREFIX: z.string().default('erp'),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5_000),
+  OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().max(1_000).default(50),
+  OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().positive().default(8),
+  OUTBOX_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(2_000),
+  WORKER_HEALTH_LOG_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+
+  /** PHASE_04 idempotency — DATABASE_DESIGN §4 ("expires 24h"). */
+  IDEMPOTENCY_TTL_HOURS: z.coerce.number().int().positive().default(24),
+
+  /** PHASE_04 mail — `console` writes to the log, `smtp` targets MailHog/SES later. */
+  MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
+  MAIL_FROM: z.string().default('no-reply@erp.local'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
 
   /** AES-256-GCM data-encryption key, base64 (SECURITY_ARCHITECTURE §9). */
   DATA_ENC_KEY: z.string().optional(),
+  /** HMAC secret for app-signed file download URLs; derived from DATA_ENC_KEY when unset. */
+  FILE_URL_SIGNING_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -99,6 +143,55 @@ export function assertRuntimeEnv(candidate: AppEnv = env): AppEnv {
     throw new Error(`Invalid environment: missing required variable(s) ${missing.join(', ')}`);
   }
   return candidate;
+}
+
+export type ObjectStorageEnv = {
+  endpoint: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  forcePathStyle: boolean;
+  presignExpirySeconds: number;
+};
+
+/**
+ * PHASE_04 §5.3 — "S3 env validation". Object storage is optional at boot (the API runs
+ * without it; every other endpoint keeps working) but a file endpoint must fail loudly
+ * rather than hand out an unusable URL, so the check happens where the value is used.
+ */
+export function readObjectStorageEnv(candidate: AppEnv = env): ObjectStorageEnv | undefined {
+  const missing = objectStorageGaps(candidate);
+  if (missing.length > 0) return undefined;
+  return {
+    endpoint: (candidate.S3_ENDPOINT as string).replace(/\/+$/, ''),
+    bucket: candidate.S3_BUCKET as string,
+    accessKeyId: candidate.S3_ACCESS_KEY_ID as string,
+    secretAccessKey: candidate.S3_SECRET_ACCESS_KEY as string,
+    region: candidate.S3_REGION,
+    forcePathStyle: candidate.S3_FORCE_PATH_STYLE,
+    presignExpirySeconds: candidate.S3_PRESIGN_EXPIRY_SECONDS,
+  };
+}
+
+export function objectStorageGaps(candidate: AppEnv = env): string[] {
+  const missing: string[] = [];
+  if (!candidate.S3_ENDPOINT) missing.push('S3_ENDPOINT');
+  if (!candidate.S3_BUCKET) missing.push('S3_BUCKET');
+  if (!candidate.S3_ACCESS_KEY_ID) missing.push('S3_ACCESS_KEY_ID');
+  if (!candidate.S3_SECRET_ACCESS_KEY) missing.push('S3_SECRET_ACCESS_KEY');
+  return missing;
+}
+
+export function assertObjectStorageEnv(candidate: AppEnv = env): ObjectStorageEnv {
+  const storage = readObjectStorageEnv(candidate);
+  if (!storage) {
+    throw new Error(
+      `Object storage is not configured: missing ${objectStorageGaps(candidate).join(', ')}. ` +
+        'See infrastructure/docker-compose.yml for the local MinIO defaults.',
+    );
+  }
+  return storage;
 }
 
 /**

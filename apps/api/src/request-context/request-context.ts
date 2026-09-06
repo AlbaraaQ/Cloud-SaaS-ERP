@@ -45,6 +45,16 @@ export type RequestContextValue = {
   tenant?: TenantContextValue;
   /** Validated `X-Branch-Id` request scope. */
   branchId?: string;
+  /** Client address, captured for `audit_log.meta` (SECURITY_ARCHITECTURE §10). */
+  clientIp?: string;
+  /** Truncated `User-Agent`, captured for `audit_log.meta`. */
+  userAgent?: string;
+  /**
+   * Set by a service that has already written a richer `audit_log` row (with a real
+   * `before`/`after` diff) for this request, so `AuditInterceptor` does not add a
+   * second, poorer one.
+   */
+  audited?: boolean;
 };
 
 export const requestContextStorage = new AsyncLocalStorage<RequestContextValue>();
@@ -89,4 +99,25 @@ export function setTenantContextValue(value: TenantContextValue): void {
 export function setBranchId(branchId: string): void {
   const store = requestContextStorage.getStore();
   if (store) store.branchId = branchId;
+}
+
+/** PHASE_04 — `audit_log.meta` provenance, published by `RequestIdMiddleware`. */
+export function setClientMetadata(value: { clientIp?: string; userAgent?: string }): void {
+  const store = requestContextStorage.getStore();
+  if (!store) return;
+  if (value.clientIp) store.clientIp = value.clientIp;
+  if (value.userAgent) store.userAgent = value.userAgent;
+}
+
+/**
+ * Marks the current request as already audited by a service that produced a real
+ * before/after diff — `AuditInterceptor` then skips its generic row.
+ */
+export function markRequestAudited(): void {
+  const store = requestContextStorage.getStore();
+  if (store) store.audited = true;
+}
+
+export function isRequestAudited(): boolean {
+  return getRequestContext().audited === true;
 }

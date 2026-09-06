@@ -18,8 +18,19 @@ export const ALL_PLATFORM_PERMISSIONS = permissionRegistry
   .filter((entry) => entry.module === 'platform')
   .map((entry) => entry.code);
 
+/** Every PHASE_05 permission — the organization suites need all of them (PHASE_05 §7). */
+export const ALL_ORGANIZATION_PERMISSIONS = permissionRegistry
+  .filter((entry) => entry.module === 'organization')
+  .map((entry) => entry.code);
+
 export type ActorOptions = {
   tenantCode: string;
+  /**
+   * Reuses an existing tenant instead of creating one. This is what lets a suite put two
+   * memberships — e.g. an unrestricted admin and a branch-scoped user — inside the same
+   * tenant, which is the only way to test `branch_scope` filtering.
+   */
+  tenantId?: string;
   tenantName?: string;
   email: string;
   fullName?: string;
@@ -57,11 +68,13 @@ export function hashPassword(password: string): Promise<string> {
  * token signed by the application's own TokenService.
  */
 export async function createActor(ctx: TestApp, options: ActorOptions): Promise<Actor> {
-  const tenant = await createTenantFixture(ctx.db.ownerUrl, {
-    code: options.tenantCode,
-    name: options.tenantName,
-    status: options.tenantStatus ?? 'active',
-  });
+  const tenant = options.tenantId
+    ? { id: options.tenantId, code: options.tenantCode }
+    : await createTenantFixture(ctx.db.ownerUrl, {
+        code: options.tenantCode,
+        name: options.tenantName,
+        status: options.tenantStatus ?? 'active',
+      });
 
   const permissionCodes = options.permissions ?? ALL_PLATFORM_PERMISSIONS;
   const roleIds: string[] = [];
