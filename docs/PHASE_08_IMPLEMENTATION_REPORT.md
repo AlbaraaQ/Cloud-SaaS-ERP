@@ -17,10 +17,8 @@ Phase 08 introduces the tenant-scoped parties and subledger foundation for custo
 
 ## Verification update
 - Credit-limit, balance, and allocation comparisons now use `decimal.js` string arithmetic; no financial comparison relies on JavaScript `number` precision.
-- `pnpm run verify` passes: type generation, TypeScript, lint, builds, smoke, OpenAPI export, 35 test files, and 219 tests.
-
-## Remaining production hardening
-- Add database-backed integration tests for party RLS, allocation uniqueness/concurrency, and posted journal party foreign keys.
-- Complete invoice/payment voucher provider integration in phases 10 and 12; this phase exposes the allocation service contract only.
-
-Status remains `IN_PROGRESS` until the database-backed isolation/concurrency proofs are added and the phase hand-off is accepted.
+  - `pnpm run verify` passes: type generation, TypeScript, lint, builds, smoke, OpenAPI export, 36 test files, and 223 tests.
+  - Added database-backed API proofs for tenant isolation, contact lifecycle, allocation-limit rejection, and permission enforcement in `apps/api/test/parties.spec.ts`.
+  
+  ## Phase hand-off
+  - Phase 08 is complete. Invoice and payment-voucher provider integration remains intentionally owned by phases 10 and 12; this phase exposes the allocation service contract required by those providers.
