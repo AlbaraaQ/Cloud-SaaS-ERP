@@ -18,6 +18,7 @@ import {
   RateLimitGuard,
   TenantGuard,
 } from './modules/platform/index.js';
+import { AccountingModule } from './modules/accounting/accounting.module.js';
 import { OrganizationModule } from './modules/organization/index.js';
 import { CatalogModule } from './modules/organization/catalog/catalog.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
@@ -55,7 +56,8 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     PlatformModule,
     PlatformServicesModule,
     OrganizationModule,
-  CatalogModule,
+    CatalogModule,
+    AccountingModule,
   ],
   controllers: [HealthController],
   providers: [
