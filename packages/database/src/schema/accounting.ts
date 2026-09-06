@@ -4,7 +4,6 @@ import {
   date,
   index,
   integer,
-  jsonb,
   numeric,
   pgTable,
   primaryKey,
@@ -15,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
+
 import { branches } from './organization.js';
 import { tenants } from './platform.js';
 

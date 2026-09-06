@@ -69,6 +69,50 @@ export class AccountingService {
     });
   }
 
+  async listPeriods(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(fiscalPeriods).where(eq(fiscalPeriods.tenantId, tenantId)),
+    );
+  }
+
+  async closePeriod(tenantId: string, periodId: string) {
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)));
+      if (!period) throw new Error('Fiscal period not found');
+      if (period.status === 'closed') return;
+      const [draft] = await tx.select({ id: journalEntries.id }).from(journalEntries).where(and(eq(journalEntries.tenantId, tenantId), eq(journalEntries.fiscalPeriodId, periodId), eq(journalEntries.status, 'draft'))).limit(1);
+      if (draft) throw new Error('Fiscal period contains draft journals');
+      await tx.update(fiscalPeriods).set({ status: 'closed', closedAt: new Date() }).where(eq(fiscalPeriods.id, periodId));
+    });
+  }
+
+  async reopenPeriod(tenantId: string, periodId: string, reason: string) {
+    if (!reason.trim()) throw new Error('Reopen reason is required');
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)));
+      if (!period) throw new Error('Fiscal period not found');
+      await tx.update(fiscalPeriods).set({ status: 'open', closedAt: null, closedBy: null }).where(eq(fiscalPeriods.id, periodId));
+    });
+  }
+
+  async reverseJournal(tenantId: string, entryId: string, input: { branchId: string; fiscalPeriodId: string; date: string; reason: string }) {
+    if (!input.reason.trim()) throw new Error('Reversal reason is required');
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [original] = await tx.select().from(journalEntries).where(and(eq(journalEntries.id, entryId), eq(journalEntries.tenantId, tenantId)));
+      if (!original || original.status !== 'posted') throw new Error('Only posted journals can be reversed');
+      const [existing] = await tx.select({ id: journalEntries.id }).from(journalEntries).where(eq(journalEntries.reversalOf, entryId));
+      if (existing) throw new Error('Journal was already reversed');
+      const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, input.fiscalPeriodId), eq(fiscalPeriods.tenantId, tenantId)));
+      if (!period || period.status !== 'open') throw new Error('Reversal period is closed or unavailable');
+      const lines = await tx.select().from(journalEntryLines).where(eq(journalEntryLines.entryId, entryId));
+      const reversalId = newId();
+      await tx.insert(journalEntries).values({ id: reversalId, tenantId, branchId: input.branchId, fiscalPeriodId: input.fiscalPeriodId, date: input.date, kind: 'reversal', status: 'posted', description: input.reason, reversalOf: entryId, postedAt: new Date() });
+      await tx.insert(journalEntryLines).values(lines.map((line) => ({ entryId: reversalId, lineNo: line.lineNo, tenantId, accountId: line.accountId, debit: line.credit, credit: line.debit, partyId: line.partyId, description: line.description })));
+      await tx.update(journalEntries).set({ status: 'void', updatedAt: new Date() }).where(eq(journalEntries.id, entryId));
+      return { id: reversalId, reversalOf: entryId };
+    });
+  }
+
   async postJournal(tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[] }) {
     if (input.lines.length < 2) throw new Error('A journal entry needs at least two lines');
     const debit = input.lines.reduce((sum, line) => sum + Number(line.debit ?? 0), 0);

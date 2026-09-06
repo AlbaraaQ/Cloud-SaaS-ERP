@@ -27,9 +27,35 @@ export class AccountingController {
     return { data: await this.accounting.readAccount(getTenantContext().tenantId, id) };
   }
 
+  @Get('fiscal-periods')
+  @RequiresPermission('accounting.period.view')
+  async listPeriods() {
+    return { data: await this.accounting.listPeriods(getTenantContext().tenantId) };
+  }
+
+  @Post('fiscal-periods/:id/close')
+  @RequiresPermission('accounting.period.close')
+  async closePeriod(@Param('id') id: string) {
+    await this.accounting.closePeriod(getTenantContext().tenantId, id);
+    return { data: { id, status: 'closed' } };
+  }
+
+  @Post('fiscal-periods/:id/reopen')
+  @RequiresPermission('accounting.period.reopen')
+  async reopenPeriod(@Param('id') id: string, @Body() body: { reason: string }) {
+    await this.accounting.reopenPeriod(getTenantContext().tenantId, id, body.reason);
+    return { data: { id, status: 'open' } };
+  }
+
   @Post('journal-entries')
   @RequiresPermission('accounting.journal.post')
   async postJournal(@Body() body: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[] }) {
     return { data: await this.accounting.postJournal(getTenantContext().tenantId, body) };
+  }
+
+  @Post('journal-entries/:id/reverse')
+  @RequiresPermission('accounting.journal.reverse')
+  async reverseJournal(@Param('id') id: string, @Body() body: { branchId: string; fiscalPeriodId: string; date: string; reason: string }) {
+    return { data: await this.accounting.reverseJournal(getTenantContext().tenantId, id, body) };
   }
 }

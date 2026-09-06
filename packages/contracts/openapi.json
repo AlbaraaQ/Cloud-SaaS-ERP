@@ -3404,6 +3404,152 @@
           "Catalog"
         ]
       }
+    },
+    "/api/v1/accounts": {
+      "get": {
+        "operationId": "AccountingController_listAccounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      },
+      "post": {
+        "operationId": "AccountingController_createAccount",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/accounts/{id}": {
+      "get": {
+        "operationId": "AccountingController_readAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/fiscal-periods": {
+      "get": {
+        "operationId": "AccountingController_listPeriods",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/fiscal-periods/{id}/close": {
+      "post": {
+        "operationId": "AccountingController_closePeriod",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/fiscal-periods/{id}/reopen": {
+      "post": {
+        "operationId": "AccountingController_reopenPeriod",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/journal-entries": {
+      "post": {
+        "operationId": "AccountingController_postJournal",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/journal-entries/{id}/reverse": {
+      "post": {
+        "operationId": "AccountingController_reverseJournal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
     }
   },
   "info": {

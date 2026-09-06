@@ -17,6 +17,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS item_alt_codes_tenant_code_key ON item_alterna
 CREATE INDEX IF NOT EXISTS items_name_trgm_idx ON items USING gin ((name_ar || ' ' || coalesce(name_en,'')) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS items_tenant_category_idx ON items(tenant_id,category_id);
 CREATE INDEX IF NOT EXISTS items_tenant_barcode_idx ON items(tenant_id,barcode);
-DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['item_categories','units_of_measure','tax_groups','items','item_units','item_barcodes','item_alternative_codes','item_components','item_price_history','item_details'] LOOP EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t); EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY',t); EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I',t); EXECUTE format('CREATE POLICY tenant_isolation ON %I USING (tenant_id = current_setting(''app.tenant_id'', true)::uuid) WITH CHECK (tenant_id = current_setting(''app.tenant_id'', true)::uuid)',t); END LOOP; END $$;
+DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['item_categories','units_of_measure','tax_groups','items','item_barcodes','item_alternative_codes','item_price_history','item_details'] LOOP EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t); EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY',t); EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I',t); EXECUTE format('CREATE POLICY tenant_isolation ON %I USING (tenant_id = current_setting(''app.tenant_id'', true)::uuid) WITH CHECK (tenant_id = current_setting(''app.tenant_id'', true)::uuid)',t); END LOOP; END $$;
+ALTER TABLE item_units ENABLE ROW LEVEL SECURITY;
+ALTER TABLE item_units FORCE ROW LEVEL SECURITY;
+ALTER TABLE item_components ENABLE ROW LEVEL SECURITY;
+ALTER TABLE item_components FORCE ROW LEVEL SECURITY;
 ALTER TABLE price_list_items ADD COLUMN IF NOT EXISTS item_id uuid;
 CREATE INDEX IF NOT EXISTS price_list_items_item_idx ON price_list_items(item_id);
