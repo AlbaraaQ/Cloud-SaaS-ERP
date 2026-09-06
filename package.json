@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -15,10 +18,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typegen": "node ./scripts/typegen.mjs",
-    "verify": "pnpm run typegen && pnpm exec tsc --project tsconfig.base.json --noEmit && pnpm -r run lint && pnpm --dir apps/api run test:smoke && pnpm -r run test && pnpm run build",
-    "db:generate": "echo 'Drizzle generation is deferred until Phase 02; the schema is intentionally not created in Phase 01.'",
-    "db:migrate": "echo 'Database migration execution is deferred until Phase 02; the schema is intentionally not created in Phase 01.'",
-    "prepare": "echo 'Git hooks are scaffolded in CI; local hooks are intentionally not enforced in this bootstrap phase.'"
+    "openapi:export": "pnpm --filter \"@erp/api...\" run build && node apps/api/dist/openapi/export-openapi-cli.js",
+    "db:generate": "pnpm --dir packages/database run generate",
+    "db:migrate": "pnpm --dir packages/database run migrate",
+    "db:migrate:down": "pnpm --dir packages/database run migrate:down",
+    "db:seed": "pnpm --dir packages/database run seed",
+    "db:roles": "pnpm --dir packages/database run roles",
+    "db:up": "docker compose -f infrastructure/docker-compose.yml up -d postgres redis",
+    "verify": "pnpm run typegen && pnpm exec tsc --project tsconfig.base.json --noEmit && pnpm -r run lint && pnpm run build && pnpm --dir apps/api run test:smoke && pnpm -r run test && pnpm run openapi:export"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.1.0",

@@ -32,6 +32,21 @@ Feature flags (vertical packs).
 Tables: users(email,status,last_login), audit(time,actor,entity,action,diff).
 Perms: platform.*. Actions: invite/reset-password/suspend/resend.
 
+> Backend readiness after PHASE_04 (the screens themselves land in PHASE_17):
+> - Audit log explorer — `GET /audit-log` with `entity/entityId/action/actorUserId/from/to`
+>   filters; each row already carries `before`/`after`, so the diff viewer needs no extra
+>   endpoint.
+> - Files manager — `GET /files` (filter `status`/`entity`, search by name),
+>   `GET /files/{id}`, presign/finalize, and a short-lived signed download link.
+> - Notifications center — `GET /notifications` (+ `meta.unread`), mark-read,
+>   `POST /notifications`.
+> - Sequences/numbering admin — **service only** (`SequencesService.peek/configure`); no
+>   HTTP surface yet, because PHASE_04 §5.6 scopes sequences to the allocation service.
+>   The screen needs read/update endpoints for `document_sequences`; whichever phase
+>   builds it must add them (prefix/padding are editable, `current_value` must not be
+>   rewindable).
+> - Feature flags — already covered by the typed settings editor (`feature.*` keys).
+
 ## 2. Organization module
 
 Screens: Company profile form (+ ZATCA national address sub-form, logo upload to S3) ·
@@ -39,6 +54,17 @@ Branches CRUD (+ posting profile tab per doc type) · Warehouses CRUD · Cash lo
 CRUD (safe/bank, bank JSON block, balances view) · Currencies & FX rates grid ·
 Price lists (items side-panel pricing editor) · Fiscal calendar viewer (link to
 accounting). Empty states guide first-time setup (onboarding checklist widget).
+
+Backend capabilities available to these screens beyond the list above (PHASE_05, aligned
+2026-09-05): a **rate preview** (`GET /fx-rates/resolve`) that reports whether a number is
+direct, inverse or triangulated and through which pivot — the grid should show the source,
+not just the number; a **posting-profile preview** (`GET /branch-posting-profiles/resolve`)
+that shows which rung of the branch→tenant fallback chain a document would actually use;
+IBANs arrive **masked in lists** and unmasked only on the detail read, so a grid must not
+be built to expect the full value; "activate" and "make default" are PATCH fields on the
+row (with an optimistic-concurrency `version`), not separate actions; and delete is a soft
+delete, so the UI should say "archive" and expect the code to become re-usable.
+
 
 ## 3. Catalog module
 
