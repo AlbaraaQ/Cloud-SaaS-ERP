@@ -1,12 +1,6 @@
-import {
-  ArgumentsHost,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
-import { Response } from 'express';
-
+import { Catch, HttpException, HttpStatus } from '@nestjs/common';
+import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
+import type { Response } from 'express';
 import { createProblemDetails, DomainError } from '@erp/contracts';
 
 @Catch()

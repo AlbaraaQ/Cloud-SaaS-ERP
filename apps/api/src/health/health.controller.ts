@@ -4,7 +4,11 @@ import { DatabaseService } from '../database/database.service.js';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly databaseService: DatabaseService) {}
+  private readonly databaseService: DatabaseService;
+
+  constructor(databaseService: DatabaseService) {
+    this.databaseService = databaseService;
+  }
 
   @Get('live')
   live() {

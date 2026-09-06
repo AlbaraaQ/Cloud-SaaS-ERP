@@ -6,6 +6,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "noImplicitAny": true,
     "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true,

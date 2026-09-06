@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-
 import { env } from '@erp/config';
 
 import { DatabaseService } from './database/database.service.js';

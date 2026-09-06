@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-
 import { getDb } from '@erp/database';
 
 @Injectable()

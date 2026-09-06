@@ -12,5 +12,12 @@
     "lint": "eslint src --config ../../eslint.config.mjs",
     "build": "echo 'Database package build is not required in Phase 01.'",
     "test": "echo 'Database package tests are not required in Phase 01.'"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.38.3",
+    "pg": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
   }
 }

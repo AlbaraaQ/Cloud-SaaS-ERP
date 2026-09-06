@@ -1,7 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { describe, expect, it } from 'vitest';
-
 import { createProblemDetails, DomainError } from '@erp/contracts';
 
 import { AllExceptionsFilter } from './all-exceptions.filter.js';

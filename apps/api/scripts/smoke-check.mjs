@@ -1,4 +1,4 @@
-import { env } from '@erp/config';
+import { env } from '../../../packages/config/src/env.ts';
 
 const mode = env.NODE_ENV;
 const hasConfig = Boolean(env.DATABASE_URL || env.REDIS_URL || env.S3_ENDPOINT || env.DATA_ENC_KEY);

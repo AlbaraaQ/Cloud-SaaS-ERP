@@ -1,7 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-
 import { env } from '@erp/config';
 
 export type DrizzleDb = NodePgDatabase<Record<string, never>>;
@@ -20,9 +19,10 @@ export function getDb(): DrizzleDb {
   return dbInstance;
 }
 
-export async function withTx<T>(work: (tx: DrizzleDb) => Promise<T>): Promise<T> {
+// eslint-disable-next-line no-unused-vars
+export async function withTx<T>(work: (...args: [DrizzleDb]) => Promise<T>): Promise<T> {
   const client = getDb();
-  return client.transaction(async (tx) => work(tx as unknown as DrizzleDb));
+  return client.transaction((tx) => work(tx as unknown as DrizzleDb));
 }
 
 export function baseAuditColumns() {

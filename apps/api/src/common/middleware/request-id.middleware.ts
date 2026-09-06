@@ -1,5 +1,6 @@
-import { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
+
+import type { NextFunction, Request, Response } from 'express';
 
 import { requestContextStorage } from '../request-context/request-context.js';
 
