@@ -16,6 +16,9 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
@@ -24,7 +27,8 @@
       "@erp/testing": ["packages/testing/src/index.ts"],
       "@erp/contracts": ["packages/contracts/src/index.ts"],
       "@erp/database": ["packages/database/src/index.ts"]
-    }
+    },
+    "noEmitOnError": true
   },
   "include": [
     "apps/**/*.ts",
@@ -35,9 +39,5 @@
     "packages/**/*.mjs",
     "scripts/**/*.mjs"
   ],
-  "exclude": [
-    "**/node_modules",
-    "**/dist",
-    "**/.next"
-  ]
+  "exclude": ["**/node_modules", "**/dist", "**/.next"]
 }
