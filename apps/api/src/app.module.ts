@@ -23,6 +23,7 @@ import { OrganizationModule } from './modules/organization/index.js';
 import { PartiesModule } from './modules/parties/parties.module.js';
 import { CatalogModule } from './modules/organization/catalog/catalog.module.js';
 import { InventoryModule } from './modules/inventory/inventory.module.js';
+import { SalesModule } from './modules/sales/sales.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
 /**
@@ -62,6 +63,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     AccountingModule,
     PartiesModule,
     InventoryModule,
+    SalesModule,
   ],
   controllers: [HealthController],
   providers: [

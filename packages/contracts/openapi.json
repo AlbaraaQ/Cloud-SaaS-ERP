@@ -3914,6 +3914,122 @@
           "Inventory"
         ]
       }
+    },
+    "/api/v1/sales/invoices": {
+      "get": {
+        "operationId": "SalesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/invoices/{id}": {
+      "get": {
+        "operationId": "SalesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      },
+      "patch": {
+        "operationId": "SalesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/invoices/{id}/post": {
+      "post": {
+        "operationId": "SalesController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/invoices/{id}/payments": {
+      "post": {
+        "operationId": "SalesController_payment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
     }
   },
   "info": {
