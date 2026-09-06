@@ -8,7 +8,7 @@ Phase 08 introduces the tenant-scoped parties and subledger foundation for custo
 - Added reversible migration `0005_parties.sql` and down migration.
 - Enabled and forced tenant RLS for all phase tables.
 - Added API module, service, and controller.
-- Added party listing, lookup, creation, soft deletion, contacts, balances, statements, credit-limit checks, and allocation endpoints.
+- Added party listing, lookup, creation, update, soft deletion, contacts with soft deletion, balances, statements, credit-limit checks, and allocation endpoints.
 - Added open-balance deletion protection and allocation-overrun validation.
 - Integrated `PartiesModule` into `AppModule` and exported schema through the database index.
 

@@ -3645,6 +3645,27 @@
           "Parties"
         ]
       },
+      "put": {
+        "operationId": "PartiesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      },
       "delete": {
         "operationId": "PartiesController_remove",
         "parameters": [
@@ -3703,6 +3724,37 @@
         ],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/contacts/{contactId}": {
+      "delete": {
+        "operationId": "PartiesController_removeContact",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contactId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
