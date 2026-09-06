@@ -3355,6 +3355,55 @@
           "organization"
         ]
       }
+    },
+    "/api/v1/organization/catalog/items": {
+      "get": {
+        "operationId": "CatalogController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/categories": {
+      "get": {
+        "operationId": "CatalogController_categories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
     }
   },
   "info": {

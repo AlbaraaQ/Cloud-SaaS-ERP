@@ -19,6 +19,7 @@ import {
   TenantGuard,
 } from './modules/platform/index.js';
 import { OrganizationModule } from './modules/organization/index.js';
+import { CatalogModule } from './modules/organization/catalog/catalog.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
 /**
@@ -54,6 +55,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     PlatformModule,
     PlatformServicesModule,
     OrganizationModule,
+  CatalogModule,
   ],
   controllers: [HealthController],
   providers: [
