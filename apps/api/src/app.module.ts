@@ -20,6 +20,7 @@ import {
 } from './modules/platform/index.js';
 import { AccountingModule } from './modules/accounting/accounting.module.js';
 import { OrganizationModule } from './modules/organization/index.js';
+import { PartiesModule } from './modules/parties/parties.module.js';
 import { CatalogModule } from './modules/organization/catalog/catalog.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
@@ -58,6 +59,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     OrganizationModule,
     CatalogModule,
     AccountingModule,
+    PartiesModule,
   ],
   controllers: [HealthController],
   providers: [

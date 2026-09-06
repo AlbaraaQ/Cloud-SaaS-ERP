@@ -3587,6 +3587,205 @@
           "Accounting"
         ]
       }
+    },
+    "/api/v1/parties": {
+      "get": {
+        "operationId": "PartiesController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      },
+      "post": {
+        "operationId": "PartiesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/parties/{id}": {
+      "get": {
+        "operationId": "PartiesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      },
+      "delete": {
+        "operationId": "PartiesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/parties/{id}/contacts": {
+      "get": {
+        "operationId": "PartiesController_contacts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      },
+      "post": {
+        "operationId": "PartiesController_addContact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/parties/{id}/balance": {
+      "get": {
+        "operationId": "PartiesController_balance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/parties/{id}/statement": {
+      "get": {
+        "operationId": "PartiesController_statement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/allocations": {
+      "post": {
+        "operationId": "PartiesController_allocate",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
     }
   },
   "info": {
