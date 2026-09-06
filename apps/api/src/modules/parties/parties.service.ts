@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax, import/order */
 import { Inject, Injectable } from '@nestjs/common';
+import { Decimal } from 'decimal.js';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import { DomainError, errorCodes, newId } from '@erp/contracts';
@@ -22,7 +23,32 @@ export class PartiesService {
   async contacts(tenantId: string, partyId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(partyContacts).where(and(eq(partyContacts.tenantId, tenantId), eq(partyContacts.partyId, partyId), isNull(partyContacts.deletedAt)))); }
   async addContact(tenantId: string, partyId: string, input: ContactInput) { const id = newId(); await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(partyContacts).values({ id, partyId, tenantId, ...input })); return this.contacts(tenantId, partyId); }
   async removeContact(tenantId: string, partyId: string, id: string) { await withTenantTx(this.database.db, tenantId, (tx) => tx.update(partyContacts).set({ deletedAt: new Date() }).where(and(eq(partyContacts.tenantId, tenantId), eq(partyContacts.partyId, partyId), eq(partyContacts.id, id)))); return this.contacts(tenantId, partyId); }
-  async allocate(tenantId: string, input: AllocationInput) { const amount = Number(input.amount); const total = Number(input.invoiceTotal ?? Number.POSITIVE_INFINITY); const allocated = Number(input.alreadyAllocated ?? 0); if (!Number.isFinite(amount) || amount <= 0 || allocated + amount > total) throw new DomainError('ALLOCATION_EXCEEDS_OPEN_AMOUNT', 'Allocation exceeds the invoice open amount', 422); const id = newId(); await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(paymentAllocations).values({ id, tenantId, partyId: input.partyId, voucherId: input.voucherId, invoiceKind: input.invoiceKind, invoiceId: input.invoiceId, amount: input.amount })); return { id, ...input }; }
-  async partyBalance(tenantId: string, partyId: string, asOf?: string) { const rows = await withTenantTx(this.database.db, tenantId, (tx) => tx.select({ accountId: journalEntryLines.accountId, debit: journalEntryLines.debit, credit: journalEntryLines.credit, date: journalEntries.date, entryId: journalEntries.id }).from(journalEntryLines).innerJoin(journalEntries, eq(journalEntryLines.entryId, journalEntries.id)).where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntryLines.partyId, partyId), eq(journalEntries.status, 'posted'), asOf ? sql`${journalEntries.date} <= ${asOf}` : undefined))); const total = rows.reduce((sum, row) => sum + Number(row.debit) - Number(row.credit), 0).toFixed(4); const allocations = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(paymentAllocations).where(and(eq(paymentAllocations.tenantId, tenantId), eq(paymentAllocations.partyId, partyId)))); return { receivable: total, payable: '0.0000', open: rows.map((row) => ({ ...row, allocated: allocations.filter((a) => a.invoiceId === row.entryId).reduce((s, a) => s + Number(a.amount), 0).toFixed(4) })) }; }
-  async assertCreditAvailable(tenantId: string, partyId: string, newAmount: string, override = false) { const party = await this.get(tenantId, partyId); if (!party) throw new DomainError(errorCodes.NOT_FOUND, 'Party not found', 404); if (!override && Number((await this.partyBalance(tenantId, partyId)).receivable) + Number(newAmount) > Number(party.creditLimit)) throw new DomainError('CREDIT_LIMIT_EXCEEDED', 'Credit limit exceeded', 422); return true; }
+  async allocate(tenantId: string, input: AllocationInput) {
+    const amount = new Decimal(input.amount);
+    const total = input.invoiceTotal === undefined ? null : new Decimal(input.invoiceTotal);
+    const allocated = new Decimal(input.alreadyAllocated ?? '0');
+    if (!amount.isFinite() || amount.lte(0) || (total && allocated.plus(amount).gt(total))) {
+      throw new DomainError('ALLOCATION_EXCEEDS_OPEN_AMOUNT', 'Allocation exceeds the invoice open amount', 422);
+    }
+    const id = newId();
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const existing = await tx.select({ amount: paymentAllocations.amount }).from(paymentAllocations).where(and(eq(paymentAllocations.tenantId, tenantId), eq(paymentAllocations.invoiceKind, input.invoiceKind), eq(paymentAllocations.invoiceId, input.invoiceId)));
+      const persisted = existing.reduce((sum, row) => sum.plus(row.amount), new Decimal(0));
+      if (total && persisted.plus(amount).gt(total)) throw new DomainError('ALLOCATION_EXCEEDS_OPEN_AMOUNT', 'Allocation exceeds the invoice open amount', 422);
+      await tx.insert(paymentAllocations).values({ id, tenantId, partyId: input.partyId, voucherId: input.voucherId, invoiceKind: input.invoiceKind, invoiceId: input.invoiceId, amount: amount.toFixed(4) });
+    });
+    return { id, ...input, amount: amount.toFixed(4) };
+  }
+  async partyBalance(tenantId: string, partyId: string, asOf?: string) {
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) => tx.select({ accountId: journalEntryLines.accountId, debit: journalEntryLines.debit, credit: journalEntryLines.credit, date: journalEntries.date, entryId: journalEntries.id }).from(journalEntryLines).innerJoin(journalEntries, eq(journalEntryLines.entryId, journalEntries.id)).where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntryLines.partyId, partyId), eq(journalEntries.status, 'posted'), asOf ? sql`${journalEntries.date} <= ${asOf}` : undefined)));
+    const total = rows.reduce((sum, row) => sum.plus(new Decimal(row.debit).minus(row.credit)), new Decimal(0));
+    const allocations = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(paymentAllocations).where(and(eq(paymentAllocations.tenantId, tenantId), eq(paymentAllocations.partyId, partyId))));
+    return { receivable: total.toFixed(4), payable: '0.0000', open: rows.map((row) => ({ ...row, allocated: allocations.filter((a) => a.invoiceId === row.entryId).reduce((sum, a) => sum.plus(a.amount), new Decimal(0)).toFixed(4) })) };
+  }
+  async assertCreditAvailable(tenantId: string, partyId: string, newAmount: string, override = false) {
+    const party = await this.get(tenantId, partyId);
+    if (!party) throw new DomainError(errorCodes.NOT_FOUND, 'Party not found', 404);
+    if (!override && new Decimal((await this.partyBalance(tenantId, partyId)).receivable).plus(new Decimal(newAmount)).gt(new Decimal(party.creditLimit))) throw new DomainError('CREDIT_LIMIT_EXCEEDED', 'Credit limit exceeded', 422);
+    return true;
+  }
 }
