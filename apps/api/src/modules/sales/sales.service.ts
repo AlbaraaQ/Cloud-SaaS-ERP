@@ -14,16 +14,23 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
 
 export type SalesLineInput = { itemId?: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
 export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string };
 export type PaymentInput = { method: 'cash' | 'card' | 'bank' | 'credit' | 'split'; amount: string; idempotencyKey: string; cashLocationId?: string; reference?: string };
+export type PostingInput = { fiscalPeriodId?: string; journalLines?: { accountId: string; debit?: string; credit?: string; partyId?: string; description?: string }[]; inventoryLines?: InventoryLine[] };
 
 const money = (value: string) => new Decimal(value);
 
 @Injectable()
 export class SalesService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly inventory: InventoryService,
+    private readonly accounting: AccountingService,
+  ) {}
 
   async list(tenantId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesInvoices).where(eq(salesInvoices.tenantId, tenantId)).orderBy(desc(salesInvoices.createdAt)).limit(100)); }
 
@@ -61,11 +68,16 @@ export class SalesService {
     return this.get(tenantId, id);
   }
 
-  async post(tenantId: string, id: string) {
+  async post(tenantId: string, id: string, posting: PostingInput = {}) {
     const invoice = await this.get(tenantId, id);
     if (invoice.status === 'posted') return invoice;
     if (invoice.status !== 'draft') throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only draft invoices can be posted', 409);
     const number = `${invoice.kind === 'sale_return' ? 'SR' : invoice.kind === 'credit_note' ? 'CN' : invoice.kind === 'debit_note' ? 'DN' : 'SI'}-${Date.now()}-${id.slice(0, 6)}`;
+    if (posting.inventoryLines?.length) await this.inventory.record(tenantId, posting.inventoryLines.map((line) => ({ ...line, docType: line.docType || 'sales_invoice', docId: id })));
+    if (posting.journalLines?.length) {
+      if (!posting.fiscalPeriodId) throw new DomainError('SALES_FISCAL_PERIOD_REQUIRED', 'A fiscal period is required for accounting posting', 422);
+      await this.accounting.postJournal(tenantId, { branchId: invoice.branchId, fiscalPeriodId: posting.fiscalPeriodId, date: new Date().toISOString().slice(0, 10), description: `Sales invoice ${number}`, lines: posting.journalLines });
+    }
     await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesInvoices).set({ status: 'posted', number, postedAt: new Date(), paymentStatus: invoice.total === '0' ? 'paid' : 'unpaid' }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft'))));
     return this.get(tenantId, id);
   }
