@@ -3514,6 +3514,43 @@
         ]
       }
     },
+    "/api/v1/statements/trial-balance": {
+      "get": {
+        "operationId": "AccountingController_trialBalance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/statements/general-ledger/{accountId}": {
+      "get": {
+        "operationId": "AccountingController_generalLedger",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
     "/api/v1/journal-entries": {
       "post": {
         "operationId": "AccountingController_postJournal",

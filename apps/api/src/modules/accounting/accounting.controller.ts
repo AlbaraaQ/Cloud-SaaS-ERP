@@ -47,6 +47,18 @@ export class AccountingController {
     return { data: { id, status: 'open' } };
   }
 
+  @Get('statements/trial-balance')
+  @RequiresPermission('accounting.reports.view')
+  async trialBalance() {
+    return { data: await this.accounting.trialBalance(getTenantContext().tenantId) };
+  }
+
+  @Get('statements/general-ledger/:accountId')
+  @RequiresPermission('accounting.reports.view')
+  async generalLedger(@Param('accountId') accountId: string) {
+    return { data: await this.accounting.generalLedger(getTenantContext().tenantId, accountId) };
+  }
+
   @Post('journal-entries')
   @RequiresPermission('accounting.journal.post')
   async postJournal(@Body() body: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[] }) {

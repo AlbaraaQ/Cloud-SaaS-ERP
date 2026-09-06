@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { Decimal } from 'decimal.js';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   accounts,
@@ -111,6 +112,33 @@ export class AccountingService {
       await tx.update(journalEntries).set({ status: 'void', updatedAt: new Date() }).where(eq(journalEntries.id, entryId));
       return { id: reversalId, reversalOf: entryId };
     });
+  }
+
+  async trialBalance(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx.select({ accountId: journalEntryLines.accountId, debit: journalEntryLines.debit, credit: journalEntryLines.credit })
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntries.status, 'posted')));
+      const totals = new Map<string, { debit: Decimal; credit: Decimal }>();
+      for (const row of rows) {
+        const current = totals.get(row.accountId) ?? { debit: new Decimal(0), credit: new Decimal(0) };
+        current.debit = current.debit.plus(row.debit);
+        current.credit = current.credit.plus(row.credit);
+        totals.set(row.accountId, current);
+      }
+      // eslint-disable-next-line no-restricted-syntax
+      return [...totals.entries()].map(([accountId, total]) => ({ accountId, debit: total.debit.toFixed(4), credit: total.credit.toFixed(4), balance: total.debit.minus(total.credit).toFixed(4) }));
+    });
+  }
+
+  async generalLedger(tenantId: string, accountId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select({ entryId: journalEntries.id, date: journalEntries.date, number: journalEntries.number, description: journalEntries.description, debit: journalEntryLines.debit, credit: journalEntryLines.credit })
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntryLines.accountId, accountId), eq(journalEntries.status, 'posted'))),
+    );
   }
 
   async postJournal(tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[] }) {
