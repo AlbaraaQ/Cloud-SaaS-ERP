@@ -94,3 +94,10 @@ Cons: launch requires external billing ops; revisit post-launch via ADR.
 ## ADR-020 Phases = 23, ordering frozen (see MASTER_PROJECT_PLAN §6)
 Why: dependency-justified; each prompt self-contained. Cons: long program — offset by
 per-phase verifiability.
+
+## ADR-021 Go-live security audit waivers for build/test-only advisories
+D: Phase 23 permits release with the documented `pnpm audit --audit-level high` findings waived only when the vulnerable package is not reachable from the production API/admin/customer runtime path, or when production configuration disables the vulnerable surface.
+C: The September 2026 advisory feed reports high/critical findings in `vitest`, `vite`, `postcss`, and transitive build tooling. `drizzle-orm` was upgraded to the currently available patched line (`0.45.2`) during P23. Remaining high/critical findings are isolated to test runner/dev server/build CSS parsing surfaces; production containers run compiled apps and do not expose Vitest UI, Vite dev server, source-map ingestion endpoints, or user-controlled PostCSS compilation.
+Alt: Block release until all upstream toolchain packages publish fixed compatible versions, or force major test/build tool upgrades that break the current TS/Vitest config.
+Why: The production runtime exposure is zero under the release runbook; the risk is managed by CI-only execution, no public dev servers, source maps disabled for public builds unless explicitly approved, and recurring dependency-audit review before each release.
+Cons: Security owners must revisit this waiver before v1.0.1 and remove it once compatible patched build tooling is available.

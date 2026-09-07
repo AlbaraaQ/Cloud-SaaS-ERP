@@ -40,6 +40,8 @@ import { OpticsModule } from './modules/optics/optics.module.js';
 import { SallaModule } from './modules/integrations/salla/salla.module.js';
 import { TailoringModule } from './modules/tailoring/tailoring.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
+import { MetricsInterceptor } from './ops/metrics.interceptor.js';
+import { OpsModule } from './ops/ops.module.js';
 
 /**
  * Guard order is frozen by API_ARCHITECTURE §2:
@@ -70,6 +72,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
       },
     }),
     DatabaseModule,
+    OpsModule,
     DomainEventsModule,
     PlatformModule,
     PlatformServicesModule,
@@ -101,6 +104,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     { provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },

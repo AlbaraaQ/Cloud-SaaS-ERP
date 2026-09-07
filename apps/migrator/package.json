@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "devDependencies": {
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.9"
   },
   "scripts": {
     "dev": "node --enable-source-maps dist/cli.js --help",

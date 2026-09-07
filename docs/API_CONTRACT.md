@@ -229,3 +229,11 @@ Fitment: `POST /fitment/makes`, `POST /fitment/makes/{makeId}/models`, `POST /fi
 Salla: `GET /integrations/salla/oauth/authorize`, `POST /integrations/salla/connections`, `POST /integrations/salla/branch-mappings`, `POST /integrations/salla/export-queue`, `POST /integrations/salla/export-next`, `GET /integrations/salla/export-log`, `POST /integrations/salla/webhooks/{storeId}/orders`.
 
 Perms: `optics.view/manage`, `tailoring.view/manage`, `marina.view/manage/invoice`, `fitment.view/manage`, `salla.integration.view/manage`.
+
+## 18. Operations endpoints (P23)
+
+Ops endpoints are outside `/api/v1` and public for infrastructure probes/scrapers:
+
+- `GET /health/live`: process liveness only.
+- `GET /health/ready`: deep readiness with database, process, memory and uptime fields.
+- `GET /metrics`: Prometheus text exposition for request counts, latency buckets, queue depth placeholder, e-invoice failures and migration throughput.

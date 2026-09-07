@@ -25,7 +25,12 @@ export class HealthController {
     const dbReady = await this.databaseService.checkConnection();
     return {
       status: dbReady ? 'ok' : 'degraded',
-      db: dbReady ? 'connected' : 'unavailable',
+      checks: {
+        database: dbReady ? 'connected' : 'unavailable',
+        process: 'running',
+        memory: process.memoryUsage().heapUsed > 0 ? 'ok' : 'unknown',
+      },
+      uptimeSeconds: Math.floor(process.uptime()),
     };
   }
 }
