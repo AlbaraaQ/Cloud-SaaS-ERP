@@ -141,15 +141,17 @@ Widgets: cash on hand, pending cheques.
 
 Credentials wizard (CSR upload, environment toggle, masked secrets) · Submissions
 monitor (status, UUID, hash, error, retry) · Failed queue bulk retry · ZATCA health
-panel. Egypt ETA tab hidden unless authority enabled.
+panel. Backend Phase 13 endpoints are available for credential vaulting, health,
+submission ledger, invoice submit, and retry. Egypt ETA tab hidden unless authority enabled.
 
 ## 11. Reporting center
 
 Reports index (categories: financial/inventory/sales/purchases/parties/treasury/HR) ·
 Parametric runner (date presets, branch/warehouse/party pickers) · Tables + charts ·
-Async export (CSV/XLSX/PDF) to files with notification on ready. Reports keys per
-`API_CONTRACT` §11 (incl. legacy-parity: SalesByDay, category/items/payment-method
-breakdowns, expiry, stock limits, aging).
+Async export (CSV/XLSX/PDF) to files with notification on ready. Backend Phase 14
+registry and report/export endpoints are available. Reports keys per `API_CONTRACT` §11
+(incl. legacy-parity: SalesByDay, category/items/payment-method breakdowns, expiry,
+stock limits, aging).
 
 ## 12. Migration console (P15/P16)
 

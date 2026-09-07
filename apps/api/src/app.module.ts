@@ -26,6 +26,8 @@ import { InventoryModule } from './modules/inventory/inventory.module.js';
 import { SalesModule } from './modules/sales/sales.module.js';
 import { PurchasesModule } from './modules/purchases/purchases.module.js';
 import { TreasuryModule } from './modules/treasury/treasury.module.js';
+import { EinvoicingModule } from './modules/einvoicing/einvoicing.module.js';
+import { ReportingModule } from './modules/reporting/reporting.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
 /**
@@ -68,6 +70,8 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     SalesModule,
     PurchasesModule,
     TreasuryModule,
+    EinvoicingModule,
+    ReportingModule,
   ],
   controllers: [HealthController],
   providers: [

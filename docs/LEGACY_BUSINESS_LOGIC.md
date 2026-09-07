@@ -152,6 +152,8 @@ branch + party + item class) into immutable posted entries; void = reversal entr
   config; simulation & production flags; finalization dates window.
 - ETA Egypt: client id/2 secrets, signer pin, doc-type version, branch/activity codes +
   GS1/EGS item coding on items.
+- Implemented in PHASE_13: encrypted credential vault, ZATCA UBL/hash/QR submission
+  ledger and invoice metadata sync; ETA remains an explicit disabled adapter stub.
 
 ## BL-12 Reservations/orders vs invoices (CONFIRMED existence)
 

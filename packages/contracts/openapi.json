@@ -5210,6 +5210,221 @@
           "Treasury"
         ]
       }
+    },
+    "/api/v1/einvoice/credentials": {
+      "put": {
+        "operationId": "EinvoicingController_putCredentials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      },
+      "get": {
+        "operationId": "EinvoicingController_credentials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/einvoice/submissions": {
+      "get": {
+        "operationId": "EinvoicingController_submissions",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/einvoice/submissions/{id}/retry": {
+      "post": {
+        "operationId": "EinvoicingController_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/sales-invoices/{id}/einvoice/submit": {
+      "post": {
+        "operationId": "EinvoicingController_submitInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/einvoice/health": {
+      "get": {
+        "operationId": "EinvoicingController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/reports": {
+      "get": {
+        "operationId": "ReportingController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/{key}": {
+      "get": {
+        "operationId": "ReportingController_run",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/{key}/export": {
+      "post": {
+        "operationId": "ReportingController_export",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/invoices/{id}": {
+      "get": {
+        "operationId": "ReportingController_invoicePrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/shifts/{id}": {
+      "get": {
+        "operationId": "ReportingController_shiftPrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
     }
   },
   "info": {

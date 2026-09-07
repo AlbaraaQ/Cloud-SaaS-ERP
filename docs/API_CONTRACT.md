@@ -142,18 +142,18 @@ POST `/cash-locations/{id}/recalc-balance`. Perms `treasury.view`,
 
 ## 10. E-Invoicing
 
-`/einvoice/credentials` PUT/GET (masked) · GET `/einvoice/submissions?filter[status]`
+`/einvoice/credentials` PUT/GET (masked) · GET `/einvoice/submissions?status=`
 · POST `/einvoice/submissions/{id}/retry` · POST `/sales-invoices/{id}/einvoice/submit`
-(queued) · GET `/einvoice/health`. Perms `einvoice.{manage,submit,view}`.
+(queued/submission-ledger) · GET `/einvoice/health`. Perms `einvoice.{manage,submit,view}` and `einvoice.credentials.manage`.
 
 ## 11. Reporting (P14)
 
-`GET /reports/{reportKey}` with documented param sets per key:
+`GET /reports` catalog · `GET /reports/{reportKey}` with documented param sets per key:
 `sales-by-day, sales-by-category, sales-by-item, sales-by-payment, sales-by-ordertype,
-inventory-valuation, item-movement, expiry-report, stock-limits, ar-aging, ap-aging,
+monthly-sales, inventory-valuation, item-movement, expiry-report, stock-limits, ar-aging, ap-aging,
 vat-return, trial-balance, general-ledger, profit-loss, balance-sheet, cashier-shift,
 party-statement, serial-tracking, batch-tracking`. Async: POST `/reports/{key}/export
-{format:csv|xlsx|pdf}` → job → file download. Perm `reporting.{key}.view`.
+{format:csv|xlsx|pdf}` → reports-export token → file download when worker renders. Perm `reporting.view`, later refined to `reporting.{key}.view`.
 
 ## 12. Migration & Compat
 

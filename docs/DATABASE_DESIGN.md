@@ -251,8 +251,10 @@ hosting, extras), per-party deferred totals, `report_html NULL`, status. ← `Ca
 `csid`, `secret_enc bytea`, `request_ids jsonb`, `org jsonb`(CSRProperties fields),
 `valid_from/to`, `is_active`. Secrets encrypted at rest (app-layer AES-GCM).
 **einvoice_submissions** — `invoice_id`, `authority`, `action CHECK(sign,submit,clear,report)`,
-`status`, `uuid`, `hash`, `qr_payload`, `request_payload jsonb`, `response jsonb`,
+`status`, `uuid`, `hash`, `previous_hash`, `qr_payload`, `request_payload jsonb`, `response jsonb`,
 `error text NULL`, `attempts`, `submitted_at/by`. IDX(invoice). ← ZatcaResponse/Encoded/ETA.
+**einvoice_chain** — tenant/authority/environment hash-chain registry: `last_hash`, `updated_at`.
+Added in PHASE_13 to make ZATCA-style previous-hash sequencing explicit and lockable.
 
 ## 14. Migration (engine support, apps/migrator writes here)
 

@@ -116,6 +116,7 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
 
   // e-invoicing (PHASE_13)
   perm('einvoice.view', 'Read e-invoice credentials and submissions.'),
+  perm('einvoice.manage', 'Maintain e-invoicing configuration.'),
   perm('einvoice.submit', 'Sign and submit e-invoices.'),
   perm('einvoice.credentials.manage', 'Maintain e-invoicing credentials.'),
 
