@@ -1,0 +1,1 @@
+export default function ForgotPage() { return <section className="card"><h1>استعادة كلمة المرور</h1><form className="form"><input className="input" placeholder="البريد الإلكتروني" /><button className="btn primary" type="button">إرسال رابط آمن</button></form><p className="muted">واجهة friendly rate-limit: تظهر مهلة المحاولة التالية عند 429.</p></section>; }

@@ -2,10 +2,26 @@
   "name": "@erp/customer",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "decimal.js": "^10.6.0",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-hook-form": "^7.62.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "eslint-config-next": "^15.5.4",
+    "vitest": "^2.1.5"
+  },
   "scripts": {
-    "dev": "echo 'Customer app is deferred to Phase 18.'",
-    "build": "echo 'Customer build is deferred to Phase 18.'",
-    "lint": "echo 'Customer lint is deferred to Phase 18.'",
-    "test": "echo 'Customer tests are deferred to Phase 18.'"
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "lint": "eslint app components lib tests next.config.mjs --config ../../eslint.config.mjs",
+    "test": "vitest run"
   }
 }

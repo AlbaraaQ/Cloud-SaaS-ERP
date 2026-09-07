@@ -1,0 +1,8 @@
+'use client';
+
+import { useState } from 'react';
+
+export function LoginForm() { return <form className="form"><input className="input" placeholder="tenant code" aria-label="tenant" /><input className="input" placeholder="email" aria-label="email" /><input className="input" type="password" placeholder="password" aria-label="password" /><button className="btn primary" type="button">تسجيل الدخول</button><a className="muted" href="/auth/forced-reset">إعداد كلمة مرور مستخدم مرحّل</a></form>; }
+export function ProfileRequestForm() { return <form className="form"><input className="input" placeholder="الاسم" /><input className="input" placeholder="الجوال" /><textarea className="input" placeholder="تفاصيل طلب التعديل" /><button className="btn primary" type="button">إرسال طلب موافقة</button></form>; }
+export function VerifyForm() { const [result, setResult] = useState(''); return <div className="card"><form className="form"><input className="input" placeholder="Invoice UUID" /><input className="input" placeholder="Hash / QR value" /><button className="btn primary" type="button" onClick={() => setResult('issuer: شركة*** · date: 2026-09-07 · total: SAR 115.00')}>تحقق</button></form>{result ? <p className="muted">{result}</p> : <p className="muted">المخرجات مخفية ومحدودة البيانات ومحمية بمعدل طلبات منخفض.</p>}</div>; }
+export function QuickSaleForm() { return <form className="form"><input className="input" placeholder="بحث عن صنف" /><input className="input" inputMode="decimal" placeholder="الكمية" /><select className="input"><option>cash</option><option>card</option><option>credit</option></select><button className="btn primary" type="button">إنشاء وترحيل فاتورة</button></form>; }

@@ -1,0 +1,4 @@
+import { PortalShell } from '../../../../components/portal-shell';
+import { SimpleTable } from '../../../../components/table';
+
+export default async function InvoiceDetail({ params }: { params: Promise<{ id: string }> }) { const { id } = await params; return <PortalShell><section className="card print"><div className="row" style={{ justifyContent: 'space-between' }}><div><h1>فاتورة {id}</h1><p className="muted">PDF fallback: إذا كان ملف PDF قيد التجهيز استخدم طباعة المتصفح.</p></div><div className="qr" aria-label="ZATCA QR placeholder" /></div><SimpleTable rows={[{ id: '1', item: 'صنف', qty: '1.0000', price: '100.00', vat: '15.00', total: '115.00' }]} columns={['item','qty','price','vat','total']} /><div className="toolbar"><button className="btn primary" type="button">تحميل PDF</button><button className="btn" type="button">CSV</button></div></section></PortalShell>; }
