@@ -132,6 +132,13 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   // legacy compat gateway (PHASE_16)
   perm('compat.manage', 'Register, rotate and revoke legacy desktop compatibility devices.'),
   perm('compat.sync', 'Use legacy desktop compatibility pull and push endpoints.'),
+
+  // restaurant POS pack (PHASE_19)
+  perm('pos.view', 'Read POS floor maps, tables and open order state.'),
+  perm('pos.operate', 'Open tables, add or void order items, merge/split, send and close POS orders.'),
+  perm('pos.priceoverride', 'Override POS item prices where tenant caps permit it.'),
+  perm('pos.tables.manage', 'Maintain dining tables and table categories.'),
+  perm('pos.config.manage', 'Maintain POS order methods, payment visibility and kitchen print routing.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

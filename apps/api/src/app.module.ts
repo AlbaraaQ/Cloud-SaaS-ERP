@@ -30,6 +30,7 @@ import { EinvoicingModule } from './modules/einvoicing/einvoicing.module.js';
 import { ReportingModule } from './modules/reporting/reporting.module.js';
 import { MigrationModule } from './modules/migration/migration.module.js';
 import { CompatModule } from './modules/compat/compat.module.js';
+import { PosModule } from './modules/pos/pos.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
 /**
@@ -76,6 +77,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     ReportingModule,
     MigrationModule,
     CompatModule,
+    PosModule,
   ],
   controllers: [HealthController],
   providers: [

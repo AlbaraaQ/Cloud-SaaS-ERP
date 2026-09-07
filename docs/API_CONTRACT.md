@@ -173,3 +173,19 @@ public device `POST /compat/auth/device`; scoped token endpoints `GET /compat/ma
 
 Separate guard `is_platform_admin`: `/platform/tenants` CRUD + `suspend/activate`,
 `/platform/users`, `/platform/stats`, `/platform/migrations`. Never mixed with tenant routes.
+
+
+## 14. Restaurant POS Pack (P19)
+
+Feature flag `pack.pos`; disabled tenants receive 404 for `/pos/*`.
+
+`GET/POST /pos/categories` · `GET/POST /pos/tables` ·
+`POST /pos/tables/{id}/open` · `POST /pos/tables/{id}/items` ·
+`POST /pos/events/{id}/void {reason}` · `POST /pos/tables/{id}/send-to-invoice` ·
+`POST /pos/tables/{id}/close` · `POST /pos/tables/{sourceId}/merge/{targetId}` ·
+`POST /pos/tables/{id}/split`.
+
+Perms: `pos.view`, `pos.operate`, `pos.priceoverride`, `pos.tables.manage`,
+`pos.config.manage`. Order events are append-only lifecycle facts; send-to-invoice creates
+a normal sales invoice with `order_type`, `table_no`, and daily branch-scoped
+`pos_order:YYYY-MM-DD` numbering.

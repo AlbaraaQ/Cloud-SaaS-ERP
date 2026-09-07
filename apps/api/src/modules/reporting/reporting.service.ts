@@ -30,6 +30,8 @@ export class ReportingService {
           return { key, params: parsed, rows: rowsOf(await tx.execute(sql`SELECT date_trunc('month', posted_at)::date AS month, sum(total)::text AS total FROM sales_invoices WHERE tenant_id = ${tenantId} AND status = 'posted' GROUP BY date_trunc('month', posted_at) ORDER BY month`)) };
         case 'sales-by-payment':
           return { key, params: parsed, rows: rowsOf(await tx.execute(sql`SELECT payment_status, count(*)::text AS count, sum(total)::text AS total FROM sales_invoices WHERE tenant_id = ${tenantId} GROUP BY payment_status ORDER BY payment_status`)) };
+        case 'sales-by-ordertype':
+          return { key, params: parsed, rows: rowsOf(await tx.execute(sql`SELECT coalesce(order_type, 'standard') AS order_type, count(*)::text AS count, sum(total)::text AS total FROM sales_invoices WHERE tenant_id = ${tenantId} AND status = 'posted' GROUP BY coalesce(order_type, 'standard') ORDER BY order_type`)) };
         case 'inventory-valuation':
           return { key, params: parsed, rows: rowsOf(await tx.execute(sql`SELECT item_id, warehouse_id, quantity::text, value::text, average_cost::text FROM stock_balances WHERE tenant_id = ${tenantId} ORDER BY item_id, warehouse_id`)) };
         case 'item-movement':

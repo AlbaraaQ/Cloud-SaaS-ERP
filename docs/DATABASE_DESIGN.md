@@ -287,8 +287,9 @@ dates, status ← PM_Projects), `project_stage_templates`, `project_stages`(orde
 accreditation), `boq_terms`(← PM_Terms), `progress_bills / _lines`(retention
 `work_guarantee`, previously_paid, remaining — from InvContratct), `project_requirements`.
 **Restaurant POS (P19)**: `dining_tables`(cat, status, current invoice ← Tables),
-`table_categories`, `order_items_events`(← Table_Order), configs in tenant_settings
-(SettingOrderMethods/PayMethods/Print…).
+`table_categories`, `order_events`(← Table_Order), configs in tenant_settings
+(SettingOrderMethods/PayMethods/Print…). Implemented in PHASE_19 with FORCE RLS plus
+`sales_invoices.order_type/table_no/combined_into` and `sales_invoice_lines.modifiers`.
 **Niche (P22)**: `optical_prescriptions`(← Glasses+Other_Column jsonb), `customer_measurements`,
 `vessels`+`vessel_groups`+`bookings`+`rental_invoices`+`violations`+`vessel_owners`(
 party link, percent) ← Marine family, `vehicle_makes/models`, `item_vehicle_fitment`,

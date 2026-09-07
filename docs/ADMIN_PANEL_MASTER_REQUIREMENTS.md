@@ -173,8 +173,8 @@ year, preview lines, post) · Payslip print. Perms hrm.*.
 
 ## 14. Vertical packs (enabled per tenant flags)
 
-POS (P19): tables floor map grid, open/new order flow, order-type chips, kitchen print
-config, daily order numbers reset view. Projects (P21): projects kanban by stage,
+POS (P19) 🟢: tables floor map grid, open/new order flow, order-type chips, kitchen print
+config, daily order numbers reset view implemented at admin `/pos` and API `/pos/*`. Projects (P21): projects kanban by stage,
 progress-bill editor (retention, previous payments auto), contractor parties view,
 installment contracts schedule grid + collect action. Niche (P22): prescription form
 (optics), measurements card (tailoring), marina booking calendar + rent invoice +
@@ -204,3 +204,5 @@ RTL numerals option (western digits default) · decimal input masks per currency
 - 🟢 Reporting center: route `/reporting`.
 - 🟢 Migration/compat console: route `/migration`.
 - ⚪ Vertical packs remain owned by later phases P19-P22.
+
+- 🟢 Restaurant POS vertical pack: `/pos` covers floor map, order flow, modifiers, kitchen print config, daily counters, merge/split and pay/close handoff.

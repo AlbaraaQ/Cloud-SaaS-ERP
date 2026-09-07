@@ -116,3 +116,11 @@ allocation details remain explicit DTO extensions, not table mirroring.
 No desktop route can elevate permissions. Admin device management still uses normal JWT
 RBAC. Compat document pushes are audited through the normal API audit pipeline and carry
 source metadata as a device-originated request.
+
+## Phase 19 POS extension note
+
+Desktop restaurant/POS payloads continue to use the Phase 16 compat gateway. POS-specific
+legacy values such as `Tables`, `Table_Order`, `SettingOrderMethods`, additions, and
+kitchen-category routing map to the Phase 19 `/pos/*` resources and then to normal cloud
+sales invoices. The gateway must still reject unknown enum integers unless configured in
+the per-device `enumMaps`.
