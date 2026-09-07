@@ -3999,6 +3999,71 @@
         ]
       }
     },
+    "/api/v1/inventory/transfers/draft": {
+      "post": {
+        "operationId": "InventoryController_createTransfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/{id}/send": {
+      "post": {
+        "operationId": "InventoryController_sendTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/receive": {
+      "post": {
+        "operationId": "InventoryController_receiveTransfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/cancel": {
+      "post": {
+        "operationId": "InventoryController_cancelTransfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/adjustments/post": {
       "post": {
         "operationId": "InventoryController_adjust",

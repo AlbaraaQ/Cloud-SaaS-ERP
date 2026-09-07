@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 import { getTenantContext } from '../platform/context/tenant-context.js';
@@ -14,6 +14,10 @@ export class InventoryController {
   @Get('valuation/as-of') @RequiresPermission('inventory.view') valuationAsOf(@Query('as_of') asOf: string, @Query('warehouse_id') warehouseId?: string, @Query('item_id') itemId?: string) { return this.inventory.valuationAsOf(getTenantContext().tenantId, new Date(asOf), warehouseId, itemId); }
   @Post('balances/recompute') @RequiresPermission('inventory.negative.override') recompute(@Query('warehouse_id') warehouseId?: string, @Query('item_id') itemId?: string) { return this.inventory.recomputeBalances(getTenantContext().tenantId, warehouseId, itemId); }
   @Post('transfers') @RequiresPermission('inventory.adjust') transfer(@Body() body: { transferId: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialId?: string }> }) { return this.inventory.transfer(getTenantContext().tenantId, body); }
+  @Post('transfers/draft') @RequiresPermission('inventory.adjust') createTransfer(@Body() body: { id: string; number: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }> }) { return this.inventory.createTransfer(getTenantContext().tenantId, body); }
+  @Post('transfers/:id/send') @RequiresPermission('inventory.adjust') sendTransfer(@Param('id') transferId: string) { return this.inventory.sendTransfer(getTenantContext().tenantId, transferId); }
+  @Post('transfers/receive') @RequiresPermission('inventory.adjust') receiveTransfer(@Body() body: { transferId: string; received: Array<{ lineNo: number; qty: string }> }) { return this.inventory.receiveTransfer(getTenantContext().tenantId, body.transferId, body.received); }
+  @Post('transfers/cancel') @RequiresPermission('inventory.adjust') cancelTransfer(@Body() body: { transferId: string }) { return this.inventory.cancelTransfer(getTenantContext().tenantId, body.transferId); }
   @Post('adjustments/post') @RequiresPermission('inventory.adjust') adjust(@Body() body: { adjustmentId: string; itemId: string; warehouseId: string; countedQty: string; unitCost?: string; approved: boolean; journalEntryId?: string }) { return this.inventory.adjust(getTenantContext().tenantId, body); }
   @Post('serials/reserve') @RequiresPermission('inventory.adjust') reserveSerials(@Body() body: { serialIds: string[] }) { return this.inventory.reserveSerials(getTenantContext().tenantId, body.serialIds); }
 }

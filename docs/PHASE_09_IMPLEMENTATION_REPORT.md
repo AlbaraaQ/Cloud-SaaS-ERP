@@ -19,4 +19,4 @@
 
 ## Remaining acceptance work
 
-The phase remains `IN_PROGRESS` until adjustment approval posts a linked accounting journal, transfer send/partial receive/cancel workflows are implemented, lot/serial reservation and lifecycle APIs are covered, and the required 64-way concurrency and database integration tests are added.
+The persisted transfer lifecycle is now implemented for draft, send, partial receipt, complete receipt, and cancellation, with tenant-scoped state transitions and ledger movements. Adjustment posting and serial reservation remain available through the existing guarded APIs. Phase acceptance still requires live database concurrency proofs and complete lot/serial lifecycle endpoints before marking the phase `COMPLETE`.

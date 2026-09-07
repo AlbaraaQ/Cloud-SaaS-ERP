@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
-import { inventoryTransactions, itemSerials, stockBalances, withTenantTx, type DatabaseHandle } from '@erp/database';
+import { inventoryTransactions, itemSerials, stockBalances, stockTransfers, stockTransferLines, withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 
@@ -87,8 +87,43 @@ export class InventoryService {
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const rows = await tx.select().from(itemSerials).where(and(eq(itemSerials.tenantId, tenantId), inArray(itemSerials.id, serialIds)));
       if (rows.length !== serialIds.length || rows.some((row) => row.status !== 'available')) throw new DomainError('SERIAL_UNAVAILABLE', 'One or more serials are unavailable', 422);
-      for (const serial of rows) await tx.update(itemSerials).set({ status: 'reserved', updatedAt: new Date() }).where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, serial.id)));
+      for (const serial of rows) await tx.update(itemSerials).set({ status: 'reserved', updatedAt: new Date() }).where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, serial.id), eq(itemSerials.status, 'available')));
       return { serialIds };
     });
+  }
+
+  async createTransfer(tenantId: string, input: { id: string; number: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }> }) {
+    if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId) throw new DomainError('INVALID_STOCK_TRANSFER', 'A transfer requires distinct warehouses and at least one line', 422);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await tx.insert(stockTransfers).values({ id: input.id, tenantId, number: input.number, fromWarehouseId: input.fromWarehouseId, toWarehouseId: input.toWarehouseId, status: 'draft' });
+      await tx.insert(stockTransferLines).values(input.lines.map((line, index) => ({ transferId: input.id, tenantId, lineNo: index + 1, itemId: line.itemId, qty: line.qty, unitCost: line.unitCost ?? '0', lotId: line.lotId, serialIds: line.serialIds ?? [] })));
+      return { id: input.id, status: 'draft' };
+    });
+  }
+
+  async sendTransfer(tenantId: string, transferId: string) {
+    const transfer = await withTenantTx(this.database.db, tenantId, async (tx) => (await tx.select().from(stockTransfers).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))))[0]);
+    if (!transfer || transfer.status !== 'draft') throw new DomainError('TRANSFER_INVALID_STATE', 'Only draft transfers can be sent', 422);
+    const lines = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(stockTransferLines).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId))));
+    const result = await this.record(tenantId, lines.map((line) => ({ itemId: line.itemId, warehouseId: transfer.fromWarehouseId, qty: line.qty, unitCost: line.unitCost, direction: 'out' as const, docType: 'stock_transfer', docId: transferId, lineId: `${transferId}:${line.lineNo}`, lotId: line.lotId ?? undefined, costing: 'outAtAvg' as const })));
+    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(stockTransfers).set({ status: 'in_transit', sentAt: new Date(), updatedAt: new Date() }).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))));
+    return { transferId, status: 'in_transit', transactionIds: result.transactionIds };
+  }
+
+  async receiveTransfer(tenantId: string, transferId: string, received: Array<{ lineNo: number; qty: string }>) {
+    const transfer = await withTenantTx(this.database.db, tenantId, async (tx) => (await tx.select().from(stockTransfers).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))))[0]);
+    if (!transfer || !['in_transit', 'partially_received'].includes(transfer.status)) throw new DomainError('TRANSFER_INVALID_STATE', 'Transfer is not awaiting receipt', 422);
+    const lines = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(stockTransferLines).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId))));
+    const byLine = new Map(lines.map((line) => [line.lineNo, line]));
+    const movements: InventoryLine[] = [];
+    for (const input of received) { const line = byLine.get(input.lineNo); if (!line) throw new DomainError('TRANSFER_LINE_NOT_FOUND', 'Transfer line was not found', 404); const qty = new Decimal(input.qty); const already = new Decimal(line.receivedQty); const requested = new Decimal(line.qty); if (!qty.gt(0) || already.plus(qty).gt(requested)) throw new DomainError('TRANSFER_RECEIPT_INVALID', 'Received quantity exceeds transfer quantity', 422); movements.push({ itemId: line.itemId, warehouseId: transfer.toWarehouseId, qty: qty.toFixed(4), unitCost: line.unitCost, direction: 'in', docType: 'stock_transfer_receipt', docId: transferId, lineId: `${transferId}:${line.lineNo}:${already.plus(qty).toFixed(4)}`, lotId: line.lotId ?? undefined, costing: 'inWithCost' }); }
+    const result = await this.record(tenantId, movements);
+    await withTenantTx(this.database.db, tenantId, async (tx) => { for (const input of received) { const line = byLine.get(input.lineNo); if (line) await tx.update(stockTransferLines).set({ receivedQty: sql`${stockTransferLines.receivedQty} + ${input.qty}` }).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId), eq(stockTransferLines.lineNo, input.lineNo))); } const updated = await tx.select().from(stockTransferLines).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId))); const complete = updated.every((line) => new Decimal(line.receivedQty).eq(new Decimal(line.qty))); await tx.update(stockTransfers).set({ status: complete ? 'received' : 'partially_received', receivedAt: complete ? new Date() : undefined, updatedAt: new Date() }).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))); });
+    return { transferId, transactionIds: result.transactionIds };
+  }
+
+  async cancelTransfer(tenantId: string, transferId: string) {
+    const result = await withTenantTx(this.database.db, tenantId, async (tx) => { const row = (await tx.select().from(stockTransfers).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))))[0]; if (!row || ['received', 'cancelled'].includes(row.status)) throw new DomainError('TRANSFER_INVALID_STATE', 'Transfer cannot be cancelled', 422); await tx.update(stockTransfers).set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date() }).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))); return { transferId, status: 'cancelled' }; });
+    return result;
   }
 }
