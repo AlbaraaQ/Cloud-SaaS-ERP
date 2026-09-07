@@ -3985,6 +3985,48 @@
         ]
       }
     },
+    "/api/v1/inventory/transfers": {
+      "post": {
+        "operationId": "InventoryController_transfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments/post": {
+      "post": {
+        "operationId": "InventoryController_adjust",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/reserve": {
+      "post": {
+        "operationId": "InventoryController_reserveSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/sales/invoices": {
       "get": {
         "operationId": "SalesController_list",

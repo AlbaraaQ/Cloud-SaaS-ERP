@@ -1,9 +1,9 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
-import { inventoryTransactions, stockBalances, withTenantTx, type DatabaseHandle } from '@erp/database';
+import { inventoryTransactions, itemSerials, stockBalances, withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 
@@ -62,6 +62,33 @@ export class InventoryService {
         await tx.insert(stockBalances).values({ tenantId, itemId: row.itemId, warehouseId: row.warehouseId, quantity: row.quantity, value: row.value, averageCost: row.averageCost, version: 1, updatedAt: new Date() }).onConflictDoUpdate({ target: [stockBalances.tenantId, stockBalances.itemId, stockBalances.warehouseId], set: { quantity: row.quantity, value: row.value, averageCost: row.averageCost, version: sql`${stockBalances.version} + 1`, updatedAt: new Date() } });
       }
       return { recomputed: valuation.length };
+    });
+  }
+
+  async transfer(tenantId: string, input: { transferId: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialId?: string }> }) {
+    if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId) throw new DomainError('INVALID_STOCK_TRANSFER', 'A transfer requires distinct warehouses and at least one line', 422);
+    const outbound = input.lines.map((line) => ({ ...line, warehouseId: input.fromWarehouseId, direction: 'out' as const, docType: 'stock_transfer', docId: input.transferId, costing: 'outAtAvg' as const }));
+    const inbound = input.lines.map((line) => ({ ...line, warehouseId: input.toWarehouseId, direction: 'in' as const, docType: 'stock_transfer', docId: input.transferId, costing: 'inWithCost' as const }));
+    return this.record(tenantId, [...outbound, ...inbound]);
+  }
+
+  async adjust(tenantId: string, input: { adjustmentId: string; itemId: string; warehouseId: string; countedQty: string; unitCost?: string; approved: boolean; journalEntryId?: string }) {
+    if (!input.approved) throw new DomainError('ADJUSTMENT_APPROVAL_REQUIRED', 'Stock adjustments require approval before posting', 422);
+    if (!input.journalEntryId) throw new DomainError('ADJUSTMENT_JOURNAL_REQUIRED', 'An approved adjustment must reference a journal entry', 422);
+    const current = await this.levels(tenantId, input.warehouseId, input.itemId);
+    const existing = current[0];
+    const delta = new Decimal(input.countedQty).minus(existing?.quantity ?? '0');
+    if (delta.isZero()) return { adjustmentId: input.adjustmentId, transactionIds: [] };
+    return this.record(tenantId, [{ itemId: input.itemId, warehouseId: input.warehouseId, qty: delta.abs().toFixed(4), unitCost: input.unitCost ?? existing?.averageCost ?? '0', direction: delta.gt(0) ? 'in' : 'out', docType: 'stock_adjustment', docId: input.adjustmentId, costing: delta.gt(0) ? 'inWithCost' : 'outAtAvg' }]);
+  }
+
+  async reserveSerials(tenantId: string, serialIds: string[]) {
+    if (!serialIds.length) throw new DomainError('SERIALS_REQUIRED', 'At least one serial is required', 422);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx.select().from(itemSerials).where(and(eq(itemSerials.tenantId, tenantId), inArray(itemSerials.id, serialIds)));
+      if (rows.length !== serialIds.length || rows.some((row) => row.status !== 'available')) throw new DomainError('SERIAL_UNAVAILABLE', 'One or more serials are unavailable', 422);
+      for (const serial of rows) await tx.update(itemSerials).set({ status: 'reserved', updatedAt: new Date() }).where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, serial.id)));
+      return { serialIds };
     });
   }
 }

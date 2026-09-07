@@ -6,6 +6,9 @@
 - Append-only transaction trigger and tenant-scoped indexes.
 - Moving-average `record()` engine with costing hints, negative-stock guard, and transactional balance cache updates.
 - Movement, current-level, as-of valuation, and balance recomputation APIs.
+- Transfer posting flow with distinct-warehouse validation and paired outbound/inbound ledger movements.
+- Approved adjustment posting flow requiring a journal reference before writing the delta movement.
+- Serial reservation flow with tenant scoping, availability checks, and atomic status transitions.
 - Inventory valuation parity helpers and fixtures for moving average, pro-rata discount allocation, and transfer value conservation.
 - Transfer, serial, and adjustment lifecycle contracts with invariant tests for partial receipt, terminal cancellation, serial transitions, and journal-link requirements.
 - Inventory module README documenting costing hints and numeric examples.
