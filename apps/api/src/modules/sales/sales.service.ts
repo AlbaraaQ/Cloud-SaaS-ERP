@@ -73,10 +73,10 @@ export class SalesService {
     if (invoice.status === 'posted') return invoice;
     if (invoice.status !== 'draft') throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only draft invoices can be posted', 409);
     const number = `${invoice.kind === 'sale_return' ? 'SR' : invoice.kind === 'credit_note' ? 'CN' : invoice.kind === 'debit_note' ? 'DN' : 'SI'}-${Date.now()}-${id.slice(0, 6)}`;
+    if (posting.journalLines?.length && !posting.fiscalPeriodId) throw new DomainError('SALES_FISCAL_PERIOD_REQUIRED', 'A fiscal period is required for accounting posting', 422);
     if (posting.inventoryLines?.length) await this.inventory.record(tenantId, posting.inventoryLines.map((line) => ({ ...line, docType: line.docType || 'sales_invoice', docId: id })));
     if (posting.journalLines?.length) {
-      if (!posting.fiscalPeriodId) throw new DomainError('SALES_FISCAL_PERIOD_REQUIRED', 'A fiscal period is required for accounting posting', 422);
-      await this.accounting.postJournal(tenantId, { branchId: invoice.branchId, fiscalPeriodId: posting.fiscalPeriodId, date: new Date().toISOString().slice(0, 10), description: `Sales invoice ${number}`, lines: posting.journalLines });
+      await this.accounting.postJournal(tenantId, { branchId: invoice.branchId, fiscalPeriodId: posting.fiscalPeriodId!, date: new Date().toISOString().slice(0, 10), description: `Sales invoice ${number}`, lines: posting.journalLines });
     }
     await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesInvoices).set({ status: 'posted', number, postedAt: new Date(), paymentStatus: invoice.total === '0' ? 'paid' : 'unpaid' }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft'))));
     return this.get(tenantId, id);

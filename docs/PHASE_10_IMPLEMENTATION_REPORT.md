@@ -20,7 +20,7 @@
 - API lint: passed.
 - Workspace TypeScript/build: passed.
 - Smoke check and OpenAPI export: passed.
-- Full test command completed, but existing database fixture tests report migration/schema failures (`tenant_id` missing) unrelated to the sales module.
+- `pnpm run verify` completed successfully: typecheck, lint, build, smoke checks, OpenAPI export, and all workspace tests passed (API: 38 files / 234 tests).
 
 ## Remaining Phase 10 scope
 
