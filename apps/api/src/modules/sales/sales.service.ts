@@ -112,6 +112,32 @@ export class SalesService {
     const source = await this.get(tenantId, sourceId);
     if (source.status !== 'posted') throw new DomainError('SALES_RETURN_SOURCE_INVALID', 'Returns require a posted source invoice', 409);
     if (source.kind === 'sale_return') throw new DomainError('SALES_RETURN_SOURCE_INVALID', 'A return cannot reference another return', 422);
+
+    const sourceQuantities = new Map<string, Decimal>();
+    const requested = new Map<string, Decimal>();
+    for (const line of input.lines) {
+      if (!line.itemId) throw new DomainError('SALES_RETURN_ITEM_REQUIRED', 'Return lines must reference an item', 422);
+      const quantity = money(line.quantity);
+      if (!quantity.isFinite() || quantity.lte(0)) throw new DomainError('SALES_RETURN_QUANTITY_INVALID', 'Return quantities must be positive', 422);
+      sourceQuantities.set(line.itemId, sourceQuantities.get(line.itemId) ?? new Decimal(0));
+      requested.set(line.itemId, (requested.get(line.itemId) ?? new Decimal(0)).plus(quantity));
+    }
+    for (const line of source.lines) if (line.itemId) sourceQuantities.set(line.itemId, (sourceQuantities.get(line.itemId) ?? new Decimal(0)).plus(line.quantity));
+
+    const returned = await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const returnInvoices = await tx.select({ id: salesInvoices.id }).from(salesInvoices).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.referenceInvoiceId, sourceId), eq(salesInvoices.kind, 'sale_return')));
+      const totals = new Map<string, Decimal>();
+      for (const invoice of returnInvoices) {
+        const lines = await tx.select().from(salesInvoiceLines).where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.invoiceId, invoice.id)));
+        for (const line of lines) if (line.itemId) totals.set(line.itemId, (totals.get(line.itemId) ?? new Decimal(0)).plus(line.quantity));
+      }
+      return totals;
+    });
+
+    for (const [itemId, quantity] of requested) {
+      const available = (sourceQuantities.get(itemId) ?? new Decimal(0)).minus(returned.get(itemId) ?? new Decimal(0));
+      if (quantity.gt(available)) throw new DomainError('SALES_RETURN_QUANTITY_EXCEEDED', 'Return quantity exceeds the remaining invoice quantity', 422);
+    }
     return this.create(tenantId, { ...input, kind: 'sale_return', partyId: input.partyId ?? source.partyId ?? undefined, referenceInvoiceId: sourceId } as SalesInvoiceInput & { referenceInvoiceId: string });
   }
 
