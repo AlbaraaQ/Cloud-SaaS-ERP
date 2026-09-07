@@ -25,7 +25,8 @@
 ## Remaining Phase 10 scope
 
 - Transactional posting integration with inventory movements and accounting journal entries.
-- Returns, credit/debit note lifecycle, promotion application, and tax authority submission workflows.
-- Dedicated sales integration/concurrency tests and fixture migration repair.
+- Added reference-linked return creation with source-status and return-of-return guards.
+- Added offer validity/target evaluation endpoint and adjustment-note posting lifecycle.
+- Remaining: atomic PostingEngine + InventoryLedger transaction, accounting/stock reversal effects, full returns quantity enforcement, and dedicated sales integration/concurrency tests.
 
-The phase must remain `IN_PROGRESS` until the remaining scope and failing fixtures are resolved.
+The phase remains `IN_PROGRESS` until the posting effects and acceptance fixtures are implemented and verified.

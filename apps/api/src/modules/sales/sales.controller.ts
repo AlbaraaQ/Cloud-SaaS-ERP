@@ -16,7 +16,10 @@ export class SalesController {
   @Post('sales/invoices/:id/post') @RequiresPermission('sales.invoice.post') post(@Param('id') id: string, @Body() body: PostingInput) { return this.sales.post(getTenantContext().tenantId, id, body); }
   @Post('sales/invoices/:id/void') @RequiresPermission('sales.invoice.void') void(@Param('id') id: string, @Body() body: { reason: string }) { return this.sales.void(getTenantContext().tenantId, id, body.reason); }
   @Post('sales/invoices/:id/payments') @RequiresPermission('sales.invoice.pay') payment(@Param('id') id: string, @Body() body: PaymentInput) { return this.sales.addPayment(getTenantContext().tenantId, id, body); }
+  @Post('sales/invoices/:id/return') @RequiresPermission('sales.return.create') returnFrom(@Param('id') id: string, @Body() body: Omit<SalesInvoiceInput, 'kind'>) { return this.sales.returnFrom(getTenantContext().tenantId, id, body); }
   @Post('sales/invoices/:id/adjustment-notes') @RequiresPermission('sales.adjustment.create') note(@Param('id') id: string, @Body() body: { branchId: string; kind: string; reason: string; amount: string }) { return this.sales.createAdjustmentNote(getTenantContext().tenantId, id, body); }
+  @Post('sales/adjustment-notes/:id/post') @RequiresPermission('sales.invoice.post') postNote(@Param('id') id: string) { return this.sales.postAdjustmentNote(getTenantContext().tenantId, id); }
+  @Post('sales/offers/:id/evaluate') @RequiresPermission('sales.view') evaluateOffer(@Param('id') id: string, @Body() body: { itemId: string; quantity: string; value: string }) { return this.sales.evaluateOffer(getTenantContext().tenantId, id, body); }
   @Get('sales/offers') @RequiresPermission('sales.view') offers() { return this.sales.listOffers(getTenantContext().tenantId); }
   @Post('sales/offers') @RequiresPermission('sales.offer.manage') createOffer(@Body() body: Parameters<SalesService['createOffer']>[1]) { return this.sales.createOffer(getTenantContext().tenantId, body); }
   @Get('sales/salesmen') @RequiresPermission('sales.view') salesmen() { return this.sales.listSalesmen(getTenantContext().tenantId); }

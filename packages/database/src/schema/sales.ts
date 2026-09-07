@@ -14,6 +14,7 @@ const qty = { precision: 20, scale: 4, mode: 'string' as const };
 export const salesInvoices = pgTable('sales_invoices', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   branchId: uuid('branch_id').notNull().references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id),
+  referenceInvoiceId: uuid('reference_invoice_id'),
   partyId: uuid('party_id').references(() => parties.id), salesmanId: uuid('salesman_id'), kind: text('kind').notNull().default('sale'),
   status: text('status').notNull().default('draft'), number: text('number'), currency: text('currency').notNull().default('SAR'),
   priceIncludesVat: boolean('price_includes_vat').notNull().default(false), cashCustomerName: text('cash_customer_name'), cashCustomerMobile: text('cash_customer_mobile'),

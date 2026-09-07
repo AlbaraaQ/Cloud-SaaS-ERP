@@ -18,7 +18,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
 
 export type SalesLineInput = { itemId?: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
-export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string };
+export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; referenceInvoiceId?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string };
 export type PaymentInput = { method: 'cash' | 'card' | 'bank' | 'credit' | 'split'; amount: string; idempotencyKey: string; cashLocationId?: string; reference?: string };
 export type PostingInput = { fiscalPeriodId?: string; journalLines?: { accountId: string; debit?: string; credit?: string; partyId?: string; description?: string }[]; inventoryLines?: InventoryLine[] };
 
@@ -48,7 +48,7 @@ export class SalesService {
     const totals = calculateInvoiceTotals({ lines: input.lines, priceIncludesVat: input.priceIncludesVat, invoiceDiscount: input.invoiceDiscount, extraTax: input.extraTax, withholding: input.withholding });
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
-      await tx.insert(salesInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, partyId: input.partyId, salesmanId: input.salesmanId, kind: input.kind ?? 'sale', currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, cashCustomerName: input.cashCustomerName, cashCustomerMobile: input.cashCustomerMobile, invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
+      await tx.insert(salesInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, referenceInvoiceId: input.referenceInvoiceId, partyId: input.partyId, salesmanId: input.salesmanId, kind: input.kind ?? 'sale', currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, cashCustomerName: input.cashCustomerName, cashCustomerMobile: input.cashCustomerMobile, invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
       await tx.insert(salesInvoiceLines).values(input.lines.map((line, index) => { const calculated = totals.lines[index]; if (!calculated) throw new DomainError('SALES_TOTALS_INVALID', 'Invoice totals do not match invoice lines', 422); return { id: newId(), tenantId, invoiceId: id, lineNo: index + 1, itemId: line.itemId, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice, discountRate: line.discountRate ?? '0', discountAmount: calculated.discount, taxGroupId: line.taxGroupId, taxRate: line.taxRate ?? '0', net: calculated.net, tax: calculated.tax, total: calculated.total }; }));
     });
     return this.get(tenantId, id);
@@ -106,6 +106,33 @@ export class SalesService {
       return payment;
     });
     return result;
+  }
+
+  async returnFrom(tenantId: string, sourceId: string, input: Omit<SalesInvoiceInput, 'kind'>) {
+    const source = await this.get(tenantId, sourceId);
+    if (source.status !== 'posted') throw new DomainError('SALES_RETURN_SOURCE_INVALID', 'Returns require a posted source invoice', 409);
+    if (source.kind === 'sale_return') throw new DomainError('SALES_RETURN_SOURCE_INVALID', 'A return cannot reference another return', 422);
+    return this.create(tenantId, { ...input, kind: 'sale_return', partyId: input.partyId ?? source.partyId ?? undefined, referenceInvoiceId: sourceId } as SalesInvoiceInput & { referenceInvoiceId: string });
+  }
+
+  async evaluateOffer(tenantId: string, offerId: string, input: { itemId: string; quantity: string; value: string }) {
+    const [offer] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(offers).where(and(eq(offers.tenantId, tenantId), eq(offers.id, offerId))));
+    if (!offer) throw new DomainError('SALES_OFFER_NOT_FOUND', 'Offer was not found', 404);
+    const now = Date.now();
+    if (offer.status !== 'active' || now < offer.validFrom.getTime() || now > offer.validTo.getTime()) return { eligible: false, discount: '0', reason: 'OFFER_NOT_VALID' };
+    const target = money(offer.targetValue);
+    const eligible = offer.targetType === 'value' ? money(input.value).gte(target) : money(input.quantity).gte(target);
+    if (!eligible) return { eligible: false, discount: '0', reason: 'TARGET_NOT_MET' };
+    const discount = offer.discountType === 'percent' ? money(input.value).mul(offer.discountValue).div(100) : Decimal.min(money(offer.discountValue), money(input.value));
+    return { eligible: true, discount: discount.toFixed(4), offerId };
+  }
+
+  async postAdjustmentNote(tenantId: string, id: string) {
+    const [note] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesAdjustmentNotes).where(and(eq(salesAdjustmentNotes.tenantId, tenantId), eq(salesAdjustmentNotes.id, id))));
+    if (!note) throw new DomainError('SALES_NOTE_NOT_FOUND', 'Adjustment note was not found', 404);
+    if (note.status !== 'draft') throw new DomainError('SALES_NOTE_INVALID_STATUS', 'Only draft adjustment notes can be posted', 409);
+    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesAdjustmentNotes).set({ status: 'posted', number: `AN-${Date.now()}-${id.slice(0, 6)}`, postedAt: new Date() }).where(and(eq(salesAdjustmentNotes.tenantId, tenantId), eq(salesAdjustmentNotes.id, id), eq(salesAdjustmentNotes.status, 'draft'))));
+    return this.get(tenantId, note.invoiceId ?? '');
   }
 
   async printData(tenantId: string, id: string) { return this.get(tenantId, id); }

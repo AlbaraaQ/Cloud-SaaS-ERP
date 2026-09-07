@@ -4254,9 +4254,78 @@
         ]
       }
     },
+    "/api/v1/sales/invoices/{id}/return": {
+      "post": {
+        "operationId": "SalesController_returnFrom",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
     "/api/v1/sales/invoices/{id}/adjustment-notes": {
       "post": {
         "operationId": "SalesController_note",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/adjustment-notes/{id}/post": {
+      "post": {
+        "operationId": "SalesController_postNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/offers/{id}/evaluate": {
+      "post": {
+        "operationId": "SalesController_evaluateOffer",
         "parameters": [
           {
             "name": "id",
