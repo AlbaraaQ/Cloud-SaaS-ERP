@@ -310,3 +310,7 @@ COA template (AR/AP/cash/bank/stock/sales/purchases/VAT in-out/discounts), 3 rol
 (owner/accountant/cashier), SAR+USD currencies, Pcs unit, 15%/0%/exempt tax groups,
 payment methods, posting profiles, main branch+warehouse+safe. Seed lists live in
 `packages/config/seeds/*.ts` (P03/P05/P07).
+
+### Phase 21 implementation notes
+
+The P21 vertical pack tables are implemented by `packages/database/migrations/0017_installments_projects.sql` and exported from `packages/database/src/schema/projects.ts`. All tenant-scoped tables have `ENABLE ROW LEVEL SECURITY` and `FORCE ROW LEVEL SECURITY`; installment and progress-bill numbering is handled through `document_sequences` with `installment_contract` and `progress_bill` scopes.

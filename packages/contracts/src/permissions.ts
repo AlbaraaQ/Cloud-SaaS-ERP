@@ -145,6 +145,15 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('hrm.manage', 'Maintain departments, jobs, employees, attendance imports and payroll drafts.'),
   perm('hrm.payroll.post', 'Post, pay and reverse payroll runs.'),
   perm('hrm.adjust.approve', 'Approve salary additions and deductions.'),
+
+  // installments and contracting/projects packs (PHASE_21)
+  perm('installments.view', 'Read installment contracts, schedules, overdue aging and contract statements.'),
+  perm('installments.manage', 'Create and maintain installment contracts and schedule templates.'),
+  perm('installments.collect', 'Collect installment receipts and allocate them to due schedule rows.'),
+  perm('projects.view', 'Read projects, stages, BOQ terms, progress bills and requirements.'),
+  perm('projects.manage', 'Create and maintain projects, stage templates, BOQ terms and requirement registers.'),
+  perm('projects.bill.post', 'Post progress bills and release retention invoices.'),
+  perm('projects.stage.accredit', 'Accredit or reject project stages assigned to a user.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

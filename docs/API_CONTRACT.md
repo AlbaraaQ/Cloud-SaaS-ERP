@@ -207,3 +207,13 @@ Feature flag `pack.hrm`; disabled tenants receive 404 for `/hrm/*`.
 Perms: `hrm.view`, `hrm.manage`, `hrm.payroll.post`, `hrm.adjust.approve`. Posted runs
 are immutable; correction is reversal plus a new run. Pay creates a treasury voucher with
 subtype `salary`.
+
+## 16. Installments and Contracting/Projects Packs (P21)
+
+Feature flags: `pack.installments` and `pack.projects`; disabled tenants receive 404 for the pack routes.
+
+Installments endpoints: `GET/POST /installments/contracts`, `GET /installments/contracts/{id}`, `GET /installments/overdue?asOf=YYYY-MM-DD`, `POST /installments/contracts/{id}/collect`.
+
+Projects endpoints: `GET/POST /projects`, `GET /projects/{id}`, `POST /projects/stage-templates`, `POST /projects/{id}/stages`, `POST /projects/stages/{stageId}/accredit`, `POST /projects/{id}/boq`, `POST /projects/{id}/progress-bills`, `GET /projects/progress-bills/{billId}`, `POST /projects/progress-bills/{billId}/post`, `POST /projects/progress-bills/{billId}/release-retention`, `POST /projects/requirements`.
+
+Perms: `installments.view`, `installments.manage`, `installments.collect`, `projects.view`, `projects.manage`, `projects.bill.post`, `projects.stage.accredit`.

@@ -23,4 +23,6 @@ export const sections: AdminSection[] = [
   { key: 'migration', href: '/migration', labelAr: 'الهجرة والتوافق', labelEn: 'Migration', permission: 'migration.view', description: 'Runs, issues, reconciliation, compat devices.' },
   { key: 'pos', href: '/pos', labelAr: 'مطعم POS', labelEn: 'Restaurant POS', permission: 'pos.view', description: 'Floor map, table orders, kitchen routing and daily counters.' },
   { key: 'hrm', href: '/hrm', labelAr: 'الموارد البشرية', labelEn: 'HRM & Payroll', permission: 'hrm.view', description: 'Employees, attendance, adjustments, payroll runs and payslips.' },
+  { key: 'installments', href: '/installments', labelAr: 'الأقساط', labelEn: 'Installments', permission: 'installments.view', description: 'Contracts, schedules, collections and aging.' },
+  { key: 'projects', href: '/projects', labelAr: 'المقاولات', labelEn: 'Projects & Contracting', permission: 'projects.view', description: 'Projects, stages, BOQ, progress bills and retention.' },
 ];

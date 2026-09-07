@@ -189,3 +189,7 @@ branch + party + item class) into immutable posted entries; void = reversal entr
 All RC-xx above are consolidated with context + required evidence in
 `REQUIRES_CONFIRMATION.md` (RC-01 … RC-31). Nothing here is silently adopted without
 either `CONFIRMED` evidence or an owner answer.
+
+### BL-12 Phase 21 implementation marker
+
+Installments and contracting are now implemented as vertical packs. `cont`/`cont_installments` semantics map to `installment_contracts` plus `installment_schedule`, with collection receipts allocated oldest due first. `PM_Projects`, `PM_ProjStages`, `PM_Terms`, `PM_Requirement(Sub)` and `InvContratct(_Sub)` semantics map to `projects`, `project_stages`, `boq_terms`, `project_requirements`, and `progress_bills/_lines`; progress billing preserves work value, previously billed, retention/work guarantee and remaining-balance calculations before posting standard sale invoices without inventory movement.

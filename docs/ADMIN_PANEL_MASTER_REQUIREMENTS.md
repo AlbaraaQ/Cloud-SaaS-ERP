@@ -209,3 +209,6 @@ RTL numerals option (western digits default) · decimal input masks per currency
 - 🟢 Restaurant POS vertical pack: `/pos` covers floor map, order flow, modifiers, kitchen print config, daily counters, merge/split and pay/close handoff.
 
 - 🟢 HRM vertical pack: `/hrm` covers employee directory, salary components, masked bank fields, attendance import/summary, adjustments, payroll wizard, pay/reverse and payslip print.
+
+- 🟢 Installments vertical pack: `/installments` covers contract list/detail, schedule grid, collection dialog and overdue aging hooks.
+- 🟢 Projects/contracting vertical pack: `/projects` covers project list, stage kanban/accreditation, BOQ editor, progress bill editor/posting, retention release and requirements register.
