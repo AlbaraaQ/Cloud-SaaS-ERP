@@ -6139,6 +6139,306 @@
           "Pos"
         ]
       }
+    },
+    "/api/v1/hrm/departments": {
+      "get": {
+        "operationId": "HrmController_departments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createDepartment",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/jobs": {
+      "get": {
+        "operationId": "HrmController_jobs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createJob",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/employees": {
+      "get": {
+        "operationId": "HrmController_employees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createEmployee",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/attendance/import": {
+      "post": {
+        "operationId": "HrmController_importAttendance",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/attendance/summary": {
+      "get": {
+        "operationId": "HrmController_attendanceSummary",
+        "parameters": [
+          {
+            "name": "enroll",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/adjustments": {
+      "post": {
+        "operationId": "HrmController_createAdjustment",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/adjustments/{id}/approve": {
+      "post": {
+        "operationId": "HrmController_approveAdjustment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/preview": {
+      "post": {
+        "operationId": "HrmController_preview",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs": {
+      "get": {
+        "operationId": "HrmController_runs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createRun",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}": {
+      "get": {
+        "operationId": "HrmController_readRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}/post": {
+      "post": {
+        "operationId": "HrmController_postRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}/pay": {
+      "post": {
+        "operationId": "HrmController_payRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}/reverse": {
+      "post": {
+        "operationId": "HrmController_reverseRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
     }
   },
   "info": {

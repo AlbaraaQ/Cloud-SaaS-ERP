@@ -278,7 +278,9 @@ is enabled and all sync tokens are branch-scoped.
 
 **HR (P20)**: `departments`, `jobs`, `employees`(profile+salary components jsonb+bank),
 `attendance_logs`(raw punches ← Attendance), `salary_adjustments`(← EmpSalaryAddSub),
-`payroll_runs / payroll_run_lines`(← Salary_Res/SalaryPay), journals linked.
+`payroll_runs / payroll_run_lines`(← Salary_Res/SalaryPay), journals linked. Implemented
+in PHASE_20 with FORCE RLS, optional employee↔membership link, masked bank output, and
+salary voucher/journal references.
 **Installments (P21)**: `installment_contracts`(party, item/stock, total, down, count,
 period unit, first_date, status, ← `cont`), `installment_schedule`(num, due_date, amount,
 paid, voucher_id ← `cont_installments`).

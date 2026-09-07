@@ -169,7 +169,8 @@ available for the devices manager.
 
 Employees directory (profile + salary components + bank) · Attendance import + log ·
 Adjustments (additions/deductions incl. SubFromSalary) · Payroll runs wizard (month/
-year, preview lines, post) · Payslip print. Perms hrm.*.
+year, preview lines, post/pay/reverse) · Payslip print. Perms hrm.*. Phase 20 backend
+and admin `/hrm` page are implemented behind `pack.hrm`.
 
 ## 14. Vertical packs (enabled per tenant flags)
 
@@ -206,3 +207,5 @@ RTL numerals option (western digits default) · decimal input masks per currency
 - ⚪ Vertical packs remain owned by later phases P19-P22.
 
 - 🟢 Restaurant POS vertical pack: `/pos` covers floor map, order flow, modifiers, kitchen print config, daily counters, merge/split and pay/close handoff.
+
+- 🟢 HRM vertical pack: `/hrm` covers employee directory, salary components, masked bank fields, attendance import/summary, adjustments, payroll wizard, pay/reverse and payslip print.

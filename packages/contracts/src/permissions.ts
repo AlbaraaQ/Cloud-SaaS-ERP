@@ -139,6 +139,12 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('pos.priceoverride', 'Override POS item prices where tenant caps permit it.'),
   perm('pos.tables.manage', 'Maintain dining tables and table categories.'),
   perm('pos.config.manage', 'Maintain POS order methods, payment visibility and kitchen print routing.'),
+
+  // HRM and payroll pack (PHASE_20)
+  perm('hrm.view', 'Read HR directories, attendance summaries, payroll previews and payslips.'),
+  perm('hrm.manage', 'Maintain departments, jobs, employees, attendance imports and payroll drafts.'),
+  perm('hrm.payroll.post', 'Post, pay and reverse payroll runs.'),
+  perm('hrm.adjust.approve', 'Approve salary additions and deductions.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

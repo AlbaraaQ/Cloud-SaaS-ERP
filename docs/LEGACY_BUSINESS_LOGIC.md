@@ -143,7 +143,8 @@ branch + party + item class) into immutable posted entries; void = reversal entr
 - Salary = components on employee + monthly `Salary_Res` runs + `SalaryPay` payouts with
   journal link; advances/adjustments via `EmpSalaryAddSub` (`SubFromSalary` deducts).
 - Attendance = raw biometric punches only (no evaluation logic in DB) → basic import
-  in target P20; evaluation rules RC-10.
+  in target P20; evaluation rules RC-10. Implemented in PHASE_20 as idempotent raw
+  punch import plus documented naïve in/out summary.
 
 ## BL-11 E-invoicing (CONFIRMED pipeline)
 

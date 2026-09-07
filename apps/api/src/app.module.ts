@@ -31,6 +31,7 @@ import { ReportingModule } from './modules/reporting/reporting.module.js';
 import { MigrationModule } from './modules/migration/migration.module.js';
 import { CompatModule } from './modules/compat/compat.module.js';
 import { PosModule } from './modules/pos/pos.module.js';
+import { HrmModule } from './modules/hrm/hrm.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
 /**
@@ -78,6 +79,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     MigrationModule,
     CompatModule,
     PosModule,
+    HrmModule,
   ],
   controllers: [HealthController],
   providers: [

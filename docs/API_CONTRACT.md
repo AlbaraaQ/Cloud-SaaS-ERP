@@ -189,3 +189,21 @@ Perms: `pos.view`, `pos.operate`, `pos.priceoverride`, `pos.tables.manage`,
 `pos.config.manage`. Order events are append-only lifecycle facts; send-to-invoice creates
 a normal sales invoice with `order_type`, `table_no`, and daily branch-scoped
 `pos_order:YYYY-MM-DD` numbering.
+
+
+## 15. HRM & Payroll Pack (P20)
+
+Feature flag `pack.hrm`; disabled tenants receive 404 for `/hrm/*`.
+
+`GET/POST /hrm/departments` · `GET/POST /hrm/jobs` · `GET/POST /hrm/employees`
+(bank fields masked in list output) · `POST /hrm/attendance/import {csv}` for
+`machine,enroll,datetime,inout` · `GET /hrm/attendance/summary?enroll&from&to`
+(naïve in/out pairing only) · `POST /hrm/adjustments` ·
+`POST /hrm/adjustments/{id}/approve` · `POST /hrm/payroll/preview` ·
+`GET/POST /hrm/payroll/runs` · `GET /hrm/payroll/runs/{id}` ·
+`POST /hrm/payroll/runs/{id}/post` · `POST /hrm/payroll/runs/{id}/pay` ·
+`POST /hrm/payroll/runs/{id}/reverse {reason}`.
+
+Perms: `hrm.view`, `hrm.manage`, `hrm.payroll.post`, `hrm.adjust.approve`. Posted runs
+are immutable; correction is reversal plus a new run. Pay creates a treasury voucher with
+subtype `salary`.
