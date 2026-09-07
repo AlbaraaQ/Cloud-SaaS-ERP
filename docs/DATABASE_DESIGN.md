@@ -314,3 +314,7 @@ payment methods, posting profiles, main branch+warehouse+safe. Seed lists live i
 ### Phase 21 implementation notes
 
 The P21 vertical pack tables are implemented by `packages/database/migrations/0017_installments_projects.sql` and exported from `packages/database/src/schema/projects.ts`. All tenant-scoped tables have `ENABLE ROW LEVEL SECURITY` and `FORCE ROW LEVEL SECURITY`; installment and progress-bill numbering is handled through `document_sequences` with `installment_contract` and `progress_bill` scopes.
+
+### Phase 22 implementation notes
+
+The niche verticals and Salla integration are implemented by `packages/database/migrations/0018_niche_verticals_salla.sql` and exported from `packages/database/src/schema/niche.ts`. Token-bearing Salla columns store encrypted payloads only; legacy optics/tailoring/marina additive fields use typed JSONB to avoid core invoice-kind expansion.

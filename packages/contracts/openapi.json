@@ -6772,6 +6772,553 @@
           "Projects"
         ]
       }
+    },
+    "/api/v1/optics/prescriptions": {
+      "get": {
+        "operationId": "OpticsController_list",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Optics"
+        ]
+      },
+      "post": {
+        "operationId": "OpticsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Optics"
+        ]
+      }
+    },
+    "/api/v1/optics/invoice-lines/{lineId}/print-section": {
+      "get": {
+        "operationId": "OpticsController_print",
+        "parameters": [
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Optics"
+        ]
+      }
+    },
+    "/api/v1/tailoring/parties/{partyId}/measurements": {
+      "get": {
+        "operationId": "TailoringController_list",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tailoring"
+        ]
+      }
+    },
+    "/api/v1/tailoring/parties/{partyId}/measurements/latest": {
+      "get": {
+        "operationId": "TailoringController_latest",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tailoring"
+        ]
+      }
+    },
+    "/api/v1/tailoring/measurements": {
+      "post": {
+        "operationId": "TailoringController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tailoring"
+        ]
+      }
+    },
+    "/api/v1/marina": {
+      "get": {
+        "operationId": "MarinaController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/groups": {
+      "post": {
+        "operationId": "MarinaController_group",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/groups/{id}/pricing": {
+      "post": {
+        "operationId": "MarinaController_price",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/vessels": {
+      "post": {
+        "operationId": "MarinaController_vessel",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/vessels/{id}/owners": {
+      "post": {
+        "operationId": "MarinaController_owner",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings": {
+      "post": {
+        "operationId": "MarinaController_booking",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings/{id}/additions": {
+      "post": {
+        "operationId": "MarinaController_addition",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings/{id}/rental-invoice": {
+      "post": {
+        "operationId": "MarinaController_invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/violations": {
+      "post": {
+        "operationId": "MarinaController_violation",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/operation-plans": {
+      "post": {
+        "operationId": "MarinaController_plan",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/fitment/makes": {
+      "post": {
+        "operationId": "FitmentController_make",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/makes/{makeId}/models": {
+      "post": {
+        "operationId": "FitmentController_model",
+        "parameters": [
+          {
+            "name": "makeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/items": {
+      "post": {
+        "operationId": "FitmentController_attach",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/items-for-vehicle": {
+      "get": {
+        "operationId": "FitmentController_items",
+        "parameters": [
+          {
+            "name": "makeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modelId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/items/{itemId}/vehicles": {
+      "get": {
+        "operationId": "FitmentController_vehicles",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/oauth/authorize": {
+      "get": {
+        "operationId": "SallaController_auth",
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirectUri",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/connections": {
+      "post": {
+        "operationId": "SallaController_connect",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/branch-mappings": {
+      "post": {
+        "operationId": "SallaController_map",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/export-queue": {
+      "post": {
+        "operationId": "SallaController_queue",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/export-next": {
+      "post": {
+        "operationId": "SallaController_exportNext",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/export-log": {
+      "get": {
+        "operationId": "SallaController_logs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/webhooks/{storeId}/orders": {
+      "post": {
+        "operationId": "SallaController_webhook",
+        "parameters": [
+          {
+            "name": "storeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-salla-signature",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
     }
   },
   "info": {

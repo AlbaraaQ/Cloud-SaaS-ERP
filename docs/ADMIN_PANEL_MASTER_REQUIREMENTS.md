@@ -212,3 +212,9 @@ RTL numerals option (western digits default) · decimal input masks per currency
 
 - 🟢 Installments vertical pack: `/installments` covers contract list/detail, schedule grid, collection dialog and overdue aging hooks.
 - 🟢 Projects/contracting vertical pack: `/projects` covers project list, stage kanban/accreditation, BOQ editor, progress bill editor/posting, retention release and requirements register.
+
+- 🟢 Optics vertical pack: `/optics` covers prescriptions, Other_Column grid and invoice print sections.
+- 🟢 Tailoring vertical pack: `/tailoring` covers versioned customer measurement cards and latest measurement context.
+- 🟢 Marina vertical pack: `/marina` covers groups/pricing, vessels/owners, bookings/additions, rental invoices, violations and operation plans.
+- 🟢 Fitment vertical pack: `/fitment` covers make/model/year compatibility pickers.
+- 🟢 Salla integration: `/integrations` covers OAuth connections, branch mappings, sync monitor, diff flags and HMAC webhooks.

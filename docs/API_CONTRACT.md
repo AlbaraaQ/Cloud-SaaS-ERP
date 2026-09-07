@@ -217,3 +217,15 @@ Installments endpoints: `GET/POST /installments/contracts`, `GET /installments/c
 Projects endpoints: `GET/POST /projects`, `GET /projects/{id}`, `POST /projects/stage-templates`, `POST /projects/{id}/stages`, `POST /projects/stages/{stageId}/accredit`, `POST /projects/{id}/boq`, `POST /projects/{id}/progress-bills`, `GET /projects/progress-bills/{billId}`, `POST /projects/progress-bills/{billId}/post`, `POST /projects/progress-bills/{billId}/release-retention`, `POST /projects/requirements`.
 
 Perms: `installments.view`, `installments.manage`, `installments.collect`, `projects.view`, `projects.manage`, `projects.bill.post`, `projects.stage.accredit`.
+
+## 17. Niche Verticals and Salla Integration (P22)
+
+Feature flags: `pack.optics`, `pack.tailoring`, `pack.marina`, `pack.fitment`, `integration.salla`; disabled tenants receive 404 for the respective routes.
+
+Optics: `GET/POST /optics/prescriptions`, `GET /optics/invoice-lines/{lineId}/print-section`.
+Tailoring: `GET /tailoring/parties/{partyId}/measurements`, `GET /tailoring/parties/{partyId}/measurements/latest`, `POST /tailoring/measurements`.
+Marina: `GET /marina`, `POST /marina/groups`, `POST /marina/groups/{id}/pricing`, `POST /marina/vessels`, `POST /marina/vessels/{id}/owners`, `POST /marina/bookings`, `POST /marina/bookings/{id}/additions`, `POST /marina/bookings/{id}/rental-invoice`, `POST /marina/violations`, `POST /marina/operation-plans`.
+Fitment: `POST /fitment/makes`, `POST /fitment/makes/{makeId}/models`, `POST /fitment/items`, `GET /fitment/items-for-vehicle`, `GET /fitment/items/{itemId}/vehicles`.
+Salla: `GET /integrations/salla/oauth/authorize`, `POST /integrations/salla/connections`, `POST /integrations/salla/branch-mappings`, `POST /integrations/salla/export-queue`, `POST /integrations/salla/export-next`, `GET /integrations/salla/export-log`, `POST /integrations/salla/webhooks/{storeId}/orders`.
+
+Perms: `optics.view/manage`, `tailoring.view/manage`, `marina.view/manage/invoice`, `fitment.view/manage`, `salla.integration.view/manage`.

@@ -29,12 +29,12 @@
 | RC-18 | 🟡 | Receipts enums | `ReceiptType`, `PaymentType`, `CheckState`, `State` value lists | Extract distinct values from data before migration |
 | RC-19 | 🔴 | Live voucher tables | Which of `SandQ/SandD/SandQD/SandSD/SandVAT` vs `Receipts` is authoritative today (per customer)? | Import both families into unified `vouchers` with doc-kind mapping |
 | RC-20 | 🟡 | `ProductStocks` writer | Which process maintains the cache (no trigger/proc in export)? | Ignore cache; recompute balances from documents |
-| RC-21 | ⚪ | `Other_Column` R1..L5 | Optics grid semantics | Park as JSONB metadata on optical module |
+| RC-21 | ⚪ | `Other_Column` R1..L5 | Optics grid semantics | Answer applied in P22: stored as typed `other_grid` JSONB on `optical_prescriptions`; no schema guess beyond preserving R/L grid keys. |
 | RC-22 | ⚪ | `VATClients` | Where used? | Import as parties flagged `vat_client` |
 | RC-23 | 🟡 | `Customers.act` | Lookup → `Acts`? | Map to `activity_id` nullable |
 | RC-24 | 🟡 | Contracting enums | `ContrType`, `statusPk`, `RestractionPk`(retention?), `TermPk` value lists | Extract distinct values; map to lookup tables |
 | RC-25 | 🟡 | Installment rules | `cont.period` unit (days/months), interest handling in `installval`? | Configurable schedule template |
-| RC-26 | 🟡 | Marina pricing | `GroupMarine` hour/half-hour/offer interplay + `RentPeriodSub` | Encode in pricing tables P22 |
+| RC-26 | 🟡 | Marina pricing | `GroupMarine` hour/half-hour/offer interplay + `RentPeriodSub` | Answer applied in P22: encoded in `vessel_group_pricing.period_kind` (`hour`, `half_hour`, `offer`, `day`) plus booking metadata for unresolved period details. |
 | RC-27 | 🔴 | Fiscal-year DBs | Is `Data16` year-isolated (only 2016 docs)? Multi-year migration scope per customer? | Engine accepts N source DBs per tenant, merged on fiscal years |
 | RC-28 | 🔴 | Deleted rows | Should soft-deleted legacy rows migrate (as void docs) or be archived-only? | Default: archive + void-marked, excluded from balances |
 | RC-29 | 🟡 | `Foundation` vs branches | One company row per DB? Multi-company per DB possible? | One `company_profile` per tenant |

@@ -193,3 +193,7 @@ either `CONFIRMED` evidence or an owner answer.
 ### BL-12 Phase 21 implementation marker
 
 Installments and contracting are now implemented as vertical packs. `cont`/`cont_installments` semantics map to `installment_contracts` plus `installment_schedule`, with collection receipts allocated oldest due first. `PM_Projects`, `PM_ProjStages`, `PM_Terms`, `PM_Requirement(Sub)` and `InvContratct(_Sub)` semantics map to `projects`, `project_stages`, `boq_terms`, `project_requirements`, and `progress_bills/_lines`; progress billing preserves work value, previously billed, retention/work guarantee and remaining-balance calculations before posting standard sale invoices without inventory movement.
+
+### BL-12 Phase 22 implementation marker
+
+Optics `Glasses` and `Other_Column` are represented by `optical_prescriptions` with typed eye JSON plus a typed metadata grid. Tailoring `CustomerMeasurements` is represented by versioned `customer_measurements`. Marina `Marine`, `GroupMarine`, `Booking`, `RentInvoice`, `Violation`, `Owners` and operation plan families map to the marina vessel/booking/rental/plan tables. Fitment `EquipMakes/EquipModels/ItemVehicleFitment` map to the fitment tables. Salla settings, item sync, export log, branch mappings and legacy view diff semantics map to encrypted `salla_connections`, `salla_item_sync`, `salla_export_log` and `salla_branch_mappings`.

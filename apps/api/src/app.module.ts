@@ -34,6 +34,11 @@ import { PosModule } from './modules/pos/pos.module.js';
 import { HrmModule } from './modules/hrm/hrm.module.js';
 import { InstallmentsModule } from './modules/installments/installments.module.js';
 import { ProjectsModule } from './modules/projects/projects.module.js';
+import { FitmentModule } from './modules/fitment/fitment.module.js';
+import { MarinaModule } from './modules/marina/marina.module.js';
+import { OpticsModule } from './modules/optics/optics.module.js';
+import { SallaModule } from './modules/integrations/salla/salla.module.js';
+import { TailoringModule } from './modules/tailoring/tailoring.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 
 /**
@@ -84,6 +89,11 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     HrmModule,
     InstallmentsModule,
     ProjectsModule,
+    OpticsModule,
+    TailoringModule,
+    MarinaModule,
+    FitmentModule,
+    SallaModule,
   ],
   controllers: [HealthController],
   providers: [

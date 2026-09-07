@@ -25,4 +25,9 @@ export const sections: AdminSection[] = [
   { key: 'hrm', href: '/hrm', labelAr: 'الموارد البشرية', labelEn: 'HRM & Payroll', permission: 'hrm.view', description: 'Employees, attendance, adjustments, payroll runs and payslips.' },
   { key: 'installments', href: '/installments', labelAr: 'الأقساط', labelEn: 'Installments', permission: 'installments.view', description: 'Contracts, schedules, collections and aging.' },
   { key: 'projects', href: '/projects', labelAr: 'المقاولات', labelEn: 'Projects & Contracting', permission: 'projects.view', description: 'Projects, stages, BOQ, progress bills and retention.' },
+  { key: 'optics', href: '/optics', labelAr: 'النظارات', labelEn: 'Optics', permission: 'optics.view', description: 'Optical prescriptions linked to parties and invoice lines.' },
+  { key: 'tailoring', href: '/tailoring', labelAr: 'الخياطة', labelEn: 'Tailoring', permission: 'tailoring.view', description: 'Versioned customer measurement cards.' },
+  { key: 'marina', href: '/marina', labelAr: 'المارينا', labelEn: 'Marina', permission: 'marina.view', description: 'Vessels, bookings, rental invoices and operation plans.' },
+  { key: 'fitment', href: '/fitment', labelAr: 'توافق المركبات', labelEn: 'Fitment', permission: 'fitment.view', description: 'Vehicle make/model/year item compatibility.' },
+  { key: 'integrations', href: '/integrations', labelAr: 'التكاملات', labelEn: 'Integrations', permission: 'salla.integration.view', description: 'Salla OAuth, item sync, export logs and webhooks.' },
 ];

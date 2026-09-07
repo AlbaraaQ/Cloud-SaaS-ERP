@@ -154,6 +154,19 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('projects.manage', 'Create and maintain projects, stage templates, BOQ terms and requirement registers.'),
   perm('projects.bill.post', 'Post progress bills and release retention invoices.'),
   perm('projects.stage.accredit', 'Accredit or reject project stages assigned to a user.'),
+
+  // niche verticals and Salla integration pack (PHASE_22)
+  perm('optics.view', 'Read optical prescriptions and invoice print sections.'),
+  perm('optics.manage', 'Create and maintain optical prescriptions.'),
+  perm('tailoring.view', 'Read customer measurement cards and latest measurements.'),
+  perm('tailoring.manage', 'Create and maintain customer measurements.'),
+  perm('marina.view', 'Read marina groups, vessels, bookings and operation plans.'),
+  perm('marina.manage', 'Create and maintain marina vessels, owners, bookings, pricing, violations and plans.'),
+  perm('marina.invoice', 'Create rental invoices from marina bookings.'),
+  perm('fitment.view', 'Read vehicle compatibility lookups.'),
+  perm('fitment.manage', 'Maintain vehicle makes, models and item fitment rows.'),
+  perm('salla.integration.view', 'Read Salla synchronization status and export logs.'),
+  perm('salla.integration.manage', 'Manage Salla OAuth connections, mappings, export queues and webhooks.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));
