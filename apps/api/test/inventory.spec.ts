@@ -103,6 +103,54 @@ describe('inventory phase 09 integration', () => {
 
     expect(response.status).toBe(403);
   });
+
+  it('rejects invalid transfer shapes before touching the ledger', async () => {
+    const response = await api(ctx.server, 'post', '/api/v1/inventory/transfers', {
+      token: alpha.token,
+      body: {
+        transferId: '00000000-0000-4000-8000-000000000010',
+        fromWarehouseId: '00000000-0000-4000-8000-000000000011',
+        toWarehouseId: '00000000-0000-4000-8000-000000000011',
+        lines: [],
+      },
+    });
+
+    expect(response.status).toBe(422);
+    const errorBody = response.body as { error?: { code?: string }; code?: string };
+    expect(errorBody.error?.code ?? errorBody.code).toBe('INVALID_STOCK_TRANSFER');
+
+    const movements = await api(ctx.server, 'get', '/api/v1/inventory/movements', { token: alpha.token });
+    expect(movements.status).toBe(200);
+    expect(movements.body.data ?? movements.body).toEqual([]);
+  });
+
+  it('requires an approved journal before posting a stock adjustment', async () => {
+    const response = await api(ctx.server, 'post', '/api/v1/inventory/adjustments/post', {
+      token: alpha.token,
+      body: {
+        adjustmentId: '00000000-0000-4000-8000-000000000020',
+        itemId: '00000000-0000-4000-8000-000000000021',
+        warehouseId: '00000000-0000-4000-8000-000000000022',
+        countedQty: '1.0000',
+        approved: false,
+      },
+    });
+
+    expect(response.status).toBe(422);
+    const errorBody = response.body as { error?: { code?: string }; code?: string };
+    expect(errorBody.error?.code ?? errorBody.code).toBe('ADJUSTMENT_APPROVAL_REQUIRED');
+  });
+
+  it('rejects serial reservation without serial identifiers', async () => {
+    const response = await api(ctx.server, 'post', '/api/v1/inventory/serials/reserve', {
+      token: alpha.token,
+      body: { serialIds: [] },
+    });
+
+    expect(response.status).toBe(422);
+    const errorBody = response.body as { error?: { code?: string }; code?: string };
+    expect(errorBody.error?.code ?? errorBody.code).toBe('SERIALS_REQUIRED');
+  });
 });
 
 export {};
