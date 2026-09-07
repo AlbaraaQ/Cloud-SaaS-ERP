@@ -3915,6 +3915,76 @@
         ]
       }
     },
+    "/api/v1/inventory/valuation/as-of": {
+      "get": {
+        "operationId": "InventoryController_valuationAsOf",
+        "parameters": [
+          {
+            "name": "as_of",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/balances/recompute": {
+      "post": {
+        "operationId": "InventoryController_recompute",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/sales/invoices": {
       "get": {
         "operationId": "SalesController_list",

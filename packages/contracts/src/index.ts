@@ -44,5 +44,8 @@ export type { PermissionDefinition } from './permissions.js';
 export * from './platform/index.js';
 export * from './organization/index.js';
 export * from './invoice-math.js';
+export * from './inventory-valuation.js';
+export * from './inventory-lifecycle.js';
+export * from './inventory-valuation.js';
 
 export const contractVersion = '0.6.0';

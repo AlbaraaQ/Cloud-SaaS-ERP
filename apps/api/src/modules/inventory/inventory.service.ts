@@ -40,4 +40,28 @@ export class InventoryService {
 
   levels(tenantId: string, warehouseId?: string, itemId?: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(stockBalances).where(and(eq(stockBalances.tenantId, tenantId), warehouseId ? eq(stockBalances.warehouseId, warehouseId) : undefined, itemId ? eq(stockBalances.itemId, itemId) : undefined)).orderBy(asc(stockBalances.itemId))); }
   movements(tenantId: string, itemId?: string, warehouseId?: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(inventoryTransactions).where(and(eq(inventoryTransactions.tenantId, tenantId), itemId ? eq(inventoryTransactions.itemId, itemId) : undefined, warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined)).orderBy(asc(inventoryTransactions.occurredAt))); }
+
+  async valuationAsOf(tenantId: string, asOf: Date, warehouseId?: string, itemId?: string) {
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(inventoryTransactions).where(and(eq(inventoryTransactions.tenantId, tenantId), sql`${inventoryTransactions.occurredAt} <= ${asOf}`, warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined, itemId ? eq(inventoryTransactions.itemId, itemId) : undefined)).orderBy(asc(inventoryTransactions.occurredAt)));
+    const totals = new Map<string, { quantity: Decimal; value: Decimal }>();
+    for (const row of rows) {
+      const key = `${row.itemId}:${row.warehouseId}`;
+      const current = totals.get(key) ?? { quantity: new Decimal(0), value: new Decimal(0) };
+      const quantity = new Decimal(row.baseQty);
+      const value = new Decimal(row.totalCost);
+      if (row.direction === 'in') { current.quantity = current.quantity.plus(quantity); current.value = current.value.plus(value); } else { current.quantity = current.quantity.minus(quantity); current.value = current.value.minus(value); }
+      totals.set(key, current);
+    }
+    return [...totals].map(([key, total]) => { const parts = key.split(':'); const resultItemId = parts[0]; const resultWarehouseId = parts[1]; if (!resultItemId || !resultWarehouseId) throw new DomainError('INVENTORY_REPLAY_INVALID_KEY', 'Inventory replay produced an invalid balance key', 500); return { itemId: resultItemId, warehouseId: resultWarehouseId, quantity: total.quantity.toFixed(4), value: total.value.toFixed(4), averageCost: total.quantity.isZero() ? '0.0000' : total.value.div(total.quantity).toFixed(4) }; });
+  }
+
+  async recomputeBalances(tenantId: string, warehouseId?: string, itemId?: string) {
+    const valuation = await this.valuationAsOf(tenantId, new Date('9999-12-31T23:59:59.999Z'), warehouseId, itemId);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      for (const row of valuation) {
+        await tx.insert(stockBalances).values({ tenantId, itemId: row.itemId, warehouseId: row.warehouseId, quantity: row.quantity, value: row.value, averageCost: row.averageCost, version: 1, updatedAt: new Date() }).onConflictDoUpdate({ target: [stockBalances.tenantId, stockBalances.itemId, stockBalances.warehouseId], set: { quantity: row.quantity, value: row.value, averageCost: row.averageCost, version: sql`${stockBalances.version} + 1`, updatedAt: new Date() } });
+      }
+      return { recomputed: valuation.length };
+    });
+  }
 }
