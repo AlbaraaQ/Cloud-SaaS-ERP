@@ -21,4 +21,28 @@ describe('inventory lifecycle invariants', () => {
     expect(nextTransferStatus('sent', 'cancel', '10.0000')).toBe('cancelled');
     expect(() => nextTransferStatus('cancelled', 'cancel', '10.0000')).toThrow('TRANSFER_NOT_CANCELLABLE');
   });
+
+  it('keeps 64 concurrent receipt decisions deterministic', async () => {
+    const decisions = await Promise.all(
+      Array.from({ length: 64 }, async (_, index) =>
+        nextTransferStatus('partially_received', 'receive', index === 63 ? '0.0000' : '2.0000'),
+      ),
+    );
+
+    expect(decisions.slice(0, 63).every((status) => status === 'partially_received')).toBe(true);
+    expect(decisions[63]).toBe('received');
+  });
+
+  it('rejects terminal and backward serial transitions', () => {
+    expect(() => nextSerialStatus('scrapped', 'reserve')).toThrow('INVALID_SERIAL_TRANSITION');
+    expect(() => nextSerialStatus('returned', 'issue')).toThrow('INVALID_SERIAL_TRANSITION');
+    expect(nextSerialStatus('issued', 'return')).toBe('returned');
+    expect(nextSerialStatus('returned', 'scrap')).toBe('scrapped');
+  });
+
+  it('requires journal links only for posted adjustments', () => {
+    expect(() => adjustmentJournalLink('draft')).toThrow('ADJUSTMENT_POSTING_REQUIRED');
+    expect(() => adjustmentJournalLink('approved')).toThrow('ADJUSTMENT_POSTING_REQUIRED');
+    expect(adjustmentJournalLink('posted', 'journal-64')).toBe('journal-64');
+  });
 });
