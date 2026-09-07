@@ -18,6 +18,7 @@
 | PHASE_14 | 2026-09-07 | COMPLETE | Reporting completed: registry for all v1 report keys, tenant-bound report readers, export token endpoint, invoice/shift print HTML shells, README recipe, registry tests, and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_14_IMPLEMENTATION_REPORT.md`. |
 | PHASE_15 | 2026-09-07 | COMPLETE | Migration engine completed: apps/migrator CLI/library, W1-W10 registry plus W13/W14 artifacts, anonymized fixture source, analyze/dry_run/import/reconcile/rollback modes, idempotent legacy-id loader, R1-R7 reconciliation, rollback order, engine persistence tables with RLS, API run-management endpoints, runbook, and tests. `pnpm run verify` exits 0. See `PHASE_15_IMPLEMENTATION_REPORT.md`. |
 | PHASE_16 | 2026-09-07 | COMPLETE | Legacy desktop compat gateway completed: compat device table/RLS, hashed API keys, admin device management, device auth, scoped compat tokens, master pulls with cursor watermarks/tombstones, sales/voucher push mappers with GlobalID idempotency, cursor/status endpoints, wire doc, permissions, tests, and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_16_IMPLEMENTATION_REPORT.md`. |
+| PHASE_17 | 2026-09-07 | COMPLETE | Admin panel completed: Next.js App Router shell, Arabic RTL default, module routes for master sections 1-12, permission-aware navigation, UI kits, report runner, migration/compat console pages, print CSS, CSP headers, README, and tests. `pnpm --filter @erp/admin build` and `pnpm run verify` exit 0. See `PHASE_17_IMPLEMENTATION_REPORT.md`. |
 
 ## Phase-01 Notes
 

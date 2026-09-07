@@ -186,3 +186,21 @@ violations, fitment compatibility picker (make/model/year), Salla sync monitor
 loading skeleton · empty (with CTA) · error (retry + traceId) · forbidden (403 page) ·
 offline banner (query retries) · posted/immutable read-only mode with explain tooltip ·
 RTL numerals option (western digits default) · decimal input masks per currency digits.
+
+
+## Phase 17 coverage markers
+
+- 🟢 Shell/dashboard: implemented in `apps/admin/app/page.tsx` and `app/layout.tsx`.
+- 🟢 Platform/settings: route `/platform`.
+- 🟢 Organization: route `/organization`.
+- 🟢 Catalog: route `/catalog`.
+- 🟢 Accounting: route `/accounting`.
+- 🟢 Parties: route `/parties`.
+- 🟢 Inventory: route `/inventory`.
+- 🟢 Sales: route `/sales`.
+- 🟢 Purchases: route `/purchases`.
+- 🟢 Treasury: route `/treasury`.
+- 🟢 E-invoicing console: route `/einvoicing`.
+- 🟢 Reporting center: route `/reporting`.
+- 🟢 Migration/compat console: route `/migration`.
+- ⚪ Vertical packs remain owned by later phases P19-P22.
