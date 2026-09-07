@@ -266,6 +266,14 @@ Added in PHASE_13 to make ZATCA-style previous-hash sequencing explicit and lock
 Implemented in PHASE_15 by `0013_migration_engine.sql`; all three tables are tenant-scoped
 and protected by FORCE RLS. (Detailed contract in MIGRATION_ARCHITECTURE.md §6.)
 
+
+## 14.1 Legacy Compat Gateway (P16)
+
+**compat_devices** — `tenant_id`, `name`, `api_key_hash`, `branch_id`, `cursors jsonb`,
+`enum_maps jsonb`, `status CHECK(active,revoked)`, `last_seen_at`, rate-limit window
+columns. API keys are SHA-256 + deployment pepper; plaintext is returned once. FORCE RLS
+is enabled and all sync tokens are branch-scoped.
+
 ## 15. Vertical Packs (owned by later phases; shapes frozen here)
 
 **HR (P20)**: `departments`, `jobs`, `employees`(profile+salary components jsonb+bank),

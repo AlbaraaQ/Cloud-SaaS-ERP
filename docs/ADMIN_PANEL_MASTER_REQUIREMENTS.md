@@ -161,7 +161,9 @@ pause/resume) · Reconciliation report viewer (R1–R7 pass/waive/fail + PDF dow
 owner waiver upload) · Legacy ID lookup tool (search old GlobalID → new record) ·
 Compat devices manager (API keys, cursor resets) + sync status. Backend Phase 15
 run-management endpoints, issue feed, reconciliation payload, migrator CLI, registry docs,
-and rollback mechanics are available for the P17 UI console.
+and rollback mechanics are available for the P17 UI console. Phase 16 compat device
+registration/revocation, cursor reset, status lookup, and desktop wire contract are also
+available for the devices manager.
 
 ## 13. HR (P20)
 

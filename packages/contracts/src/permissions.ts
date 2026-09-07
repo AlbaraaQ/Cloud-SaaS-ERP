@@ -128,6 +128,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('migration.view', 'Read migration runs, issues and reconciliation.'),
   perm('migration.run.execute', 'Start dry-run and import migration runs.'),
   perm('migration.run.import', 'Execute production data imports.'),
+
+  // legacy compat gateway (PHASE_16)
+  perm('compat.manage', 'Register, rotate and revoke legacy desktop compatibility devices.'),
+  perm('compat.sync', 'Use legacy desktop compatibility pull and push endpoints.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

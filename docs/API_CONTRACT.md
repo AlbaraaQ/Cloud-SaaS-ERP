@@ -161,9 +161,13 @@ party-statement, serial-tracking, batch-tracking`. Async: POST `/reports/{key}/e
 (starts job and returns run status), GET `/migration/runs`, GET `/migration/runs/{id}` status,
 GET `/migration/runs/{id}/issues`, GET `/migration/runs/{id}/reconciliation`. Perms
 `migration.view`, `migration.run.execute`, `migration.run.import` ·
-`/compat/v1/*` (P16): `POST /compat/auth/device`, `GET /compat/master/items?since=`,
-`GET /compat/master/parties?since=`, `POST /compat/docs/sales-invoice`,
-`POST /compat/docs/voucher`, `GET /compat/sync/cursor`. Device-key auth, per-tenant.
+Compat (P16): admin `POST/GET /compat/devices`, `PATCH /compat/devices/{id}/revoke`;
+public device `POST /compat/auth/device`; scoped token endpoints `GET /compat/master/items?since=`,
+`GET /compat/master/parties?since=`, `GET /compat/master/accounts?since=`,
+`GET /compat/master/tax-groups?since=`, `POST /compat/docs/sales-invoice`,
+`POST /compat/docs/voucher`, `GET/POST /compat/sync/cursor`,
+`GET /compat/docs/status?legacyId=`. Device-key auth, per-tenant, per-branch. Perms
+`compat.manage`, `compat.sync`.
 
 ## 13. Admin-plane (platform owner)
 
