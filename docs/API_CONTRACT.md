@@ -157,8 +157,10 @@ party-statement, serial-tracking, batch-tracking`. Async: POST `/reports/{key}/e
 
 ## 12. Migration & Compat
 
-`/migration/runs` POST `{mode:dry_run|import, source:{…}}` (starts job), GET status,
-GET `/migration/runs/{id}/issues`, GET `/migration/runs/{id}/reconciliation` ·
+`/migration/runs` POST `{mode:analyze|dry_run|import|reconcile|rollback, source:{label?,kind?,...}}`
+(starts job and returns run status), GET `/migration/runs`, GET `/migration/runs/{id}` status,
+GET `/migration/runs/{id}/issues`, GET `/migration/runs/{id}/reconciliation`. Perms
+`migration.view`, `migration.run.execute`, `migration.run.import` ·
 `/compat/v1/*` (P16): `POST /compat/auth/device`, `GET /compat/master/items?since=`,
 `GET /compat/master/parties?since=`, `POST /compat/docs/sales-invoice`,
 `POST /compat/docs/voucher`, `GET /compat/sync/cursor`. Device-key auth, per-tenant.

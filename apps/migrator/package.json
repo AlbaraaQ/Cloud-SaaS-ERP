@@ -2,10 +2,14 @@
   "name": "@erp/migrator",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "vitest": "^2.1.5"
+  },
   "scripts": {
-    "dev": "echo 'Migrator app is deferred to Phase 15.'",
-    "build": "echo 'Migrator build is deferred to Phase 15.'",
-    "lint": "echo 'Migrator lint is deferred to Phase 15.'",
-    "test": "echo 'Migrator tests are deferred to Phase 15.'"
+    "dev": "node --enable-source-maps dist/cli.js --help",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --config ../../eslint.config.mjs",
+    "test": "vitest run"
   }
 }

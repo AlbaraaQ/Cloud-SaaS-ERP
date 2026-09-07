@@ -258,11 +258,13 @@ Added in PHASE_13 to make ZATCA-style previous-hash sequencing explicit and lock
 
 ## 14. Migration (engine support, apps/migrator writes here)
 
-**migration_runs** — `tenant_id`, `source_label`(`sqlserver:Data16`…), `mode CHECK(dry_run,import)`,
-`status`, `started_by/at`, `finished_at`, `summary jsonb`.
-**legacy_id_mappings** — UQ(tenant, entity, legacy_source, legacy_pk): `new_id uuid`, `run_id`.
+**migration_runs** — `tenant_id`, `source_label`(`sqlserver:Data16`…),
+`mode CHECK(analyze,dry_run,import,reconcile,rollback)`, `status`, `started_by/at`,
+`finished_at`, `summary jsonb`.
+**legacy_id_mappings** — PK/UQ(tenant, entity, legacy_source, legacy_pk): `new_id uuid`, `run_id`.
 **migration_issues** — `run_id`, `entity`, `legacy_pk`, `severity`, `code`, `message`, `payload jsonb`.
-(Detailed contract in MIGRATION_ARCHITECTURE.md §6.)
+Implemented in PHASE_15 by `0013_migration_engine.sql`; all three tables are tenant-scoped
+and protected by FORCE RLS. (Detailed contract in MIGRATION_ARCHITECTURE.md §6.)
 
 ## 15. Vertical Packs (owned by later phases; shapes frozen here)
 

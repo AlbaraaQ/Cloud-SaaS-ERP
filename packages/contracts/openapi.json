@@ -5425,6 +5425,101 @@
           "Reporting"
         ]
       }
+    },
+    "/api/v1/migration/runs": {
+      "post": {
+        "operationId": "MigrationController_start",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      },
+      "get": {
+        "operationId": "MigrationController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/migration/runs/{id}": {
+      "get": {
+        "operationId": "MigrationController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/migration/runs/{id}/issues": {
+      "get": {
+        "operationId": "MigrationController_issues",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/migration/runs/{id}/reconciliation": {
+      "get": {
+        "operationId": "MigrationController_reconciliation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
     }
   },
   "info": {

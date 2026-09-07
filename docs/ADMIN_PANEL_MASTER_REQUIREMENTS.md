@@ -159,7 +159,9 @@ New run wizard (source profile, waves selection, mode pick) · Analyze/dry-run r
 (counts, issue severities drill-down payloads) · Import progress (per-wave bars,
 pause/resume) · Reconciliation report viewer (R1–R7 pass/waive/fail + PDF download,
 owner waiver upload) · Legacy ID lookup tool (search old GlobalID → new record) ·
-Compat devices manager (API keys, cursor resets) + sync status.
+Compat devices manager (API keys, cursor resets) + sync status. Backend Phase 15
+run-management endpoints, issue feed, reconciliation payload, migrator CLI, registry docs,
+and rollback mechanics are available for the P17 UI console.
 
 ## 13. HR (P20)
 

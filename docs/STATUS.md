@@ -16,6 +16,7 @@
 | PHASE_12 | 2026-09-07 | COMPLETE | Treasury completed: unified receipt/payment vouchers, cheque state transitions, cash transfers, expense types, cashier shift close/count lines, cash-location balance writers, one-open-shift invariant, tenant-scoped RLS migration `0011_treasury.sql`, module README, updated permissions and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_12_IMPLEMENTATION_REPORT.md`. |
 | PHASE_13 | 2026-09-07 | COMPLETE | E-invoicing completed: credential vault with encrypted secrets/masked reads, tenant-scoped credentials/submissions/hash-chain tables, ZATCA UBL/hash/QR fixture builders, submission ledger, invoice ZATCA status sync, ETA explicit stub, endpoints, README, permissions, tests, and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_13_IMPLEMENTATION_REPORT.md`. |
 | PHASE_14 | 2026-09-07 | COMPLETE | Reporting completed: registry for all v1 report keys, tenant-bound report readers, export token endpoint, invoice/shift print HTML shells, README recipe, registry tests, and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_14_IMPLEMENTATION_REPORT.md`. |
+| PHASE_15 | 2026-09-07 | COMPLETE | Migration engine completed: apps/migrator CLI/library, W1-W10 registry plus W13/W14 artifacts, anonymized fixture source, analyze/dry_run/import/reconcile/rollback modes, idempotent legacy-id loader, R1-R7 reconciliation, rollback order, engine persistence tables with RLS, API run-management endpoints, runbook, and tests. `pnpm run verify` exits 0. See `PHASE_15_IMPLEMENTATION_REPORT.md`. |
 
 ## Phase-01 Notes
 

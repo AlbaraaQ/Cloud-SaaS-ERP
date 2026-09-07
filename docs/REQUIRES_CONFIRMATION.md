@@ -43,3 +43,12 @@
 
 > Process: owner answers → update this table → if the answer changes architecture,
 > open an ADR. Phase P15 (migration) cannot mark "Done" while any 🔴 is open.
+
+## Phase 15 analyze-mode support
+
+Phase 15 does not guess owner decisions. The migrator now emits machine-readable evidence
+for RC entries it can derive from source data, including document-type dictionaries,
+`state=1` posted-entry evidence, `Accounts_Index.ParentCode` repair inputs, receipt enum
+value lists, fiscal-source labels, deleted-row counts, and rounding settings. Customer
+imports remain blocked until the 🔴 answers for that customer are reviewed and frozen in
+the migration profile.

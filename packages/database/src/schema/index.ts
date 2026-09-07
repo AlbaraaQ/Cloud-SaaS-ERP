@@ -10,3 +10,4 @@ export * from './sales.js';
 export * from './purchases.js';
 export * from './treasury.js';
 export * from './einvoicing.js';
+export * from './migration.js';
