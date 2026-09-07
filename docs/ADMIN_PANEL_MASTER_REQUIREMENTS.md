@@ -121,7 +121,9 @@ Customer quick-statement link. Widgets: today sales, unpaid > 30 d.
 
 Mirror of sales + supplier-required validation, additional-costs tab with allocation
 method preview (qty/value) and landed-cost effect per line, supplier reference/date
-fields. Receiving note shortcut from invoice (creates stock-in when draft policy off).
+fields. Backend Phase 11 endpoints are available for invoice CRUD, posting, voiding,
+payment hooks, costs management, and landed-cost preview. Receiving note shortcut from
+invoice remains an admin UX composition over the purchase post endpoint.
 
 ## 9. Treasury module
 
@@ -131,21 +133,25 @@ actions clear/bounce, allocations table to open invoices with auto-suggest oldes
 · Cash transfers (send/receive badges) · Expense types CRUD · Cash location balances
 board (+ per-currency chips) · Shift closes: open/current screen (live counters),
 close wizard (counts by denomination ← Rekaba grid, diff explanation, print report),
-history list with PDF. Widgets: cash on hand, pending cheques.
+history list with PDF. Backend Phase 12 endpoints are available for voucher lifecycle,
+cheque transitions, transfers, expense types, balances, and structured shift print data.
+Widgets: cash on hand, pending cheques.
 
 ## 10. E-invoicing console
 
 Credentials wizard (CSR upload, environment toggle, masked secrets) · Submissions
 monitor (status, UUID, hash, error, retry) · Failed queue bulk retry · ZATCA health
-panel. Egypt ETA tab hidden unless authority enabled.
+panel. Backend Phase 13 endpoints are available for credential vaulting, health,
+submission ledger, invoice submit, and retry. Egypt ETA tab hidden unless authority enabled.
 
 ## 11. Reporting center
 
 Reports index (categories: financial/inventory/sales/purchases/parties/treasury/HR) ·
 Parametric runner (date presets, branch/warehouse/party pickers) · Tables + charts ·
-Async export (CSV/XLSX/PDF) to files with notification on ready. Reports keys per
-`API_CONTRACT` §11 (incl. legacy-parity: SalesByDay, category/items/payment-method
-breakdowns, expiry, stock limits, aging).
+Async export (CSV/XLSX/PDF) to files with notification on ready. Backend Phase 14
+registry and report/export endpoints are available. Reports keys per `API_CONTRACT` §11
+(incl. legacy-parity: SalesByDay, category/items/payment-method breakdowns, expiry,
+stock limits, aging).
 
 ## 12. Migration console (P15/P16)
 
@@ -153,18 +159,23 @@ New run wizard (source profile, waves selection, mode pick) · Analyze/dry-run r
 (counts, issue severities drill-down payloads) · Import progress (per-wave bars,
 pause/resume) · Reconciliation report viewer (R1–R7 pass/waive/fail + PDF download,
 owner waiver upload) · Legacy ID lookup tool (search old GlobalID → new record) ·
-Compat devices manager (API keys, cursor resets) + sync status.
+Compat devices manager (API keys, cursor resets) + sync status. Backend Phase 15
+run-management endpoints, issue feed, reconciliation payload, migrator CLI, registry docs,
+and rollback mechanics are available for the P17 UI console. Phase 16 compat device
+registration/revocation, cursor reset, status lookup, and desktop wire contract are also
+available for the devices manager.
 
 ## 13. HR (P20)
 
 Employees directory (profile + salary components + bank) · Attendance import + log ·
 Adjustments (additions/deductions incl. SubFromSalary) · Payroll runs wizard (month/
-year, preview lines, post) · Payslip print. Perms hrm.*.
+year, preview lines, post/pay/reverse) · Payslip print. Perms hrm.*. Phase 20 backend
+and admin `/hrm` page are implemented behind `pack.hrm`.
 
 ## 14. Vertical packs (enabled per tenant flags)
 
-POS (P19): tables floor map grid, open/new order flow, order-type chips, kitchen print
-config, daily order numbers reset view. Projects (P21): projects kanban by stage,
+POS (P19) 🟢: tables floor map grid, open/new order flow, order-type chips, kitchen print
+config, daily order numbers reset view implemented at admin `/pos` and API `/pos/*`. Projects (P21): projects kanban by stage,
 progress-bill editor (retention, previous payments auto), contractor parties view,
 installment contracts schedule grid + collect action. Niche (P22): prescription form
 (optics), measurements card (tailoring), marina booking calendar + rent invoice +
@@ -176,3 +187,34 @@ violations, fitment compatibility picker (make/model/year), Salla sync monitor
 loading skeleton · empty (with CTA) · error (retry + traceId) · forbidden (403 page) ·
 offline banner (query retries) · posted/immutable read-only mode with explain tooltip ·
 RTL numerals option (western digits default) · decimal input masks per currency digits.
+
+
+## Phase 17 coverage markers
+
+- 🟢 Shell/dashboard: implemented in `apps/admin/app/page.tsx` and `app/layout.tsx`.
+- 🟢 Platform/settings: route `/platform`.
+- 🟢 Organization: route `/organization`.
+- 🟢 Catalog: route `/catalog`.
+- 🟢 Accounting: route `/accounting`.
+- 🟢 Parties: route `/parties`.
+- 🟢 Inventory: route `/inventory`.
+- 🟢 Sales: route `/sales`.
+- 🟢 Purchases: route `/purchases`.
+- 🟢 Treasury: route `/treasury`.
+- 🟢 E-invoicing console: route `/einvoicing`.
+- 🟢 Reporting center: route `/reporting`.
+- 🟢 Migration/compat console: route `/migration`.
+- ⚪ Vertical packs remain owned by later phases P19-P22.
+
+- 🟢 Restaurant POS vertical pack: `/pos` covers floor map, order flow, modifiers, kitchen print config, daily counters, merge/split and pay/close handoff.
+
+- 🟢 HRM vertical pack: `/hrm` covers employee directory, salary components, masked bank fields, attendance import/summary, adjustments, payroll wizard, pay/reverse and payslip print.
+
+- 🟢 Installments vertical pack: `/installments` covers contract list/detail, schedule grid, collection dialog and overdue aging hooks.
+- 🟢 Projects/contracting vertical pack: `/projects` covers project list, stage kanban/accreditation, BOQ editor, progress bill editor/posting, retention release and requirements register.
+
+- 🟢 Optics vertical pack: `/optics` covers prescriptions, Other_Column grid and invoice print sections.
+- 🟢 Tailoring vertical pack: `/tailoring` covers versioned customer measurement cards and latest measurement context.
+- 🟢 Marina vertical pack: `/marina` covers groups/pricing, vessels/owners, bookings/additions, rental invoices, violations and operation plans.
+- 🟢 Fitment vertical pack: `/fitment` covers make/model/year compatibility pickers.
+- 🟢 Salla integration: `/integrations` covers OAuth connections, branch mappings, sync monitor, diff flags and HMAC webhooks.

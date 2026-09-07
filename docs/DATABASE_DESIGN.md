@@ -251,22 +251,36 @@ hosting, extras), per-party deferred totals, `report_html NULL`, status. ← `Ca
 `csid`, `secret_enc bytea`, `request_ids jsonb`, `org jsonb`(CSRProperties fields),
 `valid_from/to`, `is_active`. Secrets encrypted at rest (app-layer AES-GCM).
 **einvoice_submissions** — `invoice_id`, `authority`, `action CHECK(sign,submit,clear,report)`,
-`status`, `uuid`, `hash`, `qr_payload`, `request_payload jsonb`, `response jsonb`,
+`status`, `uuid`, `hash`, `previous_hash`, `qr_payload`, `request_payload jsonb`, `response jsonb`,
 `error text NULL`, `attempts`, `submitted_at/by`. IDX(invoice). ← ZatcaResponse/Encoded/ETA.
+**einvoice_chain** — tenant/authority/environment hash-chain registry: `last_hash`, `updated_at`.
+Added in PHASE_13 to make ZATCA-style previous-hash sequencing explicit and lockable.
 
 ## 14. Migration (engine support, apps/migrator writes here)
 
-**migration_runs** — `tenant_id`, `source_label`(`sqlserver:Data16`…), `mode CHECK(dry_run,import)`,
-`status`, `started_by/at`, `finished_at`, `summary jsonb`.
-**legacy_id_mappings** — UQ(tenant, entity, legacy_source, legacy_pk): `new_id uuid`, `run_id`.
+**migration_runs** — `tenant_id`, `source_label`(`sqlserver:Data16`…),
+`mode CHECK(analyze,dry_run,import,reconcile,rollback)`, `status`, `started_by/at`,
+`finished_at`, `summary jsonb`.
+**legacy_id_mappings** — PK/UQ(tenant, entity, legacy_source, legacy_pk): `new_id uuid`, `run_id`.
 **migration_issues** — `run_id`, `entity`, `legacy_pk`, `severity`, `code`, `message`, `payload jsonb`.
-(Detailed contract in MIGRATION_ARCHITECTURE.md §6.)
+Implemented in PHASE_15 by `0013_migration_engine.sql`; all three tables are tenant-scoped
+and protected by FORCE RLS. (Detailed contract in MIGRATION_ARCHITECTURE.md §6.)
+
+
+## 14.1 Legacy Compat Gateway (P16)
+
+**compat_devices** — `tenant_id`, `name`, `api_key_hash`, `branch_id`, `cursors jsonb`,
+`enum_maps jsonb`, `status CHECK(active,revoked)`, `last_seen_at`, rate-limit window
+columns. API keys are SHA-256 + deployment pepper; plaintext is returned once. FORCE RLS
+is enabled and all sync tokens are branch-scoped.
 
 ## 15. Vertical Packs (owned by later phases; shapes frozen here)
 
 **HR (P20)**: `departments`, `jobs`, `employees`(profile+salary components jsonb+bank),
 `attendance_logs`(raw punches ← Attendance), `salary_adjustments`(← EmpSalaryAddSub),
-`payroll_runs / payroll_run_lines`(← Salary_Res/SalaryPay), journals linked.
+`payroll_runs / payroll_run_lines`(← Salary_Res/SalaryPay), journals linked. Implemented
+in PHASE_20 with FORCE RLS, optional employee↔membership link, masked bank output, and
+salary voucher/journal references.
 **Installments (P21)**: `installment_contracts`(party, item/stock, total, down, count,
 period unit, first_date, status, ← `cont`), `installment_schedule`(num, due_date, amount,
 paid, voucher_id ← `cont_installments`).
@@ -275,8 +289,9 @@ dates, status ← PM_Projects), `project_stage_templates`, `project_stages`(orde
 accreditation), `boq_terms`(← PM_Terms), `progress_bills / _lines`(retention
 `work_guarantee`, previously_paid, remaining — from InvContratct), `project_requirements`.
 **Restaurant POS (P19)**: `dining_tables`(cat, status, current invoice ← Tables),
-`table_categories`, `order_items_events`(← Table_Order), configs in tenant_settings
-(SettingOrderMethods/PayMethods/Print…).
+`table_categories`, `order_events`(← Table_Order), configs in tenant_settings
+(SettingOrderMethods/PayMethods/Print…). Implemented in PHASE_19 with FORCE RLS plus
+`sales_invoices.order_type/table_no/combined_into` and `sales_invoice_lines.modifiers`.
 **Niche (P22)**: `optical_prescriptions`(← Glasses+Other_Column jsonb), `customer_measurements`,
 `vessels`+`vessel_groups`+`bookings`+`rental_invoices`+`violations`+`vessel_owners`(
 party link, percent) ← Marine family, `vehicle_makes/models`, `item_vehicle_fitment`,
@@ -295,3 +310,11 @@ COA template (AR/AP/cash/bank/stock/sales/purchases/VAT in-out/discounts), 3 rol
 (owner/accountant/cashier), SAR+USD currencies, Pcs unit, 15%/0%/exempt tax groups,
 payment methods, posting profiles, main branch+warehouse+safe. Seed lists live in
 `packages/config/seeds/*.ts` (P03/P05/P07).
+
+### Phase 21 implementation notes
+
+The P21 vertical pack tables are implemented by `packages/database/migrations/0017_installments_projects.sql` and exported from `packages/database/src/schema/projects.ts`. All tenant-scoped tables have `ENABLE ROW LEVEL SECURITY` and `FORCE ROW LEVEL SECURITY`; installment and progress-bill numbering is handled through `document_sequences` with `installment_contract` and `progress_bill` scopes.
+
+### Phase 22 implementation notes
+
+The niche verticals and Salla integration are implemented by `packages/database/migrations/0018_niche_verticals_salla.sql` and exported from `packages/database/src/schema/niche.ts`. Token-bearing Salla columns store encrypted payloads only; legacy optics/tailoring/marina additive fields use typed JSONB to avoid core invoice-kind expansion.

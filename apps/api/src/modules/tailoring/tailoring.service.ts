@@ -1,0 +1,9 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import { DomainError, newId } from '@erp/contracts';
+import { customerMeasurements, tenantSettings, withTenantTx, type DatabaseHandle } from '@erp/database';
+
+import { DATABASE_HANDLE } from '../../database/database.module.js';
+export type MeasurementInput = { partyId: string; kind?: string; measurements: Record<string, string>; notes?: string; active?: boolean };
+@Injectable()
+export class TailoringService { constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {} async ensureEnabled(tenantId: string) { const [flag] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(tenantSettings).where(and(eq(tenantSettings.tenantId, tenantId), eq(tenantSettings.key, 'pack.tailoring'))).limit(1)); if (flag && flag.value !== true && flag.value !== 'true') throw new DomainError('NOT_FOUND', 'Tailoring pack is disabled', 404); } async list(tenantId: string, partyId: string) { await this.ensureEnabled(tenantId); return { data: await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(customerMeasurements).where(and(eq(customerMeasurements.tenantId, tenantId), eq(customerMeasurements.partyId, partyId), isNull(customerMeasurements.deletedAt))).orderBy(desc(customerMeasurements.createdAt))) }; } async latest(tenantId: string, partyId: string) { const rows = await this.list(tenantId, partyId); return { data: rows.data[0] ?? null }; } async create(tenantId: string, input: MeasurementInput) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(customerMeasurements).values({ id: newId(), tenantId, partyId: input.partyId, kind: input.kind ?? 'tailoring', measurements: input.measurements, notes: input.notes, active: input.active ?? true }).returning()); return row; } }

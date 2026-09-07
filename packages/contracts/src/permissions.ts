@@ -101,6 +101,8 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('purchase.invoice.create', 'Create draft purchase invoices.'),
   perm('purchase.invoice.post', 'Post purchase invoices.'),
   perm('purchase.invoice.void', 'Void posted purchase invoices.'),
+  perm('purchase.invoice.pay', 'Record supplier payment hooks on purchase invoices.'),
+  perm('purchase.cost.manage', 'Create, update and allocate purchase landed costs.'),
 
   // treasury (PHASE_13)
   perm('treasury.view', 'List and read vouchers and shifts.'),
@@ -108,10 +110,13 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('treasury.voucher.post', 'Post vouchers.'),
   perm('treasury.voucher.void', 'Void posted vouchers.'),
   perm('treasury.cheque.clear', 'Clear or bounce cheques.'),
+  perm('treasury.transfer.manage', 'Create, send and receive cash transfers.'),
+  perm('treasury.expensetype.manage', 'Maintain treasury expense types.'),
   perm('treasury.shift.close', 'Open and close cashier shifts.'),
 
   // e-invoicing (PHASE_13)
   perm('einvoice.view', 'Read e-invoice credentials and submissions.'),
+  perm('einvoice.manage', 'Maintain e-invoicing configuration.'),
   perm('einvoice.submit', 'Sign and submit e-invoices.'),
   perm('einvoice.credentials.manage', 'Maintain e-invoicing credentials.'),
 
@@ -123,6 +128,45 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('migration.view', 'Read migration runs, issues and reconciliation.'),
   perm('migration.run.execute', 'Start dry-run and import migration runs.'),
   perm('migration.run.import', 'Execute production data imports.'),
+
+  // legacy compat gateway (PHASE_16)
+  perm('compat.manage', 'Register, rotate and revoke legacy desktop compatibility devices.'),
+  perm('compat.sync', 'Use legacy desktop compatibility pull and push endpoints.'),
+
+  // restaurant POS pack (PHASE_19)
+  perm('pos.view', 'Read POS floor maps, tables and open order state.'),
+  perm('pos.operate', 'Open tables, add or void order items, merge/split, send and close POS orders.'),
+  perm('pos.priceoverride', 'Override POS item prices where tenant caps permit it.'),
+  perm('pos.tables.manage', 'Maintain dining tables and table categories.'),
+  perm('pos.config.manage', 'Maintain POS order methods, payment visibility and kitchen print routing.'),
+
+  // HRM and payroll pack (PHASE_20)
+  perm('hrm.view', 'Read HR directories, attendance summaries, payroll previews and payslips.'),
+  perm('hrm.manage', 'Maintain departments, jobs, employees, attendance imports and payroll drafts.'),
+  perm('hrm.payroll.post', 'Post, pay and reverse payroll runs.'),
+  perm('hrm.adjust.approve', 'Approve salary additions and deductions.'),
+
+  // installments and contracting/projects packs (PHASE_21)
+  perm('installments.view', 'Read installment contracts, schedules, overdue aging and contract statements.'),
+  perm('installments.manage', 'Create and maintain installment contracts and schedule templates.'),
+  perm('installments.collect', 'Collect installment receipts and allocate them to due schedule rows.'),
+  perm('projects.view', 'Read projects, stages, BOQ terms, progress bills and requirements.'),
+  perm('projects.manage', 'Create and maintain projects, stage templates, BOQ terms and requirement registers.'),
+  perm('projects.bill.post', 'Post progress bills and release retention invoices.'),
+  perm('projects.stage.accredit', 'Accredit or reject project stages assigned to a user.'),
+
+  // niche verticals and Salla integration pack (PHASE_22)
+  perm('optics.view', 'Read optical prescriptions and invoice print sections.'),
+  perm('optics.manage', 'Create and maintain optical prescriptions.'),
+  perm('tailoring.view', 'Read customer measurement cards and latest measurements.'),
+  perm('tailoring.manage', 'Create and maintain customer measurements.'),
+  perm('marina.view', 'Read marina groups, vessels, bookings and operation plans.'),
+  perm('marina.manage', 'Create and maintain marina vessels, owners, bookings, pricing, violations and plans.'),
+  perm('marina.invoice', 'Create rental invoices from marina bookings.'),
+  perm('fitment.view', 'Read vehicle compatibility lookups.'),
+  perm('fitment.manage', 'Maintain vehicle makes, models and item fitment rows.'),
+  perm('salla.integration.view', 'Read Salla synchronization status and export logs.'),
+  perm('salla.integration.manage', 'Manage Salla OAuth connections, mappings, export queues and webhooks.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

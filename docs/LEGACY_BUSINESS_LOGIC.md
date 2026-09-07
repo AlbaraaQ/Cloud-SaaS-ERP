@@ -103,7 +103,12 @@ branch + party + item class) into immutable posted entries; void = reversal entr
   reference, `tot_purch`, `AdditionalCost`, `Insurance`, VAT lines, WHT fields.
 - Additional costs feed item cost (`ItemAddedCost`) → landed cost into average pool.
 - Free-of-charge/exempt sales buckets (`FreeVATSales`) tracked.
-- RC-08: where supplier identity lives on purchases (`cust_id` vs `Suppliers`).
+- RC-08 implementation decision for the SaaS target: purchase documents require
+  `parties.kind IN ('supplier','both')`; ambiguous legacy `cust_id` mappings are handled
+  by migration reconciliation rather than accepted at runtime.
+- Implemented in PHASE_11: additional costs allocate by quantity or value, feed landed
+  unit cost into the inventory average-cost pool, and purchase returns exit the pool via
+  the Phase 09 ledger hints.
 
 ## BL-7 Treasury & receipts (CONFIRMED shapes)
 
@@ -114,6 +119,9 @@ branch + party + item class) into immutable posted entries; void = reversal entr
 - Shift close: cash counted vs computed (`diff`), network/returns/expenses/purchases
   buckets, per-customer deferred amounts, Android variant w/ HTML report print.
 - Multi-currency safe balances + denomination counting sheets (`Rekaba`).
+- Implemented in PHASE_12: the target runtime uses one `vouchers` table for receipt/payment
+  Sand*/Receipts behavior, terminal cheque transitions, cash transfers, balance-cache
+  writers, and shift-close denomination/diff storage. Legacy Sand* imports remain P15.
 
 ## BL-8 Period governance (CONFIRMED, recently introduced)
 
@@ -135,7 +143,8 @@ branch + party + item class) into immutable posted entries; void = reversal entr
 - Salary = components on employee + monthly `Salary_Res` runs + `SalaryPay` payouts with
   journal link; advances/adjustments via `EmpSalaryAddSub` (`SubFromSalary` deducts).
 - Attendance = raw biometric punches only (no evaluation logic in DB) → basic import
-  in target P20; evaluation rules RC-10.
+  in target P20; evaluation rules RC-10. Implemented in PHASE_20 as idempotent raw
+  punch import plus documented naïve in/out summary.
 
 ## BL-11 E-invoicing (CONFIRMED pipeline)
 
@@ -144,6 +153,8 @@ branch + party + item class) into immutable posted entries; void = reversal entr
   config; simulation & production flags; finalization dates window.
 - ETA Egypt: client id/2 secrets, signer pin, doc-type version, branch/activity codes +
   GS1/EGS item coding on items.
+- Implemented in PHASE_13: encrypted credential vault, ZATCA UBL/hash/QR submission
+  ledger and invoice metadata sync; ETA remains an explicit disabled adapter stub.
 
 ## BL-12 Reservations/orders vs invoices (CONFIRMED existence)
 
@@ -178,3 +189,11 @@ branch + party + item class) into immutable posted entries; void = reversal entr
 All RC-xx above are consolidated with context + required evidence in
 `REQUIRES_CONFIRMATION.md` (RC-01 … RC-31). Nothing here is silently adopted without
 either `CONFIRMED` evidence or an owner answer.
+
+### BL-12 Phase 21 implementation marker
+
+Installments and contracting are now implemented as vertical packs. `cont`/`cont_installments` semantics map to `installment_contracts` plus `installment_schedule`, with collection receipts allocated oldest due first. `PM_Projects`, `PM_ProjStages`, `PM_Terms`, `PM_Requirement(Sub)` and `InvContratct(_Sub)` semantics map to `projects`, `project_stages`, `boq_terms`, `project_requirements`, and `progress_bills/_lines`; progress billing preserves work value, previously billed, retention/work guarantee and remaining-balance calculations before posting standard sale invoices without inventory movement.
+
+### BL-12 Phase 22 implementation marker
+
+Optics `Glasses` and `Other_Column` are represented by `optical_prescriptions` with typed eye JSON plus a typed metadata grid. Tailoring `CustomerMeasurements` is represented by versioned `customer_measurements`. Marina `Marine`, `GroupMarine`, `Booking`, `RentInvoice`, `Violation`, `Owners` and operation plan families map to the marina vessel/booking/rental/plan tables. Fitment `EquipMakes/EquipModels/ItemVehicleFitment` map to the fitment tables. Salla settings, item sync, export log, branch mappings and legacy view diff semantics map to encrypted `salla_connections`, `salla_item_sync`, `salla_export_log` and `salla_branch_mappings`.

@@ -16,6 +16,7 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
+import { SequencesService } from '../platform-services/index.js';
 
 export type SalesLineInput = { itemId?: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
 export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; referenceInvoiceId?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string };
@@ -30,6 +31,7 @@ export class SalesService {
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly inventory: InventoryService,
     private readonly accounting: AccountingService,
+    private readonly sequences: SequencesService,
   ) {}
 
   async list(tenantId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesInvoices).where(eq(salesInvoices.tenantId, tenantId)).orderBy(desc(salesInvoices.createdAt)).limit(100)); }
@@ -72,13 +74,29 @@ export class SalesService {
     const invoice = await this.get(tenantId, id);
     if (invoice.status === 'posted') return invoice;
     if (invoice.status !== 'draft') throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only draft invoices can be posted', 409);
-    const number = `${invoice.kind === 'sale_return' ? 'SR' : invoice.kind === 'credit_note' ? 'CN' : invoice.kind === 'debit_note' ? 'DN' : 'SI'}-${Date.now()}-${id.slice(0, 6)}`;
     if (posting.journalLines?.length && !posting.fiscalPeriodId) throw new DomainError('SALES_FISCAL_PERIOD_REQUIRED', 'A fiscal period is required for accounting posting', 422);
-    if (posting.inventoryLines?.length) await this.inventory.record(tenantId, posting.inventoryLines.map((line) => ({ ...line, docType: line.docType || 'sales_invoice', docId: id })));
-    if (posting.journalLines?.length) {
-      await this.accounting.postJournal(tenantId, { branchId: invoice.branchId, fiscalPeriodId: posting.fiscalPeriodId!, date: new Date().toISOString().slice(0, 10), description: `Sales invoice ${number}`, lines: posting.journalLines });
-    }
-    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesInvoices).set({ status: 'posted', number, postedAt: new Date(), paymentStatus: invoice.total === '0' ? 'paid' : 'unpaid' }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft'))));
+
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [locked] = await tx.select().from(salesInvoices).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft')));
+      if (!locked) throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only draft invoices can be posted', 409);
+      const prefix = locked.kind === 'sale_return' ? 'SR-' : locked.kind === 'credit_note' ? 'CN-' : locked.kind === 'debit_note' ? 'DN-' : 'SI-';
+      const allocated = await this.sequences.next({ tenantId, branchId: locked.branchId, docType: locked.kind }, tx, { prefix, padding: 6 });
+      const number = allocated.display;
+
+      if (posting.inventoryLines?.length) await this.inventory.recordInTx(tx, tenantId, posting.inventoryLines.map((line) => ({ ...line, docType: line.docType || 'sales_invoice', docId: id })));
+      if (posting.journalLines?.length) {
+        await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId: locked.branchId,
+          fiscalPeriodId: posting.fiscalPeriodId!,
+          date: new Date().toISOString().slice(0, 10),
+          description: `Sales invoice ${number}`,
+          lines: posting.journalLines,
+          sourceType: 'sales_invoice',
+          sourceId: id,
+        });
+      }
+      await tx.update(salesInvoices).set({ status: 'posted', number, postedAt: new Date(), paymentStatus: locked.total === '0' ? 'paid' : 'unpaid' }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft')));
+    });
     return this.get(tenantId, id);
   }
 

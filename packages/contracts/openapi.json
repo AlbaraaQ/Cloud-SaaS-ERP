@@ -29,6 +29,20 @@
         ]
       }
     },
+    "/metrics": {
+      "get": {
+        "operationId": "MetricsController_scrape",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Metrics"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -3514,6 +3528,68 @@
         ]
       }
     },
+    "/api/v1/fiscal-periods/{id}/modules/{module}/lock": {
+      "post": {
+        "operationId": "AccountingController_lockModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "module",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/fiscal-periods/{id}/modules/{module}/unlock": {
+      "post": {
+        "operationId": "AccountingController_unlockModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "module",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
     "/api/v1/statements/trial-balance": {
       "get": {
         "operationId": "AccountingController_trialBalance",
@@ -4078,9 +4154,129 @@
         ]
       }
     },
+    "/api/v1/inventory/lots": {
+      "get": {
+        "operationId": "InventoryController_lots",
+        "parameters": [
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createLot",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials": {
+      "get": {
+        "operationId": "InventoryController_serials",
+        "parameters": [
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createSerial",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/serials/reserve": {
       "post": {
         "operationId": "InventoryController_reserveSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/release": {
+      "post": {
+        "operationId": "InventoryController_releaseSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/consume": {
+      "post": {
+        "operationId": "InventoryController_consumeSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/return": {
+      "post": {
+        "operationId": "InventoryController_returnSerials",
         "parameters": [],
         "responses": {
           "201": {
@@ -4383,6 +4579,2758 @@
         },
         "tags": [
           "Sales"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices": {
+      "get": {
+        "operationId": "PurchasesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      },
+      "post": {
+        "operationId": "PurchasesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}": {
+      "get": {
+        "operationId": "PurchasesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      },
+      "patch": {
+        "operationId": "PurchasesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/post": {
+      "post": {
+        "operationId": "PurchasesController_postInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/void": {
+      "post": {
+        "operationId": "PurchasesController_voidInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/payments": {
+      "post": {
+        "operationId": "PurchasesController_payment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/landed-cost": {
+      "get": {
+        "operationId": "PurchasesController_previewInvoiceCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/preview-landed-cost": {
+      "post": {
+        "operationId": "PurchasesController_previewLandedCost",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/costs": {
+      "post": {
+        "operationId": "PurchasesController_addCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/costs/{costId}": {
+      "delete": {
+        "operationId": "PurchasesController_deleteCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "costId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/vouchers": {
+      "get": {
+        "operationId": "TreasuryController_vouchers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "post": {
+        "operationId": "TreasuryController_createVoucher",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}": {
+      "get": {
+        "operationId": "TreasuryController_getVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "patch": {
+        "operationId": "TreasuryController_updateVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}/post": {
+      "post": {
+        "operationId": "TreasuryController_postVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}/void": {
+      "post": {
+        "operationId": "TreasuryController_voidVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}/cheque": {
+      "post": {
+        "operationId": "TreasuryController_cheque",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-transfers": {
+      "get": {
+        "operationId": "TreasuryController_transfers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "post": {
+        "operationId": "TreasuryController_createTransfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-transfers/{id}/send": {
+      "post": {
+        "operationId": "TreasuryController_sendTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-transfers/{id}/receive": {
+      "post": {
+        "operationId": "TreasuryController_receiveTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/expense-types": {
+      "get": {
+        "operationId": "TreasuryController_expenseTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "post": {
+        "operationId": "TreasuryController_createExpenseType",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/open": {
+      "post": {
+        "operationId": "TreasuryController_openShift",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/current": {
+      "get": {
+        "operationId": "TreasuryController_currentShift",
+        "parameters": [
+          {
+            "name": "branch_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes": {
+      "get": {
+        "operationId": "TreasuryController_history",
+        "parameters": [
+          {
+            "name": "branch_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/{id}/close": {
+      "post": {
+        "operationId": "TreasuryController_closeShift",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/{id}/print-data": {
+      "get": {
+        "operationId": "TreasuryController_printShift",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-locations/{id}/balance": {
+      "get": {
+        "operationId": "TreasuryController_cashLocationBalance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-locations/{id}/recalc-balance": {
+      "post": {
+        "operationId": "TreasuryController_recalc",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/einvoice/credentials": {
+      "put": {
+        "operationId": "EinvoicingController_putCredentials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      },
+      "get": {
+        "operationId": "EinvoicingController_credentials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/einvoice/submissions": {
+      "get": {
+        "operationId": "EinvoicingController_submissions",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/einvoice/submissions/{id}/retry": {
+      "post": {
+        "operationId": "EinvoicingController_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/sales-invoices/{id}/einvoice/submit": {
+      "post": {
+        "operationId": "EinvoicingController_submitInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/einvoice/health": {
+      "get": {
+        "operationId": "EinvoicingController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Einvoicing"
+        ]
+      }
+    },
+    "/api/v1/reports": {
+      "get": {
+        "operationId": "ReportingController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/{key}": {
+      "get": {
+        "operationId": "ReportingController_run",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/{key}/export": {
+      "post": {
+        "operationId": "ReportingController_export",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/invoices/{id}": {
+      "get": {
+        "operationId": "ReportingController_invoicePrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/shifts/{id}": {
+      "get": {
+        "operationId": "ReportingController_shiftPrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/migration/runs": {
+      "post": {
+        "operationId": "MigrationController_start",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      },
+      "get": {
+        "operationId": "MigrationController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/migration/runs/{id}": {
+      "get": {
+        "operationId": "MigrationController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/migration/runs/{id}/issues": {
+      "get": {
+        "operationId": "MigrationController_issues",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/migration/runs/{id}/reconciliation": {
+      "get": {
+        "operationId": "MigrationController_reconciliation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Migration"
+        ]
+      }
+    },
+    "/api/v1/compat/devices": {
+      "post": {
+        "operationId": "CompatController_createDevice",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      },
+      "get": {
+        "operationId": "CompatController_devices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/devices/{id}/revoke": {
+      "patch": {
+        "operationId": "CompatController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/auth/device": {
+      "post": {
+        "operationId": "CompatController_authDevice",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/master/items": {
+      "get": {
+        "operationId": "CompatController_items",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/master/parties": {
+      "get": {
+        "operationId": "CompatController_parties",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/master/accounts": {
+      "get": {
+        "operationId": "CompatController_accounts",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/master/tax-groups": {
+      "get": {
+        "operationId": "CompatController_taxGroups",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/docs/sales-invoice": {
+      "post": {
+        "operationId": "CompatController_sale",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/docs/voucher": {
+      "post": {
+        "operationId": "CompatController_voucher",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/sync/cursor": {
+      "get": {
+        "operationId": "CompatController_getCursor",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      },
+      "post": {
+        "operationId": "CompatController_setCursor",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/docs/status": {
+      "get": {
+        "operationId": "CompatController_status",
+        "parameters": [
+          {
+            "name": "x-tenant-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-compat-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "legacyId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/pos/categories": {
+      "get": {
+        "operationId": "PosController_categories",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      },
+      "post": {
+        "operationId": "PosController_createCategory",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables": {
+      "get": {
+        "operationId": "PosController_tables",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      },
+      "post": {
+        "operationId": "PosController_createTable",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables/{id}/open": {
+      "post": {
+        "operationId": "PosController_open",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables/{id}/items": {
+      "post": {
+        "operationId": "PosController_addItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/events/{id}/void": {
+      "post": {
+        "operationId": "PosController_voidItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables/{id}/send-to-invoice": {
+      "post": {
+        "operationId": "PosController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables/{id}/close": {
+      "post": {
+        "operationId": "PosController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables/{sourceId}/merge/{targetId}": {
+      "post": {
+        "operationId": "PosController_merge",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tables/{id}/split": {
+      "post": {
+        "operationId": "PosController_split",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/api/v1/hrm/departments": {
+      "get": {
+        "operationId": "HrmController_departments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createDepartment",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/jobs": {
+      "get": {
+        "operationId": "HrmController_jobs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createJob",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/employees": {
+      "get": {
+        "operationId": "HrmController_employees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createEmployee",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/attendance/import": {
+      "post": {
+        "operationId": "HrmController_importAttendance",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/attendance/summary": {
+      "get": {
+        "operationId": "HrmController_attendanceSummary",
+        "parameters": [
+          {
+            "name": "enroll",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/adjustments": {
+      "post": {
+        "operationId": "HrmController_createAdjustment",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/adjustments/{id}/approve": {
+      "post": {
+        "operationId": "HrmController_approveAdjustment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/preview": {
+      "post": {
+        "operationId": "HrmController_preview",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs": {
+      "get": {
+        "operationId": "HrmController_runs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "post": {
+        "operationId": "HrmController_createRun",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}": {
+      "get": {
+        "operationId": "HrmController_readRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}/post": {
+      "post": {
+        "operationId": "HrmController_postRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}/pay": {
+      "post": {
+        "operationId": "HrmController_payRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/payroll/runs/{id}/reverse": {
+      "post": {
+        "operationId": "HrmController_reverseRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/installments/contracts": {
+      "get": {
+        "operationId": "InstallmentsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Installments"
+        ]
+      },
+      "post": {
+        "operationId": "InstallmentsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Installments"
+        ]
+      }
+    },
+    "/api/v1/installments/contracts/{id}": {
+      "get": {
+        "operationId": "InstallmentsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Installments"
+        ]
+      }
+    },
+    "/api/v1/installments/overdue": {
+      "get": {
+        "operationId": "InstallmentsController_overdue",
+        "parameters": [
+          {
+            "name": "asOf",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Installments"
+        ]
+      }
+    },
+    "/api/v1/installments/contracts/{id}/collect": {
+      "post": {
+        "operationId": "InstallmentsController_collect",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Installments"
+        ]
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "ProjectsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      },
+      "post": {
+        "operationId": "ProjectsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "get": {
+        "operationId": "ProjectsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/stage-templates": {
+      "post": {
+        "operationId": "ProjectsController_template",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{id}/stages": {
+      "post": {
+        "operationId": "ProjectsController_stage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/stages/{stageId}/accredit": {
+      "post": {
+        "operationId": "ProjectsController_accredit",
+        "parameters": [
+          {
+            "name": "stageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{id}/boq": {
+      "post": {
+        "operationId": "ProjectsController_boq",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{id}/progress-bills": {
+      "post": {
+        "operationId": "ProjectsController_bill",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/progress-bills/{billId}": {
+      "get": {
+        "operationId": "ProjectsController_getBill",
+        "parameters": [
+          {
+            "name": "billId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/progress-bills/{billId}/post": {
+      "post": {
+        "operationId": "ProjectsController_postBill",
+        "parameters": [
+          {
+            "name": "billId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/progress-bills/{billId}/release-retention": {
+      "post": {
+        "operationId": "ProjectsController_release",
+        "parameters": [
+          {
+            "name": "billId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/projects/requirements": {
+      "post": {
+        "operationId": "ProjectsController_requirement",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/api/v1/optics/prescriptions": {
+      "get": {
+        "operationId": "OpticsController_list",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Optics"
+        ]
+      },
+      "post": {
+        "operationId": "OpticsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Optics"
+        ]
+      }
+    },
+    "/api/v1/optics/invoice-lines/{lineId}/print-section": {
+      "get": {
+        "operationId": "OpticsController_print",
+        "parameters": [
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Optics"
+        ]
+      }
+    },
+    "/api/v1/tailoring/parties/{partyId}/measurements": {
+      "get": {
+        "operationId": "TailoringController_list",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tailoring"
+        ]
+      }
+    },
+    "/api/v1/tailoring/parties/{partyId}/measurements/latest": {
+      "get": {
+        "operationId": "TailoringController_latest",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tailoring"
+        ]
+      }
+    },
+    "/api/v1/tailoring/measurements": {
+      "post": {
+        "operationId": "TailoringController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tailoring"
+        ]
+      }
+    },
+    "/api/v1/marina": {
+      "get": {
+        "operationId": "MarinaController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/groups": {
+      "post": {
+        "operationId": "MarinaController_group",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/groups/{id}/pricing": {
+      "post": {
+        "operationId": "MarinaController_price",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/vessels": {
+      "post": {
+        "operationId": "MarinaController_vessel",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/vessels/{id}/owners": {
+      "post": {
+        "operationId": "MarinaController_owner",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings": {
+      "post": {
+        "operationId": "MarinaController_booking",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings/{id}/additions": {
+      "post": {
+        "operationId": "MarinaController_addition",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings/{id}/rental-invoice": {
+      "post": {
+        "operationId": "MarinaController_invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/violations": {
+      "post": {
+        "operationId": "MarinaController_violation",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/operation-plans": {
+      "post": {
+        "operationId": "MarinaController_plan",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/fitment/makes": {
+      "post": {
+        "operationId": "FitmentController_make",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/makes/{makeId}/models": {
+      "post": {
+        "operationId": "FitmentController_model",
+        "parameters": [
+          {
+            "name": "makeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/items": {
+      "post": {
+        "operationId": "FitmentController_attach",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/items-for-vehicle": {
+      "get": {
+        "operationId": "FitmentController_items",
+        "parameters": [
+          {
+            "name": "makeId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modelId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/fitment/items/{itemId}/vehicles": {
+      "get": {
+        "operationId": "FitmentController_vehicles",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Fitment"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/oauth/authorize": {
+      "get": {
+        "operationId": "SallaController_auth",
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirectUri",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/connections": {
+      "post": {
+        "operationId": "SallaController_connect",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/branch-mappings": {
+      "post": {
+        "operationId": "SallaController_map",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/export-queue": {
+      "post": {
+        "operationId": "SallaController_queue",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/export-next": {
+      "post": {
+        "operationId": "SallaController_exportNext",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/export-log": {
+      "get": {
+        "operationId": "SallaController_logs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/webhooks/{storeId}/orders": {
+      "post": {
+        "operationId": "SallaController_webhook",
+        "parameters": [
+          {
+            "name": "storeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-salla-signature",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
         ]
       }
     }

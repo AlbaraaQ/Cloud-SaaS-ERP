@@ -52,3 +52,19 @@ suspended (read-only mode banner).
 
 No public e-commerce storefront (Salla integration serves that), no password-free
 magic links, no embedded PSP checkout (payment link integration is a future ADR).
+
+
+## Phase 18 coverage markers
+
+- 🟢 Global marketing shell: `/`, `/pricing`, `/contact`.
+- 🟢 Auth, forced reset, and tenant picker: `/auth/login`, `/auth/forgot`, `/auth/forced-reset`, `/auth/tenant-picker`.
+- 🟢 Self-service portal dashboard: `/portal`.
+- 🟢 Invoices and detail/PDF/QR affordance: `/portal/invoices`, `/portal/invoices/[id]`.
+- 🟢 Statement export UI: `/portal/statement`.
+- 🟢 Payments history: `/portal/payments`.
+- 🟢 Profile change request flow: `/portal/profile`.
+- 🟢 Notifications center: `/portal/notifications`.
+- 🟢 Lightweight staff screens with flag copy: `/portal/quick-sale`, `/portal/stock`, `/portal/tasks`.
+- 🟢 Onboarding wizard: `/onboarding`.
+- 🟢 Public verification page with masked/minimal result: `/verify`.
+- ⚪ Payment gateway checkout, storefront, native push, and SEO automation remain out of v1 scope.

@@ -126,40 +126,114 @@ price_includes_vat, currency_code?, lines:[{item_id, unit_id, qty, unit_price,
 discount_amount?, tax_group_id?|tax_rate?, description?}], invoice_discount?,
 pay_method?, payments?[...], reference_invoice_id? (returns) }`.
 Purchases mirror: `/purchase-invoices`, `/{id}/post` (computes landed cost),
-`/{id}/payments`, `/purchase-invoices/{id}/costs`. Perms `sales.invoice.*`,
-`purchase.invoice.*` (create/post/void/pay/view).
+`/{id}/payments`, `/purchase-invoices/{id}/costs`, and
+`POST /purchase-invoices/preview-landed-cost`. Perms `sales.invoice.*`,
+`purchase.invoice.*` (create/post/void/pay/view), `purchase.cost.manage`.
 
 ## 9. Treasury
 
 `/vouchers?filter[kind]=receipt` CRUD(draft) + `post/void` + `POST /vouchers/{id}/cheque`
-transitions (`clear|bounce`) + allocations endpoint §6 · `/cash-transfers` + `receive` ·
-`/expense-types` · `/shift-closes` open/current/close `{counts:[{denomination,count}]}` ·
-GET `/cash-locations/{id}/balance`. Perms `treasury.{voucher,transfer,shift}.manage/view`.
+transitions (`clear|bounce|collect`) + allocations on post · `/cash-transfers` create/send/receive ·
+`/expense-types` create/list · `/shift-closes` open/current/history/close `{counts:[{denomination,count}]}` ·
+GET `/shift-closes/{id}/print-data` · GET `/cash-locations/{id}/balance` ·
+POST `/cash-locations/{id}/recalc-balance`. Perms `treasury.view`,
+`treasury.voucher.{create,post,void}`, `treasury.cheque.clear`,
+`treasury.transfer.manage`, `treasury.expensetype.manage`, `treasury.shift.close`.
 
 ## 10. E-Invoicing
 
-`/einvoice/credentials` PUT/GET (masked) · GET `/einvoice/submissions?filter[status]`
+`/einvoice/credentials` PUT/GET (masked) · GET `/einvoice/submissions?status=`
 · POST `/einvoice/submissions/{id}/retry` · POST `/sales-invoices/{id}/einvoice/submit`
-(queued) · GET `/einvoice/health`. Perms `einvoice.{manage,submit,view}`.
+(queued/submission-ledger) · GET `/einvoice/health`. Perms `einvoice.{manage,submit,view}` and `einvoice.credentials.manage`.
 
 ## 11. Reporting (P14)
 
-`GET /reports/{reportKey}` with documented param sets per key:
+`GET /reports` catalog · `GET /reports/{reportKey}` with documented param sets per key:
 `sales-by-day, sales-by-category, sales-by-item, sales-by-payment, sales-by-ordertype,
-inventory-valuation, item-movement, expiry-report, stock-limits, ar-aging, ap-aging,
+monthly-sales, inventory-valuation, item-movement, expiry-report, stock-limits, ar-aging, ap-aging,
 vat-return, trial-balance, general-ledger, profit-loss, balance-sheet, cashier-shift,
 party-statement, serial-tracking, batch-tracking`. Async: POST `/reports/{key}/export
-{format:csv|xlsx|pdf}` → job → file download. Perm `reporting.{key}.view`.
+{format:csv|xlsx|pdf}` → reports-export token → file download when worker renders. Perm `reporting.view`, later refined to `reporting.{key}.view`.
 
 ## 12. Migration & Compat
 
-`/migration/runs` POST `{mode:dry_run|import, source:{…}}` (starts job), GET status,
-GET `/migration/runs/{id}/issues`, GET `/migration/runs/{id}/reconciliation` ·
-`/compat/v1/*` (P16): `POST /compat/auth/device`, `GET /compat/master/items?since=`,
-`GET /compat/master/parties?since=`, `POST /compat/docs/sales-invoice`,
-`POST /compat/docs/voucher`, `GET /compat/sync/cursor`. Device-key auth, per-tenant.
+`/migration/runs` POST `{mode:analyze|dry_run|import|reconcile|rollback, source:{label?,kind?,...}}`
+(starts job and returns run status), GET `/migration/runs`, GET `/migration/runs/{id}` status,
+GET `/migration/runs/{id}/issues`, GET `/migration/runs/{id}/reconciliation`. Perms
+`migration.view`, `migration.run.execute`, `migration.run.import` ·
+Compat (P16): admin `POST/GET /compat/devices`, `PATCH /compat/devices/{id}/revoke`;
+public device `POST /compat/auth/device`; scoped token endpoints `GET /compat/master/items?since=`,
+`GET /compat/master/parties?since=`, `GET /compat/master/accounts?since=`,
+`GET /compat/master/tax-groups?since=`, `POST /compat/docs/sales-invoice`,
+`POST /compat/docs/voucher`, `GET/POST /compat/sync/cursor`,
+`GET /compat/docs/status?legacyId=`. Device-key auth, per-tenant, per-branch. Perms
+`compat.manage`, `compat.sync`.
 
 ## 13. Admin-plane (platform owner)
 
 Separate guard `is_platform_admin`: `/platform/tenants` CRUD + `suspend/activate`,
 `/platform/users`, `/platform/stats`, `/platform/migrations`. Never mixed with tenant routes.
+
+
+## 14. Restaurant POS Pack (P19)
+
+Feature flag `pack.pos`; disabled tenants receive 404 for `/pos/*`.
+
+`GET/POST /pos/categories` · `GET/POST /pos/tables` ·
+`POST /pos/tables/{id}/open` · `POST /pos/tables/{id}/items` ·
+`POST /pos/events/{id}/void {reason}` · `POST /pos/tables/{id}/send-to-invoice` ·
+`POST /pos/tables/{id}/close` · `POST /pos/tables/{sourceId}/merge/{targetId}` ·
+`POST /pos/tables/{id}/split`.
+
+Perms: `pos.view`, `pos.operate`, `pos.priceoverride`, `pos.tables.manage`,
+`pos.config.manage`. Order events are append-only lifecycle facts; send-to-invoice creates
+a normal sales invoice with `order_type`, `table_no`, and daily branch-scoped
+`pos_order:YYYY-MM-DD` numbering.
+
+
+## 15. HRM & Payroll Pack (P20)
+
+Feature flag `pack.hrm`; disabled tenants receive 404 for `/hrm/*`.
+
+`GET/POST /hrm/departments` · `GET/POST /hrm/jobs` · `GET/POST /hrm/employees`
+(bank fields masked in list output) · `POST /hrm/attendance/import {csv}` for
+`machine,enroll,datetime,inout` · `GET /hrm/attendance/summary?enroll&from&to`
+(naïve in/out pairing only) · `POST /hrm/adjustments` ·
+`POST /hrm/adjustments/{id}/approve` · `POST /hrm/payroll/preview` ·
+`GET/POST /hrm/payroll/runs` · `GET /hrm/payroll/runs/{id}` ·
+`POST /hrm/payroll/runs/{id}/post` · `POST /hrm/payroll/runs/{id}/pay` ·
+`POST /hrm/payroll/runs/{id}/reverse {reason}`.
+
+Perms: `hrm.view`, `hrm.manage`, `hrm.payroll.post`, `hrm.adjust.approve`. Posted runs
+are immutable; correction is reversal plus a new run. Pay creates a treasury voucher with
+subtype `salary`.
+
+## 16. Installments and Contracting/Projects Packs (P21)
+
+Feature flags: `pack.installments` and `pack.projects`; disabled tenants receive 404 for the pack routes.
+
+Installments endpoints: `GET/POST /installments/contracts`, `GET /installments/contracts/{id}`, `GET /installments/overdue?asOf=YYYY-MM-DD`, `POST /installments/contracts/{id}/collect`.
+
+Projects endpoints: `GET/POST /projects`, `GET /projects/{id}`, `POST /projects/stage-templates`, `POST /projects/{id}/stages`, `POST /projects/stages/{stageId}/accredit`, `POST /projects/{id}/boq`, `POST /projects/{id}/progress-bills`, `GET /projects/progress-bills/{billId}`, `POST /projects/progress-bills/{billId}/post`, `POST /projects/progress-bills/{billId}/release-retention`, `POST /projects/requirements`.
+
+Perms: `installments.view`, `installments.manage`, `installments.collect`, `projects.view`, `projects.manage`, `projects.bill.post`, `projects.stage.accredit`.
+
+## 17. Niche Verticals and Salla Integration (P22)
+
+Feature flags: `pack.optics`, `pack.tailoring`, `pack.marina`, `pack.fitment`, `integration.salla`; disabled tenants receive 404 for the respective routes.
+
+Optics: `GET/POST /optics/prescriptions`, `GET /optics/invoice-lines/{lineId}/print-section`.
+Tailoring: `GET /tailoring/parties/{partyId}/measurements`, `GET /tailoring/parties/{partyId}/measurements/latest`, `POST /tailoring/measurements`.
+Marina: `GET /marina`, `POST /marina/groups`, `POST /marina/groups/{id}/pricing`, `POST /marina/vessels`, `POST /marina/vessels/{id}/owners`, `POST /marina/bookings`, `POST /marina/bookings/{id}/additions`, `POST /marina/bookings/{id}/rental-invoice`, `POST /marina/violations`, `POST /marina/operation-plans`.
+Fitment: `POST /fitment/makes`, `POST /fitment/makes/{makeId}/models`, `POST /fitment/items`, `GET /fitment/items-for-vehicle`, `GET /fitment/items/{itemId}/vehicles`.
+Salla: `GET /integrations/salla/oauth/authorize`, `POST /integrations/salla/connections`, `POST /integrations/salla/branch-mappings`, `POST /integrations/salla/export-queue`, `POST /integrations/salla/export-next`, `GET /integrations/salla/export-log`, `POST /integrations/salla/webhooks/{storeId}/orders`.
+
+Perms: `optics.view/manage`, `tailoring.view/manage`, `marina.view/manage/invoice`, `fitment.view/manage`, `salla.integration.view/manage`.
+
+## 18. Operations endpoints (P23)
+
+Ops endpoints are outside `/api/v1` and public for infrastructure probes/scrapers:
+
+- `GET /health/live`: process liveness only.
+- `GET /health/ready`: deep readiness with database, process, memory and uptime fields.
+- `GET /metrics`: Prometheus text exposition for request counts, latency buckets, queue depth placeholder, e-invoice failures and migration throughput.

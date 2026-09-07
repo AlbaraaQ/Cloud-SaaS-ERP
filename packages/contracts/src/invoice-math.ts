@@ -100,4 +100,66 @@ export function calculateInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals
   return { lines, subtotal: format(subtotal, scale), discount: format(discount, scale), taxable: format(taxable, scale), tax: format(tax, scale), extraTax: format(extraTax, scale), withholding: format(withholding, scale), total: format(total, scale) };
 }
 
-export const invoiceMath = { calculateInvoiceTotals, invoiceLineInputSchema };
+export type LandedCostLineInput = { lineId?: string; itemId?: string; quantity: string; net: string; unitCost?: string };
+export type LandedCostInput = { lines: LandedCostLineInput[]; costs: Array<{ amount: string }>; method: 'qty' | 'value'; scale?: number };
+export type LandedCostLineAllocation = {
+  lineId?: string;
+  itemId?: string;
+  base: string;
+  allocatedCost: string;
+  net: string;
+  landedTotal: string;
+  effectiveUnitCost: string;
+};
+export type LandedCostAllocation = { method: 'qty' | 'value'; totalCost: string; lines: LandedCostLineAllocation[] };
+
+/**
+ * Allocates landed costs pro-rata by quantity or value, HALF_UP at the selected scale,
+ * then assigns any rounding remainder to the line with the largest allocation base.
+ */
+export function allocateLandedCost(input: LandedCostInput): LandedCostAllocation {
+  const scale = input.scale ?? 4;
+  const totalCost = input.costs.reduce((sum, cost) => sum + parse(cost.amount, scale), 0n);
+  const prepared = input.lines.map((line, index) => {
+    const quantity = parse(line.quantity, scale);
+    const net = parse(line.net, scale);
+    const base = input.method === 'qty' ? quantity : net;
+    return { line, index, quantity, net, base };
+  });
+  const totalBase = prepared.reduce((sum, line) => sum + line.base, 0n);
+  if (prepared.length === 0 || totalCost < 0n || totalBase <= 0n) {
+    throw new Error('Cannot allocate landed cost without positive lines, costs and allocation base');
+  }
+
+  const allocations = prepared.map((line) => divRound(totalCost * line.base, totalBase));
+  const allocated = allocations.reduce((sum, value) => sum + value, 0n);
+  const remainder = totalCost - allocated;
+  if (remainder !== 0n) {
+    let target = 0;
+    for (let index = 1; index < prepared.length; index += 1) {
+      if (prepared[index]!.base > prepared[target]!.base) target = index;
+    }
+    allocations[target] = (allocations[target] ?? 0n) + remainder;
+  }
+
+  return {
+    method: input.method,
+    totalCost: format(totalCost, scale),
+    lines: prepared.map(({ line, quantity, net, base }, index) => {
+      const allocatedCost = allocations[index] ?? 0n;
+      const landedTotal = net + allocatedCost;
+      const effectiveUnitCost = divRound(landedTotal * ten(scale), quantity);
+      return {
+        lineId: line.lineId,
+        itemId: line.itemId,
+        base: format(base, scale),
+        allocatedCost: format(allocatedCost, scale),
+        net: format(net, scale),
+        landedTotal: format(landedTotal, scale),
+        effectiveUnitCost: format(effectiveUnitCost, scale),
+      };
+    }),
+  };
+}
+
+export const invoiceMath = { calculateInvoiceTotals, allocateLandedCost, invoiceLineInputSchema };

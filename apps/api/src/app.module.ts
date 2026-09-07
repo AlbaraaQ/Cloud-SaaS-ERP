@@ -24,7 +24,24 @@ import { PartiesModule } from './modules/parties/parties.module.js';
 import { CatalogModule } from './modules/organization/catalog/catalog.module.js';
 import { InventoryModule } from './modules/inventory/inventory.module.js';
 import { SalesModule } from './modules/sales/sales.module.js';
+import { PurchasesModule } from './modules/purchases/purchases.module.js';
+import { TreasuryModule } from './modules/treasury/treasury.module.js';
+import { EinvoicingModule } from './modules/einvoicing/einvoicing.module.js';
+import { ReportingModule } from './modules/reporting/reporting.module.js';
+import { MigrationModule } from './modules/migration/migration.module.js';
+import { CompatModule } from './modules/compat/compat.module.js';
+import { PosModule } from './modules/pos/pos.module.js';
+import { HrmModule } from './modules/hrm/hrm.module.js';
+import { InstallmentsModule } from './modules/installments/installments.module.js';
+import { ProjectsModule } from './modules/projects/projects.module.js';
+import { FitmentModule } from './modules/fitment/fitment.module.js';
+import { MarinaModule } from './modules/marina/marina.module.js';
+import { OpticsModule } from './modules/optics/optics.module.js';
+import { SallaModule } from './modules/integrations/salla/salla.module.js';
+import { TailoringModule } from './modules/tailoring/tailoring.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
+import { MetricsInterceptor } from './ops/metrics.interceptor.js';
+import { OpsModule } from './ops/ops.module.js';
 
 /**
  * Guard order is frozen by API_ARCHITECTURE §2:
@@ -55,6 +72,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
       },
     }),
     DatabaseModule,
+    OpsModule,
     DomainEventsModule,
     PlatformModule,
     PlatformServicesModule,
@@ -64,6 +82,21 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     PartiesModule,
     InventoryModule,
     SalesModule,
+    PurchasesModule,
+    TreasuryModule,
+    EinvoicingModule,
+    ReportingModule,
+    MigrationModule,
+    CompatModule,
+    PosModule,
+    HrmModule,
+    InstallmentsModule,
+    ProjectsModule,
+    OpticsModule,
+    TailoringModule,
+    MarinaModule,
+    FitmentModule,
+    SallaModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -71,6 +104,7 @@ import { AuditInterceptor, PlatformServicesModule } from './modules/platform-ser
     { provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },

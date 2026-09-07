@@ -16,7 +16,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "vitest": "^2.1.5"
+    "vitest": "^2.1.9"
   },
   "scripts": {
     "lint": "eslint src --config ../../eslint.config.mjs",

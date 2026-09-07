@@ -47,6 +47,18 @@ export class AccountingController {
     return { data: { id, status: 'open' } };
   }
 
+  @Post('fiscal-periods/:id/modules/:module/lock')
+  @RequiresPermission('accounting.period.close')
+  async lockModule(@Param('id') id: string, @Param('module') module: string) {
+    return { data: await this.accounting.lockModule(getTenantContext().tenantId, id, module) };
+  }
+
+  @Post('fiscal-periods/:id/modules/:module/unlock')
+  @RequiresPermission('accounting.period.reopen')
+  async unlockModule(@Param('id') id: string, @Param('module') module: string) {
+    return { data: await this.accounting.unlockModule(getTenantContext().tenantId, id, module) };
+  }
+
   @Get('statements/trial-balance')
   @RequiresPermission('accounting.reports.view')
   async trialBalance() {
