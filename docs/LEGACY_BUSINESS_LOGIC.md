@@ -103,7 +103,12 @@ branch + party + item class) into immutable posted entries; void = reversal entr
   reference, `tot_purch`, `AdditionalCost`, `Insurance`, VAT lines, WHT fields.
 - Additional costs feed item cost (`ItemAddedCost`) → landed cost into average pool.
 - Free-of-charge/exempt sales buckets (`FreeVATSales`) tracked.
-- RC-08: where supplier identity lives on purchases (`cust_id` vs `Suppliers`).
+- RC-08 implementation decision for the SaaS target: purchase documents require
+  `parties.kind IN ('supplier','both')`; ambiguous legacy `cust_id` mappings are handled
+  by migration reconciliation rather than accepted at runtime.
+- Implemented in PHASE_11: additional costs allocate by quantity or value, feed landed
+  unit cost into the inventory average-cost pool, and purchase returns exit the pool via
+  the Phase 09 ledger hints.
 
 ## BL-7 Treasury & receipts (CONFIRMED shapes)
 
@@ -114,6 +119,9 @@ branch + party + item class) into immutable posted entries; void = reversal entr
 - Shift close: cash counted vs computed (`diff`), network/returns/expenses/purchases
   buckets, per-customer deferred amounts, Android variant w/ HTML report print.
 - Multi-currency safe balances + denomination counting sheets (`Rekaba`).
+- Implemented in PHASE_12: the target runtime uses one `vouchers` table for receipt/payment
+  Sand*/Receipts behavior, terminal cheque transitions, cash transfers, balance-cache
+  writers, and shift-close denomination/diff storage. Legacy Sand* imports remain P15.
 
 ## BL-8 Period governance (CONFIRMED, recently introduced)
 

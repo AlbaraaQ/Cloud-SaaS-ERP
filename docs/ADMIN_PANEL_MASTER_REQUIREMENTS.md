@@ -121,7 +121,9 @@ Customer quick-statement link. Widgets: today sales, unpaid > 30 d.
 
 Mirror of sales + supplier-required validation, additional-costs tab with allocation
 method preview (qty/value) and landed-cost effect per line, supplier reference/date
-fields. Receiving note shortcut from invoice (creates stock-in when draft policy off).
+fields. Backend Phase 11 endpoints are available for invoice CRUD, posting, voiding,
+payment hooks, costs management, and landed-cost preview. Receiving note shortcut from
+invoice remains an admin UX composition over the purchase post endpoint.
 
 ## 9. Treasury module
 
@@ -131,7 +133,9 @@ actions clear/bounce, allocations table to open invoices with auto-suggest oldes
 · Cash transfers (send/receive badges) · Expense types CRUD · Cash location balances
 board (+ per-currency chips) · Shift closes: open/current screen (live counters),
 close wizard (counts by denomination ← Rekaba grid, diff explanation, print report),
-history list with PDF. Widgets: cash on hand, pending cheques.
+history list with PDF. Backend Phase 12 endpoints are available for voucher lifecycle,
+cheque transitions, transfers, expense types, balances, and structured shift print data.
+Widgets: cash on hand, pending cheques.
 
 ## 10. E-invoicing console
 

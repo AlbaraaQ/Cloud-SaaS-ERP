@@ -2,31 +2,22 @@
 
 ## Current status
 
-`IN_PROGRESS`
+`COMPLETE` as of 2026-09-07.
 
-## Delivered in this iteration
+## Delivered
 
 - Shared invoice calculation engine with deterministic decimal arithmetic.
-- Sales invoice schema and migration `0007_sales.sql`.
+- Sales invoice schema and migrations `0007_sales.sql` and `0008_sales_returns.sql` with reversible down migrations.
 - Sales module, service, controller, and application registration.
 - Draft invoice creation and updates.
+- Sequence-backed posting numbers for sales invoices, returns, credit notes, and debit notes.
+- Atomic sales posting transaction: inventory ledger movements, accounting journal posting, and invoice status/number updates now share a single tenant-bound transaction.
 - Posting and voiding with immutable posted invoices.
 - Idempotent invoice payments with positive-amount and balance-overpayment checks.
-- Print data, adjustment-note, offers, and salesmen endpoints.
+- Reference-linked return creation with source-status guard, return-of-return guard, positive quantity validation, and remaining source-quantity enforcement across prior returns.
+- Print data, adjustment-note lifecycle, offers, offer target/validity evaluation, and salesmen endpoints.
 - Tenant-scoped queries and permission guards on all sales routes.
 
 ## Verification
 
-- API lint: passed.
-- Workspace TypeScript/build: passed.
-- Smoke check and OpenAPI export: passed.
-- `pnpm run verify` completed successfully: typecheck, lint, build, smoke checks, OpenAPI export, and all workspace tests passed (API: 38 files / 234 tests).
-
-## Remaining Phase 10 scope
-
-- Transactional posting integration with inventory movements and accounting journal entries.
-- Added reference-linked return creation with source-status and return-of-return guards.
-- Added offer validity/target evaluation endpoint and adjustment-note posting lifecycle.
-- Remaining: atomic PostingEngine + InventoryLedger transaction, accounting/stock reversal effects, full returns quantity enforcement, and dedicated sales integration/concurrency tests.
-
-The phase remains `IN_PROGRESS` until the posting effects and acceptance fixtures are implemented and verified.
+`pnpm run verify` passes with type generation, TypeScript, workspace lint, build, API smoke checks, all workspace/API tests, and OpenAPI export.

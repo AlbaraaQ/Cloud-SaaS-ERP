@@ -126,15 +126,19 @@ price_includes_vat, currency_code?, lines:[{item_id, unit_id, qty, unit_price,
 discount_amount?, tax_group_id?|tax_rate?, description?}], invoice_discount?,
 pay_method?, payments?[...], reference_invoice_id? (returns) }`.
 Purchases mirror: `/purchase-invoices`, `/{id}/post` (computes landed cost),
-`/{id}/payments`, `/purchase-invoices/{id}/costs`. Perms `sales.invoice.*`,
-`purchase.invoice.*` (create/post/void/pay/view).
+`/{id}/payments`, `/purchase-invoices/{id}/costs`, and
+`POST /purchase-invoices/preview-landed-cost`. Perms `sales.invoice.*`,
+`purchase.invoice.*` (create/post/void/pay/view), `purchase.cost.manage`.
 
 ## 9. Treasury
 
 `/vouchers?filter[kind]=receipt` CRUD(draft) + `post/void` + `POST /vouchers/{id}/cheque`
-transitions (`clear|bounce`) + allocations endpoint §6 · `/cash-transfers` + `receive` ·
-`/expense-types` · `/shift-closes` open/current/close `{counts:[{denomination,count}]}` ·
-GET `/cash-locations/{id}/balance`. Perms `treasury.{voucher,transfer,shift}.manage/view`.
+transitions (`clear|bounce|collect`) + allocations on post · `/cash-transfers` create/send/receive ·
+`/expense-types` create/list · `/shift-closes` open/current/history/close `{counts:[{denomination,count}]}` ·
+GET `/shift-closes/{id}/print-data` · GET `/cash-locations/{id}/balance` ·
+POST `/cash-locations/{id}/recalc-balance`. Perms `treasury.view`,
+`treasury.voucher.{create,post,void}`, `treasury.cheque.clear`,
+`treasury.transfer.manage`, `treasury.expensetype.manage`, `treasury.shift.close`.
 
 ## 10. E-Invoicing
 

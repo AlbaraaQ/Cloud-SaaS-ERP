@@ -3514,6 +3514,68 @@
         ]
       }
     },
+    "/api/v1/fiscal-periods/{id}/modules/{module}/lock": {
+      "post": {
+        "operationId": "AccountingController_lockModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "module",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
+    "/api/v1/fiscal-periods/{id}/modules/{module}/unlock": {
+      "post": {
+        "operationId": "AccountingController_unlockModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "module",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Accounting"
+        ]
+      }
+    },
     "/api/v1/statements/trial-balance": {
       "get": {
         "operationId": "AccountingController_trialBalance",
@@ -4078,9 +4140,129 @@
         ]
       }
     },
+    "/api/v1/inventory/lots": {
+      "get": {
+        "operationId": "InventoryController_lots",
+        "parameters": [
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createLot",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials": {
+      "get": {
+        "operationId": "InventoryController_serials",
+        "parameters": [
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createSerial",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/serials/reserve": {
       "post": {
         "operationId": "InventoryController_reserveSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/release": {
+      "post": {
+        "operationId": "InventoryController_releaseSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/consume": {
+      "post": {
+        "operationId": "InventoryController_consumeSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/return": {
+      "post": {
+        "operationId": "InventoryController_returnSerials",
         "parameters": [],
         "responses": {
           "201": {
@@ -4383,6 +4565,649 @@
         },
         "tags": [
           "Sales"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices": {
+      "get": {
+        "operationId": "PurchasesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      },
+      "post": {
+        "operationId": "PurchasesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}": {
+      "get": {
+        "operationId": "PurchasesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      },
+      "patch": {
+        "operationId": "PurchasesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/post": {
+      "post": {
+        "operationId": "PurchasesController_postInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/void": {
+      "post": {
+        "operationId": "PurchasesController_voidInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/payments": {
+      "post": {
+        "operationId": "PurchasesController_payment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/landed-cost": {
+      "get": {
+        "operationId": "PurchasesController_previewInvoiceCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/preview-landed-cost": {
+      "post": {
+        "operationId": "PurchasesController_previewLandedCost",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/costs": {
+      "post": {
+        "operationId": "PurchasesController_addCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/costs/{costId}": {
+      "delete": {
+        "operationId": "PurchasesController_deleteCost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "costId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/api/v1/vouchers": {
+      "get": {
+        "operationId": "TreasuryController_vouchers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "post": {
+        "operationId": "TreasuryController_createVoucher",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}": {
+      "get": {
+        "operationId": "TreasuryController_getVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "patch": {
+        "operationId": "TreasuryController_updateVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}/post": {
+      "post": {
+        "operationId": "TreasuryController_postVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}/void": {
+      "post": {
+        "operationId": "TreasuryController_voidVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/vouchers/{id}/cheque": {
+      "post": {
+        "operationId": "TreasuryController_cheque",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-transfers": {
+      "get": {
+        "operationId": "TreasuryController_transfers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "post": {
+        "operationId": "TreasuryController_createTransfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-transfers/{id}/send": {
+      "post": {
+        "operationId": "TreasuryController_sendTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-transfers/{id}/receive": {
+      "post": {
+        "operationId": "TreasuryController_receiveTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/expense-types": {
+      "get": {
+        "operationId": "TreasuryController_expenseTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "post": {
+        "operationId": "TreasuryController_createExpenseType",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/open": {
+      "post": {
+        "operationId": "TreasuryController_openShift",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/current": {
+      "get": {
+        "operationId": "TreasuryController_currentShift",
+        "parameters": [
+          {
+            "name": "branch_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes": {
+      "get": {
+        "operationId": "TreasuryController_history",
+        "parameters": [
+          {
+            "name": "branch_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/{id}/close": {
+      "post": {
+        "operationId": "TreasuryController_closeShift",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/shift-closes/{id}/print-data": {
+      "get": {
+        "operationId": "TreasuryController_printShift",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-locations/{id}/balance": {
+      "get": {
+        "operationId": "TreasuryController_cashLocationBalance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/cash-locations/{id}/recalc-balance": {
+      "post": {
+        "operationId": "TreasuryController_recalc",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
         ]
       }
     }

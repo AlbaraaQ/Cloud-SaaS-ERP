@@ -7,3 +7,5 @@ export * from './accounting.js';
 export * from './parties.js';
 export * from './inventory.js';
 export * from './sales.js';
+export * from './purchases.js';
+export * from './treasury.js';

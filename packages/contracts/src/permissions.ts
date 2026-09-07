@@ -101,6 +101,8 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('purchase.invoice.create', 'Create draft purchase invoices.'),
   perm('purchase.invoice.post', 'Post purchase invoices.'),
   perm('purchase.invoice.void', 'Void posted purchase invoices.'),
+  perm('purchase.invoice.pay', 'Record supplier payment hooks on purchase invoices.'),
+  perm('purchase.cost.manage', 'Create, update and allocate purchase landed costs.'),
 
   // treasury (PHASE_13)
   perm('treasury.view', 'List and read vouchers and shifts.'),
@@ -108,6 +110,8 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('treasury.voucher.post', 'Post vouchers.'),
   perm('treasury.voucher.void', 'Void posted vouchers.'),
   perm('treasury.cheque.clear', 'Clear or bounce cheques.'),
+  perm('treasury.transfer.manage', 'Create, send and receive cash transfers.'),
+  perm('treasury.expensetype.manage', 'Maintain treasury expense types.'),
   perm('treasury.shift.close', 'Open and close cashier shifts.'),
 
   // e-invoicing (PHASE_13)
