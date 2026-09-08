@@ -1,7 +1,7 @@
 # @erp/database
 
 Drizzle schema, client factory, transaction/RLS helpers, migration runner and the
-idempotent platform seed. Canonical shapes live in `docs/DATABASE_DESIGN.md`; tenancy
+idempotent seeds. Canonical shapes live in `docs/DATABASE_DESIGN.md`; tenancy
 rules in `docs/MULTI_TENANCY.md`.
 
 ## Public API
@@ -21,6 +21,8 @@ rules in `docs/MULTI_TENANCY.md`.
 | `runMigrationsDown(url?, opts?)`                                                               | applies `migrations/down/*.down.sql`                                                     |
 | `configureDatabaseRoles(url?, opts?)`                                                          | grants LOGIN + password from env                                                         |
 | `seedPlatform(url?, opts?)`                                                                    | idempotent permissions / demo tenant / roles / settings seed                             |
+| `seedDemoData(url, opts?)`                                                                     | idempotent working dataset for a tenant: licence, org defaults, chart of accounts, cost centres, fiscal calendar, opening entry, extra users |
+| `DEMO_CHART_OF_ACCOUNTS`, `DEMO_PLANS`                                                         | the seeded Arabic chart of accounts and the billing catalogue                            |
 | `rlsProtectedTables`, `createTenantIsolationPolicySql()`, `createParentIsolationPolicySql()`   | RLS helpers                                                                              |
 | `createAuditLogPolicySql()`, `revokeMutationsSql(table, role)`                                 | PHASE_04: nullable-tenant audit policy + append-only hardening                            |
 | `SEQUENCE_SCOPE_NIL_UUID`                                                                      | sentinel used by the `document_sequences` unique index (NULL branch / fiscal year)        |

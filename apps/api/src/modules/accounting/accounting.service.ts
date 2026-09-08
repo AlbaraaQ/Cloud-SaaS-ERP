@@ -90,6 +90,15 @@ export class AccountingService {
   async createAccount(tenantId: string, input: AccountInput) {
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
+      // `accounts.path` is an ltree of account ids, root first. A child hangs off its
+      // parent's path (`<parent path>.<own id>`) and sits one level deeper — that is what
+      // makes subtree queries (`path <@ ancestor`) and the depth column agree, both here
+      // and in the seeded chart of accounts.
+      const parent = input.parentId ? await this.readAccountRow(tx, tenantId, input.parentId) : undefined;
+      if (input.parentId && !parent) {
+        throw new DomainError('NOT_FOUND', 'Parent account not found', 404);
+      }
+
       await tx.insert(accounts).values({
         id,
         tenantId,
@@ -100,11 +109,20 @@ export class AccountingService {
         subtype: input.subtype ?? null,
         normalBalance: input.normalBalance ?? defaultNormalBalance(input.type),
         parentId: input.parentId ?? null,
-        path: input.parentId ?? id,
+        level: parent ? parent.level + 1 : 0,
+        path: parent ? `${parent.path}.${id}` : id,
         isPostable: input.isPostable ?? true,
       });
     });
     return this.readAccount(tenantId, id);
+  }
+
+  private async readAccountRow(tx: DrizzleTx, tenantId: string, id: string) {
+    const [row] = await tx
+      .select({ id: accounts.id, path: accounts.path, level: accounts.level })
+      .from(accounts)
+      .where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)));
+    return row;
   }
 
   async readAccount(tenantId: string, id: string) {
