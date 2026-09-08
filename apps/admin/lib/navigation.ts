@@ -464,9 +464,9 @@ const marina: ModuleNode = {
       labelAr: 'إدارة',
       labelEn: 'Management',
       items: [
-        screen('marina-prep', 'تحضير المراكب', 'Vessel preparation', '/s/marina/preparation', 'api', { endpoint: '/marina/preparation' }),
+        screen('marina-prep', 'تحضير المراكب', 'Vessel preparation', '/marina/preparation', 'ready', { permission: 'marina.view', endpoint: '/marina/preparations' }),
         screen('marina-violations', 'المخالفات', 'Violations', '/marina/violations', 'ready', { endpoint: '/marina/violations' }),
-        screen('marina-rota', 'خطة الدور', 'Rotation plan', '/s/marina/rota', 'api', { endpoint: '/marina/operation-plans' }),
+        screen('marina-rota', 'خطة الدور', 'Rotation plan', '/marina/rota', 'ready', { permission: 'marina.view', endpoint: '/marina/operation-plans' }),
       ],
     },
     {
@@ -475,9 +475,9 @@ const marina: ModuleNode = {
       labelEn: 'Operations',
       items: [
         screen('marina-invoice', 'فاتورة', 'Invoice', '/marina/bookings', 'ready', { permission: 'marina.invoice', endpoint: 'POST /marina/bookings/{id}/rental-invoice' }),
-        screen('marina-link', 'ربط الفواتير', 'Link invoices', '/s/marina/link-invoices', 'planned'),
+        screen('marina-link', 'ربط الفواتير', 'Link invoices', '/marina/link-invoices', 'ready', { permission: 'marina.view', endpoint: '/marina/rental-invoices' }),
         screen('marina-bookings', 'حجوزات', 'Bookings', '/marina/bookings', 'ready', { endpoint: '/marina/bookings' }),
-        screen('marina-day-close', 'إغلاق اليومية', 'Day close', '/s/marina/day-close', 'planned'),
+        screen('marina-day-close', 'إغلاق اليومية', 'Day close', '/marina/day-close', 'ready', { permission: 'marina.view', endpoint: '/marina/day-close' }),
       ],
     },
     {
@@ -521,7 +521,7 @@ const projects: ModuleNode = {
       items: [
         screen('customer-contract', 'عقد عميل', 'Customer contract', '/projects', 'ready', { endpoint: '/projects' }),
         screen('contractor-contract', 'عقد مقاول', 'Contractor contract', '/s/projects/contractor-contracts', 'planned'),
-        screen('project-followup', 'متابعة', 'Follow-up', '/s/projects/followup', 'planned'),
+        screen('project-followup', 'متابعة', 'Follow-up', '/projects/followup', 'ready', { permission: 'projects.view', endpoint: '/projects/{id}' }),
         screen('project-offers', 'عروض', 'Offers', '/s/projects/offers', 'planned'),
         screen('project-receipt', 'سند قبض عميل', 'Customer receipt', '/treasury/vouchers?kind=receipt', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('contractor-payment', 'سند دفع لمقاول', 'Contractor payment', '/s/projects/contractor-payments', 'planned'),

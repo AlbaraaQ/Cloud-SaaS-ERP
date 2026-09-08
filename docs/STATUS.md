@@ -35,9 +35,9 @@ asserted by hand.
 
 | State | Count | Meaning |
 |---|---|---|
-| `ready` | 173 | A real screen reading and writing the live API. |
-| `api` | 2 | The endpoint exists; the screen is still the scaffold. |
-| `planned` | 15 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| `ready` | 178 | A real screen reading and writing the live API. |
+| `api` | 0 | The endpoint exists; the screen is still the scaffold. |
+| `planned` | 12 | Neither screen nor endpoint yet; routed under `/s/…`. |
 | **total** | **190** | |
 
 Round 1 wired: expense cards (`/accounting/expenses`), sales credit/debit notes with
@@ -93,10 +93,32 @@ While wiring fulfilment, transfer numbering moved server-side: `POST
 caller omits a number. The admin screen used to mint `TR-<timestamp>` in the browser,
 which is neither gap-free nor collision-proof.
 
-Still `planned`, and honestly so: production orders, contracting returns, the marina
-preparation/rota/link/day-close screens, contractor contracts and payments, project
-follow-up and offers, backup/restore/data-rotation, invoice maintenance, the
-preparation-device settings and the report designer.
+Round 4 wired the marina operations and the project follow-up board (migration `0025`):
+
+* **تحضير المراكب** — `marina_preparations`, one row per booking, holding the
+  pre-departure checklist and the return. Life jackets must cover every companion on the
+  booking (422 `MARINA_JACKETS_INSUFFICIENT`) because that is the one check a harbour is
+  actually inspected on, and a booking cannot be prepared twice.
+* **خطة الدور** — the rota already had a writer and no reader, which made the screen
+  impossible: you could file a plan and never see it again. `GET /marina/operation-plans`
+  now returns plans with their lines, filterable by date.
+* **ربط الفواتير** — `GET /marina/bookings/uninvoiced` lists bookings that were never
+  invoiced and `POST /marina/rental-invoices/link` issues the rental invoices in bulk,
+  reporting per-booking failures instead of aborting the batch on the first one.
+* **إغلاق اليومية** — `marina_day_closings` freezes a harbour day per branch. Afterwards
+  the service refuses new bookings and new rental invoices dated into that day
+  (409 `MARINA_DAY_CLOSED`), which is the entire point of the document: yesterday's cash
+  and vessel movements can no longer change under the supervisor. Closing over bookings
+  that were never invoiced hides revenue, so it takes an explicit `force`.
+* **متابعة المشاريع** — a read-only board over the existing project endpoints: completion
+  against the contract value, retention still held, stage accreditation, and per-BOQ-term
+  progress. No new tables; the data was already there with nowhere to show it.
+
+Still `planned` — 12 screens, each needing real domain work rather than another table
+view: production orders and contracting returns; contractor contracts, contractor
+payments and project offers; the file-level operations (backup, restore, data rotation,
+new company file, invoice maintenance); the preparation-device settings; and the report
+designer.
 
 ## Billing and live-data integration notes
 
