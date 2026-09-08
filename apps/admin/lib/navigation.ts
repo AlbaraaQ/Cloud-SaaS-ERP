@@ -10,6 +10,7 @@ export type AdminSection = {
 export const sections: AdminSection[] = [
   { key: 'dashboard', href: '/', labelAr: 'الرئيسية', labelEn: 'Dashboard', permission: 'reporting.view', description: 'KPIs and module widgets.' },
   { key: 'platform', href: '/platform', labelAr: 'المنصة والإعدادات', labelEn: 'Platform', permission: 'platform.tenant.view', description: 'Tenant, roles, audit, files, jobs.' },
+  { key: 'billing', href: '/billing', labelAr: 'اشتراكات العملاء', labelEn: 'Billing', permission: 'platform.billing.manage', description: 'Review and activate customer subscriptions.' },
   { key: 'organization', href: '/organization', labelAr: 'المؤسسة', labelEn: 'Organization', permission: 'organization.branch.view', description: 'Branches, warehouses, cash locations, currencies, profiles.' },
   { key: 'catalog', href: '/catalog', labelAr: 'الكتالوج', labelEn: 'Catalog', permission: 'catalog.item.view', description: 'Items, units, categories, tax, prices.' },
   { key: 'accounting', href: '/accounting', labelAr: 'المحاسبة', labelEn: 'Accounting', permission: 'accounting.account.view', description: 'COA, periods, journals, statements.' },
