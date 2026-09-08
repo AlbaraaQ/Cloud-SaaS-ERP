@@ -1,3 +1,5 @@
+import { inflateRawSync } from 'node:zlib';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
@@ -59,6 +61,7 @@ describe('document printing and master-data editing', () => {
         'treasury.voucher.post',
         'treasury.expensetype.manage',
         'reporting.view',
+        'reporting.export.execute',
       ],
     });
 
@@ -146,6 +149,60 @@ describe('document printing and master-data editing', () => {
     }
   });
 
+  it('exports a report as a workbook, not a CSV wearing an .xlsx name', async () => {
+    const response = await api(ctx.server, 'post', `/api/v1/reports/sales-invoices/export?from=2000-01-01&to=2099-12-31&branchId=${branchId}`, {
+      token: actor.token,
+      body: { format: 'xlsx' },
+    });
+    expect(response.status).toBe(201);
+    const payload = body(response) as unknown as { filename: string; mimeType: string; encoding: string; content: string; rows: number };
+    expect(payload.filename).toMatch(/\.xlsx$/);
+    expect(payload.mimeType).toContain('spreadsheetml');
+    expect(payload.encoding).toBe('base64');
+    expect(payload.rows).toBeGreaterThan(0);
+
+    const archive = Buffer.from(payload.content, 'base64');
+    expect(archive.subarray(0, 2).toString()).toBe('PK');
+    const sheet = readZipEntry(archive, 'xl/worksheets/sheet1.xml');
+    expect(sheet).toContain('rightToLeft="1"');
+    expect(sheet).toContain('تقرير فواتير المبيعات'); // the report title band
+    expect(sheet).toContain('الفرع: الفرع الرئيسي'); // the filter is spelled out, not left as a uuid
+    expect(sheet).toContain('مؤسسة النخبة');
+    // Money must land in numeric cells or the accountant cannot sum the column.
+    expect(sheet).toMatch(/<v>379\.5<\/v>/);
+  });
+
+  it('exports CSV with a byte-order mark so Excel reads Arabic', async () => {
+    const response = await api(ctx.server, 'post', '/api/v1/reports/sales-invoices/export?from=2000-01-01&to=2099-12-31', {
+      token: actor.token,
+      body: { format: 'csv' },
+    });
+    const payload = body(response) as unknown as { content: string; filename: string; mimeType: string };
+    expect(payload.filename).toMatch(/\.csv$/);
+    expect(payload.mimeType).toContain('text/csv');
+    expect(payload.content.startsWith('\uFEFF')).toBe(true);
+    expect(payload.content).toContain('مؤسسة النخبة');
+  });
+
+  it('returns a printable landscape page for the pdf format', async () => {
+    const response = await api(ctx.server, 'post', '/api/v1/reports/sales-invoices/export?from=2000-01-01&to=2099-12-31', {
+      token: actor.token,
+      body: { format: 'pdf' },
+    });
+    const payload = body(response) as unknown as { content: string; mimeType: string };
+    expect(payload.mimeType).toContain('text/html');
+    expect(payload.content).toContain('A4 landscape');
+    expect(payload.content).toContain('مؤسسة الأفق للتجارة'); // company letterhead
+    expect(payload.content).toContain('310000000000003'); // its VAT number
+    expect(payload.content).toContain('عدد السجلات');
+  });
+
+  it('refuses a format it cannot actually produce', async () => {
+    const response = await api(ctx.server, 'post', '/api/v1/reports/sales-invoices/export', { token: actor.token, body: { format: 'docx' } });
+    expect(response.status).toBe(422);
+    expect(response.body.code).toBe('VALIDATION_FAILED');
+  });
+
   it('answers 404 for a document that does not exist', async () => {
     const missing = await api(ctx.server, 'get', '/api/v1/reports/print/invoices/00000000-0000-4000-8000-0000000000ff', { token: actor.token });
     expect(missing.status).toBe(404);
@@ -198,3 +255,24 @@ describe('document printing and master-data editing', () => {
     }
   });
 });
+
+/** Reads one entry out of a zip archive — enough to look inside the workbook we produced. */
+function readZipEntry(archive: Buffer, wanted: string): string {
+  const end = archive.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = archive.readUInt16LE(end + 10);
+  let cursor = archive.readUInt32LE(end + 16);
+  for (let index = 0; index < count; index += 1) {
+    const nameLength = archive.readUInt16LE(cursor + 28);
+    const extraLength = archive.readUInt16LE(cursor + 30);
+    const commentLength = archive.readUInt16LE(cursor + 32);
+    const compressedSize = archive.readUInt32LE(cursor + 20);
+    const localOffset = archive.readUInt32LE(cursor + 42);
+    const name = archive.subarray(cursor + 46, cursor + 46 + nameLength).toString('utf8');
+    if (name === wanted) {
+      const dataStart = localOffset + 30 + archive.readUInt16LE(localOffset + 26) + archive.readUInt16LE(localOffset + 28);
+      return inflateRawSync(archive.subarray(dataStart, dataStart + compressedSize)).toString('utf8');
+    }
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  throw new Error(`zip entry not found: ${wanted}`);
+}

@@ -68,3 +68,31 @@ Two details are deliberate:
 - **The ZATCA QR** is drawn only when the invoice actually carries a reported TLV payload.
   Until then the slot prints a sentence saying so, because a decorative square that no
   scanner can read is worse than an honest gap.
+
+## Exports
+
+`POST /reports/:key/export` (permission `reporting.export.execute`) re-runs the report
+server-side with the query string it was given — the same filters and the same saved layout
+as the screen — and returns a finished file:
+
+| `format` | Payload | Notes |
+|---|---|---|
+| `csv` | `encoding: 'utf-8'` | Leading BOM, so Excel on Windows reads Arabic instead of mojibake. |
+| `xlsx` | `encoding: 'base64'` | A real workbook written by `xlsx.ts`: right-to-left sheet, frozen header, auto-filter, `#,##0.00` numeric cells and a bold totals band. |
+| `pdf` | `encoding: 'utf-8'` | A print-ready A4 **landscape** page on the company letterhead; the browser's print dialog turns it into a PDF. |
+
+Three decisions worth keeping:
+
+- **The client never builds the file.** It used to serialise the rows already on screen, which
+  ignored the layout and silently dropped anything not rendered. The export is now the report,
+  not a screenshot of it.
+- **Only clean decimals become numeric cells.** An account code (`1101`), a document number
+  (`SI-000006`) or anything with leading zeros stays text, so Excel cannot "helpfully" turn it
+  into a number or a date.
+- **Filters are spelled out in the header band.** `branchId=<uuid>` prints as
+  `الفرع: الفرع الرئيسي`; the lookup is best-effort and falls back to the raw value, because a
+  caption must never be the reason an export fails.
+
+There is no PDF renderer in the process on purpose: producing Arabic PDF text requires
+embedding a font with contextual shaping, and the print dialog already produces a smaller,
+selectable, better-typeset document.

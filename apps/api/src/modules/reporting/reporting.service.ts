@@ -1,13 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
+import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { DomainError, newId } from '@erp/contracts';
 import { withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 
-import { REPORT_DEFINITIONS, reportByKey, type ReportColumn, type ReportFilters } from './report-catalog.js';
+import { PrintTemplatesService } from './print-templates.service.js';
+import { REPORT_DEFINITIONS, reportByKey, type ReportColumn, type ReportFilters, type ReportParam } from './report-catalog.js';
 import { ReportLayoutsService } from './report-layouts.service.js';
+import { buildXlsx } from './xlsx.js';
 
 export const REPORT_KEYS = REPORT_DEFINITIONS.map((definition) => definition.key);
 export type ReportKey = string;
@@ -34,6 +37,23 @@ const filtersSchema = z
 
 const NUMERIC_TYPES = new Set(['money', 'qty', 'int', 'percent']);
 
+export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
+const EXPORT_FORMATS = new Set<ExportFormat>(['csv', 'xlsx', 'pdf']);
+
+/**
+ * Which table holds the display name behind each id-shaped filter. A printed report has to say
+ * "الفرع: الفرع الرئيسي", never a raw uuid, or nobody can tell two copies of the same report apart.
+ */
+const FILTER_SOURCES: Record<string, { table: string; column: string } | undefined> = {
+  branch: { table: 'branches', column: 'name_ar' },
+  warehouse: { table: 'warehouses', column: 'name' },
+  party: { table: 'parties', column: 'name' },
+  item: { table: 'items', column: 'name_ar' },
+  category: { table: 'item_categories', column: 'name_ar' },
+  salesman: { table: 'salesmen', column: 'name' },
+  costCenter: { table: 'cost_centers', column: 'name_ar' },
+};
+
 @Injectable()
 export class ReportingService {
   // The handle is injected rather than read from the module-level singleton so a test
@@ -41,6 +61,7 @@ export class ReportingService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly layouts: ReportLayoutsService,
+    private readonly print: PrintTemplatesService,
   ) {}
 
   /** Everything a client needs to render every report without hard-coding any of them. */
@@ -88,21 +109,105 @@ export class ReportingService {
     };
   }
 
-  /** Exports are produced inline — the dataset is already capped, so there is nothing to queue. */
-  async export(tenantId: string, key: string, params: Record<string, string | undefined> = {}, format: 'csv' | 'xlsx' | 'pdf' = 'csv') {
+  /**
+   * Exports are produced inline — the dataset is already capped, so there is nothing to queue.
+   *
+   * Three formats, three real files:
+   * - `csv`  — UTF-8 with a BOM so Excel on Windows reads Arabic instead of mojibake.
+   * - `xlsx` — a genuine workbook (right-to-left sheet, frozen header, numeric cells that sum).
+   * - `pdf`  — a print-ready A4 landscape page on the company letterhead; the browser turns it
+   *   into a PDF. Rendering a PDF here would mean shipping a font with Arabic shaping, and the
+   *   print dialog already produces a better-looking, selectable document.
+   *
+   * The payload is base64 for binary formats and plain text otherwise, so one endpoint can
+   * serve all three without content negotiation.
+   */
+  async export(tenantId: string, key: string, params: Record<string, string | undefined> = {}, format: ExportFormat = 'csv') {
+    if (!EXPORT_FORMATS.has(format)) throw new DomainError('VALIDATION_FAILED', `Unsupported export format: ${format}`, 422);
     const report = await this.run(tenantId, key, params);
+    const definition = reportByKey.get(key)!;
+    const stamp = report.generatedAt.slice(0, 10);
+    const base = { exportId: newId(), status: 'ready' as const, format, reportKey: key, titleAr: report.titleAr, rows: report.rows.length };
+    const captions = await this.filterCaptions(tenantId, definition.params, report.params);
+
+    if (format === 'xlsx') {
+      const workbook = buildXlsx({
+        name: report.titleAr,
+        titleAr: report.titleAr,
+        captions: [...captions, `عدد السجلات: ${report.rows.length}`, `طُبع في: ${report.generatedAt.slice(0, 16).replace('T', ' ')}`],
+        columns: report.columns.map((column) => ({
+          header: column.labelAr,
+          kind: isNumericColumn(column) ? (column.type === 'int' ? 'integer' : 'number') : 'text',
+          width: column.type === 'text' ? 26 : 15,
+        })),
+        rows: report.rows.map((row) => report.columns.map((column) => row[column.key] ?? '')),
+        totalsRow: Object.keys(report.totals).length
+          ? report.columns.map((column, index) => (report.totals[column.key] ? report.totals[column.key]! : index === 0 ? 'الإجمالي' : ''))
+          : undefined,
+      });
+      return {
+        ...base,
+        filename: `${key}-${stamp}.xlsx`,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        encoding: 'base64' as const,
+        content: workbook.toString('base64'),
+      };
+    }
+
+    if (format === 'pdf') {
+      const html = await this.print.reportSheet(tenantId, {
+        titleAr: report.titleAr,
+        columns: report.columns.map((column) => ({ key: column.key, labelAr: column.labelAr, numeric: isNumericColumn(column) })),
+        rows: report.rows,
+        totals: report.totals,
+        captions,
+        generatedAt: report.generatedAt,
+      });
+      return { ...base, filename: `${key}-${stamp}.html`, mimeType: 'text/html; charset=utf-8', encoding: 'utf-8' as const, content: html, printable: true as const };
+    }
+
     const csv = toCsv(report.columns, report.rows);
-    return {
-      exportId: newId(),
-      status: 'ready' as const,
-      format,
-      reportKey: key,
-      filename: `${key}-${report.generatedAt.slice(0, 10)}.csv`,
-      rows: report.rows.length,
-      csv,
-    };
+    return { ...base, filename: `${key}-${stamp}.csv`, mimeType: 'text/csv; charset=utf-8', encoding: 'utf-8' as const, content: csv, csv };
   }
 
+
+  /** Turns the applied filters into the caption lines printed under the report title. */
+  private async filterCaptions(tenantId: string, params: ReportParam[], applied: Record<string, string>): Promise<string[]> {
+    const captions: string[] = [];
+    const period = [applied.from, applied.to].filter(Boolean);
+    if (period.length === 2) captions.push(`الفترة: من ${applied.from} إلى ${applied.to}`);
+    else if (applied.from) captions.push(`من تاريخ: ${applied.from}`);
+    else if (applied.to) captions.push(`إلى تاريخ: ${applied.to}`);
+
+    for (const param of params) {
+      const value = applied[param.name];
+      if (!value || param.kind === 'date') continue;
+      if (param.options?.length) {
+        captions.push(`${param.labelAr}: ${param.options.find((option) => option.value === value)?.labelAr ?? value}`);
+        continue;
+      }
+      const source = FILTER_SOURCES[param.kind];
+      if (!source) {
+        captions.push(`${param.labelAr}: ${value}`);
+        continue;
+      }
+      const name = await this.lookupName(tenantId, source, value);
+      captions.push(`${param.labelAr}: ${name ?? value}`);
+    }
+    return captions;
+  }
+
+  private async lookupName(tenantId: string, source: { table: string; column: string }, id: string): Promise<string | null> {
+    try {
+      const found = await withTenantTx(this.database.db, tenantId, async (tx) =>
+        rowsOf(await tx.execute(sql`SELECT ${sql.raw(source.column)} AS label FROM ${sql.raw(source.table)} WHERE tenant_id = ${tenantId} AND id = ${id} LIMIT 1`)),
+      );
+      const label = found[0]?.label;
+      return typeof label === 'string' && label ? label : null;
+    } catch {
+      return null; // a caption is decoration; it must never fail an export
+    }
+  }
 }
 
 /**

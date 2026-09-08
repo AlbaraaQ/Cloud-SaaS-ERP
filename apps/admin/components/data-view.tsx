@@ -77,7 +77,7 @@ export function DataTable<T>({ columns, rows, rowKey }: { columns: Array<Column<
 }
 
 /** Inline feedback after a mutation. */
-export function Notice({ notice }: { notice?: { kind: 'ok' | 'danger' | 'info'; text: string } }) {
+export function Notice({ notice }: { notice?: { kind: 'ok' | 'danger' | 'info' | 'warn'; text: string } }) {
   if (!notice) return null;
   return <p className={`alert ${notice.kind}`}>{notice.text}</p>;
 }

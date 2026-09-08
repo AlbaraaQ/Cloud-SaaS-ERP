@@ -4,7 +4,6 @@ import { use, useEffect, useMemo, useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
-import { downloadCsv } from '../../../lib/accounts';
 import {
   arabicName,
   itemLabel,
@@ -26,12 +25,16 @@ import {
 } from '../../../lib/lookups';
 import {
   REPORT_GROUP_LABELS,
+  exportReport,
   fetchReportCatalog,
   fetchReportLayouts,
   formatCell,
   initialFilters,
   isNumericColumn,
+  openPrintable,
   runReport,
+  saveExport,
+  type ExportFormat,
   type ReportEntry,
   type ReportLayout,
   type ReportParam,
@@ -48,6 +51,8 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [applied, setApplied] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState<ExportFormat | null>(null);
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'warn'; text: string } | null>(null);
   // Saved layouts (مصمم التقارير) ride along as an ordinary filter: the server resolves
   // the layout, applies its defaults and returns the columns already shaped.
   const layouts = useQuery<ReportLayout[]>(() => fetchReportLayouts(reportKey), [reportKey]);
@@ -97,6 +102,28 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
   const result = report.data ?? null;
   const columns = entry?.columns ?? [];
 
+  // Exports re-run the report on the server: the file always matches the filters and the
+  // saved layout, never just the rows that happen to be rendered.
+  async function download(format: ExportFormat) {
+    setBusy(format);
+    setNotice(null);
+    try {
+      const produced = await exportReport(reportKey, applied, format);
+      if (format === 'pdf') {
+        if (!openPrintable(produced.content)) {
+          setNotice({ kind: 'warn', text: 'تعذّر فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.' });
+        }
+      } else {
+        saveExport(produced);
+        setNotice({ kind: 'ok', text: `تم تصدير ${produced.rows} سجلاً إلى الملف ${produced.filename}` });
+      }
+    } catch (error) {
+      setNotice({ kind: 'danger', text: error instanceof Error ? error.message : 'تعذّر التصدير' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <Screen
       title={entry?.titleAr ?? 'تقرير'}
@@ -104,23 +131,14 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
       crumbs={['التقارير', REPORT_GROUP_LABELS[entry?.group ?? ''] ?? '']}
       actions={
         <>
-          <button
-            type="button"
-            className="btn"
-            disabled={!result || result.rows.length === 0}
-            onClick={() => {
-              if (!result) return;
-              downloadCsv(
-                `${reportKey}.csv`,
-                result.columns.map((column) => column.labelAr),
-                result.rows.map((row) => result.columns.map((column) => row[column.key] ?? '')),
-              );
-            }}
-          >
-            تصدير CSV
+          <button type="button" className="btn" disabled={!result || busy !== null} onClick={() => void download('xlsx')}>
+            {busy === 'xlsx' ? 'جارٍ التصدير…' : 'تصدير Excel'}
           </button>
-          <button type="button" className="btn no-print" onClick={() => window.print()}>
-            طباعة
+          <button type="button" className="btn" disabled={!result || busy !== null} onClick={() => void download('csv')}>
+            {busy === 'csv' ? 'جارٍ التصدير…' : 'تصدير CSV'}
+          </button>
+          <button type="button" className="btn no-print" disabled={!result || busy !== null} onClick={() => void download('pdf')}>
+            {busy === 'pdf' ? 'جارٍ التجهيز…' : 'طباعة / PDF'}
           </button>
         </>
       }
@@ -165,6 +183,8 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
           </button>
         </form>
       ) : null}
+
+      <Notice notice={notice ?? undefined} />
 
       <QueryView query={report} isEmpty={(data) => data !== null && data.rows.length === 0} empty="لا توجد بيانات ضمن هذه الفترة" emptyDetail="جرّب توسيع الفترة أو إزالة المرشحات — التقارير تعرض المستندات المرحّلة فقط.">
         {(data) =>

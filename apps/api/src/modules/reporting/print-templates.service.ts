@@ -357,6 +357,74 @@ export class PrintTemplatesService {
     });
   }
 
+  /**
+   * A printable page for any report in the catalogue.
+   *
+   * Reports are wide and unpredictable, so this uses the same letterhead as the documents
+   * but lays the table out in landscape and repeats the header band on every printed page
+   * (`thead` + `page-break-inside: avoid`), which is what an accountant expects when a trial
+   * balance runs to nine pages.
+   */
+  async reportSheet(
+    tenantId: string,
+    report: {
+      titleAr: string;
+      columns: Array<{ key: string; labelAr: string; numeric: boolean }>;
+      rows: Array<Record<string, string>>;
+      totals: Record<string, string>;
+      captions: string[];
+      generatedAt: string;
+    },
+  ) {
+    const company = await withTenantTx(this.database.db, tenantId, async (tx) => this.company(tx, tenantId));
+    const contact = [company.phones.join(' / '), company.email, addressText(company.address)].filter(Boolean).join(' — ');
+    const head = report.columns.map((column) => `<th>${escapeHtml(column.labelAr)}</th>`).join('');
+    const body = report.rows.length
+      ? report.rows
+          .map(
+            (row, index) =>
+              `<tr><td class="num">${index + 1}</td>${report.columns
+                .map((column) => `<td${column.numeric ? ' class="num"' : ''}>${escapeHtml(cellText(row[column.key] ?? '', column.numeric))}</td>`)
+                .join('')}</tr>`,
+          )
+          .join('')
+      : `<tr><td class="empty" colspan="${report.columns.length + 1}">لا توجد بيانات ضمن معايير البحث المحددة.</td></tr>`;
+    const hasTotals = Object.keys(report.totals).length > 0;
+    const footer = hasTotals
+      ? `<tfoot><tr><th>الإجمالي</th>${report.columns
+          .map((column) => `<th class="num">${report.totals[column.key] ? escapeHtml(money(report.totals[column.key]!)) : ''}</th>`)
+          .join('')}</tr></tfoot>`
+      : '';
+
+    return this.page({
+      title: report.titleAr,
+      landscape: true,
+      body: `
+        <header class="doc-head">
+          <div class="company">
+            <h1>${escapeHtml(company.nameAr)}</h1>
+            ${company.nameEn ? `<div class="en">${escapeHtml(company.nameEn)}</div>` : ''}
+            <div class="meta">${company.taxNo ? `<span>الرقم الضريبي: <b dir="ltr">${escapeHtml(company.taxNo)}</b></span>` : ''}${company.crNo ? `<span>السجل التجاري: <b dir="ltr">${escapeHtml(company.crNo)}</b></span>` : ''}</div>
+            ${contact ? `<div class="meta">${escapeHtml(contact)}</div>` : ''}
+          </div>
+          <div class="doc">
+            <div class="doc-title">${escapeHtml(report.titleAr)}</div>
+            <table class="doc-meta">
+              ${report.captions.map((caption) => `<tr><td>${escapeHtml(caption)}</td></tr>`).join('')}
+              <tr><td>عدد السجلات: ${report.rows.length}</td></tr>
+              <tr><td>طُبع في: ${escapeHtml(dateTimeText(report.generatedAt))}</td></tr>
+            </table>
+          </div>
+        </header>
+        <table class="lines report">
+          <thead><tr><th>#</th>${head}</tr></thead>
+          <tbody>${body}</tbody>
+          ${footer}
+        </table>
+      `,
+    });
+  }
+
   // -------------------------------------------------------------------- pieces
 
   private async company(tx: Tx, tenantId: string) {
@@ -514,7 +582,7 @@ export class PrintTemplatesService {
   }
 
   /** One A4 stylesheet for every document, plus a print button that hides itself. */
-  private page({ title, body }: { title: string; body: string }) {
+  private page({ title, body, landscape }: { title: string; body: string; landscape?: boolean }) {
     return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
@@ -522,10 +590,10 @@ export class PrintTemplatesService {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
 <style>
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4${landscape ? ' landscape' : ''}; margin: 12mm; }
   * { box-sizing: border-box; }
   body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; color: #111; margin: 0; padding: 16px; background: #f4f5f7; font-size: 12px; }
-  .sheet { background: #fff; max-width: 210mm; margin: 0 auto; padding: 16mm 14mm; box-shadow: 0 1px 8px rgba(0,0,0,.12); }
+  .sheet { background: #fff; max-width: ${landscape ? '297mm' : '210mm'}; margin: 0 auto; padding: 16mm 14mm; box-shadow: 0 1px 8px rgba(0,0,0,.12); }
   h1 { font-size: 18px; margin: 0 0 2px; }
   h2 { font-size: 13px; margin: 0 0 6px; }
   .doc-head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 12px; }
@@ -571,6 +639,11 @@ export class PrintTemplatesService {
   .signs i { display: block; border-top: 1px solid #999; margin-top: 34px; }
   .toolbar { max-width: 210mm; margin: 0 auto 10px; display: flex; gap: 8px; }
   .toolbar button { font: inherit; padding: 6px 14px; border: 1px solid #111; background: #111; color: #fff; border-radius: 6px; cursor: pointer; }
+  table.report { font-size: 11px; }
+  table.report thead { display: table-header-group; }
+  table.report tbody tr { page-break-inside: avoid; }
+  table.report tbody tr:nth-child(even) { background: #fafafa; }
+  table.report td.empty { text-align: center; color: #666; padding: 18px; border: 1px solid #ccc; }
   @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; padding: 0; max-width: none; } .toolbar { display: none; } }
 </style>
 </head>
@@ -624,6 +697,12 @@ function addressText(address: unknown): string {
     .filter((value) => typeof value === 'string' && value.trim() !== '');
   return parts.join('، ');
 }
+/** Numbers get thousands separators; text is printed as it came out of the query. */
+function cellText(value: string, numeric: boolean): string {
+  if (!value) return '—';
+  return numeric && /^-?\d+(\.\d+)?$/.test(value) ? money(value) : value;
+}
+
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
 }

@@ -332,6 +332,28 @@ Still `planned` — 1 screen: إعدادات جهاز التحضير (preparatio
 - `POST /sales/salesmen` did not exist while the screen already posted to it — added, with
   `sales.salesman.manage` (permission count 130; re-run `pnpm db:seed`).
 
+## Round 9 — real report exports
+
+- **`POST /reports/:key/export` produces actual files.** It used to return CSV whatever the
+  caller asked for, and the admin never called it at all — the screen serialised the rows it
+  had already rendered, which ignored the saved layout and dropped anything not on screen.
+  The export now re-runs the report server-side with the same filters and returns
+  `{ filename, mimeType, encoding, content }`.
+- **`xlsx` is a genuine workbook**, written by `apps/api/src/modules/reporting/xlsx.ts` — a
+  dependency-free OOXML + ZIP writer (`node:zlib` deflate, hand-rolled CRC-32). Right-to-left
+  sheet, frozen header row, auto-filter, `#,##0.00` numeric cells, bold totals band. Verified
+  by unzipping the output and by opening it with a third-party reader.
+- **`pdf` returns a print-ready A4 landscape page** on the company letterhead with the header
+  band repeating on every page, handed to the browser's print dialog. No PDF renderer is
+  bundled: Arabic PDF text needs an embedded font with contextual shaping, and the print
+  dialog already yields a smaller, selectable document.
+- **Filters are printed as words.** `branchId=<uuid>` becomes `الفرع: الفرع الرئيسي` in both
+  the workbook caption band and the printed header; the lookup is best-effort and can never
+  fail an export.
+- Codes stay codes: only clean decimals become numeric cells, so `1101`, `SI-000006` and any
+  value with leading zeros survive the trip to Excel intact.
+- Tests: `xlsx.spec.ts` (6) plus four export cases in `test/printing-and-cards.spec.ts`.
+
 ## Conventions
 
 - `docs/` remains the authoritative documentation source.
