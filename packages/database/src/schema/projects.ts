@@ -53,3 +53,34 @@ export const projectRequirements = pgTable('project_requirements', {
 export type InstallmentContract = typeof installmentContracts.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type BoqTerm = typeof boqTerms.$inferSelect;
+
+/**
+ * عقد مقاول — the subcontractor mirror of the client contract on `projects`. The advance
+ * lives here (not on the payment) because it is recovered across many payments, so the
+ * running `advanceRecovered` total is contract state.
+ */
+export const contractorContracts = pgTable('contractor_contracts', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'restrict' }), contractorPartyId: uuid('contractor_party_id').notNull().references(() => parties.id, { onDelete: 'restrict' }), number: text('number').notNull(), title: text('title').notNull(), scope: text('scope'), status: text('status').notNull().default('draft'), contractValue: numeric('contract_value', value).notNull().default('0'), retentionPct: numeric('retention_pct', pct).notNull().default('0'), advanceAmount: numeric('advance_amount', value).notNull().default('0'), advanceRecovered: numeric('advance_recovered', value).notNull().default('0'), startsOn: date('starts_on'), endsOn: date('ends_on'), notes: text('notes'), signedAt: timestamp('signed_at', { withTimezone: true }), closedAt: timestamp('closed_at', { withTimezone: true }), ...baseAuditColumns(),
+}, (table) => ({ numberKey: uniqueIndex('contractor_contracts_tenant_number_key').on(table.tenantId, table.number), projectIdx: index('contractor_contracts_project_idx').on(table.tenantId, table.projectId, table.status) }));
+
+export const contractorContractLines = pgTable('contractor_contract_lines', {
+  contractId: uuid('contract_id').notNull().references(() => contractorContracts.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), description: text('description').notNull(), qty: numeric('qty', value).notNull().default('1'), unitValue: numeric('unit_value', value).notNull().default('0'), lineValue: numeric('line_value', value).notNull().default('0'),
+}, (table) => ({ pk: primaryKey({ columns: [table.contractId, table.lineNo] }) }));
+
+/** سند دفع لمقاول — the payment certificate; retention and advance recovery are computed. */
+export const contractorPayments = pgTable('contractor_payments', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), contractId: uuid('contract_id').notNull().references(() => contractorContracts.id, { onDelete: 'restrict' }), projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'restrict' }), branchId: uuid('branch_id').references(() => branches.id), number: text('number').notNull(), kind: text('kind').notNull().default('progress'), status: text('status').notNull().default('draft'), paymentDate: date('payment_date').notNull(), grossAmount: numeric('gross_amount', value).notNull(), retentionAmount: numeric('retention_amount', value).notNull().default('0'), advanceRecovery: numeric('advance_recovery', value).notNull().default('0'), netAmount: numeric('net_amount', value).notNull().default('0'), voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }), notes: text('notes'), approvedAt: timestamp('approved_at', { withTimezone: true }), approvedBy: uuid('approved_by'), paidAt: timestamp('paid_at', { withTimezone: true }), cancelledAt: timestamp('cancelled_at', { withTimezone: true }), ...baseAuditColumns(),
+}, (table) => ({ numberKey: uniqueIndex('contractor_payments_tenant_number_key').on(table.tenantId, table.number), contractIdx: index('contractor_payments_contract_idx').on(table.tenantId, table.contractId, table.status) }));
+
+/** عروض المشاريع — accepted offers convert into a project whose BOQ is the offer's lines. */
+export const projectOffers = pgTable('project_offers', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), partyId: uuid('party_id').notNull().references(() => parties.id, { onDelete: 'restrict' }), projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }), number: text('number').notNull(), title: text('title').notNull(), status: text('status').notNull().default('draft'), offerDate: date('offer_date').notNull(), validUntil: date('valid_until'), totalValue: numeric('total_value', value).notNull().default('0'), retentionPct: numeric('retention_pct', pct).notNull().default('0'), notes: text('notes'), decidedAt: timestamp('decided_at', { withTimezone: true }), rejectionReason: text('rejection_reason'), ...baseAuditColumns(),
+}, (table) => ({ numberKey: uniqueIndex('project_offers_tenant_number_key').on(table.tenantId, table.number), partyIdx: index('project_offers_party_idx').on(table.tenantId, table.partyId, table.status) }));
+
+export const projectOfferLines = pgTable('project_offer_lines', {
+  offerId: uuid('offer_id').notNull().references(() => projectOffers.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), code: text('code').notNull(), description: text('description').notNull(), qty: numeric('qty', value).notNull().default('1'), unitValue: numeric('unit_value', value).notNull().default('0'), lineValue: numeric('line_value', value).notNull().default('0'),
+}, (table) => ({ pk: primaryKey({ columns: [table.offerId, table.lineNo] }) }));
+
+export type ContractorContract = typeof contractorContracts.$inferSelect;
+export type ContractorPayment = typeof contractorPayments.$inferSelect;
+export type ProjectOffer = typeof projectOffers.$inferSelect;

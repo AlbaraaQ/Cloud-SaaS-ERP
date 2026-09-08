@@ -35,9 +35,9 @@ asserted by hand.
 
 | State | Count | Meaning |
 |---|---|---|
-| `ready` | 178 | A real screen reading and writing the live API. |
+| `ready` | 181 | A real screen reading and writing the live API. |
 | `api` | 0 | The endpoint exists; the screen is still the scaffold. |
-| `planned` | 12 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| `planned` | 9 | Neither screen nor endpoint yet; routed under `/s/…`. |
 | **total** | **190** | |
 
 Round 1 wired: expense cards (`/accounting/expenses`), sales credit/debit notes with
@@ -114,11 +114,42 @@ Round 4 wired the marina operations and the project follow-up board (migration `
   against the contract value, retention still held, stage accreditation, and per-BOQ-term
   progress. No new tables; the data was already there with nowhere to show it.
 
-Still `planned` — 12 screens, each needing real domain work rather than another table
-view: production orders and contracting returns; contractor contracts, contractor
-payments and project offers; the file-level operations (backup, restore, data rotation,
-new company file, invoice maintenance); the preparation-device settings; and the report
-designer.
+Round 5 wired the contracting side of projects (migration `0026`):
+
+* **عقد مقاول** — `contractor_contracts` + `contractor_contract_lines`. The contract value
+  is derived from the lines rather than typed on the header, because a header that
+  disagrees with its own breakdown is how a subcontractor ends up over-certified. The
+  agreed advance lives on the contract (not on a payment) since it is recovered across
+  many certificates, so the running `advance_recovered` total is contract state. A
+  contract must be activated before any money can be certified against it, and it cannot
+  be closed while a certificate is still unpaid.
+* **سند دفع لمقاول** — `contractor_payments`. Retention and advance recovery are
+  **computed from the contract**, never taken from the request; the form previews them,
+  the server decides them. Four kinds behave differently on purpose: an `advance` is a
+  prepayment (no retention, does not consume the contract value, capped by the agreed
+  advance), `progress`/`final` carry retention and may recover the advance, and
+  `retention_release` can never exceed the retention actually held. Cumulative gross on
+  the value-consuming kinds is capped at the contract value
+  (422 `CONTRACTOR_PAYMENT_EXCEEDS_CONTRACT`), and a cancelled certificate gives its value
+  back. Paying issues a **draft** payment voucher through `TreasuryService` and links it
+  via `voucher_id`; posting to the ledger stays in treasury, so the money has one door
+  into the journal instead of two.
+* **عروض المشاريع** — `project_offers` + `project_offer_lines`. Accepting an offer is
+  ledger-neutral. Converting one creates the project and copies the offer lines into the
+  BOQ, which is the only way the offered numbers and the project's numbers are guaranteed
+  to agree; an offer converts exactly once (409 `OFFER_ALREADY_CONVERTED`) and an expired
+  offer must be re-issued first.
+
+New permission `projects.contractor.pay` (121 total) gates approving and paying a
+certificate; creating one still needs only `projects.manage`, so the person who measures
+the work is not necessarily the person who releases the cash. Endpoints live under
+`/contracting/*` rather than `/projects/*` because `GET /projects/:id` already owns that
+segment.
+
+Still `planned` — 9 screens, each needing real domain work rather than another table
+view: production orders and contracting returns; the file-level operations (backup,
+restore, data rotation, new company file, invoice maintenance); the preparation-device
+settings; and the report designer.
 
 ## Billing and live-data integration notes
 

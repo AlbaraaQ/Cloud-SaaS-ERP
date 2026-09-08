@@ -160,6 +160,7 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('projects.view', 'Read projects, stages, BOQ terms, progress bills and requirements.'),
   perm('projects.manage', 'Create and maintain projects, stage templates, BOQ terms and requirement registers.'),
   perm('projects.bill.post', 'Post progress bills and release retention invoices.'),
+  perm('projects.contractor.pay', 'Approve and pay contractor payment certificates.'),
   perm('projects.stage.accredit', 'Accredit or reject project stages assigned to a user.'),
 
   // niche verticals and Salla integration pack (PHASE_22)
