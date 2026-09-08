@@ -137,9 +137,14 @@ export default function SalesInvoiceDetailPage() {
       subtitle={`${partyName} — ${statusLabel(doc.status)}`}
       crumbs={['المبيعات', 'العمليات']}
       actions={
-        <Link className="btn" href="/sales/invoices">
-          كل الفواتير
-        </Link>
+        <>
+          <Link className="btn primary" href={`/print/sales-invoice/${doc.id}`}>
+            طباعة
+          </Link>
+          <Link className="btn" href="/sales/invoices">
+            كل الفواتير
+          </Link>
+        </>
       }
     >
       <div className="grid cols-2">

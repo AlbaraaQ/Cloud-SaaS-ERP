@@ -12,14 +12,14 @@ export type Option = { id: string; label: string };
 
 export type Branch = { id: string; code?: string; nameAr?: string; name_ar?: string; nameEn?: string; isDefault?: boolean };
 export type Warehouse = { id: string; code?: string; name?: string; nameAr?: string; name_ar?: string; branchId?: string; isDefault?: boolean };
-export type Item = { id: string; sku: string; barcode?: string | null; nameAr?: string; name_ar?: string; nameEn?: string; salePrice?: string | null; sale_price?: string | null; purchasePrice?: string | null; purchase_price?: string | null; categoryId?: string; category_id?: string; baseUnitId?: string; base_unit_id?: string; taxGroupId?: string | null; kind?: string };
+export type Item = { id: string; sku: string; barcode?: string | null; nameAr?: string; name_ar?: string; nameEn?: string; salePrice?: string | null; sale_price?: string | null; purchasePrice?: string | null; purchase_price?: string | null; categoryId?: string; category_id?: string; baseUnitId?: string; base_unit_id?: string; taxGroupId?: string | null; tax_group_id?: string | null; kind?: string; showInPos?: boolean };
 export type Party = { id: string; code?: string; name: string; paymentMethodId?: string | null; kind?: string; phone?: string | null; taxNo?: string | null; tax_no?: string | null; creditLimit?: string | null };
 export type CashLocation = { id: string; name: string; kind?: string; accountId?: string | null; account_id?: string | null; currencyCode?: string; currency_code?: string; isDefault?: boolean; is_default?: boolean; branchId?: string | null; branch_id?: string | null };
-export type Category = { id: string; code: string; nameAr?: string; name_ar?: string };
-export type Unit = { id: string; code: string; nameAr?: string; name_ar?: string };
-export type TaxGroup = { id: string; nameAr?: string; name_ar?: string; rate: string };
+export type Category = { id: string; code: string; nameAr?: string; name_ar?: string; nameEn?: string | null; parentId?: string | null };
+export type Unit = { id: string; code: string; nameAr?: string; name_ar?: string; nameEn?: string | null };
+export type TaxGroup = { id: string; nameAr?: string; name_ar?: string; nameEn?: string | null; rate: string; isInclusiveDefault?: boolean };
 export type Salesman = { id: string; name: string; active?: boolean };
-export type CostCenter = { id: string; code: string; nameAr?: string; name_ar?: string };
+export type CostCenter = { id: string; code: string; nameAr?: string; name_ar?: string; nameEn?: string | null; parentId?: string | null; branchId?: string | null };
 export type FiscalPeriod = { id: string; name: string; status: string; startDate?: string; start_date?: string; endDate?: string; end_date?: string; fiscalYearId?: string; fiscal_year_id?: string };
 export type Employee = { id: string; employeeNo?: string; employee_no?: string; name: string; departmentId?: string | null; jobId?: string | null; status?: string; salaryComponents?: Record<string, string>; salary_components?: Record<string, string> };
 

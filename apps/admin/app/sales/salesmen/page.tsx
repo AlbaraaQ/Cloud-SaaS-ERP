@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
+import { apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
@@ -17,13 +17,37 @@ export default function SalesmenPage() {
       subtitle="مندوبو المبيعات المرتبطون بالفواتير لتقارير العمولة والأداء."
       crumbs={['المبيعات', 'التعاريف']}
       query={salesmen}
-      canCreate={can('sales.invoice.create')}
+      canCreate={can('sales.salesman.manage')}
       createLabel="مندوب جديد"
       fields={[
         { name: 'name', label: 'الاسم', required: true },
         { name: 'employeeRef', label: 'الرقم الوظيفي', ltr: true },
+        { name: 'active', label: 'نشط', type: 'checkbox' },
       ]}
-      onCreate={(values) => apiPost('/sales/salesmen', { name: String(values.name).trim(), employeeRef: String(values.employeeRef).trim() || undefined })}
+      initial={{ active: true }}
+      onCreate={(values) =>
+        apiPost('/sales/salesmen', {
+          name: String(values.name).trim(),
+          employeeRef: String(values.employeeRef).trim() || undefined,
+          active: Boolean(values.active),
+        })
+      }
+      edit={
+        can('sales.salesman.manage')
+          ? {
+              toForm: (row) => ({ name: row.name, employeeRef: row.employeeRef ?? '', active: row.active }),
+              onUpdate: (row, values) =>
+                apiPatch(`/sales/salesmen/${row.id}`, {
+                  name: String(values.name).trim(),
+                  employeeRef: String(values.employeeRef).trim() || null,
+                  active: Boolean(values.active),
+                }),
+            }
+          : undefined
+      }
+      onDelete={can('sales.salesman.manage') ? (row) => apiDelete(`/sales/salesmen/${row.id}`) : undefined}
+      confirmDelete={(row) => `هل تريد حذف المندوب ${row.name}؟ إذا كان مرتبطاً بفواتير فسيتم إيقافه فقط.`}
+      rowLabel={(row) => `المندوب ${row.name}`}
       successText={(values) => `تمت إضافة المندوب ${String(values.name)}.`}
       rowKey={(row) => row.id}
       empty="لا يوجد مندوبون"

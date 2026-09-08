@@ -105,6 +105,7 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('sales.return.create', 'Create sales returns and credit notes.'),
   perm('sales.adjustment.create', 'Issue credit and debit notes against posted sales invoices.'),
   perm('sales.offer.manage', 'Maintain sales offers and promotional discount rules.'),
+  perm('sales.salesman.manage', 'Maintain salesman cards.'),
   perm('purchase.view', 'List and read purchase documents.'),
   perm('purchase.invoice.create', 'Create draft purchase invoices.'),
   perm('purchase.invoice.post', 'Post purchase invoices.'),

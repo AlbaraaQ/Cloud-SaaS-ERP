@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
@@ -7,7 +7,9 @@ import { RequiresPermission } from '../platform/decorators/requires-permission.d
 import {
   AccountingService,
   type AccountInput,
+  type AccountPatch,
   type CostCenterInput,
+  type CostCenterPatch,
   type FiscalYearInput,
   type JournalLineInput,
 } from './accounting.service.js';
@@ -27,6 +29,20 @@ export class AccountingController {
   @RequiresPermission('accounting.account.manage')
   async createAccount(@Body() body: AccountInput) {
     return { data: await this.accounting.createAccount(getTenantContext().tenantId, body) };
+  }
+
+  @Patch('accounts/:id')
+  @RequiresPermission('accounting.account.manage')
+  @ApiOperation({ summary: 'Edit an account card' })
+  async updateAccount(@Param('id') id: string, @Body() body: AccountPatch) {
+    return { data: await this.accounting.updateAccount(getTenantContext().tenantId, id, body) };
+  }
+
+  @Delete('accounts/:id')
+  @RequiresPermission('accounting.account.manage')
+  @ApiOperation({ summary: 'Delete an unused account' })
+  async deleteAccount(@Param('id') id: string) {
+    return { data: await this.accounting.deleteAccount(getTenantContext().tenantId, id) };
   }
 
   @Get('accounts/:id')
@@ -93,6 +109,20 @@ export class AccountingController {
   @ApiOperation({ summary: 'Create a cost centre' })
   async createCostCenter(@Body() body: CostCenterInput) {
     return { data: await this.accounting.createCostCenter(getTenantContext().tenantId, body) };
+  }
+
+  @Patch('cost-centers/:id')
+  @RequiresPermission('accounting.account.manage')
+  @ApiOperation({ summary: 'Edit a cost centre' })
+  async updateCostCenter(@Param('id') id: string, @Body() body: CostCenterPatch) {
+    return { data: await this.accounting.updateCostCenter(getTenantContext().tenantId, id, body) };
+  }
+
+  @Delete('cost-centers/:id')
+  @RequiresPermission('accounting.account.manage')
+  @ApiOperation({ summary: 'Delete an unused cost centre' })
+  async deleteCostCenter(@Param('id') id: string) {
+    return { data: await this.accounting.deleteCostCenter(getTenantContext().tenantId, id) };
   }
 
   // ------------------------------------------------------------- fiscal calendar

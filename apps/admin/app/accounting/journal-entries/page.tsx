@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { Empty, ErrorBox, Forbidden, Loading, Screen } from '../../../components/screen';
@@ -162,9 +163,14 @@ export default function JournalRegisterPage() {
                         </span>
                       </td>
                       <td>
-                        <button className="btn sm" type="button" onClick={() => setOpen(open === row.id ? undefined : row.id)}>
-                          {open === row.id ? 'إخفاء' : 'تفاصيل'}
-                        </button>
+                        <span className="row">
+                          <button className="btn sm" type="button" onClick={() => setOpen(open === row.id ? undefined : row.id)}>
+                            {open === row.id ? 'إخفاء' : 'تفاصيل'}
+                          </button>
+                          <Link className="btn sm" href={`/print/journal-entry/${row.id}`}>
+                            طباعة
+                          </Link>
+                        </span>
                       </td>
                     </tr>
                   ))}

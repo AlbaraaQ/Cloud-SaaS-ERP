@@ -32,6 +32,17 @@ export type FieldSpec = {
 
 export type FormValues = Record<string, string | boolean>;
 
+/**
+ * Editing and deleting are opt-in: a screen passes `toForm` + `onUpdate` when its records
+ * are correctable, and `onDelete` when they can be withdrawn. Screens that only ever
+ * append (stock movements, notes, adjustments) simply omit them and keep behaving as
+ * before — a ledger row is not a record you fix, it is a record you reverse.
+ */
+export type RowActions<T> = {
+  toForm: (row: T) => FormValues;
+  onUpdate: (row: T, values: FormValues) => Promise<unknown>;
+};
+
 export function Directory<T>({
   title,
   subtitle,
@@ -47,6 +58,11 @@ export function Directory<T>({
   fields,
   initial,
   onCreate,
+  edit,
+  onDelete,
+  deleteLabel = 'حذف',
+  confirmDelete,
+  rowLabel,
   successText,
   blocked,
   toolbar,
@@ -66,6 +82,15 @@ export function Directory<T>({
   fields: FieldSpec[];
   initial?: FormValues;
   onCreate: (values: FormValues) => Promise<unknown>;
+  /** Enables the per-row "تعديل" button and reuses the same form for editing. */
+  edit?: RowActions<T>;
+  /** Enables the per-row "حذف" button. */
+  onDelete?: (row: T) => Promise<unknown>;
+  deleteLabel?: string;
+  /** Confirmation question; defaults to a generic one built from `rowLabel`. */
+  confirmDelete?: (row: T) => string;
+  /** How to name a single row in confirmations and success messages. */
+  rowLabel?: (row: T) => string;
   successText?: (values: FormValues) => string;
   /** Rendered instead of the submit button when a prerequisite is missing. */
   blocked?: string;
@@ -77,16 +102,38 @@ export function Directory<T>({
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<FormValues>({ ...blank, ...initial });
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<T | undefined>();
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
+
+  function reset() {
+    setEditing(undefined);
+    setValues({ ...blank, ...initial });
+  }
+
+  function startEdit(row: T) {
+    if (!edit) return;
+    setEditing(row);
+    // Whatever the card does not expose keeps its blank default, so a partially mapped
+    // row can never send stale values from a previously edited record.
+    setValues({ ...blank, ...edit.toForm(row) });
+    setNotice(undefined);
+    setOpen(true);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setNotice(undefined);
     try {
-      await onCreate(values);
-      setNotice({ kind: 'ok', text: successText ? successText(values) : 'تم الحفظ.' });
-      setValues({ ...blank, ...initial });
+      if (editing && edit) {
+        await edit.onUpdate(editing, values);
+        setNotice({ kind: 'ok', text: 'تم حفظ التعديل.' });
+      } else {
+        await onCreate(values);
+        setNotice({ kind: 'ok', text: successText ? successText(values) : 'تم الحفظ.' });
+      }
+      reset();
       query.reload();
     } catch (error) {
       setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
@@ -95,6 +142,51 @@ export function Directory<T>({
     }
   }
 
+  async function remove(row: T) {
+    if (!onDelete) return;
+    const question = confirmDelete ? confirmDelete(row) : `هل تريد حذف ${rowLabel ? rowLabel(row) : 'هذا السجل'}؟`;
+    if (typeof window !== 'undefined' && !window.confirm(question)) return;
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      await onDelete(row);
+      setNotice({ kind: 'ok', text: 'تم الحذف.' });
+      if (editing) reset();
+      query.reload();
+    } catch (error) {
+      // The API refuses to delete anything that documents already point at, and the
+      // reason it gives ("used on invoices", "has sub-accounts") is the useful part.
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rowColumns: Array<Column<T>> =
+    edit || onDelete
+      ? [
+          ...columns,
+          {
+            key: '__actions',
+            header: '',
+            cell: (row: T) => (
+              <span className="row">
+                {edit && (
+                  <button className="btn sm" type="button" onClick={() => startEdit(row)} disabled={busy}>
+                    تعديل
+                  </button>
+                )}
+                {onDelete && (
+                  <button className="btn sm danger" type="button" onClick={() => void remove(row)} disabled={busy}>
+                    {deleteLabel}
+                  </button>
+                )}
+              </span>
+            ),
+          },
+        ]
+      : columns;
+
   return (
     <Screen
       title={title}
@@ -102,7 +194,14 @@ export function Directory<T>({
       crumbs={crumbs}
       actions={
         canCreate ? (
-          <button className="btn primary" type="button" onClick={() => setOpen(!open)}>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => {
+              if (open) reset();
+              setOpen(!open);
+            }}
+          >
             {open ? 'إغلاق' : createLabel}
           </button>
         ) : null
@@ -110,21 +209,30 @@ export function Directory<T>({
     >
       {open && (
         <form className="card" onSubmit={submit}>
-          <h2>{formTitle ?? createLabel}</h2>
-          {blocked && <p className="alert warn">{blocked}</p>}
+          <h2>{editing ? `تعديل ${rowLabel ? rowLabel(editing) : 'السجل'}` : (formTitle ?? createLabel)}</h2>
+          {blocked && !editing && <p className="alert warn">{blocked}</p>}
           <FormFields fields={fields} values={values} onChange={setValues} />
           <Notice notice={notice} />
-          <button className="btn primary" type="submit" disabled={busy || Boolean(blocked)}>
-            {busy ? 'جارٍ الحفظ…' : 'حفظ'}
-          </button>
+          <div className="row">
+            <button className="btn primary" type="submit" disabled={busy || (Boolean(blocked) && !editing)}>
+              {busy ? 'جارٍ الحفظ…' : editing ? 'حفظ التعديل' : 'حفظ'}
+            </button>
+            {editing && (
+              <button className="btn" type="button" onClick={reset} disabled={busy}>
+                إلغاء التعديل
+              </button>
+            )}
+          </div>
         </form>
       )}
 
       {toolbar && <div className="card toolbar">{toolbar}</div>}
       {children}
 
+      {!open && notice && <Notice notice={notice} />}
+
       <QueryView query={query} empty={empty} emptyDetail={emptyDetail}>
-        {(rows) => <DataTable rows={rows} rowKey={rowKey} columns={columns} />}
+        {(rows) => <DataTable rows={rows} rowKey={rowKey} columns={rowColumns} />}
       </QueryView>
     </Screen>
   );

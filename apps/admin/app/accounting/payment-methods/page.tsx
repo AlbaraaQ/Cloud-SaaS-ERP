@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
+import { apiList, apiPost, apiPut } from '../../../lib/api';
 import { cashLocationLabel, listCashLocations, type CashLocation } from '../../../lib/lookups';
 import { useQuery } from '../../../lib/use-query';
 
@@ -74,6 +74,29 @@ export default function PaymentMethodsPage() {
           isDefault: Boolean(values.isDefault),
         })
       }
+      edit={{
+        toForm: (row) => ({
+          code: row.code,
+          nameAr: row.nameAr,
+          nameEn: row.nameEn ?? '',
+          kind: row.kind,
+          dueDays: String(row.dueDays ?? 0),
+          cashLocationId: row.cashLocationId ?? '',
+          isActive: row.isActive,
+          isDefault: row.isDefault,
+        }),
+        onUpdate: (row, values) =>
+          apiPut(`/payment-methods/${row.id}`, {
+            nameAr: String(values.nameAr),
+            nameEn: values.nameEn ? String(values.nameEn) : undefined,
+            kind: String(values.kind || 'cash'),
+            dueDays: Number(values.dueDays || 0),
+            cashLocationId: values.cashLocationId ? String(values.cashLocationId) : undefined,
+            isActive: Boolean(values.isActive),
+            isDefault: Boolean(values.isDefault),
+          }),
+      }}
+      rowLabel={(row) => `طريقة الدفع ${row.nameAr}`}
       successText={(values) => `تم حفظ «${String(values.nameAr)}».`}
       columns={[
         { key: 'code', header: 'الرمز', align: 'ltr', cell: (row) => row.code },

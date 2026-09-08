@@ -34,6 +34,9 @@ export type AccountInput = {
   isPostable?: boolean;
 };
 
+export type AccountPatch = Partial<AccountInput> & { allowManual?: boolean };
+export type CostCenterPatch = Partial<CostCenterInput>;
+
 export type CostCenterInput = {
   code: string;
   nameAr: string;
@@ -115,6 +118,114 @@ export class AccountingService {
       });
     });
     return this.readAccount(tenantId, id);
+  }
+
+  /**
+   * Edit an account card. What is editable depends on whether the account has ever been
+   * posted to: names and flags always are, but `code`, `type` and `normalBalance` are
+   * frozen once journal lines exist — those three define how every existing balance is
+   * read, so changing them would retroactively re-state closed periods.
+   */
+  async updateAccount(tenantId: string, id: string, patch: AccountPatch) {
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [current] = await tx.select().from(accounts).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)));
+      if (!current) throw new DomainError('NOT_FOUND', 'Account not found', 404);
+
+      const posted = await this.accountHasLines(tx, tenantId, id);
+      const changesIdentity =
+        (patch.code !== undefined && patch.code !== current.code) ||
+        (patch.type !== undefined && patch.type !== current.type) ||
+        (patch.normalBalance !== undefined && patch.normalBalance !== current.normalBalance);
+      if (posted && changesIdentity) {
+        throw new DomainError('ACCOUNT_POSTED', 'This account already carries journal entries; its number, nature and side can no longer be changed', 409);
+      }
+
+      // Only an explicit request to make the account postable is checked against its
+      // children: an older chart may already contain a parent that was left postable, and
+      // refusing to rename it would make that history impossible to clean up.
+      if (patch.isPostable === true && (await this.countAccountChildren(tx, tenantId, id)) > 0) {
+        throw new DomainError('ACCOUNT_HAS_CHILDREN', 'A parent account cannot be a posting account', 422);
+      }
+      const isPostable = patch.isPostable ?? current.isPostable;
+
+      let { level, path, parentId } = current;
+      const reparent = patch.parentId !== undefined && (patch.parentId ?? null) !== current.parentId;
+      if (reparent) {
+        const nextParent = patch.parentId ? await this.readAccountRow(tx, tenantId, patch.parentId) : undefined;
+        if (patch.parentId && !nextParent) throw new DomainError('NOT_FOUND', 'Parent account not found', 404);
+        if (nextParent && (nextParent.id === id || nextParent.path.split('.').includes(id))) {
+          throw new DomainError('ACCOUNT_CYCLE', 'An account cannot be moved under one of its own branches', 422);
+        }
+        parentId = patch.parentId ?? null;
+        level = nextParent ? nextParent.level + 1 : 0;
+        path = nextParent ? `${nextParent.path}.${id}` : id;
+
+        // The whole branch travels with the account: every descendant keeps its relative
+        // position but is re-rooted, otherwise `path <@ ancestor` queries would lose them.
+        const depthShift = level - current.level;
+        await tx.execute(sql`
+          UPDATE accounts
+             SET path = ${`${path}`}::ltree || subpath(path, nlevel(${current.path}::ltree)),
+                 level = level + ${depthShift},
+                 updated_at = now()
+           WHERE tenant_id = ${tenantId}
+             AND path <@ ${current.path}::ltree
+             AND id <> ${id}
+        `);
+      }
+
+      await tx
+        .update(accounts)
+        .set({
+          code: patch.code ?? current.code,
+          nameAr: patch.nameAr ?? current.nameAr,
+          nameEn: patch.nameEn === undefined ? current.nameEn : patch.nameEn,
+          type: patch.type ?? current.type,
+          subtype: patch.subtype === undefined ? current.subtype : patch.subtype,
+          normalBalance: patch.normalBalance ?? current.normalBalance,
+          isPostable,
+          allowManual: patch.allowManual ?? current.allowManual,
+          parentId,
+          level,
+          path,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId)));
+    });
+    return this.readAccount(tenantId, id);
+  }
+
+  /**
+   * Deleting an account is only ever allowed while it is still empty — no journal lines,
+   * no opening balances, no children. Anything else is refused rather than hidden,
+   * because a chart of accounts with a hole in it stops reconciling.
+   */
+  async deleteAccount(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [current] = await tx.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)));
+      if (!current) throw new DomainError('NOT_FOUND', 'Account not found', 404);
+      if (await this.accountHasLines(tx, tenantId, id)) {
+        throw new DomainError('ACCOUNT_POSTED', 'This account carries journal entries and cannot be deleted', 409);
+      }
+      if ((await this.countAccountChildren(tx, tenantId, id)) > 0) {
+        throw new DomainError('ACCOUNT_HAS_CHILDREN', 'Delete or move the sub-accounts first', 409);
+      }
+      await tx.update(accounts).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId)));
+      return { id, deleted: true };
+    });
+  }
+
+  private async accountHasLines(tx: DrizzleTx, tenantId: string, id: string) {
+    const result = await tx.execute(sql`
+      SELECT EXISTS (SELECT 1 FROM journal_entry_lines WHERE tenant_id = ${tenantId} AND account_id = ${id})
+          OR EXISTS (SELECT 1 FROM opening_balances WHERE tenant_id = ${tenantId} AND account_id = ${id}) AS used
+    `);
+    return Boolean((result.rows[0] as { used: boolean }).used);
+  }
+
+  private async countAccountChildren(tx: DrizzleTx, tenantId: string, id: string) {
+    const result = await tx.execute(sql`SELECT count(*)::int AS total FROM accounts WHERE tenant_id = ${tenantId} AND parent_id = ${id} AND deleted_at IS NULL`);
+    return (result.rows[0] as { total: number }).total;
   }
 
   private async readAccountRow(tx: DrizzleTx, tenantId: string, id: string) {
@@ -362,6 +473,43 @@ export class AccountingService {
       });
       const [row] = await tx.select().from(costCenters).where(eq(costCenters.id, id));
       return row;
+    });
+  }
+
+  async updateCostCenter(tenantId: string, id: string, patch: CostCenterPatch) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [current] = await tx.select().from(costCenters).where(and(eq(costCenters.id, id), eq(costCenters.tenantId, tenantId), isNull(costCenters.deletedAt)));
+      if (!current) throw new DomainError('NOT_FOUND', 'Cost centre not found', 404);
+      if (patch.parentId === id) throw new DomainError('COST_CENTER_CYCLE', 'A cost centre cannot be its own parent', 422);
+      const [row] = await tx
+        .update(costCenters)
+        .set({
+          code: patch.code ?? current.code,
+          nameAr: patch.nameAr ?? current.nameAr,
+          nameEn: patch.nameEn === undefined ? current.nameEn : patch.nameEn,
+          parentId: patch.parentId === undefined ? current.parentId : patch.parentId,
+          branchId: patch.branchId === undefined ? current.branchId : patch.branchId,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(costCenters.id, id), eq(costCenters.tenantId, tenantId)))
+        .returning();
+      return row;
+    });
+  }
+
+  /** Cost centres carry analysis, so one that already appears on journal lines stays. */
+  async deleteCostCenter(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const used = await tx.execute(sql`
+        SELECT EXISTS (SELECT 1 FROM journal_entry_lines WHERE tenant_id = ${tenantId} AND cost_center_id = ${id})
+            OR EXISTS (SELECT 1 FROM cost_centers WHERE tenant_id = ${tenantId} AND parent_id = ${id} AND deleted_at IS NULL) AS used
+      `);
+      if ((used.rows[0] as { used: boolean }).used) {
+        throw new DomainError('COST_CENTER_IN_USE', 'This cost centre is used on journal entries or has sub-centres', 409);
+      }
+      const result = await tx.update(costCenters).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(costCenters.id, id), eq(costCenters.tenantId, tenantId), isNull(costCenters.deletedAt)));
+      if (!result.rowCount) throw new DomainError('NOT_FOUND', 'Cost centre not found', 404);
+      return { id, deleted: true };
     });
   }
 

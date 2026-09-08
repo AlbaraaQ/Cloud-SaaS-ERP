@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
@@ -21,6 +21,8 @@ export class TreasuryController {
   @Post('cash-transfers/:id/receive') @RequiresPermission('treasury.transfer.manage') receiveTransfer(@Param('id') id: string) { return this.treasury.receiveTransfer(getTenantContext().tenantId, id); }
   @Get('expense-types') @RequiresPermission('treasury.view') expenseTypes() { return this.treasury.listExpenseTypes(getTenantContext().tenantId); }
   @Post('expense-types') @RequiresPermission('treasury.expensetype.manage') createExpenseType(@Body() body: { nameAr: string; nameEn?: string; accountId: string; costCenterId?: string }) { return this.treasury.createExpenseType(getTenantContext().tenantId, body); }
+  @Patch('expense-types/:id') @RequiresPermission('treasury.expensetype.manage') updateExpenseType(@Param('id') id: string, @Body() body: { nameAr?: string; nameEn?: string | null; accountId?: string; costCenterId?: string | null }) { return this.treasury.updateExpenseType(getTenantContext().tenantId, id, body); }
+  @Delete('expense-types/:id') @RequiresPermission('treasury.expensetype.manage') deleteExpenseType(@Param('id') id: string) { return this.treasury.deleteExpenseType(getTenantContext().tenantId, id); }
   @Post('shift-closes/open') @RequiresPermission('treasury.shift.close') openShift(@Body() body: { branchId: string; userId?: string }) { const ctx = getTenantContext(); return this.treasury.openShift(ctx.tenantId, body.branchId, body.userId ?? ctx.userId); }
   @Get('shift-closes/current') @RequiresPermission('treasury.view') currentShift(@Query('branch_id') branchId: string, @Query('user_id') userId?: string) { const ctx = getTenantContext(); return this.treasury.currentShift(ctx.tenantId, branchId, userId ?? ctx.userId); }
   @Get('shift-closes') @RequiresPermission('treasury.view') history(@Query('branch_id') branchId?: string) { return this.treasury.history(getTenantContext().tenantId, branchId); }

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { calculateInvoiceTotals, DomainError, newId } from '@erp/contracts';
 import {
   invoicePayments,
@@ -287,6 +287,13 @@ export class SalesService {
     return offer;
   }
   async listSalesmen(tenantId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesmen).where(eq(salesmen.tenantId, tenantId)).orderBy(salesmen.name)); }
+  async createSalesman(tenantId: string, input: { name: string; employeeRef?: string; active?: boolean }) { const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(salesmen).values({ id: newId(), tenantId, name: input.name, employeeRef: input.employeeRef, active: input.active ?? true }).returning()); return row; }
+  async updateSalesman(tenantId: string, id: string, input: { name?: string; employeeRef?: string | null; active?: boolean }) { const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesmen).set({ ...(input.name === undefined ? {} : { name: input.name }), ...(input.employeeRef === undefined ? {} : { employeeRef: input.employeeRef }), ...(input.active === undefined ? {} : { active: input.active }), updatedAt: new Date() }).where(and(eq(salesmen.tenantId, tenantId), eq(salesmen.id, id))).returning()); if (!row) throw new DomainError('NOT_FOUND', 'Salesman was not found', 404); return row; }
+  /**
+   * A salesman who is already named on invoices is deactivated rather than deleted, so
+   * commission and performance reports for closed periods keep their subject.
+   */
+  async deleteSalesman(tenantId: string, id: string) { return withTenantTx(this.database.db, tenantId, async (tx) => { const used = await tx.execute(sql`SELECT EXISTS (SELECT 1 FROM sales_invoices WHERE tenant_id = ${tenantId} AND salesman_id = ${id}) AS used`); if ((used.rows[0] as { used: boolean }).used) { const [row] = await tx.update(salesmen).set({ active: false, updatedAt: new Date() }).where(and(eq(salesmen.tenantId, tenantId), eq(salesmen.id, id))).returning(); if (!row) throw new DomainError('NOT_FOUND', 'Salesman was not found', 404); return { id, archived: true, deleted: false }; } const result = await tx.delete(salesmen).where(and(eq(salesmen.tenantId, tenantId), eq(salesmen.id, id))); if (!result.rowCount) throw new DomainError('NOT_FOUND', 'Salesman was not found', 404); return { id, archived: false, deleted: true }; }); }
 }
 
 export const salesService = { calculateInvoiceTotals };

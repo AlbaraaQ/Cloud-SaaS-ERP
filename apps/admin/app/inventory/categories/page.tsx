@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiPost } from '../../../lib/api';
+import { apiDelete, apiPatch, apiPost } from '../../../lib/api';
 import { arabicName, listCategories, type Category } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
@@ -37,6 +37,22 @@ export default function CategoriesPage() {
           parentId: String(values.parentId) || undefined,
         })
       }
+      edit={
+        can('catalog.category.manage')
+          ? {
+              toForm: (row) => ({ code: row.code, nameAr: row.nameAr ?? '', nameEn: row.nameEn ?? '', parentId: row.parentId ?? '' }),
+              onUpdate: (row, values) =>
+                apiPatch(`/organization/catalog/categories/${row.id}`, {
+                  code: String(values.code).trim(),
+                  nameAr: String(values.nameAr).trim(),
+                  nameEn: String(values.nameEn).trim() || null,
+                  parentId: String(values.parentId) || null,
+                }),
+            }
+          : undefined
+      }
+      onDelete={can('catalog.category.manage') ? (row) => apiDelete(`/organization/catalog/categories/${row.id}`) : undefined}
+      rowLabel={(row) => `المجموعة ${row.code}`}
       successText={(values) => `تمت إضافة المجموعة ${String(values.code)}.`}
       rowKey={(row) => row.id}
       empty="لا توجد مجموعات"

@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
+import { apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import { arabicName, branchOptions, listBranches, type Branch } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
@@ -34,6 +34,21 @@ export default function DepartmentsPage() {
           branchId: String(values.branchId) || undefined,
         })
       }
+      edit={
+        can('hrm.manage')
+          ? {
+              toForm: (row) => ({ code: row.code, name: row.name, branchId: row.branchId ?? '' }),
+              onUpdate: (row, values) =>
+                apiPatch(`/hrm/departments/${row.id}`, {
+                  code: String(values.code).trim(),
+                  name: String(values.name).trim(),
+                  branchId: String(values.branchId) || null,
+                }),
+            }
+          : undefined
+      }
+      onDelete={can('hrm.manage') ? (row) => apiDelete(`/hrm/departments/${row.id}`) : undefined}
+      rowLabel={(row) => `الإدارة ${row.name}`}
       successText={(values) => `تمت إضافة الإدارة ${String(values.name)}.`}
       rowKey={(row) => row.id}
       empty="لا توجد إدارات"

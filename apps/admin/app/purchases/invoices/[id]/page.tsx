@@ -115,9 +115,14 @@ export default function PurchaseInvoiceDetailPage() {
       subtitle={`${supplier ? partyLabel(supplier) : '—'} — ${statusLabel(doc.status)}`}
       crumbs={['المشتريات', 'العمليات']}
       actions={
-        <Link className="btn" href="/purchases/invoices">
-          كل الفواتير
-        </Link>
+        <>
+          <Link className="btn primary" href={`/print/purchase-invoice/${doc.id}`}>
+            طباعة
+          </Link>
+          <Link className="btn" href="/purchases/invoices">
+            كل الفواتير
+          </Link>
+        </>
       }
     >
       <div className="grid cols-2">

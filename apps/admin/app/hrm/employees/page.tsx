@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
+import { apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import { arabicName, branchOptions, listBranches, money, shortDate, statusLabel, type Branch } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
@@ -18,6 +18,7 @@ type Employee = {
   hireDate?: string | null;
   status: string;
   salaryComponents?: Record<string, string>;
+  bank?: Record<string, string | undefined> | null;
 };
 
 /** The basic salary is the only component every payroll run needs; the rest are optional. */
@@ -79,6 +80,43 @@ export default function EmployeesPage() {
           bank: String(values.iban).trim() ? { iban: String(values.iban).trim() } : undefined,
         })
       }
+      edit={
+        can('hrm.manage')
+          ? {
+              toForm: (row) => ({
+                employeeNo: row.employeeNo,
+                name: row.name,
+                branchId: row.branchId ?? '',
+                departmentId: row.departmentId ?? '',
+                jobId: row.jobId ?? '',
+                hireDate: row.hireDate ? String(row.hireDate).slice(0, 10) : '',
+                basic: row.salaryComponents?.basic ?? '',
+                housing: row.salaryComponents?.housing ?? '',
+                transport: row.salaryComponents?.transport ?? '',
+                iban: row.bank?.iban ?? '',
+              }),
+              onUpdate: (row, values) =>
+                apiPatch(`/hrm/employees/${row.id}`, {
+                  employeeNo: String(values.employeeNo).trim(),
+                  name: String(values.name).trim(),
+                  branchId: String(values.branchId) || null,
+                  departmentId: String(values.departmentId) || null,
+                  jobId: String(values.jobId) || null,
+                  hireDate: String(values.hireDate) || null,
+                  salaryComponents: Object.fromEntries(
+                    (['basic', 'housing', 'transport'] as const)
+                      .map((key) => [key, String(values[key] ?? '').trim()])
+                      .filter(([, value]) => value !== ''),
+                  ),
+                  bank: String(values.iban).trim() ? { iban: String(values.iban).trim() } : {},
+                }),
+            }
+          : undefined
+      }
+      onDelete={can('hrm.manage') ? (row) => apiDelete(`/hrm/employees/${row.id}`) : undefined}
+      deleteLabel="إنهاء الخدمة"
+      confirmDelete={(row) => `هل تريد إنهاء خدمة الموظف ${row.name}؟ إذا سبق أن دخل في مسير رواتب فسيتم أرشفته فقط.`}
+      rowLabel={(row) => `الموظف ${row.name}`}
       successText={(values) => `تمت إضافة الموظف ${String(values.name)}.`}
       rowKey={(row) => row.id}
       empty="لا يوجد موظفون"

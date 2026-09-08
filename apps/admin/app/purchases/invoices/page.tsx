@@ -83,6 +83,15 @@ export default function PurchaseInvoicesPage() {
               { key: 'tax', header: 'الضريبة', align: 'num', cell: (row) => money(row.taxTotal) },
               { key: 'total', header: 'الإجمالي', align: 'num', cell: (row) => money(row.total) },
               { key: 'status', header: 'الحالة', cell: (row) => <span className="badge">{statusLabel(row.status)}</span> },
+              {
+                key: 'print',
+                header: '',
+                cell: (row) => (
+                  <Link className="btn sm" href={`/print/purchase-invoice/${row.id}`}>
+                    طباعة
+                  </Link>
+                ),
+              },
             ]}
           />
         )}

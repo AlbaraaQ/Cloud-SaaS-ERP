@@ -223,6 +223,14 @@ export function apiPatch<T>(path: string, body: unknown, options: ApiOptions = {
   return apiData<T>(path, { ...options, method: 'PATCH', body: JSON.stringify(body) });
 }
 
+export function apiPut<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {
+  return apiData<T>(path, { ...options, method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function apiDelete<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  return apiData<T>(path, { ...options, method: 'DELETE' });
+}
+
 // --------------------------------------------------------------------------- auth
 
 export type LoginPayload = {

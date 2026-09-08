@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
+import { apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import { accountLabel, listAccounts, postableOf, typeOf, type Account } from '../../../lib/accounts';
 import { arabicName, listCostCenters, type CostCenter } from '../../../lib/lookups';
 import { useQuery } from '../../../lib/use-query';
@@ -46,6 +46,23 @@ export default function ExpenseTypesPage() {
           costCenterId: values.costCenterId ? String(values.costCenterId) : undefined,
         })
       }
+      edit={{
+        toForm: (row) => ({
+          nameAr: row.nameAr,
+          nameEn: row.nameEn ?? '',
+          accountId: row.accountId,
+          costCenterId: row.costCenterId ?? '',
+        }),
+        onUpdate: (row, values) =>
+          apiPatch(`/expense-types/${row.id}`, {
+            nameAr: String(values.nameAr),
+            nameEn: values.nameEn ? String(values.nameEn) : null,
+            accountId: String(values.accountId),
+            costCenterId: values.costCenterId ? String(values.costCenterId) : null,
+          }),
+      }}
+      onDelete={(row) => apiDelete(`/expense-types/${row.id}`)}
+      rowLabel={(row) => `المصروف ${row.nameAr}`}
       successText={(values) => `تم حفظ «${String(values.nameAr)}».`}
       columns={[
         { key: 'name', header: 'المصروف', cell: (row) => row.nameAr },

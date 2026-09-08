@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
@@ -302,6 +303,9 @@ function VouchersScreen() {
                 header: '',
                 cell: (row) => (
                   <span className="row">
+                    <Link className="btn sm" href={`/print/voucher/${row.id}`}>
+                      طباعة
+                    </Link>
                     {row.status === 'draft' && can('treasury.voucher.post') && (
                       <button className="btn sm primary" type="button" disabled={busy} onClick={() => run(() => postVoucher(row), 'تم ترحيل السند.')}>
                         ترحيل

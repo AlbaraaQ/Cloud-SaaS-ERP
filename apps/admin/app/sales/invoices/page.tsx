@@ -93,6 +93,15 @@ export default function SalesInvoicesPage() {
               { key: 'total', header: 'الإجمالي', align: 'num', cell: (row) => money(row.total) },
               { key: 'paid', header: 'المدفوع', align: 'num', cell: (row) => money(row.paidTotal) },
               { key: 'status', header: 'الحالة', cell: (row) => <span className="badge">{statusLabel(row.status)}</span> },
+              {
+                key: 'print',
+                header: '',
+                cell: (row) => (
+                  <Link className="btn sm" href={`/print/sales-invoice/${row.id}`}>
+                    طباعة
+                  </Link>
+                ),
+              },
             ]}
           />
         )}

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
@@ -157,6 +158,15 @@ export default function ShiftsPage() {
               { key: 'counted', header: 'المعدود', align: 'num', cell: (row) => money(row.countedCash) },
               { key: 'diff', header: 'الفرق', align: 'num', cell: (row) => money(row.diff) },
               { key: 'status', header: 'الحالة', cell: (row) => <span className="badge">{statusLabel(row.status)}</span> },
+              {
+                key: 'print',
+                header: '',
+                cell: (row) => (
+                  <Link className="btn sm" href={`/print/shift/${row.id}`}>
+                    طباعة
+                  </Link>
+                ),
+              },
             ]}
           />
         )}

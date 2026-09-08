@@ -1,19 +1,25 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
-import { HrmService, type AdjustmentInput, type DepartmentInput, type EmployeeInput, type JobInput, type PayRunInput, type PostRunInput, type RunInput } from './hrm.service.js';
+import { HrmService, type AdjustmentInput, type DepartmentInput, type DepartmentPatch, type EmployeeInput, type EmployeePatch, type JobInput, type JobPatch, type PayRunInput, type PostRunInput, type RunInput } from './hrm.service.js';
 
 @Controller('hrm')
 export class HrmController {
   constructor(private readonly hrm: HrmService) {}
   @Get('departments') @RequiresPermission('hrm.view') departments() { return this.hrm.listDepartments(getTenantContext().tenantId); }
   @Post('departments') @RequiresPermission('hrm.manage') createDepartment(@Body() body: DepartmentInput) { return this.hrm.createDepartment(getTenantContext().tenantId, body); }
+  @Patch('departments/:id') @RequiresPermission('hrm.manage') updateDepartment(@Param('id') id: string, @Body() body: DepartmentPatch) { return this.hrm.updateDepartment(getTenantContext().tenantId, id, body); }
+  @Delete('departments/:id') @RequiresPermission('hrm.manage') deleteDepartment(@Param('id') id: string) { return this.hrm.deleteDepartment(getTenantContext().tenantId, id); }
   @Get('jobs') @RequiresPermission('hrm.view') jobs() { return this.hrm.listJobs(getTenantContext().tenantId); }
   @Post('jobs') @RequiresPermission('hrm.manage') createJob(@Body() body: JobInput) { return this.hrm.createJob(getTenantContext().tenantId, body); }
+  @Patch('jobs/:id') @RequiresPermission('hrm.manage') updateJob(@Param('id') id: string, @Body() body: JobPatch) { return this.hrm.updateJob(getTenantContext().tenantId, id, body); }
+  @Delete('jobs/:id') @RequiresPermission('hrm.manage') deleteJob(@Param('id') id: string) { return this.hrm.deleteJob(getTenantContext().tenantId, id); }
   @Get('employees') @RequiresPermission('hrm.view') employees() { return this.hrm.listEmployees(getTenantContext().tenantId); }
   @Post('employees') @RequiresPermission('hrm.manage') createEmployee(@Body() body: EmployeeInput) { return this.hrm.createEmployee(getTenantContext().tenantId, body); }
+  @Patch('employees/:id') @RequiresPermission('hrm.manage') updateEmployee(@Param('id') id: string, @Body() body: EmployeePatch) { return this.hrm.updateEmployee(getTenantContext().tenantId, id, body); }
+  @Delete('employees/:id') @RequiresPermission('hrm.manage') deleteEmployee(@Param('id') id: string) { return this.hrm.deleteEmployee(getTenantContext().tenantId, id); }
   @Post('attendance/import') @RequiresPermission('hrm.manage') importAttendance(@Body() body: { csv: string }) { return this.hrm.importAttendanceCsv(getTenantContext().tenantId, body.csv); }
   @Get('attendance/summary') @RequiresPermission('hrm.view') attendanceSummary(@Query('enroll') enroll: string, @Query('from') from: string, @Query('to') to: string) { return this.hrm.attendanceSummary(getTenantContext().tenantId, enroll, from, to); }
   @Get('adjustments') @RequiresPermission('hrm.view') adjustments() { return this.hrm.listAdjustments(getTenantContext().tenantId); }

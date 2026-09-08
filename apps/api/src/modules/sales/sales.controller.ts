@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
@@ -27,4 +27,7 @@ export class SalesController {
   @Get('sales/offers') @RequiresPermission('sales.view') offers() { return this.sales.listOffers(getTenantContext().tenantId); }
   @Post('sales/offers') @RequiresPermission('sales.offer.manage') createOffer(@Body() body: Parameters<SalesService['createOffer']>[1]) { return this.sales.createOffer(getTenantContext().tenantId, body); }
   @Get('sales/salesmen') @RequiresPermission('sales.view') salesmen() { return this.sales.listSalesmen(getTenantContext().tenantId); }
+  @Post('sales/salesmen') @RequiresPermission('sales.salesman.manage') createSalesman(@Body() body: { name: string; employeeRef?: string; active?: boolean }) { return this.sales.createSalesman(getTenantContext().tenantId, body); }
+  @Patch('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') updateSalesman(@Param('id') id: string, @Body() body: { name?: string; employeeRef?: string | null; active?: boolean }) { return this.sales.updateSalesman(getTenantContext().tenantId, id, body); }
+  @Delete('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') deleteSalesman(@Param('id') id: string) { return this.sales.deleteSalesman(getTenantContext().tenantId, id); }
 }

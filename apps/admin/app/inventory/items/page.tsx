@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
-import { ApiError, apiPost } from '../../../lib/api';
+import { ApiError, apiDelete, apiPatch, apiPost } from '../../../lib/api';
 import {
   arabicName,
   listCategories,
@@ -30,32 +30,92 @@ export default function ItemsPage() {
   const taxGroups = useQuery<TaxGroup[]>(() => listTaxGroups(), []);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ sku: '', barcode: '', nameAr: '', nameEn: '', categoryId: '', baseUnitId: '', kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: '' });
+  const blank = { sku: '', barcode: '', nameAr: '', nameEn: '', categoryId: '', baseUnitId: '', kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: '' };
+  const [form, setForm] = useState(blank);
+  const [editing, setEditing] = useState<Item | undefined>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
   const set = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
+  function startEdit(row: Item) {
+    setEditing(row);
+    setForm({
+      sku: row.sku,
+      barcode: row.barcode ?? '',
+      nameAr: row.nameAr ?? row.name_ar ?? '',
+      nameEn: row.nameEn ?? '',
+      categoryId: row.categoryId ?? row.category_id ?? '',
+      baseUnitId: row.baseUnitId ?? row.base_unit_id ?? '',
+      kind: row.kind ?? 'stock',
+      salePrice: row.salePrice ?? row.sale_price ?? '',
+      purchasePrice: row.purchasePrice ?? row.purchase_price ?? '',
+      taxGroupId: row.taxGroupId ?? row.tax_group_id ?? '',
+    });
+    setNotice(undefined);
+    setOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelEdit() {
+    setEditing(undefined);
+    setForm(blank);
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setNotice(undefined);
     try {
-      await apiPost('/organization/catalog/items', {
-        sku: form.sku.trim(),
-        barcode: form.barcode.trim() || undefined,
-        nameAr: form.nameAr.trim(),
-        nameEn: form.nameEn.trim() || undefined,
-        categoryId: form.categoryId,
-        baseUnitId: form.baseUnitId,
-        kind: form.kind,
-        salePrice: form.salePrice.trim() || undefined,
-        purchasePrice: form.purchasePrice.trim() || undefined,
-        taxGroupId: form.taxGroupId || undefined,
-      });
-      setNotice({ kind: 'ok', text: `تمت إضافة المادة ${form.sku}.` });
-      setForm({ sku: '', barcode: '', nameAr: '', nameEn: '', categoryId: form.categoryId, baseUnitId: form.baseUnitId, kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: form.taxGroupId });
+      if (editing) {
+        // The base unit is intentionally absent from the patch: every stored quantity and
+        // moving-average cost of this item is expressed in it, so it stays as issued.
+        await apiPatch(`/organization/catalog/items/${editing.id}`, {
+          sku: form.sku.trim(),
+          barcode: form.barcode.trim() || null,
+          nameAr: form.nameAr.trim(),
+          nameEn: form.nameEn.trim() || null,
+          categoryId: form.categoryId,
+          kind: form.kind,
+          salePrice: form.salePrice.trim() || undefined,
+          purchasePrice: form.purchasePrice.trim() || undefined,
+          taxGroupId: form.taxGroupId || null,
+        });
+        setNotice({ kind: 'ok', text: `تم حفظ تعديل المادة ${form.sku}.` });
+        cancelEdit();
+      } else {
+        await apiPost('/organization/catalog/items', {
+          sku: form.sku.trim(),
+          barcode: form.barcode.trim() || undefined,
+          nameAr: form.nameAr.trim(),
+          nameEn: form.nameEn.trim() || undefined,
+          categoryId: form.categoryId,
+          baseUnitId: form.baseUnitId,
+          kind: form.kind,
+          salePrice: form.salePrice.trim() || undefined,
+          purchasePrice: form.purchasePrice.trim() || undefined,
+          taxGroupId: form.taxGroupId || undefined,
+        });
+        setNotice({ kind: 'ok', text: `تمت إضافة المادة ${form.sku}.` });
+        setForm({ ...blank, categoryId: form.categoryId, baseUnitId: form.baseUnitId, taxGroupId: form.taxGroupId });
+      }
+      items.reload();
+    } catch (error) {
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(row: Item) {
+    if (!window.confirm(`هل تريد حذف المادة ${row.sku}؟ إذا كانت لها حركات فسيتم أرشفتها فقط.`)) return;
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      const result = await apiDelete<{ archived?: boolean }>(`/organization/catalog/items/${row.id}`);
+      setNotice({ kind: 'ok', text: result?.archived ? `للمادة ${row.sku} حركات سابقة، فتمت أرشفتها بدل حذفها.` : `تم حذف المادة ${row.sku}.` });
+      if (editing?.id === row.id) cancelEdit();
       items.reload();
     } catch (error) {
       setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
@@ -75,7 +135,14 @@ export default function ItemsPage() {
       crumbs={['المستودعات', 'التعاريف']}
       actions={
         can('catalog.item.manage') ? (
-          <button className="btn primary" type="button" onClick={() => setOpen(!open)}>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => {
+              if (open) cancelEdit();
+              setOpen(!open);
+            }}
+          >
             {open ? 'إغلاق' : 'مادة جديدة'}
           </button>
         ) : null
@@ -83,8 +150,8 @@ export default function ItemsPage() {
     >
       {open && (
         <form className="card" onSubmit={submit}>
-          <h2>بطاقة مادة جديدة</h2>
-          {missingRefs && (
+          <h2>{editing ? `تعديل بطاقة المادة ${editing.sku}` : 'بطاقة مادة جديدة'}</h2>
+          {missingRefs && !editing && (
             <p className="alert warn">
               يلزم وجود مجموعة واحدة ووحدة قياس واحدة على الأقل. أنشئها من «بطاقة مجموعة» و«بطاقة وحدة».
             </p>
@@ -117,12 +184,13 @@ export default function ItemsPage() {
             </label>
             <label className="field">
               <span>وحدة القياس *</span>
-              <select className="input" value={form.baseUnitId} onChange={set('baseUnitId')} required>
+              <select className="input" value={form.baseUnitId} onChange={set('baseUnitId')} required disabled={Boolean(editing)}>
                 <option value="">— اختر —</option>
                 {unitRows.map((row) => (
                   <option key={row.id} value={row.id}>{`${row.code} — ${arabicName(row)}`}</option>
                 ))}
               </select>
+              {editing && <span className="muted small">وحدة القياس الأساسية ثابتة بعد إنشاء المادة.</span>}
             </label>
             <label className="field">
               <span>النوع</span>
@@ -151,9 +219,16 @@ export default function ItemsPage() {
             </label>
           </div>
           <Notice notice={notice} />
-          <button className="btn primary" type="submit" disabled={busy || missingRefs}>
-            {busy ? 'جارٍ الحفظ…' : 'حفظ المادة'}
-          </button>
+          <div className="row">
+            <button className="btn primary" type="submit" disabled={busy || (missingRefs && !editing)}>
+              {busy ? 'جارٍ الحفظ…' : editing ? 'حفظ التعديل' : 'حفظ المادة'}
+            </button>
+            {editing && (
+              <button className="btn" type="button" onClick={cancelEdit} disabled={busy}>
+                إلغاء التعديل
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -184,6 +259,8 @@ export default function ItemsPage() {
         )}
       </div>
 
+      {!open && notice && <Notice notice={notice} />}
+
       <QueryView query={items} empty="لا توجد مواد" emptyDetail="ابدأ بإضافة بطاقة مادة جديدة.">
         {(rows) => (
           <DataTable
@@ -196,6 +273,24 @@ export default function ItemsPage() {
               { key: 'kind', header: 'النوع', cell: (row) => (row.kind === 'service' ? 'خدمة' : row.kind === 'composite' ? 'مركبة' : 'مخزنية') },
               { key: 'sale', header: 'سعر البيع', align: 'num', cell: (row) => money(row.salePrice ?? row.sale_price) },
               { key: 'purchase', header: 'سعر الشراء', align: 'num', cell: (row) => money(row.purchasePrice ?? row.purchase_price) },
+              ...(can('catalog.item.manage')
+                ? [
+                    {
+                      key: 'actions',
+                      header: '',
+                      cell: (row: Item) => (
+                        <span className="row">
+                          <button className="btn sm" type="button" onClick={() => startEdit(row)} disabled={busy}>
+                            تعديل
+                          </button>
+                          <button className="btn sm danger" type="button" onClick={() => void remove(row)} disabled={busy}>
+                            حذف
+                          </button>
+                        </span>
+                      ),
+                    },
+                  ]
+                : []),
             ]}
           />
         )}

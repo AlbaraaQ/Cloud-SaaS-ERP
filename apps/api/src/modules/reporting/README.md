@@ -39,3 +39,32 @@ These layout routes are declared **before** `@Get(':key')` in the controller —
 Both `ReportingService` and `ReportLayoutsService` take the injected `DATABASE_HANDLE`
 rather than the module-level `getDatabase()` singleton, so a test (or any second pool) runs
 reports against the database it was actually given.
+
+## Printed documents
+
+`PrintTemplatesService` renders the six papers a company hands out: the sales invoice, the
+purchase invoice, the receipt/payment voucher, the journal voucher and the daily shift
+close. Each route returns `{ html }` — one self-contained A4 page with its own stylesheet,
+no external font, image or script — because the admin shows it inside a sandboxed iframe
+and the same string is what gets saved to disk or sent to a printer.
+
+| Route | Document |
+|---|---|
+| `GET /reports/print/invoices/:id` | فاتورة مبيعات / مردود / عرض سعر |
+| `GET /reports/print/purchase-invoices/:id` | فاتورة مشتريات / مردود مشتريات |
+| `GET /reports/print/vouchers/:id` | سند قبض / سند صرف |
+| `GET /reports/print/journal-entries/:id` | سند قيد |
+| `GET /reports/print/shifts/:id` | إغلاق اليومية |
+
+All five require `reporting.view` and are tenant-scoped through `withTenantTx`, so a
+document id from another tenant is a 404 rather than a leak.
+
+Two details are deliberate:
+
+- **The amount in words** (`tafqeet.ts`) is printed on every money document. It implements
+  the conventional accounting form — unit before ten (`واحد وعشرون`), the dual
+  (`مائتان`, `ألفان`), the 3–10 plural (`ثلاثة آلاف`) and the accusative singular after
+  11–99 (`خمسة عشر ريالاً`) — and names the currency and its fraction from an ISO code.
+- **The ZATCA QR** is drawn only when the invoice actually carries a reported TLV payload.
+  Until then the slot prints a sentence saying so, because a decorative square that no
+  scanner can read is worse than an honest gap.

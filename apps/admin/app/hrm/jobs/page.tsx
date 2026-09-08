@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
+import { apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
@@ -24,6 +24,16 @@ export default function JobsPage() {
         { name: 'name', label: 'المسمى', required: true },
       ]}
       onCreate={(values) => apiPost('/hrm/jobs', { code: String(values.code).trim(), name: String(values.name).trim() })}
+      edit={
+        can('hrm.manage')
+          ? {
+              toForm: (row) => ({ code: row.code, name: row.name }),
+              onUpdate: (row, values) => apiPatch(`/hrm/jobs/${row.id}`, { code: String(values.code).trim(), name: String(values.name).trim() }),
+            }
+          : undefined
+      }
+      onDelete={can('hrm.manage') ? (row) => apiDelete(`/hrm/jobs/${row.id}`) : undefined}
+      rowLabel={(row) => `الوظيفة ${row.name}`}
       successText={(values) => `تمت إضافة الوظيفة ${String(values.name)}.`}
       rowKey={(row) => row.id}
       empty="لا توجد وظائف"

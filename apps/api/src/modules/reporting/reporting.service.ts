@@ -103,8 +103,6 @@ export class ReportingService {
     };
   }
 
-  invoicePrintHtml(id: string) { return `<!doctype html><html dir="rtl"><body><h1>فاتورة ${escapeHtml(id)}</h1></body></html>`; }
-  shiftPrintHtml(id: string) { return `<!doctype html><html dir="rtl"><body><h1>إغلاق وردية ${escapeHtml(id)}</h1></body></html>`; }
 }
 
 /**
@@ -167,4 +165,3 @@ export function isNumericColumn(column: ReportColumn): boolean { return NUMERIC_
 function rowsOf(result: unknown): Array<Record<string, unknown>> {
   return Array.isArray(result) ? (result as Array<Record<string, unknown>>) : ((result as { rows?: Array<Record<string, unknown>> }).rows ?? []);
 }
-function escapeHtml(value: string): string { return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 
 import { Directory } from '../../../components/directory';
-import { apiPost } from '../../../lib/api';
+import { apiDelete, apiPost, apiPut } from '../../../lib/api';
 import { listParties, type Party } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
@@ -35,6 +35,22 @@ export default function SuppliersPage() {
           taxNo: String(values.taxNo).trim() || undefined,
         })
       }
+      edit={
+        can('parties.manage')
+          ? {
+              toForm: (row) => ({ code: row.code ?? '', name: row.name, phone: row.phone ?? '', taxNo: row.taxNo ?? row.tax_no ?? '' }),
+              onUpdate: (row, values) =>
+                apiPut(`/parties/${row.id}`, {
+                  name: String(values.name).trim(),
+                  phone: String(values.phone).trim() || undefined,
+                  taxNo: String(values.taxNo).trim() || undefined,
+                }),
+            }
+          : undefined
+      }
+      onDelete={can('parties.manage') ? (row) => apiDelete(`/parties/${row.id}`) : undefined}
+      confirmDelete={(row) => `هل تريد حذف المورد ${row.name}؟ لا يمكن الحذف إذا كان عليه رصيد مفتوح.`}
+      rowLabel={(row) => `المورد ${row.name}`}
       successText={(values) => `تمت إضافة المورد ${String(values.name)}.`}
       rowKey={(row) => row.id}
       empty="لا يوجد موردون"

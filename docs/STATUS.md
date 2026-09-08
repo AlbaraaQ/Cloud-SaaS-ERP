@@ -309,6 +309,29 @@ Still `planned` — 1 screen: إعدادات جهاز التحضير (preparatio
   BullMQ hop was verified against a recording queue fake. Everything that touches
   PostgreSQL — including all RLS and concurrency proofs — ran against a real server.
 
+## Round 8 — printed documents and editable master data
+
+- **Printing is real.** `apps/api/src/modules/reporting/print-templates.service.ts`
+  replaces the one-line HTML stubs with full A4 documents (company header + VAT/CR
+  number, counterparty, lines, totals, payments, tafqeet, signatures, ZATCA QR when the
+  invoice has been reported). Routes: `/reports/print/{invoices|purchase-invoices|
+  vouchers|journal-entries|shifts}/:id`. The admin viewer lives at
+  `/print/[doc]/[id]` and every document screen links to it.
+- **Master-data cards can be corrected and withdrawn.** New `PATCH`/`DELETE` endpoints for
+  catalog items, categories, units and tax groups, accounts, cost centres, salesmen,
+  expense cards and HRM departments/jobs/employees. `apps/admin/components/directory.tsx`
+  grew `edit` and `onDelete`, and the item, category, unit, account, cost-centre, branch,
+  cash-location, warehouse, customer, supplier, salesman, payment-method, expense and HRM
+  screens all use them.
+- **What editing refuses is the point.** A used item keeps its SKU and base unit; a used
+  tax group keeps its rate; a posted account keeps its number, nature and side; a category
+  or unit with items behind it, an account with children or entries, and a department with
+  staff cannot be deleted at all; an item, an employee or a salesman that already appears
+  on a document is archived instead of removed. Reparenting an account moves its whole
+  subtree (`path`/`level`) in one statement.
+- `POST /sales/salesmen` did not exist while the screen already posted to it — added, with
+  `sales.salesman.manage` (permission count 130; re-run `pnpm db:seed`).
+
 ## Conventions
 
 - `docs/` remains the authoritative documentation source.

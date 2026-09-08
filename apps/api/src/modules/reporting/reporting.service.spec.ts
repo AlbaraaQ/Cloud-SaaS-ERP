@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { escapeHtml } from './print-templates.service.js';
 import { REPORT_DEFINITIONS, reportByKey } from './report-catalog.js';
 import { REPORT_KEYS, ReportingService, parseFilters, sumColumns, toCsv } from './reporting.service.js';
 
@@ -65,8 +66,13 @@ describe('report output helpers', () => {
     expect(csv.split('\n')).toHaveLength(2);
   });
 
-  it('renders sanitized print HTML shells', () => {
-    expect(makeService().invoicePrintHtml('<x>')).toContain('&lt;x&gt;');
+  it('escapes every value that reaches a printed document', () => {
+    // Printed documents interpolate names, references and descriptions straight into the
+    // markup, so the escape has to cover quotes as well as angle brackets — an item named
+    // `" onload="…` would otherwise become an attribute.
+    expect(escapeHtml('<x>')).toBe('&lt;x&gt;');
+    expect(escapeHtml('شركة "المدى" & شركاه')).toBe('شركة &quot;المدى&quot; &amp; شركاه');
+    expect(escapeHtml("O'Brien")).toBe('O&#39;Brien');
   });
 
   it('publishes a catalog entry per definition', () => {

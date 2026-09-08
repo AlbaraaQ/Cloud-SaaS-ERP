@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 
 import { Empty, ErrorBox, Forbidden, Loading, Screen } from '../../../components/screen';
-import { ApiError, apiData, apiPost } from '../../../lib/api';
-import { ACCOUNT_TYPE_LABELS, downloadCsv, nameOf, postableOf, typeOf, type Account } from '../../../lib/accounts';
+import { ApiError, apiData, apiDelete, apiPatch, apiPost } from '../../../lib/api';
+import { ACCOUNT_TYPE_LABELS, downloadCsv, nameOf, parentOf, postableOf, typeOf, type Account } from '../../../lib/accounts';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
@@ -14,6 +14,29 @@ export default function ChartOfAccountsPage() {
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Account | undefined>();
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
+
+  function startEdit(account: Account) {
+    setEditing(account);
+    setCreating(true);
+    setNotice(undefined);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function remove(account: Account) {
+    if (!window.confirm(`هل تريد حذف الحساب ${account.code} — ${nameOf(account)}؟`)) return;
+    setNotice(undefined);
+    try {
+      await apiDelete(`/accounts/${account.id}`);
+      setNotice({ kind: 'ok', text: `تم حذف الحساب ${account.code}.` });
+      accounts.reload();
+    } catch (error) {
+      // The API refuses to delete an account that carries entries or sub-accounts, and
+      // says which of the two it is — that message is more useful than a generic failure.
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    }
+  }
 
   const rows = useMemo(() => {
     const list = accounts.data ?? [];
@@ -36,7 +59,14 @@ export default function ChartOfAccountsPage() {
       actions={
         <>
           {can('accounting.account.manage') && (
-            <button className="btn primary" type="button" onClick={() => setCreating(!creating)}>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() => {
+                setEditing(undefined);
+                setCreating(!creating);
+              }}
+            >
               {creating ? 'إغلاق النموذج' : 'حساب جديد'}
             </button>
           )}
@@ -60,14 +90,23 @@ export default function ChartOfAccountsPage() {
       }
     >
       {creating && (
-        <NewAccountForm
+        <AccountForm
+          key={editing?.id ?? 'new'}
           accounts={accounts.data ?? []}
+          editing={editing}
+          onCancel={() => {
+            setEditing(undefined);
+            setCreating(false);
+          }}
           onDone={() => {
+            setEditing(undefined);
             setCreating(false);
             accounts.reload();
           }}
         />
       )}
+
+      {notice && <p className={`alert ${notice.kind}`}>{notice.text}</p>}
 
       <div className="card tight">
         <div className="row">
@@ -108,6 +147,7 @@ export default function ChartOfAccountsPage() {
                   <th>النوع</th>
                   <th>العملة</th>
                   <th>ترحيل مباشر</th>
+                  {can('accounting.account.manage') && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -118,6 +158,18 @@ export default function ChartOfAccountsPage() {
                     <td>{ACCOUNT_TYPE_LABELS[typeOf(account)] ?? typeOf(account)}</td>
                     <td dir="ltr">{account.currencyCode ?? '—'}</td>
                     <td>{postableOf(account) ? 'نعم' : 'لا (حساب تجميعي)'}</td>
+                    {can('accounting.account.manage') && (
+                      <td>
+                        <span className="row">
+                          <button className="btn sm" type="button" onClick={() => startEdit(account)}>
+                            تعديل
+                          </button>
+                          <button className="btn sm danger" type="button" onClick={() => void remove(account)}>
+                            حذف
+                          </button>
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -128,13 +180,28 @@ export default function ChartOfAccountsPage() {
   );
 }
 
-function NewAccountForm({ accounts, onDone }: { accounts: Account[]; onDone: () => void }) {
-  const [code, setCode] = useState('');
-  const [nameAr, setNameAr] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [type, setType] = useState('asset');
-  const [parentId, setParentId] = useState('');
-  const [isPostable, setIsPostable] = useState(true);
+/**
+ * One form for both creating and correcting an account. In edit mode the API still has
+ * the final word: the number, nature and side of an account that already carries journal
+ * entries are refused server-side, and the refusal is shown here as-is.
+ */
+function AccountForm({
+  accounts,
+  editing,
+  onDone,
+  onCancel,
+}: {
+  accounts: Account[];
+  editing?: Account;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [code, setCode] = useState(editing?.code ?? '');
+  const [nameAr, setNameAr] = useState(editing ? nameOf(editing) : '');
+  const [nameEn, setNameEn] = useState(editing?.nameEn ?? editing?.name_en ?? '');
+  const [type, setType] = useState(editing ? typeOf(editing) || 'asset' : 'asset');
+  const [parentId, setParentId] = useState(editing ? (parentOf(editing) ?? '') : '');
+  const [isPostable, setIsPostable] = useState(editing ? postableOf(editing) : true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -142,19 +209,25 @@ function NewAccountForm({ accounts, onDone }: { accounts: Account[]; onDone: () 
     event.preventDefault();
     setBusy(true);
     setMessage(undefined);
+    const payload = {
+      code: code.trim(),
+      nameAr: nameAr.trim(),
+      nameEn: nameEn.trim() || undefined,
+      type,
+      parentId: parentId || undefined,
+      isPostable,
+    };
     try {
-      await apiPost('/accounts', {
-        code: code.trim(),
-        nameAr: nameAr.trim(),
-        nameEn: nameEn.trim() || undefined,
-        type,
-        parentId: parentId || undefined,
-        isPostable,
-      });
-      setMessage({ kind: 'ok', text: 'تم إنشاء الحساب.' });
-      setCode('');
-      setNameAr('');
-      setNameEn('');
+      if (editing) {
+        await apiPatch(`/accounts/${editing.id}`, { ...payload, parentId: parentId || null });
+        setMessage({ kind: 'ok', text: 'تم حفظ التعديل.' });
+      } else {
+        await apiPost('/accounts', payload);
+        setMessage({ kind: 'ok', text: 'تم إنشاء الحساب.' });
+        setCode('');
+        setNameAr('');
+        setNameEn('');
+      }
       onDone();
     } catch (error) {
       setMessage({
@@ -168,7 +241,7 @@ function NewAccountForm({ accounts, onDone }: { accounts: Account[]; onDone: () 
 
   return (
     <form className="card" onSubmit={submit}>
-      <h2>حساب جديد</h2>
+      <h2>{editing ? `تعديل الحساب ${editing.code}` : 'حساب جديد'}</h2>
       <div className="form-grid">
         <label className="field">
           <span>الرمز *</span>
@@ -196,11 +269,13 @@ function NewAccountForm({ accounts, onDone }: { accounts: Account[]; onDone: () 
           <span>الحساب الأب</span>
           <select className="input" value={parentId} onChange={(event) => setParentId(event.target.value)}>
             <option value="">— بدون (حساب رئيسي)</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.code} — {nameOf(account)}
-              </option>
-            ))}
+            {accounts
+              .filter((account) => account.id !== editing?.id)
+              .map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.code} — {nameOf(account)}
+                </option>
+              ))}
           </select>
         </label>
         <label className="field">
@@ -218,7 +293,10 @@ function NewAccountForm({ accounts, onDone }: { accounts: Account[]; onDone: () 
       {message && <p className={`alert ${message.kind}`}>{message.text}</p>}
       <div className="toolbar">
         <button className="btn primary" type="submit" disabled={busy}>
-          {busy ? 'جارٍ الحفظ…' : 'حفظ'}
+          {busy ? 'جارٍ الحفظ…' : editing ? 'حفظ التعديل' : 'حفظ'}
+        </button>
+        <button className="btn" type="button" onClick={onCancel} disabled={busy}>
+          إلغاء
         </button>
       </div>
     </form>

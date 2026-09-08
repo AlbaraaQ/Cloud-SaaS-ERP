@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '../../../components/directory';
-import { apiPost } from '../../../lib/api';
+import { apiDelete, apiPatch, apiPost } from '../../../lib/api';
 import { arabicName, listBranches, listWarehouses, type Branch, type Warehouse } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
@@ -41,6 +41,27 @@ export default function WarehousesPage() {
           isDefault: Boolean(values.isDefault),
         })
       }
+      edit={
+        can('organization.warehouse.manage')
+          ? {
+              toForm: (row) => ({
+                code: row.code ?? '',
+                name: arabicName(row),
+                branchId: row.branchId ?? '',
+                isDefault: Boolean(row.isDefault),
+              }),
+              onUpdate: (row, values) =>
+                apiPatch(`/warehouses/${row.id}`, {
+                  code: String(values.code).trim(),
+                  name: String(values.name).trim(),
+                  branchId: String(values.branchId) || undefined,
+                  isDefault: Boolean(values.isDefault),
+                }),
+            }
+          : undefined
+      }
+      onDelete={can('organization.warehouse.manage') ? (row) => apiDelete(`/warehouses/${row.id}`) : undefined}
+      rowLabel={(row) => `المستودع ${row.code ?? ''}`}
       successText={(values) => `تمت إضافة المستودع ${String(values.code)}.`}
       rowKey={(row) => row.id}
       empty="لا توجد مستودعات"
