@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Param, Req, HttpCode } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Public } from '../decorators/public.decorator.js';
@@ -15,6 +16,22 @@ export class BillingController {
   @ApiOperation({ summary: 'List active subscription plans' })
   async plans() {
     return { data: await this.billing.listActivePlans() };
+  }
+
+  @Post('webhook')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Receive Stripe subscription events' })
+  async webhook(@Req() request: Request) {
+    const signature = request.headers['stripe-signature'];
+    const rawBody = (request as Request & { rawBody?: Buffer }).rawBody;
+    if (typeof signature !== 'string' || !rawBody) throw new Error('Stripe signature is required');
+    return { data: await this.billing.handleStripeWebhook(rawBody, signature) };
+  }
+
+  @Post('checkout')
+  @ApiOperation({ summary: 'Create a Stripe subscription checkout session' })
+  async checkout(@Body() body: { planId: string }) {
+    return { data: await this.billing.createStripeCheckout(body.planId) };
   }
 
   @Post('activation-requests')

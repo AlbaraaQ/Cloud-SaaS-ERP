@@ -42,7 +42,7 @@ async function bootstrap(): Promise<void> {
   // PHASE_02 §8: fail fast on a missing runtime variable instead of degrading silently.
   assertRuntimeEnv();
 
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
 
   app.use(RequestIdMiddleware);
   applyHttpConfiguration(app);
