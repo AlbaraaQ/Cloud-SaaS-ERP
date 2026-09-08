@@ -28,6 +28,7 @@ import { SalesModule } from './modules/sales/sales.module.js';
 import { PurchasesModule } from './modules/purchases/purchases.module.js';
 import { TreasuryModule } from './modules/treasury/treasury.module.js';
 import { EinvoicingModule } from './modules/einvoicing/einvoicing.module.js';
+import { OperationsModule } from './modules/operations/operations.module.js';
 import { ReportingModule } from './modules/reporting/reporting.module.js';
 import { MigrationModule } from './modules/migration/migration.module.js';
 import { CompatModule } from './modules/compat/compat.module.js';
@@ -87,6 +88,7 @@ import { OpsModule } from './ops/ops.module.js';
     PurchasesModule,
     TreasuryModule,
     EinvoicingModule,
+    OperationsModule,
     ReportingModule,
     MigrationModule,
     CompatModule,

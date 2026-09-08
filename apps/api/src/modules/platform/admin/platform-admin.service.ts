@@ -234,6 +234,18 @@ export class PlatformAdminService {
     );
   }
 
+  /**
+   * إنشاء ملف — a second company file created from inside an existing one.
+   *
+   * Deliberately provisioned like a self-service signup rather than like a console
+   * action: the new file exists and its creator can log into it immediately, but it
+   * starts **unlicensed** with a pending activation request. A tenant permission must
+   * never be able to mint licensed tenants, or the subscription is decorative.
+   */
+  async provisionCompanyFile(input: CreateTenantInput) {
+    return this.provisionTenant(input, { subscription: 'requested' });
+  }
+
   /** Shared provisioning path: console-created tenants and self-service signups. */
   private async provisionTenant(
     input: CreateTenantInput,

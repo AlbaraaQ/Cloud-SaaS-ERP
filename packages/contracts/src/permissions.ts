@@ -132,6 +132,14 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   // reporting (PHASE_14)
   perm('reporting.view', 'Read the reporting catalogue.'),
   perm('reporting.export.execute', 'Run asynchronous report exports.'),
+  perm('reporting.layout.manage', 'Create and maintain saved report layouts (مصمم التقارير).'),
+
+  // file-level operations (الإعدادات: النسخ الإحتياطي، الإستعادة، التدوير، الصيانة، إنشاء ملف)
+  perm('settings.backup.manage', 'Take and download logical backups of the company file.'),
+  perm('settings.restore.manage', 'Dry-run and apply additive restores from a backup.'),
+  perm('settings.rotation.manage', 'Purge operational logs older than a cutoff (تدوير البيانات).'),
+  perm('settings.maintenance.manage', 'Scan and repair invoice inconsistencies (صيانة الفواتير).'),
+  perm('settings.companyfile.create', 'Create a sibling company file for the same owner (إنشاء ملف).'),
 
   // migration (PHASE_15)
   perm('migration.view', 'Read migration runs, issues and reconciliation.'),

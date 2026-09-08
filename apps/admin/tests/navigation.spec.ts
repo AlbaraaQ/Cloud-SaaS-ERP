@@ -197,6 +197,23 @@ describe('admin navigation tree', () => {
     expect(keys).not.toContain('journal-voucher');
   });
 
+  it('wires the file-level operations and the report designer to real screens', () => {
+    const wired: Record<string, string> = {
+      backup: '/settings/backup',
+      restore: '/settings/restore',
+      'data-rotation': '/settings/data-rotation',
+      'invoice-maintenance': '/settings/invoice-maintenance',
+      'new-file': '/settings/new-file',
+      'report-designer': '/support/report-designer',
+    };
+    for (const [key, href] of Object.entries(wired)) {
+      const item = allScreens.find((screen) => screen.key === key);
+      expect(item?.href, key).toBe(href);
+      expect(item?.status, key).toBe('ready');
+      expect(item?.permission, key).toBeTruthy();
+    }
+  });
+
   it('reports honest implementation counts', () => {
     const counts = screenCounts();
     expect(counts.total).toBe(counts.ready + counts.api + counts.planned);

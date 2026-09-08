@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { REPORT_DEFINITIONS, reportByKey } from './report-catalog.js';
 import { REPORT_KEYS, ReportingService, parseFilters, sumColumns, toCsv } from './reporting.service.js';
 
+/** The catalogue and the print helpers never touch the database, so neither does this. */
+const makeService = () => new ReportingService(undefined as never, undefined as never);
+
 describe('reporting catalog', () => {
   it('keeps the long-lived report keys registered', () => {
     expect(REPORT_KEYS).toContain('sales-by-day');
@@ -63,11 +66,11 @@ describe('report output helpers', () => {
   });
 
   it('renders sanitized print HTML shells', () => {
-    expect(new ReportingService().invoicePrintHtml('<x>')).toContain('&lt;x&gt;');
+    expect(makeService().invoicePrintHtml('<x>')).toContain('&lt;x&gt;');
   });
 
   it('publishes a catalog entry per definition', () => {
-    const catalog = new ReportingService().catalog();
+    const catalog = makeService().catalog();
     expect(catalog).toHaveLength(REPORT_DEFINITIONS.length);
     expect(catalog[0]).toHaveProperty('columns');
     expect(catalog[0]).toHaveProperty('params');

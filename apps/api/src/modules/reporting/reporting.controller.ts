@@ -1,16 +1,25 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
+import { ReportLayoutsService, type ReportLayoutInput } from './report-layouts.service.js';
 import { ReportingService } from './reporting.service.js';
 
 @Controller('reports')
 export class ReportingController {
-  constructor(private readonly reporting: ReportingService) {}
+  constructor(private readonly reporting: ReportingService, private readonly layouts: ReportLayoutsService) {}
   @Get() @RequiresPermission('reporting.view') catalog() { return this.reporting.catalog(); }
-  @Get(':key') @RequiresPermission('reporting.view') run(@Param('key') key: string, @Query() query: Record<string, string | undefined>) { return this.reporting.run(getTenantContext().tenantId, key, query); }
-  @Post(':key/export') @RequiresPermission('reporting.export.execute') export(@Param('key') key: string, @Query() query: Record<string, string | undefined>, @Body() body: { format?: 'csv' | 'xlsx' | 'pdf' }) { return this.reporting.export(getTenantContext().tenantId, key, query, body.format); }
+
+  // Declared before `:key` on purpose — otherwise the layout routes would be swallowed by
+  // the report runner and `/reports/layouts` would look like a report called "layouts".
+  @Get('layouts') @RequiresPermission('reporting.view') async listLayouts(@Query('report_key') reportKey?: string) { return { data: await this.layouts.list(getTenantContext().tenantId, reportKey) }; }
+  @Post('layouts') @RequiresPermission('reporting.layout.manage') async createLayout(@Body() body: ReportLayoutInput) { return { data: await this.layouts.create(getTenantContext().tenantId, body) }; }
+  @Patch('layouts/:id') @RequiresPermission('reporting.layout.manage') async updateLayout(@Param('id') id: string, @Body() body: Partial<ReportLayoutInput>) { return { data: await this.layouts.update(getTenantContext().tenantId, id, body) }; }
+  @Delete('layouts/:id') @RequiresPermission('reporting.layout.manage') async deleteLayout(@Param('id') id: string) { return { data: await this.layouts.remove(getTenantContext().tenantId, id) }; }
+
   @Get('print/invoices/:id') @RequiresPermission('reporting.view') invoicePrint(@Param('id') id: string) { return { html: this.reporting.invoicePrintHtml(id) }; }
   @Get('print/shifts/:id') @RequiresPermission('reporting.view') shiftPrint(@Param('id') id: string) { return { html: this.reporting.shiftPrintHtml(id) }; }
+  @Get(':key') @RequiresPermission('reporting.view') run(@Param('key') key: string, @Query() query: Record<string, string | undefined>) { return this.reporting.run(getTenantContext().tenantId, key, query); }
+  @Post(':key/export') @RequiresPermission('reporting.export.execute') export(@Param('key') key: string, @Query() query: Record<string, string | undefined>, @Body() body: { format?: 'csv' | 'xlsx' | 'pdf' }) { return this.reporting.export(getTenantContext().tenantId, key, query, body.format); }
 }

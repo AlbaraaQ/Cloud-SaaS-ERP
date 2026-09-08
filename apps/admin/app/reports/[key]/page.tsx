@@ -27,11 +27,13 @@ import {
 import {
   REPORT_GROUP_LABELS,
   fetchReportCatalog,
+  fetchReportLayouts,
   formatCell,
   initialFilters,
   isNumericColumn,
   runReport,
   type ReportEntry,
+  type ReportLayout,
   type ReportParam,
   type ReportResult,
 } from '../../../lib/reports';
@@ -46,6 +48,9 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [applied, setApplied] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(false);
+  // Saved layouts (مصمم التقارير) ride along as an ordinary filter: the server resolves
+  // the layout, applies its defaults and returns the columns already shaped.
+  const layouts = useQuery<ReportLayout[]>(() => fetchReportLayouts(reportKey), [reportKey]);
 
   // The filter shape is only known once the catalog answers.
   useEffect(() => {
@@ -128,6 +133,24 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
             setApplied({ ...filters });
           }}
         >
+          {(layouts.data ?? []).length > 0 && (
+            <label className="field">
+              <span>التصميم</span>
+              <select
+                className="input"
+                value={filters.layout ?? ''}
+                onChange={(event) => setFilters((current) => ({ ...current, layout: event.target.value }))}
+              >
+                <option value="">الافتراضي</option>
+                {(layouts.data ?? []).map((layout) => (
+                  <option key={layout.id} value={layout.id}>
+                    {layout.name}
+                  </option>
+                ))}
+                <option value="none">كل الأعمدة</option>
+              </select>
+            </label>
+          )}
           {entry.params.map((param) => (
             <FilterField
               key={param.name}

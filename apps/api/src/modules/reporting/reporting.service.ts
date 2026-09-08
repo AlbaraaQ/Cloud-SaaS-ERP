@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { z } from 'zod';
 import { DomainError, newId } from '@erp/contracts';
-import { getDatabase, withTenantTx } from '@erp/database';
+import { withTenantTx, type DatabaseHandle } from '@erp/database';
+
+import { DATABASE_HANDLE } from '../../database/database.module.js';
 
 import { REPORT_DEFINITIONS, reportByKey, type ReportColumn, type ReportFilters } from './report-catalog.js';
+import { ReportLayoutsService } from './report-layouts.service.js';
 
 export const REPORT_KEYS = REPORT_DEFINITIONS.map((definition) => definition.key);
 export type ReportKey = string;
@@ -33,6 +36,13 @@ const NUMERIC_TYPES = new Set(['money', 'qty', 'int', 'percent']);
 
 @Injectable()
 export class ReportingService {
+  // The handle is injected rather than read from the module-level singleton so a test
+  // (or any second connection pool) runs reports against the database it was given.
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly layouts: ReportLayoutsService,
+  ) {}
+
   /** Everything a client needs to render every report without hard-coding any of them. */
   catalog() {
     return REPORT_DEFINITIONS.map((definition) => ({
@@ -51,18 +61,26 @@ export class ReportingService {
   async run(tenantId: string, key: string, params: Record<string, string | undefined> = {}) {
     const definition = reportByKey.get(key);
     if (!definition) throw new DomainError('REPORT_NOT_FOUND', 'Report key is not registered', 404);
-    const filters = parseFilters(params);
-    const database = getDatabase().db;
+
+    // A saved layout (مصمم التقارير) contributes default filters and a column presentation.
+    // The caller's own filters always win: the layout is a starting point, not a cage.
+    const { layout: layoutRef, ...rest } = params;
+    const layout = await this.layouts.resolve(tenantId, key, layoutRef);
+    const filters = parseFilters({ ...(layout?.filters ?? {}), ...rest });
+
+    const database = this.database.db;
     const rows = await withTenantTx(database, tenantId, async (tx) => rowsOf(await tx.execute(definition.build(tenantId, filters))));
     const normalized = rows.map((row) => normalizeRow(row, definition.columns));
+    const columns = applyLayoutColumns(definition.columns, layout?.columns);
     return {
       key,
-      titleAr: definition.titleAr,
+      titleAr: layout?.titleAr || definition.titleAr,
       group: definition.group,
       hintAr: definition.hintAr ?? null,
       chart: definition.chart ?? null,
       params: filters,
-      columns: definition.columns,
+      layout: layout ? { id: layout.id, name: layout.name } : null,
+      columns,
       rows: normalized,
       totals: sumColumns(normalized, definition.totals ?? []),
       rowCount: normalized.length,
@@ -87,6 +105,20 @@ export class ReportingService {
 
   invoicePrintHtml(id: string) { return `<!doctype html><html dir="rtl"><body><h1>فاتورة ${escapeHtml(id)}</h1></body></html>`; }
   shiftPrintHtml(id: string) { return `<!doctype html><html dir="rtl"><body><h1>إغلاق وردية ${escapeHtml(id)}</h1></body></html>`; }
+}
+
+/**
+ * Reorder, rename and hide columns per a saved layout. Hidden columns are dropped from the
+ * response shape only — the rows still carry their values, so a totals row or an export
+ * that a user re-enables later does not need the report to be run again.
+ */
+export function applyLayoutColumns(columns: ReportColumn[], layout?: Array<{ key: string; labelAr?: string; visible: boolean }> | null) {
+  if (!layout?.length) return columns;
+  const byKey = new Map(columns.map((column) => [column.key, column]));
+  const chosen = layout
+    .filter((entry) => entry.visible && byKey.has(entry.key))
+    .map((entry) => ({ ...byKey.get(entry.key)!, labelAr: entry.labelAr || byKey.get(entry.key)!.labelAr }));
+  return chosen.length ? chosen : columns;
 }
 
 export function parseFilters(params: Record<string, string | undefined>): ReportFilters {

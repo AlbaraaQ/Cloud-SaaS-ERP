@@ -5,7 +5,7 @@
  * so the admin ships one screen that can render all of them instead of forty near-identical
  * pages. This module holds the wire types, the fetchers and the cell formatting.
  */
-import { apiFetch } from './api';
+import { apiData, apiFetch, apiPatch, apiPost } from './api';
 import { money, quantity, shortDate } from './lookups';
 
 export type ReportParamKind = 'date' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
@@ -53,6 +53,32 @@ export const REPORT_GROUP_LABELS: Record<string, string> = {
 export const REPORT_GROUP_ORDER = ['sales', 'purchases', 'inventory', 'accounting', 'pos', 'hrm', 'marina', 'projects'];
 
 export const fetchReportCatalog = () => apiFetch<ReportEntry[]>('/reports');
+
+/**
+ * A saved layout (مصمم التقارير) — presentation only. The report's query lives on the
+ * server, so a layout can rename, reorder and hide columns and preload filters, and can
+ * never change what the numbers mean.
+ */
+export type ReportLayoutColumn = { key: string; labelAr?: string; visible: boolean };
+export type ReportLayout = {
+  id: string;
+  reportKey: string;
+  name: string;
+  titleAr: string | null;
+  columns: ReportLayoutColumn[];
+  filters: Record<string, string>;
+  isDefault: boolean;
+};
+
+export const fetchReportLayouts = (reportKey?: string) =>
+  apiData<ReportLayout[]>(`/reports/layouts${reportKey ? `?report_key=${encodeURIComponent(reportKey)}` : ''}`);
+
+export const saveReportLayout = (input: Partial<ReportLayout> & { reportKey: string; name: string }) =>
+  apiPost<ReportLayout>('/reports/layouts', input);
+
+export const updateReportLayout = (id: string, input: Partial<ReportLayout>) => apiPatch<ReportLayout>(`/reports/layouts/${id}`, input);
+
+export const deleteReportLayout = (id: string) => apiData<unknown>(`/reports/layouts/${id}`, { method: 'DELETE' });
 
 export function runReport(key: string, filters: Record<string, string>): Promise<ReportResult> {
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '')).toString();

@@ -35,9 +35,9 @@ asserted by hand.
 
 | State | Count | Meaning |
 |---|---|---|
-| `ready` | 183 | A real screen reading and writing the live API. |
+| `ready` | 189 | A real screen reading and writing the live API. |
 | `api` | 0 | The endpoint exists; the screen is still the scaffold. |
-| `planned` | 7 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| `planned` | 1 | Neither screen nor endpoint yet; routed under `/s/…`. |
 | **total** | **190** | |
 
 Round 1 wired: expense cards (`/accounting/expenses`), sales credit/debit notes with
@@ -174,9 +174,51 @@ total): planning a recipe and consuming the warehouse against it are different d
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the
 same authority taken backwards.
 
-Still `planned` — 7 screens: the file-level operations (backup, restore, data rotation,
-new company file, invoice maintenance), the preparation-device settings, and the report
-designer.
+### Round 7 — file-level operations and the report designer (2026-09-08)
+
+The last six screens in the tree are the ones that can destroy a company's data, so each
+was built around what it refuses to do. Migration `0028` adds `backup_runs`, `restore_runs`,
+`maintenance_runs`, `company_files` and `report_layouts`, all under FORCE RLS.
+
+* **النسخ الإحتياطي** (`/settings/backup`, `POST /settings/backups`) — a logical, tenant-scoped
+  snapshot: every table carrying `tenant_id`, read through RLS, with per-table row counts and
+  a sha256 checksum. It excludes identity (`users`, `memberships`, `roles`) and the audit log,
+  because re-importing credentials or a rewritten audit trail is an attack, not a restore. Past
+  50 000 rows it fails with `BACKUP_TOO_LARGE` and points at `pg_dump` instead of writing an
+  export nobody could restore.
+* **إستعادة البيانات** (`/settings/restore`) — dry run by default; applying is **additive only**
+  (insert-missing, never delete or overwrite) and requires the file code typed back
+  (`RESTORE_CONFIRMATION_REQUIRED`). Tables are retried across passes so foreign-key order
+  resolves itself, and `tenant_id` is forced to the current file so a foreign snapshot cannot
+  smuggle rows across.
+* **تدوير البيانات** (`/settings/data-rotation`) — deletes operational logs only (notifications,
+  outbox jobs, idempotency keys) older than a cutoff that must be at least 90 days in the past
+  (`ROTATION_CUTOFF_TOO_RECENT`), and shows the documents it is *not* deleting next to them. The
+  audit log cannot be rotated at all: migration `0001` revokes DELETE on it from `erp_api`, and
+  the preview reports that as `retainedByDesign` rather than pretending otherwise.
+* **صيانة الفواتير** (`/settings/invoice-maintenance`) — scans for header totals that disagree
+  with their lines, posted invoices with no journal entry, numbering gaps and stale drafts.
+  The repair rewrites **draft** totals only; a posted discrepancy is reported for a credit note,
+  never silently edited.
+* **إنشاء ملف** (`/settings/new-file`) — a sibling company file is a new tenant, provisioned
+  through the signup path so it starts **unlicensed** with a pending activation request: a tenant
+  permission must never be able to mint licensed tenants. Master data (accounts, catalog, parties,
+  structure) can be copied with every id remapped; documents, balances and users never cross.
+* **مصمم التقارير** (`/support/report-designer`, `/reports/layouts`) — layouts store presentation
+  only: column choice, order, headings and default filters. The report's SQL stays in the
+  server-side catalog, so a designer cannot become a query editor pointed at other tenants' data.
+  Saved layouts appear as a picker on every report screen (`?layout=<id>`, `layout=none` for the
+  raw columns).
+
+Six new permissions (129 total): `settings.backup.manage`, `settings.restore.manage`,
+`settings.rotation.manage`, `settings.maintenance.manage`, `settings.companyfile.create`,
+`reporting.layout.manage`.
+
+Fixed on the way: `ReportingService` read the module-level database singleton instead of the
+injected handle, so under test it queried a different database than the one the test had
+provisioned. Both it and `ReportLayoutsService` now take `DATABASE_HANDLE`.
+
+Still `planned` — 1 screen: إعدادات جهاز التحضير (preparation device), excluded by the customer.
 
 ## Billing and live-data integration notes
 
