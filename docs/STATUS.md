@@ -35,9 +35,9 @@ asserted by hand.
 
 | State | Count | Meaning |
 |---|---|---|
-| `ready` | 181 | A real screen reading and writing the live API. |
+| `ready` | 183 | A real screen reading and writing the live API. |
 | `api` | 0 | The endpoint exists; the screen is still the scaffold. |
-| `planned` | 9 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| `planned` | 7 | Neither screen nor endpoint yet; routed under `/s/…`. |
 | **total** | **190** | |
 
 Round 1 wired: expense cards (`/accounting/expenses`), sales credit/debit notes with
@@ -146,10 +146,37 @@ the work is not necessarily the person who releases the cash. Endpoints live und
 `/contracting/*` rather than `/projects/*` because `GET /projects/:id` already owns that
 segment.
 
-Still `planned` — 9 screens, each needing real domain work rather than another table
-view: production orders and contracting returns; the file-level operations (backup,
-restore, data rotation, new company file, invoice maintenance); the preparation-device
-settings; and the report designer.
+Round 6 wired the two documents that reverse or transform recorded value (migration
+`0027`):
+
+* **مرتجع مقاولات** — `contracting_returns` + lines. A posted progress bill cannot be
+  edited: it has already produced a numbered sales invoice and moved every BOQ term's
+  billed-to-date figure. The return is therefore its own document, and posting it moves
+  **both** halves at once — the BOQ term gives its value back so the work can be
+  re-billed, and a **draft** credit note is raised against the bill's invoice for the net
+  after the withheld retention is released. Doing one without the other leaves the project
+  either double-billed or permanently short of its own contract value. Per term, the
+  cumulative return can never exceed what that bill certified (422
+  `CONTRACTING_RETURN_EXCEEDS_BILL`), and cancelling a draft return frees its value again.
+  Report key `contracting-returns`.
+* **أمر الإنتاج** — `production_orders` + `production_order_components`. Components leave
+  the warehouse at its moving average and the finished item is valued at exactly the total
+  that left, divided by the produced quantity; the order is ledger-neutral by construction
+  because inventory value is conserved, so it raises no journal entry. The output item may
+  not be one of its own components, a component may not repeat (combine the quantities),
+  and completion fails on `STOCK_INSUFFICIENT` rather than driving stock negative. The
+  `line_id` of each stock movement is the item id, so the existing
+  `(tenant, doc_type, doc_id, line_id)` unique index enforces one movement per item per
+  order. Screen `/inventory/production`, report key `production-orders`.
+
+New permissions `inventory.production.manage` and `inventory.production.complete` (123
+total): planning a recipe and consuming the warehouse against it are different decisions.
+Posting a contracting return reuses `projects.bill.post` — reversing certified work is the
+same authority taken backwards.
+
+Still `planned` — 7 screens: the file-level operations (backup, restore, data rotation,
+new company file, invoice maintenance), the preparation-device settings, and the report
+designer.
 
 ## Billing and live-data integration notes
 

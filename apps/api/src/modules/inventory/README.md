@@ -13,3 +13,16 @@ For example, 10 units at 100 followed by 5 at 110 produces `(1000 + 550) / 15 = 
 The ledger is immutable at the database trigger level. `valuationAsOf()` replays transactions up to a timestamp, while `recomputeBalances()` repairs the cache from the ledger.
 
 Adjustment approval, transfer receive workflows, and lot/serial lifecycle APIs remain explicitly tracked as follow-up work until their integration tests are present.
+
+## Production orders (`/inventory/production-orders`, migration 0027)
+
+أمر الإنتاج: components out, one finished item in, in a single transaction. Components
+leave at the warehouse's moving average; the output is valued at exactly the total that
+left divided by the produced quantity, so inventory value is conserved and the document
+raises **no journal entry**. Guards: the output cannot be its own component, a component
+cannot repeat, and completion fails with `STOCK_INSUFFICIENT` instead of driving stock
+negative. Only a draft order can be completed or cancelled — a completed order is reversed
+with a stock adjustment, not by rewriting it.
+
+Permissions: `inventory.view`, `inventory.production.manage` (create/cancel),
+`inventory.production.complete` (move the stock). Report key: `production-orders`.

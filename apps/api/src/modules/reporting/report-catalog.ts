@@ -1071,6 +1071,46 @@ const definitions: ReportDefinition[] = [
       ORDER BY bill.bill_date DESC LIMIT 1000`,
   },
   {
+    key: 'production-orders',
+    titleAr: 'تقرير أمر الإنتاج',
+    group: 'inventory',
+    hintAr: 'أوامر الإنتاج المنفَّذة: تكلفة المكونات المستهلكة وتكلفة وحدة المنتج الناتج. الأمر محايد محاسبياً — القيمة الخارجة من المستودع هي نفسها الداخلة إليه.',
+    params: [...PERIOD, WAREHOUSE, ITEM],
+    columns: [date('order_date', 'التاريخ'), text('number', 'رقم الأمر'), text('item', 'المنتج'), text('warehouse', 'المستودع'), qty('output_qty', 'الكمية المنتجة'), money('component_cost', 'تكلفة المكونات'), money('unit_cost', 'تكلفة الوحدة'), int('components', 'عدد المكونات'), text('status', 'الحالة')],
+    totals: ['output_qty', 'component_cost'],
+    build: (tenantId, f) => sql`
+      SELECT po.order_date, po.number, ${itemName} AS item, coalesce(wh.name, '—') AS warehouse,
+             po.output_qty::text, po.component_cost::text, po.unit_cost::text,
+             (SELECT count(*) FROM production_order_components c WHERE c.order_id = po.id)::text AS components,
+             po.status
+      FROM production_orders po
+      LEFT JOIN items item ON item.id = po.output_item_id
+      LEFT JOIN warehouses wh ON wh.id = po.warehouse_id
+      WHERE po.tenant_id = ${tenantId} AND po.status <> 'cancelled'
+        AND ${onDate(sql`po.order_date`, f.from, f.to)}
+        AND ${eqIf(sql`po.warehouse_id`, f.warehouseId)}
+        AND ${eqIf(sql`po.output_item_id`, f.itemId)}
+      ORDER BY po.order_date DESC, po.number DESC LIMIT 1000`,
+  },
+  {
+    key: 'contracting-returns',
+    titleAr: 'مرتجعات المقاولات',
+    group: 'projects',
+    hintAr: 'الأعمال التي أُعيدت من مستخلصات مرحَّلة، وقيمة الإشعار الدائن المقابل بعد ردّ المحتجز.',
+    params: [...PERIOD],
+    columns: [date('return_date', 'التاريخ'), text('number', 'رقم المرتجع'), text('project', 'المشروع'), text('bill', 'المستخلص'), money('return_value', 'قيمة المرتجع'), money('retention_value', 'المحتجز المردود'), money('net_value', 'صافي الإشعار'), text('status', 'الحالة')],
+    totals: ['return_value', 'retention_value', 'net_value'],
+    build: (tenantId, f) => sql`
+      SELECT r.return_date, r.number, p.name AS project, coalesce(bill.number, '—') AS bill,
+             r.return_value::text, r.retention_value::text, r.net_value::text, r.status
+      FROM contracting_returns r
+      JOIN projects p ON p.id = r.project_id
+      LEFT JOIN progress_bills bill ON bill.id = r.bill_id
+      WHERE r.tenant_id = ${tenantId} AND r.status <> 'cancelled'
+        AND ${onDate(sql`r.return_date`, f.from, f.to)}
+      ORDER BY r.return_date DESC LIMIT 1000`,
+  },
+  {
     key: 'pos-item-detail',
     titleAr: 'تفاصيل أصناف نقطة البيع',
     group: 'pos',

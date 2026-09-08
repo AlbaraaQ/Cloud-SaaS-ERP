@@ -56,3 +56,19 @@ export type StockDelivery = typeof stockDeliveries.$inferSelect;
 export type StockDeliveryLine = typeof stockDeliveryLines.$inferSelect;
 export type ItemLot = typeof itemLots.$inferSelect;
 export type ItemSerial = typeof itemSerials.$inferSelect;
+
+/**
+ * أمر الإنتاج — components out, one finished item in. Ledger-neutral by construction:
+ * `unit_cost` is the total component cost spread over the produced quantity, so the value
+ * that leaves the warehouse is exactly the value that re-enters it.
+ */
+export const productionOrders = pgTable('production_orders', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id), number: text('number').notNull(), orderDate: date('order_date').notNull(), status: text('status').notNull().default('draft'), outputItemId: uuid('output_item_id').notNull().references(() => items.id), outputQty: numeric('output_qty', qty).notNull(), componentCost: numeric('component_cost', money).notNull().default('0'), unitCost: numeric('unit_cost', money).notNull().default('0'), notes: text('notes'), completedAt: timestamp('completed_at', { withTimezone: true }), cancelledAt: timestamp('cancelled_at', { withTimezone: true }), ...baseAuditColumns(),
+}, (t) => ({ number: uniqueIndex('production_orders_tenant_number_key').on(t.tenantId, t.number), status: index('production_orders_status_idx').on(t.tenantId, t.status, t.orderDate) }));
+
+export const productionOrderComponents = pgTable('production_order_components', {
+  orderId: uuid('order_id').notNull().references(() => productionOrders.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), qty: numeric('qty', qty).notNull(), unitCost: numeric('unit_cost', money).notNull().default('0'), lineCost: numeric('line_cost', money).notNull().default('0'),
+}, (t) => ({ pk: primaryKey({ columns: [t.orderId, t.lineNo] }), item: index('production_order_components_item_idx').on(t.tenantId, t.itemId) }));
+
+export type ProductionOrder = typeof productionOrders.$inferSelect;
+export type ProductionOrderComponent = typeof productionOrderComponents.$inferSelect;

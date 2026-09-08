@@ -7,7 +7,7 @@ import { costCenters } from './accounting.js';
 import { items } from './catalog.js';
 import { branches } from './organization.js';
 import { parties } from './parties.js';
-import { salesInvoices } from './sales.js';
+import { salesAdjustmentNotes, salesInvoices } from './sales.js';
 import { tenants, users } from './platform.js';
 import { vouchers } from './treasury.js';
 
@@ -84,3 +84,19 @@ export const projectOfferLines = pgTable('project_offer_lines', {
 export type ContractorContract = typeof contractorContracts.$inferSelect;
 export type ContractorPayment = typeof contractorPayments.$inferSelect;
 export type ProjectOffer = typeof projectOffers.$inferSelect;
+
+/**
+ * مرتجع مقاولات — work taken back off a posted progress bill. It exists as its own
+ * document because the bill it reverses has already produced a posted sales invoice:
+ * deleting or editing the bill would erase an audited trail, so the return releases BOQ
+ * value for re-billing and issues a credit note instead.
+ */
+export const contractingReturns = pgTable('contracting_returns', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'restrict' }), billId: uuid('bill_id').notNull().references(() => progressBills.id, { onDelete: 'restrict' }), branchId: uuid('branch_id').references(() => branches.id), number: text('number').notNull(), returnDate: date('return_date').notNull(), status: text('status').notNull().default('draft'), reason: text('reason').notNull(), returnValue: numeric('return_value', value).notNull().default('0'), retentionValue: numeric('retention_value', value).notNull().default('0'), netValue: numeric('net_value', value).notNull().default('0'), creditNoteId: uuid('credit_note_id').references(() => salesAdjustmentNotes.id, { onDelete: 'set null' }), postedAt: timestamp('posted_at', { withTimezone: true }), cancelledAt: timestamp('cancelled_at', { withTimezone: true }), ...baseAuditColumns(),
+}, (table) => ({ numberKey: uniqueIndex('contracting_returns_tenant_number_key').on(table.tenantId, table.number), billIdx: index('contracting_returns_bill_idx').on(table.tenantId, table.billId, table.status) }));
+
+export const contractingReturnLines = pgTable('contracting_return_lines', {
+  returnId: uuid('return_id').notNull().references(() => contractingReturns.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), termId: uuid('term_id').notNull().references(() => boqTerms.id, { onDelete: 'restrict' }), returnValue: numeric('return_value', value).notNull(),
+}, (table) => ({ pk: primaryKey({ columns: [table.returnId, table.lineNo] }), termIdx: index('contracting_return_lines_term_idx').on(table.tenantId, table.termId) }));
+
+export type ContractingReturn = typeof contractingReturns.$inferSelect;

@@ -211,7 +211,7 @@ const inventory: ModuleNode = {
         screen('purchase-sales-total', 'إجمالي المبيعات والمشتريات', 'Sales & purchases total', '/reports/sales-purchases-total', 'ready', { permission: 'reporting.view' }),
         screen('invoice-profit', 'أرباح الفواتير', 'Invoice profit', '/reports/invoice-profit', 'ready', { permission: 'reporting.view' }),
         screen('turnover', 'معدل الدوران والركود', 'Turnover & dead stock', '/reports/inventory-turnover', 'ready', { permission: 'reporting.view' }),
-        screen('production-order', 'تقرير أمر الإنتاج', 'Production order report', '/s/inventory/reports/production', 'planned'),
+        screen('production-order', 'تقرير أمر الإنتاج', 'Production order report', '/inventory/production', 'ready', { permission: 'inventory.view', endpoint: '/inventory/production-orders' }),
         screen('invoices-by-type', 'الفواتير بحسب النوع', 'Invoices by type', '/reports/invoices-by-type', 'ready', { permission: 'reporting.view' }),
         screen('expired-items', 'انتهاء صلاحية الأصناف', 'Expired items', '/reports/expired-items', 'ready', { permission: 'reporting.view' }),
         screen('serials', 'تقرير الأرقام التسلسلية', 'Serial numbers report', '/inventory/serials', 'ready', { permission: 'inventory.view', endpoint: '/inventory/serials' }),
@@ -318,7 +318,7 @@ const sales: ModuleNode = {
         screen('quotation', 'عرض سعر', 'Quotation', '/sales/quotations', 'ready', { permission: 'sales.view', endpoint: '/sales/quotations' }),
         screen('day-close', 'إغلاق اليومية', 'Day close', '/sales/shifts', 'ready', { permission: 'treasury.view', endpoint: '/shift-closes' }),
         screen('contracting-invoice', 'فاتورة المقاولات', 'Contracting invoice', '/projects', 'ready', { permission: 'projects.view', endpoint: '/projects/{id}/progress-bills' }),
-        screen('contracting-return', 'مرتجع مقاولات', 'Contracting return', '/s/projects/returns', 'planned'),
+        screen('contracting-return', 'مرتجع مقاولات', 'Contracting return', '/projects/contracting-return', 'ready', { permission: 'projects.manage', endpoint: '/contracting/returns' }),
       ],
     },
     {

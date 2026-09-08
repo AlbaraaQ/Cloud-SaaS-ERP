@@ -91,6 +91,8 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('inventory.request.manage', 'Raise and submit goods requests.'),
   perm('inventory.request.approve', 'Approve, reject or fulfil goods requests.'),
   perm('inventory.delivery.manage', 'Record stock deliveries against posted sales invoices.'),
+  perm('inventory.production.manage', 'Create, edit and cancel production orders.'),
+  perm('inventory.production.complete', 'Complete production orders: consume components and receive the finished item.'),
   perm('inventory.negative.override', 'Allow negative stock movements.'),
 
   // sales / purchases (PHASE_13)

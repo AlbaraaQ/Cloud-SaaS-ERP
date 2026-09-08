@@ -105,6 +105,19 @@ describe('admin navigation tree', () => {
     expect(allScreens.find((screen) => screen.key === 'pn-report')?.href).toBe('/reports/purchase-notes');
   });
 
+  it('wires the contracting return and the production order screens', () => {
+    const wired: Record<string, string> = {
+      'contracting-return': '/projects/contracting-return',
+      'production-order': '/inventory/production',
+    };
+    for (const [key, href] of Object.entries(wired)) {
+      const item = allScreens.find((screen) => screen.key === key);
+      expect(item, key).toBeDefined();
+      expect(item?.status, key).toBe('ready');
+      expect(item?.href, key).toBe(href);
+    }
+  });
+
   it('wires the contracting screens: contractor contract, payment certificate and offers', () => {
     const wired: Record<string, string> = {
       'contractor-contract': '/projects/contractor-contract',
