@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { baseAuditColumns, baseLegacyColumns } from '../columns.js';
 
@@ -15,7 +15,7 @@ export const salesInvoices = pgTable('sales_invoices', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   branchId: uuid('branch_id').notNull().references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id),
   referenceInvoiceId: uuid('reference_invoice_id'),
-  partyId: uuid('party_id').references(() => parties.id), salesmanId: uuid('salesman_id'), kind: text('kind').notNull().default('sale'),
+  partyId: uuid('party_id').references(() => parties.id), salesmanId: uuid('salesman_id'), kind: text('kind').notNull().default('sale'), validUntil: date('valid_until'), convertedInvoiceId: uuid('converted_invoice_id'),
   status: text('status').notNull().default('draft'), number: text('number'), currency: text('currency').notNull().default('SAR'),
   priceIncludesVat: boolean('price_includes_vat').notNull().default(false), cashCustomerName: text('cash_customer_name'), cashCustomerMobile: text('cash_customer_mobile'),
   invoiceDiscount: numeric('invoice_discount', money).notNull().default('0'), extraTax: numeric('extra_tax', money).notNull().default('0'), withholding: numeric('withholding', money).notNull().default('0'),

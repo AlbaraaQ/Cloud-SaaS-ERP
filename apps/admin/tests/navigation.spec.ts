@@ -96,6 +96,15 @@ describe('admin navigation tree', () => {
     }
   });
 
+  it('implements both sides of the credit/debit note story', () => {
+    for (const key of ['sn-credit', 'sn-debit', 'pn-credit', 'pn-debit', 'purchase-credit-note', 'quotation', 'customer-payment-method']) {
+      const item = allScreens.find((screen) => screen.key === key);
+      expect(item, key).toBeDefined();
+      expect(item?.status, key).toBe('ready');
+    }
+    expect(allScreens.find((screen) => screen.key === 'pn-report')?.href).toBe('/reports/purchase-notes');
+  });
+
   it('serves the by-employee and POS breakdowns from the report engine', () => {
     const wired: Record<string, string> = {
       'employee-sales': '/reports/sales-by-employee',

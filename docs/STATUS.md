@@ -35,28 +35,45 @@ asserted by hand.
 
 | State | Count | Meaning |
 |---|---|---|
-| `ready` | 164 | A real screen reading and writing the live API. |
+| `ready` | 171 | A real screen reading and writing the live API. |
 | `api` | 2 | The endpoint exists; the screen is still the scaffold. |
-| `planned` | 24 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| `planned` | 17 | Neither screen nor endpoint yet; routed under `/s/…`. |
 | **total** | **190** | |
 
-Wired in this round: expense cards (`/accounting/expenses`), sales credit/debit notes with
+Round 1 wired: expense cards (`/accounting/expenses`), sales credit/debit notes with
 posting (`/sales/notes/[kind]`), ZATCA credentials (`/settings/zatca`) and submissions with
 retry (`/settings/sync/zatca`), migration runs with issues (`/migration/runs`), offers with
 a live evaluator (`/settings/offers`), price lists and their rows (`/settings/price-lists`),
-and a Code 128-B barcode label sheet (`/inventory/barcodes`). Five report keys were added
-to the reporting catalog (62 total): `sales-notes`, `sales-by-employee`,
-`purchases-by-employee`, `pos-item-detail`, `pos-by-category`.
+and a Code 128-B barcode label sheet (`/inventory/barcodes`).
 
-Two permission codes used by `@RequiresPermission` were missing from the shared registry
-(`sales.adjustment.create`, `sales.offer.manage`), which made those routes return 403 for
-every role including the owner. Both are now registered (116 permissions) and
-`apps/api/src/permission-codes.spec.ts` fails the build if the mismatch ever returns.
+Round 2 wired the documents that were missing an entire side of the ledger:
 
-Still `planned`, and honestly so: purchase credit/debit notes, contracting quotations and
-returns, marina preparation/rota/day-close, project follow-up and contractor payments,
-backup/restore/data-rotation, invoice maintenance, the preparation-device settings and the
-report designer.
+* **Supplier credit/debit notes** — new table `purchase_adjustment_notes` (migration
+  `0021`), `POST /purchase-invoices/:id/adjustment-notes`, `GET /purchases/adjustment-notes`
+  and `POST /purchases/adjustment-notes/:id/post`, screen `/purchases/notes/[kind]`, report
+  key `purchase-notes`. Posting now allocates the number from the document sequence on
+  **both** sides (`SCN-`/`SDN-`, `PCN-`/`PDN-`); the sales side previously minted
+  `AN-<epoch>-<id>`, which is not an auditable series.
+* **Quotations** (`عرض سعر`) — migration `0022` adds `valid_until` and
+  `converted_invoice_id` to `sales_invoices`; a quotation is numbered `QT-…` on creation,
+  is refused by `POST /sales/invoices/:id/post`, and converts once into a **draft** sales
+  invoice that carries the same lines (`/sales/quotations`).
+* **Customer payment methods** (`طريقة دفع عميل`) — migration `0023` adds
+  `payment_methods` plus `parties.payment_method_id`; the method carries the credit period
+  and the cash location, one default per tenant enforced by a partial unique index
+  (`/accounting/payment-methods`, also serving the settings menu entry).
+
+The reporting catalog is at **63 keys**; the permission registry at **117** codes.
+`apps/api/src/permission-codes.spec.ts` fails the build when a controller asks for a
+permission the registry does not define — three such codes existed
+(`sales.adjustment.create`, `sales.offer.manage`, and the new
+`purchase.adjustment.create`), each of which had made its route answer 403 to every role
+including the owner.
+
+Still `planned`, and honestly so: stock delivery notes, goods requests, production orders,
+contracting returns, the marina preparation/rota/link/day-close screens, contractor
+contracts and payments, project follow-up and offers, backup/restore/data-rotation,
+invoice maintenance, the preparation-device settings and the report designer.
 
 ## Billing and live-data integration notes
 

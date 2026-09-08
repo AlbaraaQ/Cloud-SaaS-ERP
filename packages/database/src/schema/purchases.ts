@@ -87,7 +87,26 @@ export const purchaseInvoiceCosts = pgTable('purchase_invoice_costs', {
   ...baseAuditColumns(),
 }, (t) => ({ invoice: index('purchase_invoice_costs_invoice_idx').on(t.tenantId, t.invoiceId) }));
 
-export const purchaseTables = { purchaseInvoices, purchaseInvoiceLines, purchaseInvoiceCosts };
+/** Supplier credit/debit notes — the purchase mirror of `sales_adjustment_notes`. */
+export const purchaseAdjustmentNotes = pgTable('purchase_adjustment_notes', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  invoiceId: uuid('invoice_id').references(() => purchaseInvoices.id),
+  branchId: uuid('branch_id').notNull().references(() => branches.id),
+  kind: text('kind').notNull(),
+  status: text('status').notNull().default('draft'),
+  number: text('number'),
+  reason: text('reason').notNull(),
+  amount: numeric('amount', money).notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  ...baseAuditColumns(),
+}, (t) => ({
+  number: uniqueIndex('purchase_adjustment_notes_tenant_number_key').on(t.tenantId, t.number).where(sql`number IS NOT NULL`),
+  invoice: index('purchase_adjustment_notes_invoice_idx').on(t.tenantId, t.invoiceId),
+}));
+
+export const purchaseTables = { purchaseInvoices, purchaseInvoiceLines, purchaseInvoiceCosts, purchaseAdjustmentNotes };
 export type PurchaseInvoice = typeof purchaseInvoices.$inferSelect;
 export type PurchaseInvoiceLine = typeof purchaseInvoiceLines.$inferSelect;
 export type PurchaseInvoiceCost = typeof purchaseInvoiceCosts.$inferSelect;
+export type PurchaseAdjustmentNote = typeof purchaseAdjustmentNotes.$inferSelect;

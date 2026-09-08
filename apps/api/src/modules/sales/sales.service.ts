@@ -20,7 +20,7 @@ import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
 
 export type SalesLineInput = { itemId?: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
-export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; referenceInvoiceId?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string; orderType?: string };
+export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; referenceInvoiceId?: string; validUntil?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note' | 'quotation'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string; orderType?: string };
 export type PaymentInput = { method: 'cash' | 'card' | 'bank' | 'credit' | 'split'; amount: string; idempotencyKey: string; cashLocationId?: string; reference?: string };
 export type PostingInput = { fiscalPeriodId?: string; journalLines?: { accountId: string; debit?: string; credit?: string; partyId?: string; description?: string }[]; inventoryLines?: InventoryLine[] };
 
@@ -51,7 +51,7 @@ export class SalesService {
     const totals = calculateInvoiceTotals({ lines: input.lines, priceIncludesVat: input.priceIncludesVat, invoiceDiscount: input.invoiceDiscount, extraTax: input.extraTax, withholding: input.withholding });
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
-      await tx.insert(salesInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, referenceInvoiceId: input.referenceInvoiceId, partyId: input.partyId, salesmanId: input.salesmanId, kind: input.kind ?? 'sale', currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, cashCustomerName: input.cashCustomerName, cashCustomerMobile: input.cashCustomerMobile, orderType: input.orderType, createdBy: tryGetAuthContext()?.userId, invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
+      await tx.insert(salesInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, referenceInvoiceId: input.referenceInvoiceId, partyId: input.partyId, salesmanId: input.salesmanId, kind: input.kind ?? 'sale', validUntil: input.validUntil, currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, cashCustomerName: input.cashCustomerName, cashCustomerMobile: input.cashCustomerMobile, orderType: input.orderType, createdBy: tryGetAuthContext()?.userId, invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
       await tx.insert(salesInvoiceLines).values(input.lines.map((line, index) => { const calculated = totals.lines[index]; if (!calculated) throw new DomainError('SALES_TOTALS_INVALID', 'Invoice totals do not match invoice lines', 422); return { id: newId(), tenantId, invoiceId: id, lineNo: index + 1, itemId: line.itemId, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice, discountRate: line.discountRate ?? '0', discountAmount: calculated.discount, taxGroupId: line.taxGroupId, taxRate: line.taxRate ?? '0', net: calculated.net, tax: calculated.tax, total: calculated.total }; }));
     });
     return this.get(tenantId, id);
@@ -75,6 +75,7 @@ export class SalesService {
     const invoice = await this.get(tenantId, id);
     if (invoice.status === 'posted') return invoice;
     if (invoice.status !== 'draft') throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only draft invoices can be posted', 409);
+    if (invoice.kind === 'quotation') throw new DomainError('SALES_QUOTATION_NOT_POSTABLE', 'A quotation is converted into an invoice, never posted', 409);
     if (posting.journalLines?.length && !posting.fiscalPeriodId) throw new DomainError('SALES_FISCAL_PERIOD_REQUIRED', 'A fiscal period is required for accounting posting', 422);
 
     await withTenantTx(this.database.db, tenantId, async (tx) => {
@@ -172,15 +173,89 @@ export class SalesService {
     return { eligible: true, discount: discount.toFixed(4), offerId };
   }
 
+  /**
+   * Posting allocates the note number from the shared sequence service, the same way an
+   * invoice does. It used to mint `AN-<epoch>-<id fragment>`, which is neither sequential
+   * nor auditable — a tax authority expects an unbroken series per document type.
+   */
   async postAdjustmentNote(tenantId: string, id: string) {
     const [note] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesAdjustmentNotes).where(and(eq(salesAdjustmentNotes.tenantId, tenantId), eq(salesAdjustmentNotes.id, id))));
     if (!note) throw new DomainError('SALES_NOTE_NOT_FOUND', 'Adjustment note was not found', 404);
     if (note.status !== 'draft') throw new DomainError('SALES_NOTE_INVALID_STATUS', 'Only draft adjustment notes can be posted', 409);
-    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesAdjustmentNotes).set({ status: 'posted', number: `AN-${Date.now()}-${id.slice(0, 6)}`, postedAt: new Date() }).where(and(eq(salesAdjustmentNotes.tenantId, tenantId), eq(salesAdjustmentNotes.id, id), eq(salesAdjustmentNotes.status, 'draft'))));
-    return this.get(tenantId, note.invoiceId ?? '');
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const allocated = await this.sequences.next({ tenantId, branchId: note.branchId, docType: `sales_note_${note.kind}` }, tx, { prefix: note.kind === 'credit' ? 'SCN-' : 'SDN-', padding: 6 });
+      const [posted] = await tx
+        .update(salesAdjustmentNotes)
+        .set({ status: 'posted', number: allocated.display, postedAt: new Date(), updatedAt: new Date(), updatedBy: tryGetAuthContext()?.userId })
+        .where(and(eq(salesAdjustmentNotes.tenantId, tenantId), eq(salesAdjustmentNotes.id, id), eq(salesAdjustmentNotes.status, 'draft')))
+        .returning();
+      if (!posted) throw new DomainError('SALES_NOTE_INVALID_STATUS', 'Only draft adjustment notes can be posted', 409);
+      return posted;
+    });
   }
 
   async printData(tenantId: string, id: string) { return this.get(tenantId, id); }
+
+  /**
+   * Quotations (عرض سعر) reuse the invoice tables with `kind = 'quotation'`. They are
+   * numbered on creation — a customer needs a reference before anything is agreed — but
+   * they never touch stock or the ledger; the conversion below does that.
+   */
+  async createQuotation(tenantId: string, input: SalesInvoiceInput & { validUntil?: string }) {
+    const quotation = await this.create(tenantId, { ...input, kind: 'quotation' });
+    const [numbered] = await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const allocated = await this.sequences.next({ tenantId, branchId: quotation.branchId, docType: 'quotation' }, tx, { prefix: 'QT-', padding: 6 });
+      return tx.update(salesInvoices).set({ number: allocated.display }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, quotation.id))).returning();
+    });
+    return { ...quotation, number: numbered?.number ?? quotation.number };
+  }
+
+  async listQuotations(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(salesInvoices).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.kind, 'quotation'))).orderBy(desc(salesInvoices.createdAt)).limit(200));
+  }
+
+  /**
+   * Turns a quotation into a draft sales invoice, copying the lines as they were quoted.
+   * The quotation is stamped `converted` and keeps a pointer to what it became, so the
+   * same quote cannot be billed twice.
+   */
+  async convertQuotation(tenantId: string, id: string, input: { warehouseId?: string } = {}) {
+    const quotation = await this.get(tenantId, id);
+    if (quotation.kind !== 'quotation') throw new DomainError('SALES_QUOTATION_EXPECTED', 'This document is not a quotation', 422);
+    if (quotation.status === 'converted') throw new DomainError('SALES_QUOTATION_ALREADY_CONVERTED', 'This quotation was already converted into an invoice', 409);
+    if (quotation.status !== 'draft') throw new DomainError('SALES_QUOTATION_INVALID_STATUS', 'Only an open quotation can be converted', 409);
+    if (quotation.validUntil && quotation.validUntil < new Date().toISOString().slice(0, 10)) {
+      throw new DomainError('SALES_QUOTATION_EXPIRED', 'This quotation expired; issue a new one', 422);
+    }
+
+    const invoice = await this.create(tenantId, {
+      branchId: quotation.branchId,
+      warehouseId: input.warehouseId ?? quotation.warehouseId ?? undefined,
+      partyId: quotation.partyId ?? undefined,
+      salesmanId: quotation.salesmanId ?? undefined,
+      cashCustomerName: quotation.cashCustomerName ?? undefined,
+      cashCustomerMobile: quotation.cashCustomerMobile ?? undefined,
+      currency: quotation.currency,
+      priceIncludesVat: quotation.priceIncludesVat,
+      referenceInvoiceId: quotation.id,
+      kind: 'sale',
+      lines: quotation.lines.map((line) => ({
+        itemId: line.itemId ?? undefined,
+        description: line.description ?? undefined,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        discountRate: line.discountRate,
+        taxRate: line.taxRate,
+        taxGroupId: line.taxGroupId ?? undefined,
+      })),
+    });
+
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.update(salesInvoices).set({ status: 'converted', convertedInvoiceId: invoice.id, updatedAt: new Date(), updatedBy: tryGetAuthContext()?.userId }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft'))));
+
+    return invoice;
+  }
 
   async createAdjustmentNote(tenantId: string, invoiceId: string, input: { branchId: string; kind: string; reason: string; amount: string }) {
     const invoice = await this.get(tenantId, invoiceId);

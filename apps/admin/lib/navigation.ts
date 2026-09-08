@@ -119,7 +119,7 @@ const accounting: ModuleNode = {
         screen('cash-card', 'بطاقة صندوق', 'Cash box card', '/accounting/cash-locations?type=cash', 'ready', { permission: 'organization.cashlocation.view', endpoint: '/cash-locations' }),
         screen('bank-card', 'بطاقة بنك', 'Bank card', '/accounting/cash-locations?type=bank', 'ready', { permission: 'organization.cashlocation.view', endpoint: '/cash-locations' }),
         screen('cost-center', 'بطاقة مركز تكلفة', 'Cost centre card', '/accounting/cost-centers', 'ready', { permission: 'accounting.account.view', endpoint: '/cost-centers' }),
-        screen('customer-payment-method', 'طريقة دفع عميل', 'Customer payment method', '/s/accounting/payment-methods', 'planned'),
+        screen('customer-payment-method', 'طريقة دفع عميل', 'Customer payment method', '/accounting/payment-methods', 'ready', { permission: 'parties.view', endpoint: '/payment-methods' }),
         screen('expense-card', 'بطاقة المصاريف', 'Expense card', '/accounting/expenses', 'ready', { permission: 'treasury.view', endpoint: '/expense-types' }),
       ],
     },
@@ -257,7 +257,7 @@ const purchases: ModuleNode = {
       items: [
         screen('supplier-payment', 'سند صرف لمورد', 'Supplier payment', '/treasury/vouchers?kind=payment', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('purchase-vouchers', 'عرض السندات', 'Vouchers', '/treasury/vouchers', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
-        screen('purchase-credit-note', 'إشعار دائن', 'Credit note', '/s/purchases/credit-notes', 'planned'),
+        screen('purchase-credit-note', 'إشعار دائن', 'Credit note', '/purchases/notes/credit', 'ready', { permission: 'purchase.view', endpoint: '/purchases/adjustment-notes' }),
       ],
     },
     {
@@ -265,9 +265,9 @@ const purchases: ModuleNode = {
       labelAr: 'الإشعارات',
       labelEn: 'Notes',
       items: [
-        screen('pn-credit', 'إشعار دائن', 'Credit note', '/s/purchases/notes/credit', 'planned'),
-        screen('pn-debit', 'إشعار مدين', 'Debit note', '/s/purchases/notes/debit', 'planned'),
-        screen('pn-report', 'تقرير الإشعارات', 'Notes report', '/s/purchases/notes/report', 'planned'),
+        screen('pn-credit', 'إشعار دائن', 'Credit note', '/purchases/notes/credit', 'ready', { permission: 'purchase.view', endpoint: '/purchases/adjustment-notes' }),
+        screen('pn-debit', 'إشعار مدين', 'Debit note', '/purchases/notes/debit', 'ready', { permission: 'purchase.view', endpoint: '/purchases/adjustment-notes' }),
+        screen('pn-report', 'تقرير الإشعارات', 'Notes report', '/reports/purchase-notes', 'ready', { permission: 'reporting.view' }),
       ],
     },
     {
@@ -315,7 +315,7 @@ const sales: ModuleNode = {
         screen('pos', 'نقطة البيع', 'Point of sale', '/sales/pos', 'ready', { permission: 'sales.invoice.create', endpoint: 'POST /sales/invoices' }),
         screen('sales-invoice', 'فاتورة مبيعات', 'Sales invoice', '/sales/invoices', 'ready', { endpoint: '/sales/invoices' }),
         screen('sales-return', 'مردود المبيعات', 'Sales return', '/sales/returns', 'ready', { permission: 'sales.return.create', endpoint: 'POST /sales/invoices/{id}/return' }),
-        screen('quotation', 'عرض سعر', 'Quotation', '/s/sales/quotations', 'planned'),
+        screen('quotation', 'عرض سعر', 'Quotation', '/sales/quotations', 'ready', { permission: 'sales.view', endpoint: '/sales/quotations' }),
         screen('day-close', 'إغلاق اليومية', 'Day close', '/sales/shifts', 'ready', { permission: 'treasury.view', endpoint: '/shift-closes' }),
         screen('contracting-invoice', 'فاتورة المقاولات', 'Contracting invoice', '/projects', 'ready', { permission: 'projects.view', endpoint: '/projects/{id}/progress-bills' }),
         screen('contracting-return', 'مرتجع مقاولات', 'Contracting return', '/s/projects/returns', 'planned'),
@@ -597,7 +597,7 @@ const settings: ModuleNode = {
         screen('sync-vouchers', 'مزامنة السندات', 'Voucher sync', '/settings/sync/vouchers', 'ready', { permission: 'compat.manage', endpoint: '/compat/sync/documents?entity=vouchers' }),
         screen('sync-stock', 'مزامنة المخزون', 'Stock sync', '/settings/sync/stock', 'ready', { permission: 'compat.manage', endpoint: '/compat/sync/documents?entity=stock' }),
         screen('sync-manage', 'إدارة المزامنة', 'Sync management', '/settings/sync/manage', 'ready', { permission: 'compat.manage', endpoint: '/jobs/queues' }),
-        screen('sync-payment-methods', 'إعدادات طريقة الدفع', 'Payment methods', '/s/settings/payment-methods', 'planned'),
+        screen('sync-payment-methods', 'إعدادات طريقة الدفع', 'Payment methods', '/accounting/payment-methods', 'ready', { permission: 'parties.view', endpoint: '/payment-methods' }),
         screen('sync-prices', 'إعدادات الأسعار', 'Price settings', '/settings/price-lists', 'ready', { permission: 'organization.priceList.view', endpoint: '/price-lists' }),
         screen('sync-zatca', 'مزامنة الفواتير Zatca', 'ZATCA sync', '/settings/sync/zatca', 'ready', { permission: 'einvoice.view', endpoint: '/einvoice/submissions' }),
         screen('android-devices', 'أجهزة أندرويد المرتبطة', 'Linked Android devices', '/settings/devices', 'ready', { permission: 'compat.manage', endpoint: '/compat/devices' }),

@@ -21,6 +21,9 @@ export class SalesController {
   @Get('sales/adjustment-notes') @RequiresPermission('sales.view') notes(@Query('kind') kind?: string) { return this.sales.listAdjustmentNotes(getTenantContext().tenantId, kind); }
   @Post('sales/adjustment-notes/:id/post') @RequiresPermission('sales.invoice.post') postNote(@Param('id') id: string) { return this.sales.postAdjustmentNote(getTenantContext().tenantId, id); }
   @Post('sales/offers/:id/evaluate') @RequiresPermission('sales.view') evaluateOffer(@Param('id') id: string, @Body() body: { itemId: string; quantity: string; value: string }) { return this.sales.evaluateOffer(getTenantContext().tenantId, id, body); }
+  @Get('sales/quotations') @RequiresPermission('sales.view') quotations() { return this.sales.listQuotations(getTenantContext().tenantId); }
+  @Post('sales/quotations') @RequiresPermission('sales.invoice.create') createQuotation(@Body() body: Parameters<SalesService['createQuotation']>[1]) { return this.sales.createQuotation(getTenantContext().tenantId, body); }
+  @Post('sales/quotations/:id/convert') @RequiresPermission('sales.invoice.create') convertQuotation(@Param('id') id: string, @Body() body: { warehouseId?: string }) { return this.sales.convertQuotation(getTenantContext().tenantId, id, body ?? {}); }
   @Get('sales/offers') @RequiresPermission('sales.view') offers() { return this.sales.listOffers(getTenantContext().tenantId); }
   @Post('sales/offers') @RequiresPermission('sales.offer.manage') createOffer(@Body() body: Parameters<SalesService['createOffer']>[1]) { return this.sales.createOffer(getTenantContext().tenantId, body); }
   @Get('sales/salesmen') @RequiresPermission('sales.view') salesmen() { return this.sales.listSalesmen(getTenantContext().tenantId); }

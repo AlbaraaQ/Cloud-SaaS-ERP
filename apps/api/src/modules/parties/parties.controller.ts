@@ -3,7 +3,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
-import { PartiesService, type AllocationInput, type ContactInput, type PartyInput } from './parties.service.js';
+import { PartiesService, type AllocationInput, type ContactInput, type PartyInput, type PaymentMethodInput } from './parties.service.js';
 @Controller()
 export class PartiesController {
   constructor(private readonly parties: PartiesService) {}
@@ -17,5 +17,8 @@ export class PartiesController {
   @Delete('parties/:partyId/contacts/:contactId') @RequiresPermission('parties.manage') removeContact(@Param('partyId') partyId: string, @Param('contactId') contactId: string) { return this.parties.removeContact(getTenantContext().tenantId, partyId, contactId); }
   @Get('parties/:id/balance') @RequiresPermission('parties.view') balance(@Param('id') id: string, @Query('asOf') asOf?: string) { return this.parties.partyBalance(getTenantContext().tenantId, id, asOf); }
   @Get('parties/:id/statement') @RequiresPermission('parties.view') statement(@Param('id') id: string, @Query('asOf') asOf?: string) { return this.parties.partyBalance(getTenantContext().tenantId, id, asOf); }
+  @Get('payment-methods') @RequiresPermission('parties.view') paymentMethods() { return this.parties.listPaymentMethods(getTenantContext().tenantId); }
+  @Post('payment-methods') @RequiresPermission('parties.manage') createPaymentMethod(@Body() body: PaymentMethodInput) { return this.parties.createPaymentMethod(getTenantContext().tenantId, body); }
+  @Put('payment-methods/:id') @RequiresPermission('parties.manage') updatePaymentMethod(@Param('id') id: string, @Body() body: Partial<PaymentMethodInput>) { return this.parties.updatePaymentMethod(getTenantContext().tenantId, id, body); }
   @Post('allocations') @RequiresPermission('parties.allocate') allocate(@Body() body: AllocationInput) { return this.parties.allocate(getTenantContext().tenantId, body); }
 }

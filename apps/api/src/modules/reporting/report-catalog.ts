@@ -1156,6 +1156,25 @@ const definitions: ReportDefinition[] = [
         AND ${eqIf(sql`note.branch_id`, f.branchId)}
       ORDER BY note.created_at DESC LIMIT 1000`,
   },
+  {
+    key: 'purchase-notes',
+    titleAr: 'تقرير إشعارات المشتريات',
+    group: 'purchases',
+    hintAr: 'الإشعارات الدائنة والمدينة الصادرة على فواتير موردين مرحّلة.',
+    params: [...PERIOD, BRANCH],
+    columns: [date('day', 'التاريخ'), text('number', 'رقم الإشعار'), text('kind', 'النوع'), text('invoice', 'الفاتورة'), text('party', 'المورد'), text('reason', 'السبب'), money('amount', 'المبلغ'), text('status', 'الحالة')],
+    totals: ['amount'],
+    build: (tenantId, f) => sql`
+      SELECT note.created_at::date AS day, coalesce(note.number, '—') AS number,
+             CASE note.kind WHEN 'credit' THEN 'إشعار دائن' WHEN 'debit' THEN 'إشعار مدين' ELSE note.kind END AS kind,
+             coalesce(pi.number, '—') AS invoice, ${partyName} AS party, note.reason, note.amount::text, note.status
+      FROM purchase_adjustment_notes note
+      LEFT JOIN purchase_invoices pi ON pi.id = note.invoice_id
+      LEFT JOIN parties party ON party.id = pi.party_id
+      WHERE note.tenant_id = ${tenantId} AND ${onDate(sql`note.created_at::date`, f.from, f.to)}
+        AND ${eqIf(sql`note.branch_id`, f.branchId)}
+      ORDER BY note.created_at DESC LIMIT 1000`,
+  },
   // ----------------------------------------------------- long-lived keys
   // Registered since the first release; kept so saved links and the legacy
   // desktop client keep resolving.

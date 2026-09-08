@@ -6,6 +6,7 @@ import { allocateLandedCost, calculateInvoiceTotals, DomainError, newId } from '
 import {
   parties,
   paymentAllocations,
+  purchaseAdjustmentNotes,
   purchaseInvoiceCosts,
   purchaseInvoiceLines,
   purchaseInvoices,
@@ -148,6 +149,47 @@ export class PurchasesService {
       const [allocation] = await tx.insert(paymentAllocations).values({ id: newId(), tenantId, partyId: invoice.partyId, voucherId: input.voucherId, invoiceKind: invoice.kind, invoiceId, amount: input.amount }).returning();
       await tx.update(purchaseInvoices).set({ paidTotal: paidTotal.toFixed(4), paymentStatus: paidTotal.gte(money(invoice.total)) ? 'paid' : 'partial', updatedAt: new Date() }).where(and(eq(purchaseInvoices.tenantId, tenantId), eq(purchaseInvoices.id, invoiceId)));
       return allocation;
+    });
+  }
+
+  /** Supplier notes are raised against a posted invoice only — the mirror of the sales side. */
+  async createAdjustmentNote(tenantId: string, invoiceId: string, input: { branchId: string; kind: string; reason: string; amount: string }) {
+    const invoice = await this.get(tenantId, invoiceId);
+    if (invoice.status !== 'posted') throw new DomainError('PURCHASE_INVOICE_NOT_POSTED', 'Notes require a posted purchase invoice', 409);
+    if (input.kind !== 'credit' && input.kind !== 'debit') throw new DomainError('PURCHASE_NOTE_KIND_INVALID', 'A note is either credit or debit', 422);
+    const amount = money(input.amount);
+    if (!amount.isFinite() || amount.lte(0)) throw new DomainError('PURCHASE_NOTE_AMOUNT_INVALID', 'Note amount must be positive', 422);
+    const [note] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.insert(purchaseAdjustmentNotes).values({ id: newId(), tenantId, invoiceId, branchId: input.branchId, kind: input.kind, reason: input.reason, amount: amount.toFixed(4), createdBy: tryGetAuthContext()?.userId }).returning());
+    return note;
+  }
+
+  /** Notes raised on supplier invoices, newest first — the source of the notes report. */
+  async listAdjustmentNotes(tenantId: string, kind?: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: purchaseAdjustmentNotes.id, number: purchaseAdjustmentNotes.number, kind: purchaseAdjustmentNotes.kind, status: purchaseAdjustmentNotes.status, reason: purchaseAdjustmentNotes.reason, amount: purchaseAdjustmentNotes.amount, postedAt: purchaseAdjustmentNotes.postedAt, createdAt: purchaseAdjustmentNotes.createdAt, invoiceId: purchaseAdjustmentNotes.invoiceId, invoiceNumber: purchaseInvoices.number, partyId: purchaseInvoices.partyId, invoiceTotal: purchaseInvoices.total })
+        .from(purchaseAdjustmentNotes)
+        .leftJoin(purchaseInvoices, eq(purchaseInvoices.id, purchaseAdjustmentNotes.invoiceId))
+        .where(and(eq(purchaseAdjustmentNotes.tenantId, tenantId), kind ? eq(purchaseAdjustmentNotes.kind, kind) : undefined))
+        .orderBy(desc(purchaseAdjustmentNotes.createdAt))
+        .limit(200));
+  }
+
+  /** Posting allocates the note number through the shared sequence service. */
+  async postAdjustmentNote(tenantId: string, id: string) {
+    const [note] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(purchaseAdjustmentNotes).where(and(eq(purchaseAdjustmentNotes.tenantId, tenantId), eq(purchaseAdjustmentNotes.id, id))));
+    if (!note) throw new DomainError('PURCHASE_NOTE_NOT_FOUND', 'Adjustment note was not found', 404);
+    if (note.status !== 'draft') throw new DomainError('PURCHASE_NOTE_INVALID_STATUS', 'Only draft adjustment notes can be posted', 409);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const allocated = await this.sequences.next({ tenantId, branchId: note.branchId, docType: `purchase_note_${note.kind}` }, tx, { prefix: note.kind === 'credit' ? 'PCN-' : 'PDN-', padding: 6 });
+      const [posted] = await tx
+        .update(purchaseAdjustmentNotes)
+        .set({ status: 'posted', number: allocated.display, postedAt: new Date(), updatedAt: new Date(), updatedBy: tryGetAuthContext()?.userId })
+        .where(and(eq(purchaseAdjustmentNotes.tenantId, tenantId), eq(purchaseAdjustmentNotes.id, id), eq(purchaseAdjustmentNotes.status, 'draft')))
+        .returning();
+      if (!posted) throw new DomainError('PURCHASE_NOTE_INVALID_STATUS', 'Only draft adjustment notes can be posted', 409);
+      return posted;
     });
   }
 }

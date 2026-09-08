@@ -4,11 +4,13 @@ import { Decimal } from 'decimal.js';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import { DomainError, errorCodes, newId } from '@erp/contracts';
-import { journalEntries, journalEntryLines, parties, partyContacts, paymentAllocations, withTenantTx, type DatabaseHandle } from '@erp/database';
+import { journalEntries, journalEntryLines, parties, partyContacts, paymentAllocations, paymentMethods, withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { isUniqueViolation } from '../organization/shared/org-support.js';
 
-export type PartyInput = { kind: 'customer' | 'supplier' | 'both'; name: string; legalName?: string; taxNo?: string; nationalId?: string; address?: Record<string, string | undefined>; phone?: string; email?: string; receivableAccountId?: string; payableAccountId?: string; creditLimit?: string; isOwner?: boolean; isContractor?: boolean; branchId?: string };
+export type PaymentMethodInput = { code: string; nameAr: string; nameEn?: string; kind?: 'cash' | 'card' | 'transfer' | 'cheque' | 'credit'; dueDays?: number; cashLocationId?: string; isActive?: boolean; isDefault?: boolean };
+export type PartyInput = { kind: 'customer' | 'supplier' | 'both'; name: string; paymentMethodId?: string; legalName?: string; taxNo?: string; nationalId?: string; address?: Record<string, string | undefined>; phone?: string; email?: string; receivableAccountId?: string; payableAccountId?: string; creditLimit?: string; isOwner?: boolean; isContractor?: boolean; branchId?: string };
 export type ContactInput = { name: string; role?: string; phone?: string; email?: string; isPrimary?: boolean };
 export type AllocationInput = { partyId: string; voucherId?: string; invoiceKind: string; invoiceId: string; amount: string; invoiceTotal?: string; alreadyAllocated?: string };
 
@@ -23,6 +25,55 @@ export class PartiesService {
   async contacts(tenantId: string, partyId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(partyContacts).where(and(eq(partyContacts.tenantId, tenantId), eq(partyContacts.partyId, partyId), isNull(partyContacts.deletedAt)))); }
   async addContact(tenantId: string, partyId: string, input: ContactInput) { const id = newId(); await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(partyContacts).values({ id, partyId, tenantId, ...input })); return this.contacts(tenantId, partyId); }
   async removeContact(tenantId: string, partyId: string, id: string) { await withTenantTx(this.database.db, tenantId, (tx) => tx.update(partyContacts).set({ deletedAt: new Date() }).where(and(eq(partyContacts.tenantId, tenantId), eq(partyContacts.partyId, partyId), eq(partyContacts.id, id)))); return this.contacts(tenantId, partyId); }
+  async listPaymentMethods(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(paymentMethods).where(and(eq(paymentMethods.tenantId, tenantId), isNull(paymentMethods.deletedAt))).orderBy(paymentMethods.code));
+  }
+
+  /**
+   * Only one method can be the default, so promoting one demotes the rest inside the same
+   * transaction — the partial unique index would reject the second default anyway, and
+   * failing after a partial write would leave the tenant with none.
+   */
+  async createPaymentMethod(tenantId: string, input: PaymentMethodInput) {
+    const id = newId();
+    if (input.dueDays !== undefined && (!Number.isInteger(input.dueDays) || input.dueDays < 0)) {
+      throw new DomainError('PAYMENT_METHOD_DUE_DAYS_INVALID', 'Due days must be a whole number of days', 422);
+    }
+    try {
+      await withTenantTx(this.database.db, tenantId, async (tx) => {
+      if (input.isDefault) await tx.update(paymentMethods).set({ isDefault: false }).where(and(eq(paymentMethods.tenantId, tenantId), eq(paymentMethods.isDefault, true)));
+      await tx.insert(paymentMethods).values({
+        id,
+        tenantId,
+        code: input.code,
+        nameAr: input.nameAr,
+        nameEn: input.nameEn,
+        kind: input.kind ?? 'cash',
+        dueDays: input.dueDays ?? 0,
+        cashLocationId: input.cashLocationId,
+        isActive: input.isActive ?? true,
+        isDefault: input.isDefault ?? false,
+      });
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new DomainError('PAYMENT_METHOD_CODE_TAKEN', 'Another payment method already uses this code', 422);
+      throw error;
+    }
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(paymentMethods).where(and(eq(paymentMethods.tenantId, tenantId), eq(paymentMethods.id, id))));
+    return row;
+  }
+
+  async updatePaymentMethod(tenantId: string, id: string, input: Partial<PaymentMethodInput>) {
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      if (input.isDefault) await tx.update(paymentMethods).set({ isDefault: false }).where(and(eq(paymentMethods.tenantId, tenantId), eq(paymentMethods.isDefault, true)));
+      await tx.update(paymentMethods).set({ ...input, updatedAt: new Date(), version: sql`${paymentMethods.version} + 1` }).where(and(eq(paymentMethods.tenantId, tenantId), eq(paymentMethods.id, id), isNull(paymentMethods.deletedAt)));
+    });
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(paymentMethods).where(and(eq(paymentMethods.tenantId, tenantId), eq(paymentMethods.id, id))));
+    if (!row) throw new DomainError('PAYMENT_METHOD_NOT_FOUND', 'Payment method was not found', 404);
+    return row;
+  }
+
   async allocate(tenantId: string, input: AllocationInput) {
     const amount = new Decimal(input.amount);
     const total = input.invoiceTotal === undefined ? null : new Decimal(input.invoiceTotal);
