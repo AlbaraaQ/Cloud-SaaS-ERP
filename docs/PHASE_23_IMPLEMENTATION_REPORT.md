@@ -23,4 +23,4 @@ Known sandbox note: the API test phase logs embedded PostgreSQL missing `libpq.s
 
 ## Readiness
 
-The project is marked READY for an environment-owner staging cutover using the committed runbooks and UAT sign-off sheets. Environment-specific evidence such as cloud backup ids, load-test p95/p99 values and owner signatures must be filled during the actual production launch window.
+The repository is ready for an environment-owner staging cutover using the committed runbooks and UAT sign-off sheets. This report does not constitute production sign-off: environment-specific evidence such as cloud backup IDs, restore timestamps, load-test p95/p99 values, real API database/E2E results, alert configuration and owner signatures must be completed outside this repository before release. See `docs/POST_PHASE_23_GAPS_AND_NOTES.md` for the remaining gates.

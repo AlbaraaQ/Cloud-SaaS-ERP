@@ -58,10 +58,19 @@ export async function lockDefaultSwitch(tx: DrizzleTx, tenantId: string, resourc
  * the insert still lose, and the caller deserves the same 422 either way.
  */
 export function isUniqueViolation(error: unknown, constraint?: string): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as { code?: unknown; constraint?: unknown };
-  if (candidate.code !== '23505') return false;
-  return constraint === undefined || candidate.constraint === constraint;
+  const seen = new Set<object>();
+  let current: unknown = error;
+
+  while (typeof current === 'object' && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const candidate = current as { code?: unknown; constraint?: unknown; cause?: unknown };
+    if (candidate.code === '23505') {
+      return constraint === undefined || candidate.constraint === constraint;
+    }
+    current = candidate.cause;
+  }
+
+  return false;
 }
 
 export type ActorStamp = {
