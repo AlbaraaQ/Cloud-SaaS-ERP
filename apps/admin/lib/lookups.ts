@@ -18,6 +18,7 @@ export type CashLocation = { id: string; name: string; kind?: string; accountId?
 export type Category = { id: string; code: string; nameAr?: string; name_ar?: string };
 export type Unit = { id: string; code: string; nameAr?: string; name_ar?: string };
 export type TaxGroup = { id: string; nameAr?: string; name_ar?: string; rate: string };
+export type Salesman = { id: string; name: string; active?: boolean };
 export type CostCenter = { id: string; code: string; nameAr?: string; name_ar?: string };
 export type FiscalPeriod = { id: string; name: string; status: string; startDate?: string; start_date?: string; endDate?: string; end_date?: string; fiscalYearId?: string; fiscal_year_id?: string };
 export type Employee = { id: string; employeeNo?: string; employee_no?: string; name: string; departmentId?: string | null; jobId?: string | null; status?: string; salaryComponents?: Record<string, string>; salary_components?: Record<string, string> };
@@ -35,6 +36,7 @@ export const listUnits = () => apiList<Unit>('/organization/catalog/units');
 export const listTaxGroups = () => apiList<TaxGroup>('/organization/catalog/tax-groups');
 export const listParties = (kind?: string) => apiList<Party>(`/parties${kind ? `?kind=${kind}` : ''}`);
 export const listCashLocations = () => apiList<CashLocation>('/cash-locations');
+export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');
 export const listCostCenters = () => apiList<CostCenter>('/cost-centers');
 export const listPeriods = () => apiList<FiscalPeriod>('/fiscal-periods');
 export const listEmployees = () => apiList<Employee>('/hrm/employees');

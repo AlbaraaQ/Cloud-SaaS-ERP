@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,10 +8,26 @@ import { allScreens, findScreenByHref, modules, screenCounts, visibleModules } f
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 
-/** '/sales/invoices?kind=x' -> 'app/sales/invoices/page.tsx' (dynamic segments resolved by hand). */
+/**
+ * '/sales/invoices?kind=x' -> 'app/sales/invoices/page.tsx'.
+ *
+ * A segment may be served by a dynamic route (`app/reports/[key]/page.tsx`), so each
+ * step falls back to the single `[param]` directory at that level when no literal
+ * directory exists.
+ */
 function pageFileFor(href: string): string {
-  const path = href.split('?')[0].split('#')[0].replace(/^\//, '');
-  return join(appDir, path, 'page.tsx');
+  const segments = (href.split('?')[0] ?? '').split('#')[0]?.replace(/^\//, '').split('/').filter(Boolean) ?? [];
+  let current = appDir;
+  for (const segment of segments) {
+    if (existsSync(join(current, segment))) {
+      current = join(current, segment);
+      continue;
+    }
+    const dynamic = readdirSync(current, { withFileTypes: true }).find((entry) => entry.isDirectory() && entry.name.startsWith('['));
+    if (!dynamic) return join(current, segment, 'page.tsx');
+    current = join(current, dynamic.name);
+  }
+  return join(current, 'page.tsx');
 }
 
 describe('admin navigation tree', () => {
@@ -53,6 +69,22 @@ describe('admin navigation tree', () => {
     const ready = allScreens.filter((screen) => screen.status === 'ready');
     expect(ready.some((screen) => screen.href.startsWith('/s/'))).toBe(false);
     expect(ready.length).toBeGreaterThan(60);
+  });
+
+  it('routes every report menu item through the report engine', () => {
+    const reports = allScreens.filter((item) => item.href.startsWith('/reports/'));
+    expect(reports.length).toBeGreaterThan(40);
+    expect(reports.every((item) => item.status === 'ready')).toBe(true);
+    expect(reports.every((item) => item.permission === 'reporting.view')).toBe(true);
+  });
+
+  it('implements the Salla and synchronisation screens', () => {
+    for (const key of ['salla-products', 'salla-orders', 'salla-warehouses', 'salla-settings', 'data-sync', 'sync-manage', 'sync-invoices', 'sync-journals', 'sync-vouchers', 'sync-stock', 'android-devices']) {
+      const item = allScreens.find((screen) => screen.key === key);
+      expect(item, key).toBeDefined();
+      expect(item?.status, key).toBe('ready');
+      expect(item?.href.startsWith('/s/'), key).toBe(false);
+    }
   });
 
   it('resolves a screen from its href, ignoring the query string', () => {

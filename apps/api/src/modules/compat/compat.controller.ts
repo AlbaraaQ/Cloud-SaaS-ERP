@@ -15,6 +15,9 @@ export class CompatController {
   @Get('devices') @RequiresPermission('compat.manage') devices() { return this.compat.listDevices(getTenantContext().tenantId); }
   @Patch('devices/:id/revoke') @RequiresPermission('compat.manage') revoke(@Param('id') id: string) { return this.compat.revokeDevice(getTenantContext().tenantId, id); }
 
+  @Get('sync/overview') @RequiresPermission('compat.manage') overview() { return this.compat.syncOverview(getTenantContext().tenantId); }
+  @Get('sync/documents') @RequiresPermission('compat.manage') documents(@Query('entity') entity = 'invoices') { return this.compat.syncDocuments(getTenantContext().tenantId, entity); }
+
   @Public()
   @Post('auth/device')
   authDevice(@Body() body: { tenantId: string; apiKey: string }) { return this.compat.authDevice(body.tenantId, body.apiKey); }

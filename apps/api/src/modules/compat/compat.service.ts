@@ -1,9 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
-import { accounts, compatDevices, items, parties, salesInvoices, taxGroups, vouchers, withTenantTx, type CompatDevice, type DatabaseHandle } from '@erp/database';
+import { accounts, branches, compatDevices, inventoryTransactions, items, journalEntries, parties, salesInvoices, taxGroups, vouchers, warehouses, withTenantTx, type CompatDevice, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { SalesService } from '../sales/sales.service.js';
@@ -34,6 +34,53 @@ export class CompatService {
 
   async listDevices(tenantId: string) { return { data: await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(compatDevices).where(eq(compatDevices.tenantId, tenantId))) }; }
   async revokeDevice(tenantId: string, id: string) { await withTenantTx(this.database.db, tenantId, (tx) => tx.update(compatDevices).set({ status: 'revoked', updatedAt: new Date() }).where(and(eq(compatDevices.tenantId, tenantId), eq(compatDevices.id, id)))); return { data: { id, status: 'revoked' } }; }
+
+  /**
+   * Operator-facing view of the sync plane: which devices talk to us, how far each has
+   * pulled, and how many documents each entity has received from the legacy clients.
+   */
+  async syncOverview(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const devices = await tx
+        .select({ id: compatDevices.id, name: compatDevices.name, branchId: compatDevices.branchId, branchName: branches.nameAr, status: compatDevices.status, lastSeenAt: compatDevices.lastSeenAt, cursors: compatDevices.cursors })
+        .from(compatDevices)
+        .leftJoin(branches, eq(branches.id, compatDevices.branchId))
+        .where(eq(compatDevices.tenantId, tenantId));
+      const counts = await tx.execute(sql`
+        SELECT 'invoices' AS entity, count(*)::int AS received, max(updated_at) AS last_at
+        FROM sales_invoices WHERE tenant_id = ${tenantId} AND legacy_source = 'compat'
+        UNION ALL
+        SELECT 'vouchers', count(*)::int, max(updated_at) FROM vouchers WHERE tenant_id = ${tenantId} AND legacy_source = 'compat'
+        UNION ALL
+        SELECT 'journals', count(*)::int, max(updated_at) FROM journal_entries WHERE tenant_id = ${tenantId} AND legacy_source = 'compat'
+        UNION ALL
+        SELECT 'stock', count(*)::int, max(tx.occurred_at) FROM inventory_transactions tx
+        WHERE tx.tenant_id = ${tenantId} AND tx.doc_id IN (SELECT id FROM sales_invoices WHERE tenant_id = ${tenantId} AND legacy_source = 'compat')`);
+      const rows = Array.isArray(counts) ? counts : ((counts as { rows?: unknown[] }).rows ?? []);
+      const masters = await tx.execute(sql`
+        SELECT 'items' AS entity, count(*)::int AS available, max(updated_at) AS last_at FROM items WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
+        UNION ALL SELECT 'parties', count(*)::int, max(updated_at) FROM parties WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
+        UNION ALL SELECT 'accounts', count(*)::int, max(updated_at) FROM accounts WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
+        UNION ALL SELECT 'tax-groups', count(*)::int, max(updated_at) FROM tax_groups WHERE tenant_id = ${tenantId}`);
+      return { data: { devices, inbound: rows, master: Array.isArray(masters) ? masters : ((masters as { rows?: unknown[] }).rows ?? []) } };
+    });
+  }
+
+  /** Recent documents that arrived from the legacy clients, per entity. */
+  async syncDocuments(tenantId: string, entity: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      if (entity === 'vouchers') {
+        return { data: await tx.select({ id: vouchers.id, number: vouchers.number, legacyId: vouchers.legacyId, kind: vouchers.kind, date: vouchers.date, amount: vouchers.amount, status: vouchers.status, updatedAt: vouchers.updatedAt }).from(vouchers).where(and(eq(vouchers.tenantId, tenantId), eq(vouchers.legacySource, 'compat'))).orderBy(desc(vouchers.updatedAt)).limit(200) };
+      }
+      if (entity === 'journals') {
+        return { data: await tx.select({ id: journalEntries.id, number: journalEntries.number, legacyId: journalEntries.legacyId, date: journalEntries.date, kind: journalEntries.kind, status: journalEntries.status, updatedAt: journalEntries.updatedAt }).from(journalEntries).where(and(eq(journalEntries.tenantId, tenantId), eq(journalEntries.legacySource, 'compat'))).orderBy(desc(journalEntries.updatedAt)).limit(200) };
+      }
+      if (entity === 'stock') {
+        return { data: await tx.select({ id: inventoryTransactions.id, occurredAt: inventoryTransactions.occurredAt, itemName: items.nameAr, warehouseName: warehouses.name, direction: inventoryTransactions.direction, qty: inventoryTransactions.qty, totalCost: inventoryTransactions.totalCost, docType: inventoryTransactions.docType, legacyId: salesInvoices.legacyId }).from(inventoryTransactions).innerJoin(salesInvoices, and(eq(salesInvoices.id, inventoryTransactions.docId), eq(salesInvoices.legacySource, 'compat'))).leftJoin(items, eq(items.id, inventoryTransactions.itemId)).leftJoin(warehouses, eq(warehouses.id, inventoryTransactions.warehouseId)).where(eq(inventoryTransactions.tenantId, tenantId)).orderBy(desc(inventoryTransactions.occurredAt)).limit(200) };
+      }
+      return { data: await tx.select({ id: salesInvoices.id, number: salesInvoices.number, legacyId: salesInvoices.legacyId, kind: salesInvoices.kind, total: salesInvoices.total, status: salesInvoices.status, paymentStatus: salesInvoices.paymentStatus, updatedAt: salesInvoices.updatedAt }).from(salesInvoices).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.legacySource, 'compat'))).orderBy(desc(salesInvoices.updatedAt)).limit(200) };
+    });
+  }
 
   async authDevice(tenantId: string, apiKey: string): Promise<{ data: { accessToken: string; deviceId: string; branchId: string; expiresIn: number } }> {
     const hash = this.hashApiKey(apiKey);
