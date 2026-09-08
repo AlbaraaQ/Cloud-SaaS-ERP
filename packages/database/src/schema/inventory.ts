@@ -3,7 +3,7 @@ import { date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timest
 
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
-import { warehouses } from './organization.js';
+import { branches, warehouses } from './organization.js';
 import { items } from './catalog.js';
 import { tenants } from './platform.js';
 
@@ -28,11 +28,31 @@ export const stockTransferLines = pgTable('stock_transfer_lines', { transferId: 
 
 export const itemLots = pgTable('item_lots', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), lotNo: text('lot_no').notNull(), expiryDate: date('expiry_date'), receivedAt: timestamp('received_at', { withTimezone: true }), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ lot: uniqueIndex('item_lots_tenant_item_lot_key').on(t.tenantId, t.itemId, t.lotNo).where(isNull(t.deletedAt)) }));
 export const itemSerials = pgTable('item_serials', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), serialNo: text('serial_no').notNull(), lotId: uuid('lot_id'), status: text('status').notNull().default('available'), warehouseId: uuid('warehouse_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ serial: uniqueIndex('item_serials_tenant_serial_key').on(t.tenantId, t.serialNo).where(isNull(t.deletedAt)), item: index('item_serials_stock_idx').on(t.tenantId, t.itemId, t.warehouseId, t.status) }));
+/**
+ * طلب بضاعة — the internal requisition that precedes a transfer. `transferId` is filled
+ * when an approved request is fulfilled; the transfer, not the request, owns the stock
+ * movement.
+ */
+export const goodsRequests = pgTable('goods_requests', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').notNull().references(() => branches.id), toWarehouseId: uuid('to_warehouse_id').notNull().references(() => warehouses.id), fromWarehouseId: uuid('from_warehouse_id').references(() => warehouses.id), number: text('number').notNull(), status: text('status').notNull().default('draft'), requestedAt: date('requested_at').notNull(), neededBy: date('needed_by'), notes: text('notes'), submittedAt: timestamp('submitted_at', { withTimezone: true }), decidedAt: timestamp('decided_at', { withTimezone: true }), decidedBy: uuid('decided_by'), rejectionReason: text('rejection_reason'), transferId: uuid('transfer_id').references(() => stockTransfers.id), ...baseAuditColumns() }, (t) => ({ number: uniqueIndex('goods_requests_tenant_number_key').on(t.tenantId, t.number), status: index('goods_requests_status_idx').on(t.tenantId, t.status) }));
+export const goodsRequestLines = pgTable('goods_request_lines', { requestId: uuid('request_id').notNull().references(() => goodsRequests.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), qty: numeric('qty', qty).notNull(), approvedQty: numeric('approved_qty', qty), note: text('note') }, (t) => ({ pk: primaryKey({ columns: [t.requestId, t.lineNo] }), scope: index('goods_request_lines_scope_idx').on(t.tenantId, t.itemId) }));
+
+/**
+ * توصيل مخزني — the handover record for a posted sales invoice. It carries no inventory
+ * line on purpose: posting the invoice already relieved the warehouse, so a delivery only
+ * records who physically received what, and how much of the invoice is still outstanding.
+ */
+export const stockDeliveries = pgTable('stock_deliveries', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').notNull().references(() => branches.id), warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id), invoiceId: uuid('invoice_id').notNull(), partyId: uuid('party_id'), number: text('number').notNull(), status: text('status').notNull().default('draft'), deliveredOn: date('delivered_on').notNull(), recipientName: text('recipient_name'), driverName: text('driver_name'), notes: text('notes'), deliveredAt: timestamp('delivered_at', { withTimezone: true }), cancelledAt: timestamp('cancelled_at', { withTimezone: true }), ...baseAuditColumns() }, (t) => ({ number: uniqueIndex('stock_deliveries_tenant_number_key').on(t.tenantId, t.number), invoice: index('stock_deliveries_invoice_idx').on(t.tenantId, t.invoiceId), status: index('stock_deliveries_status_idx').on(t.tenantId, t.status) }));
+export const stockDeliveryLines = pgTable('stock_delivery_lines', { deliveryId: uuid('delivery_id').notNull().references(() => stockDeliveries.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), qty: numeric('qty', qty).notNull(), note: text('note') }, (t) => ({ pk: primaryKey({ columns: [t.deliveryId, t.lineNo] }), scope: index('stock_delivery_lines_scope_idx').on(t.tenantId, t.itemId) }));
+
 export const invoiceItemAttributes = pgTable('invoice_item_attributes', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), documentType: text('document_type').notNull(), documentId: uuid('document_id').notNull(), lineId: uuid('line_id').notNull(), attributes: jsonb('attributes').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns() }, (t) => ({ line: uniqueIndex('invoice_item_attributes_line_key').on(t.tenantId, t.documentType, t.documentId, t.lineId) }));
 
-export const inventoryTables = { inventoryTransactions, stockBalances, stockAdjustments, stockAdjustmentLines, stockTransfers, stockTransferLines, itemLots, itemSerials, invoiceItemAttributes };
+export const inventoryTables = { inventoryTransactions, stockBalances, stockAdjustments, stockAdjustmentLines, stockTransfers, stockTransferLines, goodsRequests, goodsRequestLines, stockDeliveries, stockDeliveryLines, itemLots, itemSerials, invoiceItemAttributes };
 export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
 export type StockBalance = typeof stockBalances.$inferSelect;
 export type StockTransfer = typeof stockTransfers.$inferSelect;
+export type GoodsRequest = typeof goodsRequests.$inferSelect;
+export type GoodsRequestLine = typeof goodsRequestLines.$inferSelect;
+export type StockDelivery = typeof stockDeliveries.$inferSelect;
+export type StockDeliveryLine = typeof stockDeliveryLines.$inferSelect;
 export type ItemLot = typeof itemLots.$inferSelect;
 export type ItemSerial = typeof itemSerials.$inferSelect;

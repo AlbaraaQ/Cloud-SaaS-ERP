@@ -35,9 +35,9 @@ asserted by hand.
 
 | State | Count | Meaning |
 |---|---|---|
-| `ready` | 171 | A real screen reading and writing the live API. |
+| `ready` | 173 | A real screen reading and writing the live API. |
 | `api` | 2 | The endpoint exists; the screen is still the scaffold. |
-| `planned` | 17 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| `planned` | 15 | Neither screen nor endpoint yet; routed under `/s/…`. |
 | **total** | **190** | |
 
 Round 1 wired: expense cards (`/accounting/expenses`), sales credit/debit notes with
@@ -63,17 +63,40 @@ Round 2 wired the documents that were missing an entire side of the ledger:
   and the cash location, one default per tenant enforced by a partial unique index
   (`/accounting/payment-methods`, also serving the settings menu entry).
 
-The reporting catalog is at **63 keys**; the permission registry at **117** codes.
+The reporting catalog is at **63 keys**; the permission registry at **120** codes.
 `apps/api/src/permission-codes.spec.ts` fails the build when a controller asks for a
 permission the registry does not define — three such codes existed
 (`sales.adjustment.create`, `sales.offer.manage`, and the new
 `purchase.adjustment.create`), each of which had made its route answer 403 to every role
 including the owner.
 
-Still `planned`, and honestly so: stock delivery notes, goods requests, production orders,
-contracting returns, the marina preparation/rota/link/day-close screens, contractor
-contracts and payments, project follow-up and offers, backup/restore/data-rotation,
-invoice maintenance, the preparation-device settings and the report designer.
+Round 3 wired the two warehouse documents that bracket a transfer (migration `0024`):
+
+* **طلب بضاعة** — `goods_requests` + lines. A requisition is numbered `GR-…` on creation
+  and moves draft → submitted → approved → fulfilled; approval may **cut the quantities
+  down** (a store holding 30 of the 50 asked for approves 30), and fulfilment hands the
+  *approved* quantities to a **draft** `stock_transfer`, which remains the only document
+  that touches `inventory_transactions`. Approving is a separate permission from raising
+  the request, because the branch asking for stock should not be the one releasing it.
+  Rejection requires a reason (`/inventory/requests`).
+* **توصيل مخزني** — `stock_deliveries` + lines, always against a **posted** sales invoice.
+  It deliberately writes no inventory line: posting the invoice is what relieves the
+  warehouse in this system, so a second stock issue would double-count every delivered
+  unit and drag the average cost down. What it adds is the physical half of the sale —
+  who received the goods, on what date, and how much the customer is still owed.
+  `GET /inventory/deliveries/outstanding` drives the screen: you pick an invoice that
+  still owes goods and the remaining quantities are prefilled. A draft delivery already
+  reserves its quantity, and cancelling releases it (`/inventory/deliveries`).
+
+While wiring fulfilment, transfer numbering moved server-side: `POST
+/inventory/transfers/draft` now allocates `TR-000001` from the document sequence when the
+caller omits a number. The admin screen used to mint `TR-<timestamp>` in the browser,
+which is neither gap-free nor collision-proof.
+
+Still `planned`, and honestly so: production orders, contracting returns, the marina
+preparation/rota/link/day-close screens, contractor contracts and payments, project
+follow-up and offers, backup/restore/data-rotation, invoice maintenance, the
+preparation-device settings and the report designer.
 
 ## Billing and live-data integration notes
 

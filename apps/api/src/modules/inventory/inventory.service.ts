@@ -17,6 +17,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { SequencesService } from '../platform-services/index.js';
 
 export type InventoryLine = {
   itemId: string;
@@ -34,7 +35,10 @@ export type InventoryLine = {
 
 @Injectable()
 export class InventoryService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly sequences: SequencesService,
+  ) {}
 
   /**
    * Transfer register. `createTransfer` and `receiveTransfer` existed without any way to
@@ -207,12 +211,19 @@ export class InventoryService {
     });
   }
 
-  async createTransfer(tenantId: string, input: { id: string; number: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }> }) {
+  /**
+   * `number` is optional: when the caller omits it the transfer takes the next value from
+   * the document sequence. Letting the browser mint one (the old `TR-<timestamp>`) gives
+   * an auditor a series with holes in it and no guarantee of uniqueness.
+   */
+  async createTransfer(tenantId: string, input: { id?: string; number?: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }> }) {
     if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId) throw new DomainError('INVALID_STOCK_TRANSFER', 'A transfer requires distinct warehouses and at least one line', 422);
+    const id = input.id ?? newId();
     return withTenantTx(this.database.db, tenantId, async (tx) => {
-      await tx.insert(stockTransfers).values({ id: input.id, tenantId, number: input.number, fromWarehouseId: input.fromWarehouseId, toWarehouseId: input.toWarehouseId, status: 'draft' });
-      await tx.insert(stockTransferLines).values(input.lines.map((line, index) => ({ transferId: input.id, tenantId, lineNo: index + 1, itemId: line.itemId, qty: line.qty, unitCost: line.unitCost ?? '0', lotId: line.lotId, serialIds: line.serialIds ?? [] })));
-      return { id: input.id, status: 'draft' };
+      const number = input.number ?? (await this.sequences.next({ tenantId, docType: 'stock_transfer' }, tx, { prefix: 'TR-', padding: 6 })).display;
+      await tx.insert(stockTransfers).values({ id, tenantId, number, fromWarehouseId: input.fromWarehouseId, toWarehouseId: input.toWarehouseId, status: 'draft' });
+      await tx.insert(stockTransferLines).values(input.lines.map((line, index) => ({ transferId: id, tenantId, lineNo: index + 1, itemId: line.itemId, qty: line.qty, unitCost: line.unitCost ?? '0', lotId: line.lotId, serialIds: line.serialIds ?? [] })));
+      return { id, number, status: 'draft' };
     });
   }
 

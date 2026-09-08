@@ -59,10 +59,9 @@ export default function TransfersPage() {
     try {
       const filled = lines.filter((line) => line.itemId && Number(line.qtyText) > 0);
       if (filled.length === 0) throw new ApiError(422, 'VALIDATION_FAILED', 'أضف سطراً واحداً على الأقل بكمية أكبر من صفر.');
-      const stamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+      // No client-side number: the API allocates `TR-…` from the document sequence, so the
+      // series stays gap-free and unique even with two users saving at once.
       await apiPost('/inventory/transfers/draft', {
-        id: crypto.randomUUID(),
-        number: `TR-${stamp}`,
         fromWarehouseId,
         toWarehouseId,
         lines: filled.map((line) => ({ itemId: line.itemId, qty: line.qtyText, unitCost: line.unitCostText || undefined })),

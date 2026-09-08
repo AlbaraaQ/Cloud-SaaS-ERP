@@ -105,6 +105,20 @@ describe('admin navigation tree', () => {
     expect(allScreens.find((screen) => screen.key === 'pn-report')?.href).toBe('/reports/purchase-notes');
   });
 
+  it('wires the warehouse documents that bracket a transfer', () => {
+    const wired: Record<string, string> = {
+      'goods-request': '/inventory/requests',
+      'stock-delivery': '/inventory/deliveries',
+      transfer: '/inventory/transfers',
+    };
+    for (const [key, href] of Object.entries(wired)) {
+      const item = allScreens.find((screen) => screen.key === key);
+      expect(item, key).toBeDefined();
+      expect(item?.status, key).toBe('ready');
+      expect(item?.href, key).toBe(href);
+    }
+  });
+
   it('serves the by-employee and POS breakdowns from the report engine', () => {
     const wired: Record<string, string> = {
       'employee-sales': '/reports/sales-by-employee',

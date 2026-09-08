@@ -88,6 +88,9 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('inventory.adjust.approve', 'Approve stock adjustments (posts ledger and journal).'),
   perm('inventory.transfer', 'Create stock transfers.'),
   perm('inventory.transfer.receive', 'Receive stock transfers.'),
+  perm('inventory.request.manage', 'Raise and submit goods requests.'),
+  perm('inventory.request.approve', 'Approve, reject or fulfil goods requests.'),
+  perm('inventory.delivery.manage', 'Record stock deliveries against posted sales invoices.'),
   perm('inventory.negative.override', 'Allow negative stock movements.'),
 
   // sales / purchases (PHASE_13)
