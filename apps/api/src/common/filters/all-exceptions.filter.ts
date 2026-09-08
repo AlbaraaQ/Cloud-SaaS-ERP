@@ -7,6 +7,7 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { ZodError } from 'zod';
 import {
   DomainError,
   REQUEST_ID_HEADER,
@@ -57,6 +58,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private toProblem(exception: unknown, traceId: string): ProblemDetails {
     if (exception instanceof ZodValidationException) {
       return problemFromZodError(exception.zodError, traceId);
+    }
+
+    // Controllers that call `schema.parse(body)` inline throw the raw ZodError; without this
+    // branch a plain "field is required" would reach the user as an opaque 500.
+    if (exception instanceof ZodError) {
+      return problemFromZodError(exception, traceId);
     }
 
     if (exception instanceof DomainError) {

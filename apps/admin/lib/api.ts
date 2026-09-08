@@ -189,10 +189,30 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   return (text.length > 0 ? JSON.parse(text) : undefined) as T;
 }
 
-/** Convenience wrapper for the `{ data: … }` envelope every endpoint returns. */
+/**
+ * The API is not uniform: some controllers wrap their result in `{ data: … }` and some
+ * return the raw row or array. Unwrapping defensively keeps every screen working with
+ * one client instead of each page knowing which convention its endpoint follows.
+ */
+function unwrap<T>(payload: unknown): T {
+  if (payload !== null && typeof payload === 'object' && !Array.isArray(payload) && 'data' in (payload as Record<string, unknown>)) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
+
 export async function apiData<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const payload = await apiFetch<{ data: T }>(path, options);
-  return payload?.data as T;
+  return unwrap<T>(await apiFetch<unknown>(path, options));
+}
+
+/** Always resolves to an array, even when the endpoint answers with an object. */
+export async function apiList<T>(path: string, options: ApiOptions = {}): Promise<T[]> {
+  const payload = unwrap<unknown>(await apiFetch<unknown>(path, options));
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload !== null && typeof payload === 'object' && Array.isArray((payload as { items?: unknown }).items)) {
+    return (payload as { items: T[] }).items;
+  }
+  return [];
 }
 
 export function apiPost<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {

@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
+    "@erp/contracts": "workspace:*",
     "@tanstack/react-query": "^5.90.2",
     "decimal.js": "^10.6.0",
     "next": "^15.5.4",

@@ -16,6 +16,7 @@ export class HrmController {
   @Post('employees') @RequiresPermission('hrm.manage') createEmployee(@Body() body: EmployeeInput) { return this.hrm.createEmployee(getTenantContext().tenantId, body); }
   @Post('attendance/import') @RequiresPermission('hrm.manage') importAttendance(@Body() body: { csv: string }) { return this.hrm.importAttendanceCsv(getTenantContext().tenantId, body.csv); }
   @Get('attendance/summary') @RequiresPermission('hrm.view') attendanceSummary(@Query('enroll') enroll: string, @Query('from') from: string, @Query('to') to: string) { return this.hrm.attendanceSummary(getTenantContext().tenantId, enroll, from, to); }
+  @Get('adjustments') @RequiresPermission('hrm.view') adjustments() { return this.hrm.listAdjustments(getTenantContext().tenantId); }
   @Post('adjustments') @RequiresPermission('hrm.manage') createAdjustment(@Body() body: AdjustmentInput) { return this.hrm.createAdjustment(getTenantContext().tenantId, body); }
   @Post('adjustments/:id/approve') @RequiresPermission('hrm.adjust.approve') approveAdjustment(@Param('id') id: string) { return this.hrm.approveAdjustment(getTenantContext().tenantId, id); }
   @Post('payroll/preview') @RequiresPermission('hrm.view') preview(@Body() body: RunInput) { return this.hrm.preview(getTenantContext().tenantId, body); }

@@ -3,6 +3,18 @@ import { Decimal } from 'decimal.js';
 export type PayrollEmployeeInput = { id: string; name: string; components: Record<string, string>; unpaidDays?: number; daysInMonth?: number; adjustments?: Array<{ kind: 'addition' | 'deduction'; valueText: string }> };
 export type PayrollLineResult = { employeeId: string; employeeName: string; components: Record<string, string>; additions: string; deductions: string; gross: string; net: string; unpaidFactor: string };
 
+/**
+ * Last calendar day of a `YYYY-MM` month.
+ * Payroll windows used to be built as `${yearMonth}-31`, which is not a real date in
+ * 30-day months and made Postgres reject the whole adjustments query.
+ */
+export function monthEnd(yearMonth: string): string {
+  const year = Number(yearMonth.slice(0, 4));
+  const month = Number(yearMonth.slice(5, 7));
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${yearMonth}-${String(last).padStart(2, '0')}`;
+}
+
 export function calculatePayrollLine(input: PayrollEmployeeInput): PayrollLineResult {
   const base = Object.values(input.components).reduce((sum, valueText) => sum.plus(new Decimal(valueText || '0')), new Decimal(0));
   const days = new Decimal(input.daysInMonth ?? 30);

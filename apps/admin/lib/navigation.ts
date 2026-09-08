@@ -130,9 +130,9 @@ const accounting: ModuleNode = {
       items: [
         screen('opening-entry', 'قيد إفتتاحي', 'Opening entry', '/accounting/journal-entries/new?kind=opening', 'ready', { permission: 'accounting.journal.post', endpoint: 'POST /journal-entries' }),
         screen('journal-voucher', 'سند قيد', 'Journal voucher', '/accounting/journal-entries/new', 'ready', { permission: 'accounting.journal.post', endpoint: 'POST /journal-entries' }),
-        screen('receipt-voucher', 'سند قبض', 'Receipt voucher', '/s/treasury/receipt-voucher', 'api', { permission: 'treasury.view', endpoint: '/treasury/receipts' }),
-        screen('payment-voucher', 'سند صرف', 'Payment voucher', '/s/treasury/payment-voucher', 'api', { permission: 'treasury.view', endpoint: '/treasury/payments' }),
-        screen('tax-payment-voucher', 'سند صرف الضريبة', 'Tax payment voucher', '/s/treasury/tax-payment', 'planned'),
+        screen('receipt-voucher', 'سند قبض', 'Receipt voucher', '/treasury/vouchers?kind=receipt', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
+        screen('payment-voucher', 'سند صرف', 'Payment voucher', '/treasury/vouchers?kind=payment', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
+        screen('tax-payment-voucher', 'سند صرف الضريبة', 'Tax payment voucher', '/treasury/vouchers?kind=payment', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('periods', 'الفترات المحاسبية', 'Fiscal periods', '/accounting/periods', 'ready', { permission: 'accounting.period.view', endpoint: '/fiscal-periods' }),
       ],
     },
@@ -142,7 +142,7 @@ const accounting: ModuleNode = {
       labelEn: 'Accounting reports',
       items: [
         screen('journals-report', 'القيود اليومية', 'Journal entries', '/accounting/journal-entries', 'ready', { permission: 'accounting.reports.view', endpoint: '/journal-entries' }),
-        screen('vouchers-report', 'عرض السندات', 'Vouchers', '/s/accounting/vouchers', 'api', { endpoint: '/treasury/vouchers' }),
+        screen('vouchers-report', 'عرض السندات', 'Vouchers', '/treasury/vouchers', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('statement', 'كشف حساب', 'Account statement', '/accounting/ledger', 'ready', { permission: 'accounting.reports.view', endpoint: '/statements/general-ledger/{accountId}' }),
         screen('main-statement', 'كشف حساب رئيسي', 'Main account statement', '/accounting/ledger?rollup=1', 'ready', { permission: 'accounting.reports.view', endpoint: '/statements/general-ledger/{accountId}' }),
         screen('cash-movement', 'حركة الصندوق', 'Cash movement', '/s/accounting/cash-movement', 'api', { endpoint: '/reports/cash-movement' }),
@@ -175,11 +175,11 @@ const inventory: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
       items: [
-        screen('items', 'دليل المواد', 'Item directory', '/s/inventory/items', 'api', { permission: 'catalog.item.view', endpoint: '/organization/catalog/items' }),
-        screen('warehouse-card', 'بطاقة مستودع', 'Warehouse card', '/s/inventory/warehouses', 'api', { permission: 'organization.warehouse.view', endpoint: '/warehouses' }),
-        screen('group-card', 'بطاقة مجموعة', 'Category card', '/s/inventory/categories', 'api', { permission: 'catalog.item.view', endpoint: '/organization/catalog/categories' }),
-        screen('unit-card', 'بطاقة وحدة', 'Unit card', '/s/inventory/units', 'api', { permission: 'catalog.item.view', endpoint: '/organization/catalog/units' }),
-        screen('item-card', 'بطاقة مادة', 'Item card', '/s/inventory/items/new', 'api', { permission: 'catalog.item.manage', endpoint: 'POST /organization/catalog/items' }),
+        screen('items', 'دليل المواد', 'Item directory', '/inventory/items', 'ready', { permission: 'catalog.item.view', endpoint: '/organization/catalog/items' }),
+        screen('warehouse-card', 'بطاقة مستودع', 'Warehouse card', '/inventory/warehouses', 'ready', { permission: 'organization.warehouse.view', endpoint: '/warehouses' }),
+        screen('group-card', 'بطاقة مجموعة', 'Category card', '/inventory/categories', 'ready', { permission: 'catalog.category.view', endpoint: '/organization/catalog/categories' }),
+        screen('unit-card', 'بطاقة وحدة', 'Unit card', '/inventory/units', 'ready', { permission: 'catalog.unit.view', endpoint: '/organization/catalog/units' }),
+        screen('item-card', 'بطاقة مادة', 'Item card', '/inventory/items', 'ready', { permission: 'catalog.item.manage', endpoint: 'POST /organization/catalog/items' }),
       ],
     },
     {
@@ -187,11 +187,11 @@ const inventory: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('transfer', 'مناقلة', 'Transfer', '/s/inventory/transfers', 'api', { endpoint: '/inventory/transfers' }),
-        screen('opening-stock', 'بضاعة أول مدة', 'Opening stock', '/s/inventory/opening', 'api', { endpoint: '/inventory/opening-balances' }),
-        screen('goods-in', 'فاتورة إدخال', 'Goods receipt', '/s/inventory/receipts', 'api', { endpoint: '/inventory/receipts' }),
-        screen('goods-out', 'فاتورة إخراج', 'Goods issue', '/s/inventory/issues', 'api', { endpoint: '/inventory/issues' }),
-        screen('stock-adjust', 'تسوية مخزنية', 'Stock adjustment', '/s/inventory/adjustments', 'api', { endpoint: '/inventory/adjustments' }),
+        screen('transfer', 'مناقلة', 'Transfer', '/inventory/transfers', 'ready', { permission: 'inventory.view', endpoint: '/inventory/transfers' }),
+        screen('opening-stock', 'بضاعة أول مدة', 'Opening stock', '/inventory/adjustments', 'ready', { permission: 'inventory.adjust', endpoint: 'POST /inventory/adjustments/post' }),
+        screen('goods-in', 'فاتورة إدخال', 'Goods receipt', '/purchases/invoices/new', 'ready', { permission: 'purchase.invoice.create', endpoint: 'POST /purchase-invoices' }),
+        screen('goods-out', 'فاتورة إخراج', 'Goods issue', '/sales/invoices/new', 'ready', { permission: 'sales.invoice.create', endpoint: 'POST /sales/invoices' }),
+        screen('stock-adjust', 'تسوية مخزنية', 'Stock adjustment', '/inventory/adjustments', 'ready', { permission: 'inventory.adjust', endpoint: 'POST /inventory/adjustments/post' }),
         screen('stock-delivery', 'توصيل مخزني', 'Stock delivery', '/s/inventory/deliveries', 'planned'),
         screen('goods-request', 'طلب بضاعة', 'Goods request', '/s/inventory/requests', 'planned'),
         screen('barcode', 'طباعة الباركود', 'Barcode printing', '/s/inventory/barcodes', 'planned'),
@@ -202,10 +202,10 @@ const inventory: ModuleNode = {
       labelAr: 'تقارير مستودعية',
       labelEn: 'Inventory reports',
       items: [
-        screen('stock-count', 'جرد المواد', 'Stock count', '/s/inventory/reports/levels', 'api', { endpoint: '/inventory/levels' }),
-        screen('item-movement', 'حركة مادة تفصيلي', 'Item movement (detail)', '/s/inventory/reports/movement-detail', 'api', { endpoint: '/inventory/movements' }),
+        screen('stock-count', 'جرد المواد', 'Stock count', '/inventory/levels', 'ready', { permission: 'inventory.view', endpoint: '/inventory/levels' }),
+        screen('item-movement', 'حركة مادة تفصيلي', 'Item movement (detail)', '/inventory/movements', 'ready', { permission: 'inventory.view', endpoint: '/inventory/movements' }),
         screen('items-movement', 'حركة مواد تجميعي', 'Item movement (summary)', '/s/inventory/reports/movement-summary', 'api', { endpoint: '/reports/inventory-movement' }),
-        screen('expiry', 'صلاحية المواد', 'Item expiry', '/s/inventory/reports/expiry', 'api', { endpoint: '/inventory/lots' }),
+        screen('expiry', 'صلاحية المواد', 'Item expiry', '/inventory/lots', 'ready', { permission: 'inventory.view', endpoint: '/inventory/lots' }),
         screen('sales-analysis', 'تحليل المبيعات', 'Sales analysis', '/s/inventory/reports/sales-analysis', 'planned'),
         screen('purchase-sales-total', 'إجمالي المبيعات والمشتريات', 'Sales & purchases total', '/s/inventory/reports/totals', 'planned'),
         screen('invoice-profit', 'أرباح الفواتير', 'Invoice profit', '/s/inventory/reports/invoice-profit', 'planned'),
@@ -213,7 +213,7 @@ const inventory: ModuleNode = {
         screen('production-order', 'تقرير أمر الإنتاج', 'Production order report', '/s/inventory/reports/production', 'planned'),
         screen('invoices-by-type', 'الفواتير بحسب النوع', 'Invoices by type', '/s/inventory/reports/invoices-by-type', 'planned'),
         screen('expired-items', 'انتهاء صلاحية الأصناف', 'Expired items', '/s/inventory/reports/expired', 'planned'),
-        screen('serials', 'تقرير الأرقام التسلسلية', 'Serial numbers report', '/s/inventory/reports/serials', 'api', { endpoint: '/inventory/serials' }),
+        screen('serials', 'تقرير الأرقام التسلسلية', 'Serial numbers report', '/inventory/serials', 'ready', { permission: 'inventory.view', endpoint: '/inventory/serials' }),
       ],
     },
     {
@@ -237,7 +237,7 @@ const purchases: ModuleNode = {
   icon: '🛒',
   labelAr: 'المشتريات',
   labelEn: 'Purchases',
-  href: '/s/purchases/invoices',
+  href: '/purchases/invoices',
   permission: 'purchase.view',
   groups: [
     {
@@ -245,8 +245,8 @@ const purchases: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('purchase-invoice', 'فاتورة المشتريات', 'Purchase invoice', '/s/purchases/invoices', 'api', { endpoint: '/purchase-invoices' }),
-        screen('purchase-return', 'مردود المشتريات', 'Purchase return', '/s/purchases/returns', 'api', { endpoint: '/purchase-returns' }),
+        screen('purchase-invoice', 'فاتورة المشتريات', 'Purchase invoice', '/purchases/invoices', 'ready', { endpoint: '/purchase-invoices' }),
+        screen('purchase-return', 'مردود المشتريات', 'Purchase return', '/purchases/invoices/new?kind=purchase_return', 'ready', { permission: 'purchase.invoice.create', endpoint: 'POST /purchase-invoices' }),
       ],
     },
     {
@@ -254,8 +254,8 @@ const purchases: ModuleNode = {
       labelAr: 'السندات',
       labelEn: 'Vouchers',
       items: [
-        screen('supplier-payment', 'سند صرف لمورد', 'Supplier payment', '/s/purchases/payments', 'api', { endpoint: '/treasury/payments' }),
-        screen('purchase-vouchers', 'عرض السندات', 'Vouchers', '/s/purchases/vouchers', 'api', { endpoint: '/treasury/vouchers' }),
+        screen('supplier-payment', 'سند صرف لمورد', 'Supplier payment', '/treasury/vouchers?kind=payment', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
+        screen('purchase-vouchers', 'عرض السندات', 'Vouchers', '/treasury/vouchers', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('purchase-credit-note', 'إشعار دائن', 'Credit note', '/s/purchases/credit-notes', 'planned'),
       ],
     },
@@ -274,7 +274,7 @@ const purchases: ModuleNode = {
       labelAr: 'التقارير',
       labelEn: 'Reports',
       items: [
-        screen('supplier-statement', 'كشف مورد', 'Supplier statement', '/s/purchases/reports/supplier-statement', 'api', { endpoint: '/parties/{id}/statement' }),
+        screen('supplier-statement', 'كشف مورد', 'Supplier statement', '/sales/statements?kind=supplier', 'ready', { permission: 'parties.view', endpoint: '/parties/{id}/statement' }),
         screen('purchase-invoices-report', 'تقرير فواتير المشتريات', 'Purchase invoices', '/s/purchases/reports/invoices', 'api', { endpoint: '/reports/purchases' }),
         screen('purchase-returns-report', 'تقرير مردود فواتير المشتريات', 'Purchase returns', '/s/purchases/reports/returns', 'planned'),
         screen('net-purchases', 'صافي المشتريات', 'Net purchases', '/s/purchases/reports/net', 'planned'),
@@ -290,7 +290,7 @@ const purchases: ModuleNode = {
       key: 'purchases-other',
       labelAr: 'أخرى',
       labelEn: 'Other',
-      items: [screen('supplier-card', 'بطاقة مورد', 'Supplier card', '/s/parties/suppliers', 'api', { permission: 'parties.view', endpoint: '/parties?type=supplier' })],
+      items: [screen('supplier-card', 'بطاقة مورد', 'Supplier card', '/purchases/suppliers', 'ready', { permission: 'parties.view', endpoint: '/parties?kind=supplier' })],
     },
   ],
 };
@@ -303,7 +303,7 @@ const sales: ModuleNode = {
   icon: '🧾',
   labelAr: 'المبيعات',
   labelEn: 'Sales',
-  href: '/s/sales/invoices',
+  href: '/sales/invoices',
   permission: 'sales.view',
   groups: [
     {
@@ -311,12 +311,12 @@ const sales: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('pos', 'نقطة البيع', 'Point of sale', '/s/pos/terminal', 'api', { permission: 'pos.view', endpoint: '/pos/orders' }),
-        screen('sales-invoice', 'فاتورة مبيعات', 'Sales invoice', '/s/sales/invoices', 'api', { endpoint: '/sales-invoices' }),
-        screen('sales-return', 'مردود المبيعات', 'Sales return', '/s/sales/returns', 'api', { endpoint: '/sales-returns' }),
+        screen('pos', 'نقطة البيع', 'Point of sale', '/sales/pos', 'ready', { permission: 'sales.invoice.create', endpoint: 'POST /sales/invoices' }),
+        screen('sales-invoice', 'فاتورة مبيعات', 'Sales invoice', '/sales/invoices', 'ready', { endpoint: '/sales/invoices' }),
+        screen('sales-return', 'مردود المبيعات', 'Sales return', '/sales/returns', 'ready', { permission: 'sales.return.create', endpoint: 'POST /sales/invoices/{id}/return' }),
         screen('quotation', 'عرض سعر', 'Quotation', '/s/sales/quotations', 'planned'),
-        screen('day-close', 'إغلاق اليومية', 'Day close', '/s/sales/day-close', 'api', { endpoint: '/pos/shifts/close' }),
-        screen('contracting-invoice', 'فاتورة المقاولات', 'Contracting invoice', '/s/projects/progress-bills', 'api', { permission: 'projects.view', endpoint: '/projects/progress-bills' }),
+        screen('day-close', 'إغلاق اليومية', 'Day close', '/sales/shifts', 'ready', { permission: 'treasury.view', endpoint: '/shift-closes' }),
+        screen('contracting-invoice', 'فاتورة المقاولات', 'Contracting invoice', '/projects', 'ready', { permission: 'projects.view', endpoint: '/projects/{id}/progress-bills' }),
         screen('contracting-return', 'مرتجع مقاولات', 'Contracting return', '/s/projects/returns', 'planned'),
       ],
     },
@@ -325,8 +325,8 @@ const sales: ModuleNode = {
       labelAr: 'السندات',
       labelEn: 'Vouchers',
       items: [
-        screen('customer-receipt', 'سند قبض عميل', 'Customer receipt', '/s/sales/receipts', 'api', { endpoint: '/treasury/receipts' }),
-        screen('sales-vouchers', 'عرض السندات', 'Vouchers', '/s/sales/vouchers', 'api', { endpoint: '/treasury/vouchers' }),
+        screen('customer-receipt', 'سند قبض عميل', 'Customer receipt', '/treasury/vouchers?kind=receipt', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
+        screen('sales-vouchers', 'عرض السندات', 'Vouchers', '/treasury/vouchers', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('sales-debit-note', 'إشعار مدين', 'Debit note', '/s/sales/debit-notes', 'planned'),
       ],
     },
@@ -345,7 +345,7 @@ const sales: ModuleNode = {
       labelAr: 'التقارير',
       labelEn: 'Reports',
       items: [
-        screen('day-closes', 'إغلاقات اليومية', 'Day closes', '/s/sales/reports/day-closes', 'api', { endpoint: '/pos/shifts' }),
+        screen('day-closes', 'إغلاقات اليومية', 'Day closes', '/sales/shifts', 'ready', { permission: 'treasury.view', endpoint: '/shift-closes' }),
         screen('sales-invoices-report', 'تقرير فواتير المبيعات', 'Sales invoices', '/s/sales/reports/invoices', 'api', { endpoint: '/reports/sales' }),
         screen('sales-returns-report', 'تقرير مردود فواتير المبيعات', 'Sales returns', '/s/sales/reports/returns', 'planned'),
         screen('net-sales', 'صافي المبيعات', 'Net sales', '/s/sales/reports/net', 'planned'),
@@ -357,7 +357,7 @@ const sales: ModuleNode = {
         screen('item-profit-detail', 'تفاصيل أرباح الأصناف', 'Item profit detail', '/s/sales/reports/item-profit-detail', 'planned'),
         screen('reps-report', 'تقرير المندوبين', 'Sales reps', '/s/sales/reports/reps', 'planned'),
         screen('employee-sales', 'مبيعات موظف', 'Sales by employee', '/s/sales/reports/by-employee', 'planned'),
-        screen('customer-statement', 'كشف عميل', 'Customer statement', '/s/sales/reports/customer-statement', 'api', { endpoint: '/parties/{id}/statement' }),
+        screen('customer-statement', 'كشف عميل', 'Customer statement', '/sales/statements', 'ready', { permission: 'parties.view', endpoint: '/parties/{id}/statement' }),
         screen('customer-balances', 'أرصدة العملاء', 'Customer balances', '/s/sales/reports/balances', 'api', { endpoint: '/reports/party-balances' }),
         screen('customer-settlements', 'سداد العملاء', 'Customer settlements', '/s/sales/reports/settlements', 'planned'),
         screen('invoices-by-customer', 'الفواتير بحسب العملاء', 'Invoices by customer', '/s/sales/reports/by-customer', 'planned'),
@@ -383,8 +383,8 @@ const sales: ModuleNode = {
       labelAr: 'أخرى',
       labelEn: 'Other',
       items: [
-        screen('customer-card', 'بطاقة عميل', 'Customer card', '/s/parties/customers', 'api', { permission: 'parties.view', endpoint: '/parties?type=customer' }),
-        screen('rep-card', 'بطاقة مندوب', 'Sales rep card', '/s/parties/reps', 'planned'),
+        screen('customer-card', 'بطاقة عميل', 'Customer card', '/sales/customers', 'ready', { permission: 'parties.view', endpoint: '/parties?kind=customer' }),
+        screen('rep-card', 'بطاقة مندوب', 'Sales rep card', '/sales/salesmen', 'ready', { permission: 'sales.view', endpoint: '/sales/salesmen' }),
       ],
     },
   ],
@@ -398,7 +398,7 @@ const hrm: ModuleNode = {
   icon: '👥',
   labelAr: 'الموظفين والرواتب',
   labelEn: 'HR & Payroll',
-  href: '/s/hrm/employees',
+  href: '/hrm/employees',
   permission: 'hrm.view',
   groups: [
     {
@@ -406,9 +406,9 @@ const hrm: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
       items: [
-        screen('departments', 'تعريف الإدارات', 'Departments', '/s/hrm/departments', 'api', { endpoint: '/hrm/departments' }),
-        screen('sections', 'تعريف الأقسام', 'Sections', '/s/hrm/sections', 'api', { endpoint: '/hrm/sections' }),
-        screen('employee', 'تعريف موظف', 'Employee', '/s/hrm/employees', 'api', { endpoint: '/hrm/employees' }),
+        screen('departments', 'تعريف الإدارات', 'Departments', '/hrm/departments', 'ready', { endpoint: '/hrm/departments' }),
+        screen('sections', 'تعريف الأقسام والوظائف', 'Jobs', '/hrm/jobs', 'ready', { endpoint: '/hrm/jobs' }),
+        screen('employee', 'تعريف موظف', 'Employee', '/hrm/employees', 'ready', { endpoint: '/hrm/employees' }),
       ],
     },
     {
@@ -416,9 +416,9 @@ const hrm: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('adjustments', 'الحوافز والجزاءات', 'Bonuses & deductions', '/s/hrm/adjustments', 'api', { endpoint: '/hrm/adjustments' }),
-        screen('payroll-run', 'إستحقاق راتب', 'Payroll run', '/s/hrm/payroll-runs', 'api', { endpoint: '/hrm/payroll-runs' }),
-        screen('salary-payment', 'سند صرف راتب', 'Salary payment voucher', '/s/hrm/salary-payments', 'api', { endpoint: '/hrm/payroll-runs/{id}/pay' }),
+        screen('adjustments', 'الحوافز والجزاءات', 'Bonuses & deductions', '/hrm/adjustments', 'ready', { endpoint: '/hrm/adjustments' }),
+        screen('payroll-run', 'إستحقاق راتب', 'Payroll run', '/hrm/payroll', 'ready', { endpoint: '/hrm/payroll/runs' }),
+        screen('salary-payment', 'سند صرف راتب', 'Salary payment voucher', '/hrm/payroll', 'ready', { permission: 'hrm.payroll.post', endpoint: 'POST /hrm/payroll/runs/{id}/pay' }),
       ],
     },
     {
@@ -426,7 +426,7 @@ const hrm: ModuleNode = {
       labelAr: 'التقارير',
       labelEn: 'Reports',
       items: [
-        screen('accrual-report', 'تقرير الإستحقاق', 'Accrual report', '/s/hrm/reports/accrual', 'api', { endpoint: '/hrm/payroll-runs/{id}/payslips' }),
+        screen('accrual-report', 'تقرير الإستحقاق', 'Accrual report', '/hrm/payroll', 'ready', { endpoint: 'POST /hrm/payroll/preview' }),
         screen('salary-payments-report', 'دفع الرواتب', 'Salary payments', '/s/hrm/reports/payments', 'planned'),
         screen('employee-account', 'حساب موظف', 'Employee account', '/s/hrm/reports/employee-account', 'planned'),
         screen('user-logs', 'سجلات المستخدمين', 'User logs', '/platform/audit', 'ready', { permission: 'platform.audit.view', endpoint: '/audit-log' }),
@@ -443,7 +443,7 @@ const marina: ModuleNode = {
   icon: '⛵',
   labelAr: 'إدارة المراسي',
   labelEn: 'Marina',
-  href: '/s/marina/vessels',
+  href: '/marina/vessels',
   permission: 'marina.view',
   groups: [
     {
@@ -451,11 +451,11 @@ const marina: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
       items: [
-        screen('marina-model', 'بطاقة نموذج', 'Model card', '/s/marina/models', 'api', { endpoint: '/marina/models' }),
-        screen('marina-vessel', 'بطاقة مركب', 'Vessel card', '/s/marina/vessels', 'api', { endpoint: '/marina/vessels' }),
-        screen('marina-addons', 'بطاقة إضافات', 'Add-ons card', '/s/marina/addons', 'api', { endpoint: '/marina/addons' }),
-        screen('marina-owner', 'بطاقة مالك', 'Owner card', '/s/marina/owners', 'api', { endpoint: '/marina/owners' }),
-        screen('marina-customer', 'بطاقة عميل', 'Customer card', '/s/parties/customers', 'api', { permission: 'parties.view', endpoint: '/parties?type=customer' }),
+        screen('marina-model', 'بطاقة نموذج', 'Model card', '/marina/vessels', 'ready', { endpoint: 'POST /marina/groups' }),
+        screen('marina-vessel', 'بطاقة مركب', 'Vessel card', '/marina/vessels', 'ready', { endpoint: '/marina' }),
+        screen('marina-addons', 'بطاقة إضافات', 'Add-ons card', '/marina/bookings', 'ready', { permission: 'marina.manage', endpoint: 'POST /marina/bookings/{id}/additions' }),
+        screen('marina-owner', 'بطاقة مالك', 'Owner card', '/marina/vessels', 'ready', { permission: 'marina.manage', endpoint: 'POST /marina/vessels/{id}/owners' }),
+        screen('marina-customer', 'بطاقة عميل', 'Customer card', '/sales/customers', 'ready', { permission: 'parties.view', endpoint: '/parties?kind=customer' }),
       ],
     },
     {
@@ -464,7 +464,7 @@ const marina: ModuleNode = {
       labelEn: 'Management',
       items: [
         screen('marina-prep', 'تحضير المراكب', 'Vessel preparation', '/s/marina/preparation', 'api', { endpoint: '/marina/preparation' }),
-        screen('marina-violations', 'المخالفات', 'Violations', '/s/marina/violations', 'planned'),
+        screen('marina-violations', 'المخالفات', 'Violations', '/marina/violations', 'ready', { endpoint: '/marina/violations' }),
         screen('marina-rota', 'خطة الدور', 'Rotation plan', '/s/marina/rota', 'api', { endpoint: '/marina/operation-plans' }),
       ],
     },
@@ -473,9 +473,9 @@ const marina: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('marina-invoice', 'فاتورة', 'Invoice', '/s/marina/invoices', 'api', { endpoint: '/marina/invoices' }),
+        screen('marina-invoice', 'فاتورة', 'Invoice', '/marina/bookings', 'ready', { permission: 'marina.invoice', endpoint: 'POST /marina/bookings/{id}/rental-invoice' }),
         screen('marina-link', 'ربط الفواتير', 'Link invoices', '/s/marina/link-invoices', 'planned'),
-        screen('marina-bookings', 'حجوزات', 'Bookings', '/s/marina/bookings', 'api', { endpoint: '/marina/bookings' }),
+        screen('marina-bookings', 'حجوزات', 'Bookings', '/marina/bookings', 'ready', { endpoint: '/marina/bookings' }),
         screen('marina-day-close', 'إغلاق اليومية', 'Day close', '/s/marina/day-close', 'planned'),
       ],
     },
@@ -499,7 +499,7 @@ const projects: ModuleNode = {
   icon: '🏗️',
   labelAr: 'إدارة المشاريع',
   labelEn: 'Projects',
-  href: '/s/projects/list',
+  href: '/projects',
   permission: 'projects.view',
   groups: [
     {
@@ -507,10 +507,10 @@ const projects: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
       items: [
-        screen('boq-item', 'بطاقة بند', 'BOQ item card', '/s/projects/boq-items', 'api', { endpoint: '/projects/boq' }),
-        screen('contractor-card', 'بطاقة مقاول', 'Contractor card', '/s/projects/contractors', 'api', { endpoint: '/parties?type=contractor' }),
-        screen('project-customer', 'بطاقة عميل', 'Customer card', '/s/parties/customers', 'api', { permission: 'parties.view', endpoint: '/parties?type=customer' }),
-        screen('project-stages', 'مراحل مشروع', 'Project stages', '/s/projects/stages', 'api', { endpoint: '/projects/{id}/stages' }),
+        screen('boq-item', 'بطاقة بند', 'BOQ item card', '/projects', 'ready', { permission: 'projects.manage', endpoint: 'POST /projects/{id}/boq' }),
+        screen('contractor-card', 'بطاقة مقاول', 'Contractor card', '/purchases/suppliers', 'ready', { permission: 'parties.view', endpoint: '/parties?kind=supplier' }),
+        screen('project-customer', 'بطاقة عميل', 'Customer card', '/sales/customers', 'ready', { permission: 'parties.view', endpoint: '/parties?kind=customer' }),
+        screen('project-stages', 'مراحل مشروع', 'Project stages', '/projects', 'ready', { permission: 'projects.manage', endpoint: 'POST /projects/{id}/stages' }),
       ],
     },
     {
@@ -518,11 +518,11 @@ const projects: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('customer-contract', 'عقد عميل', 'Customer contract', '/s/projects/list', 'api', { endpoint: '/projects' }),
+        screen('customer-contract', 'عقد عميل', 'Customer contract', '/projects', 'ready', { endpoint: '/projects' }),
         screen('contractor-contract', 'عقد مقاول', 'Contractor contract', '/s/projects/contractor-contracts', 'planned'),
         screen('project-followup', 'متابعة', 'Follow-up', '/s/projects/followup', 'planned'),
         screen('project-offers', 'عروض', 'Offers', '/s/projects/offers', 'planned'),
-        screen('project-receipt', 'سند قبض عميل', 'Customer receipt', '/s/sales/receipts', 'api', { endpoint: '/treasury/receipts' }),
+        screen('project-receipt', 'سند قبض عميل', 'Customer receipt', '/treasury/vouchers?kind=receipt', 'ready', { permission: 'treasury.view', endpoint: '/vouchers' }),
         screen('contractor-payment', 'سند دفع لمقاول', 'Contractor payment', '/s/projects/contractor-payments', 'planned'),
       ],
     },
@@ -546,6 +546,7 @@ const settings: ModuleNode = {
       items: [
         screen('company-card', 'بطاقة المنشأة', 'Company card', '/settings/company', 'ready', { permission: 'platform.tenant.view', endpoint: '/company-profile' }),
         screen('branch-card', 'بطاقة فرع', 'Branch card', '/settings/branches', 'ready', { permission: 'organization.branch.view', endpoint: '/branches' }),
+        screen('posting-profiles', 'الربط المحاسبي', 'Posting profiles', '/settings/posting-profiles', 'ready', { permission: 'organization.postingprofile.view', endpoint: '/branch-posting-profiles' }),
         screen('zatca-settings', 'إعدادات الربط مع هيئة الزكاة والضريبة', 'ZATCA integration', '/s/settings/zatca', 'api', { permission: 'einvoice.view', endpoint: '/einvoicing/credentials' }),
       ],
     },

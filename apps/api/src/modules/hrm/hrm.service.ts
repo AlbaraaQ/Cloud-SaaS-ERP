@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import { attendanceLogs, departments, employees, jobs, payrollRunLines, payrollRuns, salaryAdjustments, tenantSettings, withTenantTx, type DatabaseHandle, type Employee } from '@erp/database';
 
@@ -10,7 +10,7 @@ import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService, type JournalLineInput } from '../accounting/accounting.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 
-import { calculatePayrollLine } from './payroll-calculator.js';
+import { calculatePayrollLine, monthEnd } from './payroll-calculator.js';
 
 export type DepartmentInput = { code: string; name: string; branchId?: string };
 export type JobInput = { code: string; name: string };
@@ -37,6 +37,7 @@ export class HrmService {
 
   async attendanceSummary(tenantId: string, enroll: string, from: string, to: string) { await this.ensureEnabled(tenantId); const rows = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(attendanceLogs).where(and(eq(attendanceLogs.tenantId, tenantId), eq(attendanceLogs.enroll, enroll), gte(attendanceLogs.punchAt, new Date(from)), lte(attendanceLogs.punchAt, new Date(to)))).orderBy(attendanceLogs.punchAt)); let minutes = new Decimal(0); let open: Date | undefined; for (const row of rows) { if (row.direction === 'in') open = row.punchAt; else if (row.direction === 'out' && open) { minutes = minutes.plus(new Decimal(row.punchAt.getTime() - open.getTime()).div(60_000)); open = undefined; } } return { data: { enroll, punches: rows.length, workingHours: minutes.div(60).toFixed(2), method: 'naive in/out pairing; no RC-10 evaluation engine' } }; }
 
+  async listAdjustments(tenantId: string) { await this.ensureEnabled(tenantId); return { data: await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(eq(salaryAdjustments.tenantId, tenantId)).orderBy(desc(salaryAdjustments.createdAt)).limit(200)) }; }
   async createAdjustment(tenantId: string, input: AdjustmentInput) { await this.ensureEnabled(tenantId); if (new Decimal(input.valueText).lte(0)) throw new DomainError('VALIDATION_FAILED', 'Adjustment value must be positive', 422); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(salaryAdjustments).values({ id: newId(), tenantId, employeeId: input.employeeId, kind: input.kind, componentCode: input.componentCode, valueText: input.valueText, startsOn: input.startsOn, endsOn: input.endsOn, recurring: input.recurring ?? false, subFromSalary: input.subFromSalary ?? input.kind === 'deduction', cashLocationId: input.cashLocationId, reason: input.reason }).returning()); return row; }
   async approveAdjustment(tenantId: string, id: string) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salaryAdjustments).set({ status: 'approved', updatedAt: new Date() }).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, id), eq(salaryAdjustments.status, 'draft'))).returning()); if (!row) throw new DomainError('NOT_FOUND', 'Draft adjustment not found', 404); return row; }
 
@@ -49,7 +50,7 @@ export class HrmService {
   async payRun(tenantId: string, id: string, input: PayRunInput) { await this.ensureEnabled(tenantId); const current = await this.readRun(tenantId, id); if (current.data.status !== 'posted') throw new DomainError('PAYROLL_RUN_NOT_POSTED', 'Only posted payroll runs can be paid', 409); const payValue = sumLines(current.data.lines.map((line) => line.net)); const voucher = await this.treasury.createVoucher(tenantId, { branchId: input.branchId, kind: 'payment', subtype: 'salary', date: new Date().toISOString().slice(0, 10), cashLocationId: input.cashLocationId, method: input.method ?? 'cash', amount: payValue, netAmount: payValue, idempotencyKey: `payroll:${id}` }); const posted = voucher?.id ? await this.treasury.postVoucher(tenantId, voucher.id, { fiscalPeriodId: input.fiscalPeriodId }) : undefined; await withTenantTx(this.database.db, tenantId, (tx) => tx.update(payrollRuns).set({ status: 'paid', voucherId: posted?.id, paidAt: new Date(), updatedAt: new Date() }).where(and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.id, id)))); return this.readRun(tenantId, id); }
   async reverseRun(tenantId: string, id: string, reason: string) { await this.ensureEnabled(tenantId); if (!reason.trim()) throw new DomainError('VALIDATION_FAILED', 'Reversal reason is required', 422); const current = await this.readRun(tenantId, id); if (current.data.status !== 'posted' && current.data.status !== 'paid') throw new DomainError('PAYROLL_REVERSAL_INVALID', 'Only posted or paid runs can be reversed', 409); await withTenantTx(this.database.db, tenantId, (tx) => tx.update(payrollRuns).set({ status: 'reversed', reversedAt: new Date(), reversalReason: reason, updatedAt: new Date() }).where(and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.id, id)))); return this.readRun(tenantId, id); }
 
-  private async adjustmentsForMonth(tenantId: string, yearMonth: string) { const start = `${yearMonth}-01`; const end = `${yearMonth}-31`; return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.status, 'approved'), lte(salaryAdjustments.startsOn, end), or(isNull(salaryAdjustments.endsOn), gte(salaryAdjustments.endsOn, start)) ?? sql`true`))); }
+  private async adjustmentsForMonth(tenantId: string, yearMonth: string) { const start = `${yearMonth}-01`; const end = monthEnd(yearMonth); return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.status, 'approved'), lte(salaryAdjustments.startsOn, end), or(isNull(salaryAdjustments.endsOn), gte(salaryAdjustments.endsOn, start)) ?? sql`true`))); }
 }
 
 function validateComponents(components: Record<string, string>) { for (const entry of Object.entries(components)) if (!new Decimal(entry[1] || '0').isFinite()) throw new DomainError('VALIDATION_FAILED', `Invalid salary component ${entry[0]}`, 422); }

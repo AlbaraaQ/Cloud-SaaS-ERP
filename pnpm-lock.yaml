@@ -59,6 +59,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@erp/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@tanstack/react-query':
         specifier: ^5.90.2
         version: 5.102.8(react@19.2.8)

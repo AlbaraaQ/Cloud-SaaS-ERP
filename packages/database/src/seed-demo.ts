@@ -58,6 +58,9 @@ export type DemoSeedReport = {
   bankId: string;
   accounts: number;
   costCenters: number;
+  catalog: { units: number; categories: number; taxGroups: number };
+  /** `created` the first time the tenant-wide posting profile is written. */
+  postingProfile: 'created' | 'existing';
   fiscalYearId: string;
   periods: number;
   openingEntryNumber?: string;
@@ -148,6 +151,52 @@ export const DEMO_CHART_OF_ACCOUNTS: AccountSeed[] = [
   { code: '5210', nameAr: 'مصروفات أخرى', nameEn: 'Other expenses', type: 'expense', parent: '52' },
 ];
 
+/**
+ * An item cannot be created without a category and a base unit, and a sales line cannot
+ * compute VAT without a tax group. Seeding the three directories is what makes the
+ * inventory / sales / purchase screens usable on the first run.
+ */
+const DEMO_UNITS = [
+  { code: 'PCS', nameAr: 'حبة', nameEn: 'Piece' },
+  { code: 'BOX', nameAr: 'كرتون', nameEn: 'Box' },
+  { code: 'KG', nameAr: 'كيلوجرام', nameEn: 'Kilogram' },
+  { code: 'LTR', nameAr: 'لتر', nameEn: 'Litre' },
+];
+
+const DEMO_CATEGORIES = [
+  { code: 'GEN', nameAr: 'بضاعة عامة', nameEn: 'General goods' },
+  { code: 'SRV', nameAr: 'خدمات', nameEn: 'Services' },
+];
+
+/** Rate is stored as a fraction (0.1500 = 15%), matching `tax_groups.rate`. */
+const DEMO_TAX_GROUPS = [
+  { nameAr: 'ضريبة القيمة المضافة 15%', nameEn: 'VAT 15%', rate: '0.1500', vatAccountCode: '2102' },
+  { nameAr: 'معفاة من الضريبة', nameEn: 'Exempt', rate: '0.0000', vatAccountCode: undefined },
+];
+
+/**
+ * The tenant-wide (`*`) posting profile. Without it every document post fails with
+ * `ACCOUNT_PROFILE_MISSING`, so a demo tenant that cannot issue an invoice is not a demo.
+ * Keys are `POST_PROFILE_ACCOUNT_KEYS` from `@erp/contracts`; values are account codes
+ * from the chart above and are resolved to ids at seed time.
+ */
+export const DEMO_POSTING_PROFILE: Record<string, string> = {
+  salesAccountId: '4101',
+  salesReturnAccountId: '4102',
+  purchasesAccountId: '1104',
+  purchaseReturnAccountId: '5102',
+  discountGivenAccountId: '4103',
+  discountReceivedAccountId: '5103',
+  vatOutputAccountId: '2102',
+  vatInputAccountId: '1105',
+  inventoryAccountId: '1104',
+  cogsAccountId: '5101',
+  cashAccountId: '1101',
+  bankAccountId: '1102',
+  receivableAccountId: '1103',
+  payableAccountId: '2101',
+};
+
 const DEMO_COST_CENTERS = [
   { code: 'ADMIN', nameAr: 'الإدارة العامة', nameEn: 'Administration' },
   { code: 'SALES', nameAr: 'المبيعات', nameEn: 'Sales' },
@@ -213,8 +262,14 @@ export async function seedDemoData(
 
     await linkCashAccounts(client, tenantId, org.safeId, org.bankId, chart.byCode);
 
+    const catalog = await seedCatalogBasics(client, tenantId, chart.byCode);
+    log(`seed  catalog: ${catalog.units} units, ${catalog.categories} categories, ${catalog.taxGroups} tax groups`);
+
     const costCenters = await seedCostCenters(client, tenantId, org.branchId);
     log(`seed  cost centers: ${costCenters}`);
+
+    const postingProfile = await seedPostingProfile(client, tenantId, chart.byCode);
+    log(`seed  posting profile (tenant-wide): ${postingProfile}`);
 
     const calendar = await seedFiscalCalendar(client, tenantId, year);
     log(`seed  fiscal year ${year}: ${calendar.periods} periods`);
@@ -244,6 +299,8 @@ export async function seedDemoData(
       bankId: org.bankId,
       accounts: chart.total,
       costCenters,
+      catalog,
+      postingProfile,
       fiscalYearId: calendar.fiscalYearId,
       periods: calendar.periods,
       openingEntryNumber,
@@ -484,6 +541,66 @@ async function linkCashAccounts(
       [accountId, cashLocationId, tenantId],
     );
   }
+}
+
+async function seedCatalogBasics(
+  client: Client,
+  tenantId: string,
+  byCode: Map<string, string>,
+): Promise<{ units: number; categories: number; taxGroups: number }> {
+  for (const unit of DEMO_UNITS) {
+    await client.query(
+      `INSERT INTO units_of_measure (id, tenant_id, code, name_ar, name_en)
+       SELECT $1, $2, $3, $4, $5
+       WHERE NOT EXISTS (SELECT 1 FROM units_of_measure WHERE tenant_id = $2 AND code = $3 AND deleted_at IS NULL)`,
+      [newId(), tenantId, unit.code, unit.nameAr, unit.nameEn],
+    );
+  }
+
+  for (const category of DEMO_CATEGORIES) {
+    await client.query(
+      `INSERT INTO item_categories (id, tenant_id, code, name_ar, name_en)
+       SELECT $1, $2, $3, $4, $5
+       WHERE NOT EXISTS (SELECT 1 FROM item_categories WHERE tenant_id = $2 AND code = $3 AND deleted_at IS NULL)`,
+      [newId(), tenantId, category.code, category.nameAr, category.nameEn],
+    );
+  }
+
+  for (const group of DEMO_TAX_GROUPS) {
+    await client.query(
+      `INSERT INTO tax_groups (id, tenant_id, name_ar, name_en, rate, vat_account_id)
+       SELECT $1, $2, $3, $4, $5, $6
+       WHERE NOT EXISTS (SELECT 1 FROM tax_groups WHERE tenant_id = $2 AND name_ar = $3 AND deleted_at IS NULL)`,
+      [newId(), tenantId, group.nameAr, group.nameEn, group.rate, group.vatAccountCode ? (byCode.get(group.vatAccountCode) ?? null) : null],
+    );
+  }
+
+  return { units: DEMO_UNITS.length, categories: DEMO_CATEGORIES.length, taxGroups: DEMO_TAX_GROUPS.length };
+}
+
+async function seedPostingProfile(
+  client: Client,
+  tenantId: string,
+  byCode: Map<string, string>,
+): Promise<'created' | 'existing'> {
+  const mapping: Record<string, string | number> = { version: 1 };
+  for (const [key, code] of Object.entries(DEMO_POSTING_PROFILE)) {
+    const accountId = byCode.get(code);
+    if (accountId) mapping[key] = accountId;
+  }
+
+  const inserted = await client.query(
+    `INSERT INTO branch_posting_profiles (id, tenant_id, branch_id, doc_type, mapping)
+     SELECT $1, $2, NULL, '*', $3::jsonb
+     WHERE NOT EXISTS (
+       SELECT 1 FROM branch_posting_profiles
+       WHERE tenant_id = $2 AND branch_id IS NULL AND doc_type = '*'
+     )
+     RETURNING id`,
+    [newId(), tenantId, JSON.stringify(mapping)],
+  );
+
+  return inserted.rowCount ? 'created' : 'existing';
 }
 
 async function seedCostCenters(client: Client, tenantId: string, branchId: string): Promise<number> {

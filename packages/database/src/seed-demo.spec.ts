@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEMO_CHART_OF_ACCOUNTS, DEMO_PLANS } from './seed-demo.js';
+import { DEMO_CHART_OF_ACCOUNTS, DEMO_PLANS, DEMO_POSTING_PROFILE } from './seed-demo.js';
 
 /**
  * The demo seed inserts the chart of accounts in a single pass and derives each account's
@@ -61,6 +61,32 @@ describe('DEMO_CHART_OF_ACCOUNTS', () => {
   it('contains the accounts the opening entry and the cash locations depend on', () => {
     const codes = new Set(DEMO_CHART_OF_ACCOUNTS.map((account) => account.code));
     for (const code of ['1101', '1102', '1201', '3101']) expect(codes).toContain(code);
+  });
+});
+
+describe('DEMO_POSTING_PROFILE', () => {
+  it('maps every account to a code that exists and is postable', () => {
+    const byCode = new Map(DEMO_CHART_OF_ACCOUNTS.map((account) => [account.code, account]));
+    for (const [key, code] of Object.entries(DEMO_POSTING_PROFILE)) {
+      const account = byCode.get(code);
+      expect(account, `${key} -> ${code}`).toBeDefined();
+      expect(account?.postable ?? true, `${key} -> ${code} postable`).not.toBe(false);
+    }
+  });
+
+  it('covers the mappings sales, purchases and treasury postings need', () => {
+    for (const key of [
+      'salesAccountId',
+      'purchasesAccountId',
+      'vatOutputAccountId',
+      'vatInputAccountId',
+      'inventoryAccountId',
+      'cogsAccountId',
+      'receivableAccountId',
+      'payableAccountId',
+    ]) {
+      expect(Object.keys(DEMO_POSTING_PROFILE)).toContain(key);
+    }
   });
 });
 

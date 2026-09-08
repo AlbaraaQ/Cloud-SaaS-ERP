@@ -36,6 +36,27 @@ export type InventoryLine = {
 export class InventoryService {
   constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
 
+  /**
+   * Transfer register. `createTransfer` and `receiveTransfer` existed without any way to
+   * read the result back, which made the مناقلة screen impossible to build.
+   */
+  async listTransfers(tenantId: string, status?: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(stockTransfers)
+        .where(and(eq(stockTransfers.tenantId, tenantId), status ? eq(stockTransfers.status, status) : undefined))
+        .orderBy(sql`${stockTransfers.createdAt} DESC`)
+        .limit(200);
+      if (rows.length === 0) return [];
+      const lines = await tx
+        .select()
+        .from(stockTransferLines)
+        .where(and(eq(stockTransferLines.tenantId, tenantId), inArray(stockTransferLines.transferId, rows.map((row) => row.id))));
+      return rows.map((row) => ({ ...row, lines: lines.filter((line) => line.transferId === row.id) }));
+    });
+  }
+
   async record(tenantId: string, lines: InventoryLine[]) {
     return withTenantTx(this.database.db, tenantId, (tx) => this.recordInTx(tx, tenantId, lines));
   }

@@ -101,4 +101,16 @@ describe('AllExceptionsFilter', () => {
     expect(sent.body).not.toContain('stack');
     expect(sent.body).not.toContain('secret detail');
   });
+
+  it('turns a raw ZodError from an inline schema.parse into a 422-style validation problem', () => {
+    const schema = z.object({ categoryId: z.string().uuid(), baseUnitId: z.string().uuid() });
+    const result = schema.safeParse({ categoryId: 'not-a-uuid' });
+    expect(result.success).toBe(false);
+
+    const sent = runFilter((result as { error: ZodError }).error);
+    const body = JSON.parse(sent.body) as { code: string; errors?: Array<{ field: string }> };
+    expect(body.code).toBe(errorCodes.VALIDATION_FAILED);
+    expect(sent.contentType).toBe('application/problem+json');
+    expect(body.errors?.map((entry) => entry.field)).toEqual(['categoryId', 'baseUnitId']);
+  });
 });
