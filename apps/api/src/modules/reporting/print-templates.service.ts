@@ -574,7 +574,7 @@ export class PrintTemplatesService {
     const qr = qrcode(0, 'M');
     qr.addData(payload);
     qr.make();
-    return `<div class="qr">${qr.createSvgTag({ cellSize: 3, margin: 0, scalable: true })}<span>${escapeHtml(status ? `ZATCA: ${status}` : 'ZATCA')}</span></div>`;
+    return `<div class="qr">${qr.createSvgTag({ cellSize: 3, margin: 0, scalable: true })}<span>${escapeHtml(ZATCA_STATUS_LABELS[status ?? ''] ?? 'رمز الاستجابة السريعة')}</span></div>`;
   }
 
   private signatures(labels: string[]) {
@@ -706,6 +706,15 @@ function cellText(value: string, numeric: boolean): string {
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
 }
+
+/** What the caption under the QR says. A prepared invoice carries a valid phase-1 code. */
+const ZATCA_STATUS_LABELS: Record<string, string> = {
+  prepared: 'رمز الفوترة الإلكترونية (المرحلة الأولى)',
+  signed: 'رمز موقّع — بانتظار الإرسال للهيئة',
+  reported: 'مُبلَّغة لهيئة الزكاة والضريبة',
+  cleared: 'مُصادق عليها من هيئة الزكاة والضريبة',
+  failed: 'تعذّر الإرسال للهيئة',
+};
 
 const SALES_KIND_TITLES: Record<string, string> = { sale: 'فاتورة مبيعات', return: 'مردود مبيعات', quotation: 'عرض سعر', contracting: 'فاتورة مقاولات' };
 const SALES_KIND_TITLES_EN: Record<string, string> = { sale: 'Sales Invoice', return: 'Sales Return', quotation: 'Quotation', contracting: 'Contracting Invoice' };

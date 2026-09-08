@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { bigint, index, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { baseAuditColumns } from '../columns.js';
 
@@ -46,6 +46,8 @@ export const einvoiceChain = pgTable('einvoice_chain', {
   authority: text('authority').notNull(),
   environment: text('environment').notNull(),
   lastHash: text('last_hash').notNull().default(''),
+  /** ZATCA invoice counter value (ICV): 1 for the first invoice of the chain, +1 each time. */
+  counter: bigint('counter', { mode: 'number' }).notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ pk: primaryKey({ columns: [t.tenantId, t.authority, t.environment] }) }));
 

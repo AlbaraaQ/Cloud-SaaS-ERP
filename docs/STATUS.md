@@ -354,6 +354,29 @@ Still `planned` — 1 screen: إعدادات جهاز التحضير (preparatio
   value with leading zeros survive the trip to Excel intact.
 - Tests: `xlsx.spec.ts` (6) plus four export cases in `test/printing-and-cards.spec.ts`.
 
+## Round 9 (part 2) — ZATCA e-invoicing is a real document, not a mock
+
+- **The invoice XML is a UBL 2.1 document** built from the tenant's own data
+  (`apps/api/src/modules/einvoicing/zatca/ubl.ts`): seller party with VAT/CR and national
+  address, buyer party, per-line tax categories, one `cac:TaxSubtotal` per rate, closing
+  `cac:LegalMonetaryTotal`, `388`/`381` type codes and the `0100000`/`0200000` standard vs
+  simplified flag. It replaces a five-element fake that no validator would have accepted.
+- **The hash chain is real.** `einvoice_chain` now also carries the invoice counter (ICV,
+  migration `0029`), handed out with the previous hash (PIH) under `FOR UPDATE`; both are
+  embedded in the document, and the next invoice's PIH is this invoice's hash.
+- **The QR is the tenant's.** TLV tags 1–5 are built from the company card and the invoice —
+  the old code hard-coded `Tenant seller` and a VAT number of fifteen zeros. Tags 6–8 (hash,
+  ECDSA signature, public key) appear only when the tenant has uploaded an EC private key.
+- **The system no longer claims acceptance it did not get.** New submission states
+  `prepared` (document built, no credentials) and `signed` (signed, no gateway configured);
+  `reported`/`cleared` are written only after a real `2xx` from `ZATCA_API_BASE_URL`, and the
+  HTTP response is stored. `retry` re-files the stored document instead of flipping a flag.
+- Admin: الإعدادات ← المزامنة ← Zatca explains the states, shows the counter and the invoice
+  profile, and can download the stored XML for any submission.
+- Still credential-bound and documented as such in the module README: the XAdES signature
+  block, ZATCA onboarding (CSR → compliance CSID → production CSID) and QR tag 9.
+- Tests: `zatca/zatca.spec.ts` (9) and `test/einvoicing.spec.ts` (6, integration).
+
 ## Conventions
 
 - `docs/` remains the authoritative documentation source.
