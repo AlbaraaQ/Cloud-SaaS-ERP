@@ -1,19 +1,92 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Decimal } from 'decimal.js';
 
 import { Kpi } from '../../components/card';
-import { PortalShell } from '../../components/portal-shell';
-import { SimpleTable } from '../../components/table';
-import { portalFetch } from '../../lib/api';
+import { PortalShell, usePortalProfile } from '../../components/portal-shell';
+import { fetchInvoices, fetchPayments } from '../../lib/api';
+import { dateText, moneyText } from '../../lib/format';
+import { useAsync } from '../../lib/use-async';
 
-type Subscription = { status: string; provider: string; plan_name: string; amount: string; currency: string; current_period_end?: string };
+const STATUS_AR: Record<string, string> = { unpaid: 'غير مسددة', partial: 'مسددة جزئياً', paid: 'مسددة', posted: 'مرحّلة', draft: 'مسودة', voided: 'ملغاة' };
 
-function token() { const value = globalThis.document.cookie.split('; ').find((part) => part.startsWith('erp_access_token=')); return value ? decodeURIComponent(value.split('=')[1] ?? '') : undefined; }
+function Dashboard() {
+  const { profile } = usePortalProfile();
+  const invoices = useAsync(() => fetchInvoices(), []);
+  const payments = useAsync(() => fetchPayments(), []);
 
-export default function PortalDashboard() {
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => { portalFetch<{ data: Subscription | null }>('/billing/subscription', token()).then((result) => setSubscription(result.data)).catch(() => setError('تعذر تحميل حالة الاشتراك')); }, []);
-  return <PortalShell><section><h1>لوحة العميل</h1><p className="muted">بيانات شركتك الحقيقية وحالة اشتراكك في النظام المحاسبي.</p></section>{error && <p className="muted" role="alert">{error}</p>}<div className="grid cols"><Kpi label="حالة الاشتراك" value={subscription?.status ?? 'غير مشترك'} /><Kpi label="الباقة" value={subscription?.plan_name ?? '-'} /><Kpi label="مزود الاشتراك" value={subscription?.provider ?? '-'} /></div><SimpleTable rows={subscription ? [{ id: subscription.plan_name, plan: subscription.plan_name, amount: `${subscription.amount} ${subscription.currency}`, renewal: subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('ar-SA') : '-', status: subscription.status }] : [{ id: 'empty', plan: 'لا يوجد اشتراك فعال', amount: '-', renewal: '-', status: 'pending' }]} columns={['plan','amount','renewal','status']} /></PortalShell>;
+  const rows = invoices.data ?? [];
+  const outstanding = rows.reduce((sum, invoice) => sum.plus(new Decimal(invoice.total || '0').minus(invoice.paid_total || '0')), new Decimal(0));
+  const overdueCount = rows.filter((invoice) => invoice.payment_status !== 'paid').length;
+  const lastPayment = (payments.data ?? [])[0];
+
+  return (
+    <>
+      <section>
+        <h1>لوحة الحساب</h1>
+        <p className="muted">ملخص تعاملك مع {profile?.company.nameAr || 'المورد'} — الفواتير الصادرة لك والمبالغ المسددة.</p>
+      </section>
+
+      <div className="grid cols">
+        <Kpi label="الرصيد المستحق" value={moneyText(profile?.balance ?? '0')} hint="حسب دفاتر المورد" />
+        <Kpi label="غير المسدد من الفواتير" value={moneyText(outstanding.toFixed(2))} hint={`${overdueCount} فاتورة مفتوحة`} />
+        <Kpi label="عدد الفواتير" value={String(rows.length)} hint="الفواتير المرحّلة الصادرة لك" />
+        <Kpi label="آخر دفعة" value={lastPayment ? moneyText(lastPayment.amount) : '—'} hint={lastPayment ? dateText(lastPayment.day) : 'لا توجد دفعات مسجلة'} />
+      </div>
+
+      <section className="card">
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0 }}>أحدث الفواتير</h2>
+          <Link className="btn" href="/portal/invoices">
+            عرض الكل
+          </Link>
+        </div>
+        {invoices.status === 'loading' ? (
+          <p className="muted">جارٍ التحميل…</p>
+        ) : invoices.status === 'error' ? (
+          <p className="muted" role="alert">
+            {invoices.error}
+          </p>
+        ) : rows.length === 0 ? (
+          <p className="muted">لم تصدر لك فواتير بعد.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>الرقم</th>
+                <th>التاريخ</th>
+                <th>الإجمالي</th>
+                <th>المسدد</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 5).map((invoice) => (
+                <tr key={invoice.id}>
+                  <td>
+                    <Link href={`/portal/invoices/${invoice.id}`}>{invoice.number ?? '—'}</Link>
+                  </td>
+                  <td>{dateText(invoice.posted_at ?? invoice.created_at)}</td>
+                  <td>{moneyText(invoice.total)}</td>
+                  <td>{moneyText(invoice.paid_total)}</td>
+                  <td>
+                    <span className={`badge ${invoice.payment_status === 'paid' ? 'paid' : 'open'}`}>{STATUS_AR[invoice.payment_status] ?? invoice.payment_status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </>
+  );
+}
+
+export default function PortalDashboardPage() {
+  return (
+    <PortalShell>
+      <Dashboard />
+    </PortalShell>
+  );
 }

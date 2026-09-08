@@ -386,6 +386,7 @@ const sales: ModuleNode = {
       items: [
         screen('customer-card', 'بطاقة عميل', 'Customer card', '/sales/customers', 'ready', { permission: 'parties.view', endpoint: '/parties?kind=customer' }),
         screen('rep-card', 'بطاقة مندوب', 'Sales rep card', '/sales/salesmen', 'ready', { permission: 'sales.view', endpoint: '/sales/salesmen' }),
+        screen('customer-portal-access', 'وصول العملاء للبوابة', 'Customer portal access', '/sales/portal-access', 'ready', { permission: 'parties.view', endpoint: '/portal-access' }),
       ],
     },
   ],

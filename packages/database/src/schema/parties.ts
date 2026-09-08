@@ -5,7 +5,7 @@ import { baseAuditColumns, baseSoftDeleteColumns } from '../columns.js';
 
 import { accounts } from './accounting.js';
 import { branches, cashLocations } from './organization.js';
-import { tenants } from './platform.js';
+import { tenants, users } from './platform.js';
 
 const money = { precision: 20, scale: 4, mode: 'string' as const };
 
@@ -42,3 +42,24 @@ export type PaymentAllocation = typeof paymentAllocations.$inferSelect;
 export type PartyAddress = NonNullable<Party['address']>;
 export const partyAddressKeys = ['country', 'city', 'district', 'street', 'building', 'postalCode', 'additionalNumber'] as const;
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
+
+/**
+ * A customer login for the self-service portal.
+ *
+ * The row binds a `users` account to exactly one party; `/portal/*` reads it instead of a
+ * permission, and the account's role carries no permissions at all, so the same token cannot
+ * reach any ERP endpoint. See `migrations/0030_portal_accounts.sql`.
+ */
+export const portalAccounts = pgTable('portal_accounts', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  partyId: uuid('party_id').notNull().references(() => parties.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('active'),
+  invitedAt: timestamp('invited_at', { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+  ...baseAuditColumns(),
+}, (table) => ({
+  userKey: uniqueIndex('portal_accounts_tenant_user_key').on(table.tenantId, table.userId),
+  partyIdx: index('portal_accounts_party_idx').on(table.tenantId, table.partyId),
+}));

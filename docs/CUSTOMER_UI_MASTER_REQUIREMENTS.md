@@ -54,17 +54,31 @@ No public e-commerce storefront (Salla integration serves that), no password-fre
 magic links, no embedded PSP checkout (payment link integration is a future ADR).
 
 
-## Phase 18 coverage markers
+## Coverage after Round 10 (2026-09-09)
 
-- 🟢 Global marketing shell: `/`, `/pricing`, `/contact`.
-- 🟢 Auth, forced reset, and tenant picker: `/auth/login`, `/auth/forgot`, `/auth/forced-reset`, `/auth/tenant-picker`.
-- 🟢 Self-service portal dashboard: `/portal`.
-- 🟢 Invoices and detail/PDF/QR affordance: `/portal/invoices`, `/portal/invoices/[id]`.
-- 🟢 Statement export UI: `/portal/statement`.
-- 🟢 Payments history: `/portal/payments`.
-- 🟢 Profile change request flow: `/portal/profile`.
-- 🟢 Notifications center: `/portal/notifications`.
-- 🟢 Lightweight staff screens with flag copy: `/portal/quick-sale`, `/portal/stock`, `/portal/tasks`.
-- 🟢 Onboarding wizard: `/onboarding`.
-- 🟢 Public verification page with masked/minimal result: `/verify`.
+Phase 18 shipped these screens as static mock-ups. Round 10 replaced them with the
+`/portal/*` API (`apps/api/src/modules/portal/`) and deleted the ones nothing backs.
+
+- 🟢 Marketing shell: `/`, `/pricing` (live plans + activation request), `/contact`.
+- 🟢 Auth: `/auth/login` (real), `/auth/change-password` (real, `POST /auth/change-password`),
+  `/auth/forgot` (explains that the supplier reissues the password — no fake email form).
+- 🟢 Dashboard `/portal`: balance, outstanding, invoice count, last payment, latest invoices.
+- 🟢 `/portal/invoices` + `/portal/invoices/[id]`: date filter, lines, totals, payments,
+  and the same A4 RTL print HTML the back office produces.
+- 🟢 `/portal/statement`: date range, running balance, closing balance, CSV, print.
+- 🟢 `/portal/payments`: posted vouchers on the party.
+- 🟢 `/portal/profile`: the customer's own party card and the supplier's contact data,
+  read-only — the portal never writes master data.
+- 🟢 `/verify`: decodes the printed ZATCA QR (TLV) client-side.
+- 🔴 Removed as unbacked mock-ups: `/portal/notifications`, `/portal/quick-sale`,
+  `/portal/stock`, `/portal/tasks`, `/auth/tenant-picker`, `/auth/forced-reset`.
+  §1 *Notifications*, §2 *lightweight staff screens* and §3 *forced reset via email token*
+  therefore remain **unimplemented**, not "done" — the admin app is where staff work, and
+  there is no mailer to send a reset token yet.
 - ⚪ Payment gateway checkout, storefront, native push, and SEO automation remain out of v1 scope.
+
+### Access model
+
+A customer login is a `users` + `memberships` row whose role (`Customer portal`) holds **zero**
+permissions, linked to one party through `portal_accounts`. Staff grant it from
+المبيعات ← أخرى ← وصول العملاء للبوابة; the one-time password is displayed once.

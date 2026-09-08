@@ -94,9 +94,14 @@ export default function CustomersPage() {
           key: 'statement',
           header: '',
           cell: (row) => (
-            <Link className="btn sm" href={`/sales/statements?partyId=${row.id}`}>
-              كشف حساب
-            </Link>
+            <span className="toolbar">
+              <Link className="btn sm" href={`/sales/statements?partyId=${row.id}`}>
+                كشف حساب
+              </Link>
+              <Link className="btn sm" href={`/sales/portal-access?partyId=${row.id}`}>
+                بوابة العميل
+              </Link>
+            </span>
           ),
         },
       ]}

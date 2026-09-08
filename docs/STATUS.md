@@ -377,6 +377,31 @@ Still `planned` — 1 screen: إعدادات جهاز التحضير (preparatio
   block, ZATCA onboarding (CSR → compliance CSID → production CSID) and QR tag 9.
 - Tests: `zatca/zatca.spec.ts` (9) and `test/einvoicing.spec.ts` (6, integration).
 
+## Round 10 — the customer portal stops being a mock-up
+
+- **`apps/customer` now serves real customers.** Every screen that used to render a hard-coded
+  row is gone or wired: dashboard, invoices, invoice detail (lines, totals, payments, printed
+  A4 HTML), statement with a running balance and a CSV download, payments, and a read-only
+  "بياناتي" card. The screens with no backing API — بيع سريع، استعلام مخزون، صندوق المهام،
+  الإشعارات، منتقي المستأجر — were deleted rather than left as furniture.
+- **A portal login is an ordinary user with an empty role.** `portal_accounts` (migration
+  `0030`, RLS forced, `UNIQUE (tenant_id, user_id)`) links a login to exactly one party; the
+  membership carries the permission-free system role `Customer portal`, so every
+  `@RequiresPermission` route answers 403, and `/portal/*` — which carries no permission
+  decorator — resolves the party from the token, never from the request. A foreign invoice is
+  a **404**, not a 403. See `apps/api/src/modules/portal/README.md`.
+- **Granting access is a back-office action**: المبيعات ← أخرى ← وصول العملاء للبوابة, or the
+  «بوابة العميل» button on بطاقة عميل. The generated one-time password is shown exactly once,
+  and `mustChangePassword` sends the buyer to `/auth/change-password` on first sign-in.
+- **The client talked to `http://localhost:3000` and therefore only ever worked on a
+  developer's laptop.** It now uses the app's own origin (`/api/v1`, rewritten by
+  `next.config.mjs`), which is also what makes the portal usable behind a proxy or preview URL.
+- `/verify` decodes a ZATCA QR (TLV) in the browser — seller, VAT number, timestamp, total, VAT
+  and whether tags 6–8 are present — instead of printing a canned sentence. No endpoint, no
+  account, nothing to leak.
+- Tests: `apps/api/test/portal.spec.ts` (10, containment-first) and `apps/customer` 8.
+  Repository total **475**.
+
 ## Conventions
 
 - `docs/` remains the authoritative documentation source.

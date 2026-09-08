@@ -7,11 +7,6 @@ import { portalFetch } from '../../lib/api';
 
 type Plan = { id: string; code: string; name: string; interval: 'month' | 'year'; amount: string; currency: string };
 
-function token() {
-  const value = globalThis.document.cookie.split('; ').find((part) => part.startsWith('erp_access_token='));
-  return value ? decodeURIComponent(value.split('=')[1] ?? '') : undefined;
-}
-
 export default function PricingPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selected, setSelected] = useState<string>();
@@ -20,8 +15,8 @@ export default function PricingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    portalFetch<{ data: Plan[] }>('/billing/plans')
-      .then((result) => setPlans(result.data))
+    portalFetch<Plan[]>('/billing/plans')
+      .then((result) => setPlans(result))
       .catch(() => setMessage('تعذر تحميل الباقات المتاحة'))
       .finally(() => setLoading(false));
   }, []);
@@ -31,7 +26,7 @@ export default function PricingPage() {
     setSubmitting(true);
     setMessage('');
     try {
-      await portalFetch('/billing/activation-requests', token(), {
+      await portalFetch('/billing/activation-requests', {
         method: 'POST',
         body: JSON.stringify({ planId: selected }),
       });
