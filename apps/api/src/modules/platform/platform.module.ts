@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 
 import { AuthController } from './auth/auth.controller.js';
+import { BillingController } from './billing/billing.controller.js';
+import { BillingService } from './billing/billing.service.js';
 import { AuthService } from './auth/auth.service.js';
 import { PasswordService } from './auth/password.service.js';
 import { TokenService } from './auth/token.service.js';
@@ -23,6 +25,7 @@ import { TenantService } from './tenancy/tenant.service.js';
 @Module({
   controllers: [
     AuthController,
+    BillingController,
     IdentityController,
     TenantController,
     MembershipsController,
@@ -31,6 +34,7 @@ import { TenantService } from './tenancy/tenant.service.js';
   ],
   providers: [
     AuthService,
+    BillingService,
     IdentityService,
     MembershipsService,
     RolesService,
