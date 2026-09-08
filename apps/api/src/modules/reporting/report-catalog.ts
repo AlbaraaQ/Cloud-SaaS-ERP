@@ -1070,6 +1070,92 @@ const definitions: ReportDefinition[] = [
       WHERE bill.tenant_id = ${tenantId} AND ${onDate(sql`bill.bill_date`, f.from, f.to)}
       ORDER BY bill.bill_date DESC LIMIT 1000`,
   },
+  {
+    key: 'pos-item-detail',
+    titleAr: 'تفاصيل أصناف نقطة البيع',
+    group: 'pos',
+    hintAr: 'سطر لكل صنف في كل فاتورة نقدية.',
+    params: [...PERIOD, BRANCH, ITEM],
+    columns: [date('day', 'التاريخ'), text('number', 'الفاتورة'), text('item', 'الصنف'), qty('quantity', 'الكمية'), money('unit_price', 'السعر'), money('discount_amount', 'الخصم'), money('total', 'الإجمالي')],
+    totals: ['quantity', 'discount_amount', 'total'],
+    build: (tenantId, f) => sql`
+      SELECT si.posted_at::date AS day, si.number, ${itemName} AS item, line.quantity::text,
+             line.unit_price::text, line.discount_amount::text, line.total::text
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      WHERE ${salesScope(tenantId, f, 'sale')} AND si.party_id IS NULL AND ${eqIf(sql`line.item_id`, f.itemId)}
+      ORDER BY si.posted_at DESC, line.line_no LIMIT 2000`,
+  },
+  {
+    key: 'pos-by-category',
+    titleAr: 'مبيعات نقطة البيع بحسب المجموعة',
+    group: 'pos',
+    params: [...PERIOD, BRANCH],
+    columns: [text('category', 'المجموعة'), int('invoices', 'عدد الفواتير'), qty('quantity', 'الكمية'), money('total', 'الإجمالي')],
+    totals: ['quantity', 'total'],
+    chart: 'bar',
+    build: (tenantId, f) => sql`
+      SELECT coalesce(cat.name_ar, '—') AS category, count(DISTINCT si.id)::text AS invoices,
+             sum(line.quantity)::text AS quantity, sum(line.total)::text AS total
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      WHERE ${salesScope(tenantId, f, 'sale')} AND si.party_id IS NULL
+      GROUP BY cat.name_ar ORDER BY sum(line.total) DESC`,
+  },
+  {
+    key: 'sales-by-employee',
+    titleAr: 'مبيعات موظف',
+    group: 'sales',
+    hintAr: 'حسب المستخدم الذي أنشأ الفاتورة. الفواتير التي أُنشئت قبل تفعيل التتبّع تظهر كـ«غير محدد».',
+    params: [...PERIOD, BRANCH],
+    columns: [text('employee', 'الموظف'), int('invoices', 'عدد الفواتير'), money('total', 'الإجمالي'), money('profit', 'الربح')],
+    totals: ['invoices', 'total', 'profit'],
+    build: (tenantId, f) => sql`
+      SELECT coalesce(u.full_name, u.email, 'غير محدد') AS employee, count(*)::text AS invoices,
+             sum(si.total)::text AS total, sum(si.subtotal - si.cost_total)::text AS profit
+      FROM sales_invoices si
+      LEFT JOIN users u ON u.id = si.created_by
+      WHERE ${salesScope(tenantId, f, 'sale')}
+      GROUP BY u.full_name, u.email ORDER BY sum(si.total) DESC`,
+  },
+  {
+    key: 'purchases-by-employee',
+    titleAr: 'مشتريات موظف',
+    group: 'purchases',
+    hintAr: 'حسب المستخدم الذي أنشأ فاتورة الشراء.',
+    params: [...PERIOD, BRANCH],
+    columns: [text('employee', 'الموظف'), int('invoices', 'عدد الفواتير'), money('total', 'الإجمالي')],
+    totals: ['invoices', 'total'],
+    build: (tenantId, f) => sql`
+      SELECT coalesce(u.full_name, u.email, 'غير محدد') AS employee, count(*)::text AS invoices,
+             sum(pi.total)::text AS total
+      FROM purchase_invoices pi
+      LEFT JOIN users u ON u.id = pi.created_by
+      WHERE ${purchaseScope(tenantId, f, 'purchase')}
+      GROUP BY u.full_name, u.email ORDER BY sum(pi.total) DESC`,
+  },
+  {
+    key: 'sales-notes',
+    titleAr: 'تقرير إشعارات المبيعات',
+    group: 'sales',
+    hintAr: 'الإشعارات الدائنة والمدينة الصادرة على فواتير مرحّلة.',
+    params: [...PERIOD, BRANCH],
+    columns: [date('day', 'التاريخ'), text('number', 'رقم الإشعار'), text('kind', 'النوع'), text('invoice', 'الفاتورة'), text('party', 'العميل'), text('reason', 'السبب'), money('amount', 'المبلغ'), text('status', 'الحالة')],
+    totals: ['amount'],
+    build: (tenantId, f) => sql`
+      SELECT note.created_at::date AS day, coalesce(note.number, '—') AS number,
+             CASE note.kind WHEN 'credit' THEN 'إشعار دائن' WHEN 'debit' THEN 'إشعار مدين' ELSE note.kind END AS kind,
+             coalesce(si.number, '—') AS invoice, ${partyName} AS party, note.reason, note.amount::text, note.status
+      FROM sales_adjustment_notes note
+      LEFT JOIN sales_invoices si ON si.id = note.invoice_id
+      LEFT JOIN parties party ON party.id = si.party_id
+      WHERE note.tenant_id = ${tenantId} AND ${onDate(sql`note.created_at::date`, f.from, f.to)}
+        AND ${eqIf(sql`note.branch_id`, f.branchId)}
+      ORDER BY note.created_at DESC LIMIT 1000`,
+  },
   // ----------------------------------------------------- long-lived keys
   // Registered since the first release; kept so saved links and the legacy
   // desktop client keep resolving.

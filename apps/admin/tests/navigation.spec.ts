@@ -87,6 +87,28 @@ describe('admin navigation tree', () => {
     }
   });
 
+  it('implements the operational screens promised by the desktop menu', () => {
+    for (const key of ['expense-card', 'barcode', 'sn-credit', 'sn-debit', 'sales-debit-note', 'zatca-settings', 'sync-zatca', 'sync-prices', 'import-export', 'offers']) {
+      const item = allScreens.find((screen) => screen.key === key);
+      expect(item, key).toBeDefined();
+      expect(item?.status, key).toBe('ready');
+      expect(item?.href.startsWith('/s/'), key).toBe(false);
+    }
+  });
+
+  it('serves the by-employee and POS breakdowns from the report engine', () => {
+    const wired: Record<string, string> = {
+      'employee-sales': '/reports/sales-by-employee',
+      'employee-purchases': '/reports/purchases-by-employee',
+      'pos-item-detail': '/reports/pos-item-detail',
+      'pos-group': '/reports/pos-by-category',
+      'sn-report': '/reports/sales-notes',
+    };
+    for (const [key, href] of Object.entries(wired)) {
+      expect(allScreens.find((screen) => screen.key === key)?.href, key).toBe(href);
+    }
+  });
+
   it('resolves a screen from its href, ignoring the query string', () => {
     expect(findScreenByHref('/accounting/accounts')?.key).toBe('coa');
     expect(findScreenByHref('/accounting/journal-entries/new?kind=opening')?.key).toBe('opening-entry');

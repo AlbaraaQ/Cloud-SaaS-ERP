@@ -6,7 +6,7 @@ import { RequiresPermission } from '../../platform/decorators/requires-permissio
 
 import { CatalogService } from './catalog.service.js';
 
-const itemSchema = z.object({ sku: z.string().min(1).max(80), nameAr: z.string().min(1).max(200), nameEn: z.string().max(200).optional(), categoryId: z.string().uuid(), baseUnitId: z.string().uuid(), kind: z.enum(['stock', 'service', 'composite']).optional(), salePrice: z.string().optional(), purchasePrice: z.string().optional(), taxGroupId: z.string().uuid().optional() });
+const itemSchema = z.object({ sku: z.string().min(1).max(80), barcode: z.string().trim().min(1).max(64).optional(), nameAr: z.string().min(1).max(200), nameEn: z.string().max(200).optional(), categoryId: z.string().uuid(), baseUnitId: z.string().uuid(), kind: z.enum(['stock', 'service', 'composite']).optional(), salePrice: z.string().optional(), purchasePrice: z.string().optional(), taxGroupId: z.string().uuid().optional() });
 const categorySchema = z.object({ code: z.string().min(1).max(40), nameAr: z.string().min(1).max(200), nameEn: z.string().max(200).optional(), parentId: z.string().uuid().optional() });
 const unitSchema = z.object({ code: z.string().min(1).max(20), nameAr: z.string().min(1).max(120), nameEn: z.string().max(120).optional() });
 const taxGroupSchema = z.object({ nameAr: z.string().min(1).max(120), nameEn: z.string().max(120).optional(), rate: z.string().regex(/^\d+(\.\d{1,4})?$/), vatAccountId: z.string().uuid().optional(), isInclusiveDefault: z.boolean().optional() });

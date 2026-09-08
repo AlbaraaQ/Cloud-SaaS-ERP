@@ -16,6 +16,7 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
+import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
 
 export type SalesLineInput = { itemId?: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
@@ -50,7 +51,7 @@ export class SalesService {
     const totals = calculateInvoiceTotals({ lines: input.lines, priceIncludesVat: input.priceIncludesVat, invoiceDiscount: input.invoiceDiscount, extraTax: input.extraTax, withholding: input.withholding });
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
-      await tx.insert(salesInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, referenceInvoiceId: input.referenceInvoiceId, partyId: input.partyId, salesmanId: input.salesmanId, kind: input.kind ?? 'sale', currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, cashCustomerName: input.cashCustomerName, cashCustomerMobile: input.cashCustomerMobile, orderType: input.orderType, invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
+      await tx.insert(salesInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, referenceInvoiceId: input.referenceInvoiceId, partyId: input.partyId, salesmanId: input.salesmanId, kind: input.kind ?? 'sale', currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, cashCustomerName: input.cashCustomerName, cashCustomerMobile: input.cashCustomerMobile, orderType: input.orderType, createdBy: tryGetAuthContext()?.userId, invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
       await tx.insert(salesInvoiceLines).values(input.lines.map((line, index) => { const calculated = totals.lines[index]; if (!calculated) throw new DomainError('SALES_TOTALS_INVALID', 'Invoice totals do not match invoice lines', 422); return { id: newId(), tenantId, invoiceId: id, lineNo: index + 1, itemId: line.itemId, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice, discountRate: line.discountRate ?? '0', discountAmount: calculated.discount, taxGroupId: line.taxGroupId, taxRate: line.taxRate ?? '0', net: calculated.net, tax: calculated.tax, total: calculated.total }; }));
     });
     return this.get(tenantId, id);
@@ -188,8 +189,28 @@ export class SalesService {
     return note;
   }
 
+  /** Notes issued against posted invoices, newest first — the source of the notes report. */
+  async listAdjustmentNotes(tenantId: string, kind?: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: salesAdjustmentNotes.id, number: salesAdjustmentNotes.number, kind: salesAdjustmentNotes.kind, status: salesAdjustmentNotes.status, reason: salesAdjustmentNotes.reason, amount: salesAdjustmentNotes.amount, postedAt: salesAdjustmentNotes.postedAt, createdAt: salesAdjustmentNotes.createdAt, invoiceId: salesAdjustmentNotes.invoiceId, invoiceNumber: salesInvoices.number, partyId: salesInvoices.partyId, invoiceTotal: salesInvoices.total })
+        .from(salesAdjustmentNotes)
+        .leftJoin(salesInvoices, eq(salesInvoices.id, salesAdjustmentNotes.invoiceId))
+        .where(and(eq(salesAdjustmentNotes.tenantId, tenantId), kind ? eq(salesAdjustmentNotes.kind, kind) : undefined))
+        .orderBy(desc(salesAdjustmentNotes.createdAt))
+        .limit(200));
+  }
+
   async listOffers(tenantId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(offers).where(eq(offers.tenantId, tenantId)).orderBy(desc(offers.validFrom))); }
-  async createOffer(tenantId: string, input: Omit<typeof offers.$inferInsert, 'id' | 'tenantId'>) { const [offer] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(offers).values({ ...input, id: newId(), tenantId }).returning()); return offer; }
+  /** Validity arrives as ISO strings over HTTP; drizzle timestamps need real `Date`s. */
+  async createOffer(tenantId: string, input: Omit<typeof offers.$inferInsert, 'id' | 'tenantId' | 'validFrom' | 'validTo'> & { validFrom: string | Date; validTo: string | Date }) {
+    const validFrom = input.validFrom instanceof Date ? input.validFrom : new Date(input.validFrom);
+    const validTo = input.validTo instanceof Date ? input.validTo : new Date(input.validTo);
+    if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validTo.getTime())) throw new DomainError('SALES_OFFER_INVALID_PERIOD', 'Offer validity dates are invalid', 422);
+    if (validTo < validFrom) throw new DomainError('SALES_OFFER_INVALID_PERIOD', 'Offer end date precedes its start date', 422);
+    const [offer] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(offers).values({ ...input, validFrom, validTo, id: newId(), tenantId, createdBy: tryGetAuthContext()?.userId }).returning());
+    return offer;
+  }
   async listSalesmen(tenantId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesmen).where(eq(salesmen.tenantId, tenantId)).orderBy(salesmen.name)); }
 }
 

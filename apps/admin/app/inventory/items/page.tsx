@@ -30,7 +30,7 @@ export default function ItemsPage() {
   const taxGroups = useQuery<TaxGroup[]>(() => listTaxGroups(), []);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ sku: '', nameAr: '', nameEn: '', categoryId: '', baseUnitId: '', kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: '' });
+  const [form, setForm] = useState({ sku: '', barcode: '', nameAr: '', nameEn: '', categoryId: '', baseUnitId: '', kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: '' });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -44,6 +44,7 @@ export default function ItemsPage() {
     try {
       await apiPost('/organization/catalog/items', {
         sku: form.sku.trim(),
+        barcode: form.barcode.trim() || undefined,
         nameAr: form.nameAr.trim(),
         nameEn: form.nameEn.trim() || undefined,
         categoryId: form.categoryId,
@@ -54,7 +55,7 @@ export default function ItemsPage() {
         taxGroupId: form.taxGroupId || undefined,
       });
       setNotice({ kind: 'ok', text: `تمت إضافة المادة ${form.sku}.` });
-      setForm({ sku: '', nameAr: '', nameEn: '', categoryId: form.categoryId, baseUnitId: form.baseUnitId, kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: form.taxGroupId });
+      setForm({ sku: '', barcode: '', nameAr: '', nameEn: '', categoryId: form.categoryId, baseUnitId: form.baseUnitId, kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: form.taxGroupId });
       items.reload();
     } catch (error) {
       setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
@@ -92,6 +93,10 @@ export default function ItemsPage() {
             <label className="field">
               <span>الرمز (SKU) *</span>
               <input className="input" dir="ltr" value={form.sku} onChange={set('sku')} required />
+            </label>
+            <label className="field">
+              <span>الباركود</span>
+              <input className="input" dir="ltr" value={form.barcode} onChange={set('barcode')} placeholder="يُستخدم الرمز (SKU) عند تركه فارغاً" />
             </label>
             <label className="field">
               <span>الاسم العربي *</span>
@@ -186,6 +191,7 @@ export default function ItemsPage() {
             rowKey={(row) => row.id}
             columns={[
               { key: 'sku', header: 'الرمز', align: 'ltr', cell: (row) => row.sku },
+              { key: 'barcode', header: 'الباركود', align: 'ltr', cell: (row) => row.barcode ?? '—' },
               { key: 'name', header: 'الاسم', cell: (row) => arabicName(row) },
               { key: 'kind', header: 'النوع', cell: (row) => (row.kind === 'service' ? 'خدمة' : row.kind === 'composite' ? 'مركبة' : 'مخزنية') },
               { key: 'sale', header: 'سعر البيع', align: 'num', cell: (row) => money(row.salePrice ?? row.sale_price) },

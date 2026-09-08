@@ -14,6 +14,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { AccountingService, type JournalLineInput } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
 import { SequencesService } from '../platform-services/index.js';
@@ -53,7 +54,7 @@ export class PurchasesService {
     await withTenantTx(this.database.db, tenantId, async (tx) => {
       const [supplier] = await tx.select().from(parties).where(and(eq(parties.tenantId, tenantId), eq(parties.id, input.partyId)));
       if (!supplier || !['supplier', 'both'].includes(supplier.kind)) throw new DomainError('PURCHASE_SUPPLIER_REQUIRED', 'Purchase invoices require a supplier party', 422);
-      await tx.insert(purchaseInvoices).values({ id, tenantId, branchId: input.branchId, warehouseId: input.warehouseId, partyId: input.partyId, referenceInvoiceId: input.referenceInvoiceId, kind: input.kind ?? 'purchase', supplierReferenceNo: input.supplierReferenceNo, supplierReferenceDate: input.supplierReferenceDate, currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, landedCostAlloc: input.landedCostAlloc ?? 'value', invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
+      await tx.insert(purchaseInvoices).values({ id, tenantId, createdBy: tryGetAuthContext()?.userId, branchId: input.branchId, warehouseId: input.warehouseId, partyId: input.partyId, referenceInvoiceId: input.referenceInvoiceId, kind: input.kind ?? 'purchase', supplierReferenceNo: input.supplierReferenceNo, supplierReferenceDate: input.supplierReferenceDate, currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, landedCostAlloc: input.landedCostAlloc ?? 'value', invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
       await tx.insert(purchaseInvoiceLines).values(input.lines.map((line, index) => { const calculated = totals.lines[index]; if (!calculated) throw new DomainError('PURCHASE_TOTALS_INVALID', 'Purchase totals do not match invoice lines', 422); return { id: newId(), tenantId, invoiceId: id, lineNo: index + 1, itemId: line.itemId, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice, discountRate: line.discountRate ?? '0', discountAmount: calculated.discount, taxGroupId: line.taxGroupId, taxRate: line.taxRate ?? '0', net: calculated.net, tax: calculated.tax, total: calculated.total }; }));
     });
     return this.get(tenantId, id);

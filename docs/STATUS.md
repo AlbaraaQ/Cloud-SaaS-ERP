@@ -26,6 +26,38 @@
 | PHASE_22 | 2026-09-07 | COMPLETE | Niche verticals and Salla integration completed: optics prescriptions, tailoring measurements, marina vessels/bookings/rental invoices, vehicle fitment and Salla OAuth/sync/webhook tables under FORCE RLS; feature-flagged `/optics`, `/tailoring`, `/marina`, `/fitment`, `/integrations/salla` APIs, encrypted Salla tokens, HMAC webhook verification, admin pages, docs, tests and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_22_IMPLEMENTATION_REPORT.md`. |
 | PHASE_23 | 2026-09-07 | COMPLETE (READINESS PACK) | Hardening and go-live readiness artifacts completed: `/metrics`, deeper readiness checks, retention-plan service/tests, dependency/secret security sweep with ADR-021 waivers, operations runbooks, backup/restore drill template, perf report, endpoint inventory, UAT pack, program acceptance matrix and `RELEASE_NOTES.md` v1.0.0. Repository verification exits 0, but staging, real API DB/E2E evidence, backup/PITR drill, performance numbers and UAT signatures remain environment-owner gates; this is not production sign-off. See `PHASE_23_IMPLEMENTATION_REPORT.md` and `POST_PHASE_23_GAPS_AND_NOTES.md`. |
 
+## Admin web UI — desktop menu coverage (2026-09-08)
+
+`apps/admin/lib/navigation.ts` is the single source of truth for the screen tree that
+mirrors the customer's desktop product. `tests/navigation.spec.ts` fails the build if a
+menu item claims `ready` without a page file behind it, so these counts are checked, not
+asserted by hand.
+
+| State | Count | Meaning |
+|---|---|---|
+| `ready` | 164 | A real screen reading and writing the live API. |
+| `api` | 2 | The endpoint exists; the screen is still the scaffold. |
+| `planned` | 24 | Neither screen nor endpoint yet; routed under `/s/…`. |
+| **total** | **190** | |
+
+Wired in this round: expense cards (`/accounting/expenses`), sales credit/debit notes with
+posting (`/sales/notes/[kind]`), ZATCA credentials (`/settings/zatca`) and submissions with
+retry (`/settings/sync/zatca`), migration runs with issues (`/migration/runs`), offers with
+a live evaluator (`/settings/offers`), price lists and their rows (`/settings/price-lists`),
+and a Code 128-B barcode label sheet (`/inventory/barcodes`). Five report keys were added
+to the reporting catalog (62 total): `sales-notes`, `sales-by-employee`,
+`purchases-by-employee`, `pos-item-detail`, `pos-by-category`.
+
+Two permission codes used by `@RequiresPermission` were missing from the shared registry
+(`sales.adjustment.create`, `sales.offer.manage`), which made those routes return 403 for
+every role including the owner. Both are now registered (116 permissions) and
+`apps/api/src/permission-codes.spec.ts` fails the build if the mismatch ever returns.
+
+Still `planned`, and honestly so: purchase credit/debit notes, contracting quotations and
+returns, marina preparation/rota/day-close, project follow-up and contractor payments,
+backup/restore/data-rotation, invoice maintenance, the preparation-device settings and the
+report designer.
+
 ## Billing and live-data integration notes
 
 - Neon migrations through `0019_billing_subscriptions` are applied to the connected database.

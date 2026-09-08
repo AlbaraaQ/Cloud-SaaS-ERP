@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
@@ -18,6 +18,7 @@ export class SalesController {
   @Post('sales/invoices/:id/payments') @RequiresPermission('sales.invoice.pay') payment(@Param('id') id: string, @Body() body: PaymentInput) { return this.sales.addPayment(getTenantContext().tenantId, id, body); }
   @Post('sales/invoices/:id/return') @RequiresPermission('sales.return.create') returnFrom(@Param('id') id: string, @Body() body: Omit<SalesInvoiceInput, 'kind'>) { return this.sales.returnFrom(getTenantContext().tenantId, id, body); }
   @Post('sales/invoices/:id/adjustment-notes') @RequiresPermission('sales.adjustment.create') note(@Param('id') id: string, @Body() body: { branchId: string; kind: string; reason: string; amount: string }) { return this.sales.createAdjustmentNote(getTenantContext().tenantId, id, body); }
+  @Get('sales/adjustment-notes') @RequiresPermission('sales.view') notes(@Query('kind') kind?: string) { return this.sales.listAdjustmentNotes(getTenantContext().tenantId, kind); }
   @Post('sales/adjustment-notes/:id/post') @RequiresPermission('sales.invoice.post') postNote(@Param('id') id: string) { return this.sales.postAdjustmentNote(getTenantContext().tenantId, id); }
   @Post('sales/offers/:id/evaluate') @RequiresPermission('sales.view') evaluateOffer(@Param('id') id: string, @Body() body: { itemId: string; quantity: string; value: string }) { return this.sales.evaluateOffer(getTenantContext().tenantId, id, body); }
   @Get('sales/offers') @RequiresPermission('sales.view') offers() { return this.sales.listOffers(getTenantContext().tenantId); }

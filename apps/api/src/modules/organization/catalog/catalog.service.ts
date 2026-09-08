@@ -4,7 +4,7 @@ import { itemCategories, items, newId, taxGroups, unitsOfMeasure, withTenantTx, 
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
 
-export type CatalogItemInput = { sku: string; nameAr: string; nameEn?: string; categoryId: string; baseUnitId: string; kind?: 'stock' | 'service' | 'composite'; salePrice?: string; purchasePrice?: string; taxGroupId?: string };
+export type CatalogItemInput = { sku: string; barcode?: string; nameAr: string; nameEn?: string; categoryId: string; baseUnitId: string; kind?: 'stock' | 'service' | 'composite'; salePrice?: string; purchasePrice?: string; taxGroupId?: string };
 export type CategoryInput = { code: string; nameAr: string; nameEn?: string; parentId?: string };
 export type UnitInput = { code: string; nameAr: string; nameEn?: string };
 export type TaxGroupInput = { nameAr: string; nameEn?: string; rate: string; vatAccountId?: string; isInclusiveDefault?: boolean };
@@ -20,7 +20,7 @@ export class CatalogService {
   async createItem(tenantId: string, input: CatalogItemInput) {
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
-      await tx.insert(items).values({ id, tenantId, sku: input.sku, nameAr: input.nameAr, nameEn: input.nameEn, categoryId: input.categoryId, baseUnitId: input.baseUnitId, kind: input.kind ?? 'stock', salePrice: input.salePrice, purchasePrice: input.purchasePrice, taxGroupId: input.taxGroupId });
+      await tx.insert(items).values({ id, tenantId, sku: input.sku, barcode: input.barcode, nameAr: input.nameAr, nameEn: input.nameEn, categoryId: input.categoryId, baseUnitId: input.baseUnitId, kind: input.kind ?? 'stock', salePrice: input.salePrice, purchasePrice: input.purchasePrice, taxGroupId: input.taxGroupId });
     });
     return this.getItem(tenantId, id);
   }

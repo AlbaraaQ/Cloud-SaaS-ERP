@@ -62,6 +62,7 @@ export const baselineRoles: readonly BaselineRoleSeed[] = [
       'sales.invoice.create',
       'sales.invoice.post',
       'sales.invoice.void',
+      'sales.adjustment.create',
       'purchase.view',
       'purchase.invoice.create',
       'purchase.invoice.post',
