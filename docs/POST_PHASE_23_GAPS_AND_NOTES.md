@@ -268,3 +268,19 @@ apps/api/src/modules/platform-services/files/s3-signer.spec.ts
 > Implementation-complete داخل المستودع ومجهز كـ READY candidate، لكنه ليس مثبتاً كـ production go-live كامل حتى يتم إغلاق اختبارات DB/E2E، staging performance، backup restore drill، UAT signatures، وsecurity scan الحقيقي.
 
 لا توجد مرحلة “فارغة”، لكن توجد مراحل — خصوصاً 21 و22 و23 — تحتاج completion hardening pass قبل الاعتماد الإنتاجي النهائي.
+
+---
+
+## 12. ما أُغلق في الجولات 8 و9 (تحديث)
+
+| البند في هذا التقرير | الحالة الآن |
+|---|---|
+| قوالب الطباعة كانت نصوصاً بديلة (stubs) | ✅ مغلق — قوالب A4 كاملة لكل مستند مع التفقيط ورمز QR (`reporting/print-templates.service.ts`) |
+| شاشات البيانات الأساسية بلا تعديل/حذف | ✅ مغلق — `PATCH`/`DELETE` لكل البطاقات مع حواجز الاستخدام، و`Directory` يدعمها |
+| تصدير التقارير يتجاهل `format` ويصدّر CSV دائماً | ✅ مغلق — Excel حقيقي و CSV و صفحة طباعة/PDF (`reporting/xlsx.ts`) |
+| ZATCA محاكاة كاملة (`accepted:true`, بائع ثابت) | 🟡 مغلق جزئياً — المستند UBL 2.1 حقيقي، سلسلة التجزئة والعدّاد حقيقيان، رمز QR من بيانات المنشأة، والتوقيع ECDSA فعلي عند رفع المفتاح. المتبقي **مرتبط بالاعتماد وليس بالكود**: توقيع XAdES داخل `UBLExtensions`، ومسار الإصدار (CSR → compliance CSID → production CSID)، والوسم 9. التفاصيل في `apps/api/src/modules/einvoicing/README.md` |
+
+المتبقي من القائمة القديمة دون تغيير: بوابة العميل (`apps/customer`) ما زالت تعرض صفوفاً
+تجريبية ثابتة في بعض الشاشات، شاشة اللغة (عربي/English) غير منفَّذة، تكامل سلة يعتمد إدخال
+الرموز يدوياً، البريد عبر console/mailhog، TOTP/2FA غير منفَّذ، محدّد المعدل في الذاكرة،
+النسخ الاحتياطي داخل قاعدة البيانات، ولا توجد اختبارات E2E للواجهة.
