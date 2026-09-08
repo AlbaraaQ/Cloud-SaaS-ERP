@@ -1,13 +1,18 @@
 export {
   env,
+  envIssues,
   assertRuntimeEnv,
   assertObjectStorageEnv,
   normalisePem,
   objectStorageGaps,
   readObjectStorageEnv,
+  describeEnvSources,
+  loadedEnvFiles,
   REDACTED_LOG_PATHS,
 } from './env.js';
 export type { AppEnv, ObjectStorageEnv } from './env.js';
+export { loadEnvFiles } from './load-env.js';
+export type { LoadedEnvFile, LoadEnvOptions } from './load-env.js';
 export {
   tenantSettingsRegistry,
   tenantSettingKeys,

@@ -27,7 +27,21 @@ async function main(): Promise<void> {
     );
   }
 
+  // Platform operator (super admin) for the control plane at /platform.
+  const adminEmail = process.env.PLATFORM_ADMIN_EMAIL;
+  const adminPassword = process.env.PLATFORM_ADMIN_PASSWORD;
+  let platformAdminPasswordHash: string | undefined;
+  if (adminEmail && adminPassword) {
+    passwords.assertPolicy(adminPassword, { email: adminEmail });
+    platformAdminPasswordHash = await passwords.hash(adminPassword);
+  } else if (adminEmail) {
+    console.log('PLATFORM_ADMIN_PASSWORD not set — the operator is created as invited.');
+  }
+
   const report = await seedPlatform(env.DATABASE_MIGRATOR_URL ?? env.DATABASE_URL, {
+    platformAdminEmail: adminEmail,
+    platformAdminFullName: process.env.PLATFORM_ADMIN_NAME,
+    platformAdminPasswordHash,
     tenantCode: process.env.DEMO_TENANT_CODE ?? 'demo',
     tenantName: process.env.DEMO_TENANT_NAME,
     ownerEmail: process.env.DEMO_OWNER_EMAIL,
@@ -38,7 +52,10 @@ async function main(): Promise<void> {
 
   console.log(
     `seed complete — tenant ${report.tenantId}, owner user ${report.userId}, ` +
-      `membership ${report.membershipId}, roles [${report.roles.join(', ')}]`,
+      `membership ${report.membershipId}, roles [${report.roles.join(', ')}]` +
+      (report.platformAdminUserId
+        ? `, platform admin ${report.platformAdminUserId} (login tenant code: ${report.platformTenantCode})`
+        : ''),
   );
 }
 

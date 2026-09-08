@@ -1,10 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { DomainError } from '@erp/contracts';
 import {
   accounts,
+  branches,
+  costCenters,
   fiscalPeriods,
+  fiscalYears,
   journalEntries,
   journalEntryLines,
   newId,
@@ -17,16 +20,49 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { SequencesService } from '../platform-services/index.js';
 
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+
 export type AccountInput = {
   code: string;
   nameAr: string;
   nameEn?: string;
-  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  type: AccountType;
   subtype?: string;
-  normalBalance: 'debit' | 'credit';
+  /** Optional: derived from `type` when the caller omits it (assets/expenses are debit). */
+  normalBalance?: 'debit' | 'credit';
   parentId?: string;
   isPostable?: boolean;
 };
+
+export type CostCenterInput = {
+  code: string;
+  nameAr: string;
+  nameEn?: string;
+  parentId?: string;
+  branchId?: string;
+};
+
+export type FiscalYearInput = {
+  name: string;
+  startDate: string;
+  endDate: string;
+  /** When true (default) twelve monthly periods are generated inside the year. */
+  generateMonthlyPeriods?: boolean;
+};
+
+export type JournalQuery = {
+  from?: string;
+  to?: string;
+  branchId?: string;
+  fiscalPeriodId?: string;
+  status?: string;
+  limit?: number;
+};
+
+/** ACCOUNTING_ARCHITECTURE §2 — the natural side of each account class. */
+export function defaultNormalBalance(type: AccountType): 'debit' | 'credit' {
+  return type === 'asset' || type === 'expense' ? 'debit' : 'credit';
+}
 
 export type JournalLineInput = {
   accountId: string;
@@ -34,6 +70,8 @@ export type JournalLineInput = {
   credit?: string;
   description?: string;
   partyId?: string;
+  costCenterId?: string;
+  branchId?: string;
 };
 
 @Injectable()
@@ -60,7 +98,7 @@ export class AccountingService {
         nameEn: input.nameEn ?? null,
         type: input.type,
         subtype: input.subtype ?? null,
-        normalBalance: input.normalBalance,
+        normalBalance: input.normalBalance ?? defaultNormalBalance(input.type),
         parentId: input.parentId ?? null,
         path: input.parentId ?? id,
         isPostable: input.isPostable ?? true,
@@ -149,8 +187,76 @@ export class AccountingService {
     );
   }
 
-  async postJournal(tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string }) {
-    return withTenantTx(this.database.db, tenantId, (tx) => this.postJournalInTx(tx, tenantId, input));
+  async postJournal(
+    tenantId: string,
+    input: {
+      branchId?: string;
+      fiscalPeriodId?: string;
+      date: string;
+      description?: string;
+      lines: JournalLineInput[];
+      sourceType?: string;
+      sourceId?: string;
+      idempotencyKey?: string;
+    },
+  ) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const resolved = await this.resolvePostingContext(tx, tenantId, input.date, input.branchId, input.fiscalPeriodId);
+      return this.postJournalInTx(tx, tenantId, { ...input, ...resolved });
+    });
+  }
+
+  /**
+   * A voucher screen sends a date; it should not have to know the internal id of the
+   * fiscal period or of the default branch. Both are derived here, and the errors are
+   * explicit so the operator learns what is actually missing (no fiscal year yet, the
+   * month is closed, no branch defined) instead of a generic 409.
+   */
+  async resolvePostingContext(
+    tx: DrizzleTx,
+    tenantId: string,
+    date: string,
+    branchId?: string,
+    fiscalPeriodId?: string,
+  ): Promise<{ branchId: string; fiscalPeriodId: string }> {
+    let resolvedBranchId = branchId;
+    if (!resolvedBranchId) {
+      const [branch] = await tx
+        .select({ id: branches.id })
+        .from(branches)
+        .where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)))
+        .orderBy(desc(branches.isDefault), asc(branches.code))
+        .limit(1);
+      if (!branch) {
+        throw new DomainError('BRANCH_REQUIRED', 'This tenant has no branch yet — create one in الإعدادات ← بطاقة فرع', 422);
+      }
+      resolvedBranchId = branch.id;
+    }
+
+    let resolvedPeriodId = fiscalPeriodId;
+    if (!resolvedPeriodId) {
+      const [period] = await tx
+        .select({ id: fiscalPeriods.id, status: fiscalPeriods.status })
+        .from(fiscalPeriods)
+        .where(
+          and(
+            eq(fiscalPeriods.tenantId, tenantId),
+            lte(fiscalPeriods.startDate, date),
+            gte(fiscalPeriods.endDate, date),
+          ),
+        )
+        .limit(1);
+      if (!period) {
+        throw new DomainError(
+          'FISCAL_PERIOD_NOT_FOUND',
+          `No fiscal period covers ${date} — create the fiscal year first (المحاسبة ← الفترات المحاسبية)`,
+          422,
+        );
+      }
+      resolvedPeriodId = period.id;
+    }
+
+    return { branchId: resolvedBranchId, fiscalPeriodId: resolvedPeriodId };
   }
 
   async postJournalInTx(tx: DrizzleTx, tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string }) {
@@ -189,7 +295,9 @@ export class AccountingService {
       accountId: line.accountId,
       debit: line.debit ?? '0',
       credit: line.credit ?? '0',
+      costCenterId: line.costCenterId ?? null,
       partyId: line.partyId ?? null,
+      branchId: line.branchId ?? input.branchId,
       description: line.description ?? null,
     })));
     const [entry] = await tx.select().from(journalEntries).where(eq(journalEntries.id, entryId));
@@ -207,6 +315,173 @@ export class AccountingService {
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       await tx.insert(periodModuleLocks).values({ tenantId, periodId, module, locked: false, lockedAt: null }).onConflictDoUpdate({ target: [periodModuleLocks.periodId, periodModuleLocks.module], set: { locked: false, lockedAt: null, lockedBy: null } });
       return { periodId, module, locked: false };
+    });
+  }
+
+  // -------------------------------------------------------------- cost centres
+
+  async listCostCenters(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(costCenters)
+        .where(and(eq(costCenters.tenantId, tenantId), isNull(costCenters.deletedAt)))
+        .orderBy(asc(costCenters.code)),
+    );
+  }
+
+  async createCostCenter(tenantId: string, input: CostCenterInput) {
+    const id = newId();
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await tx.insert(costCenters).values({
+        id,
+        tenantId,
+        code: input.code,
+        nameAr: input.nameAr,
+        nameEn: input.nameEn ?? null,
+        parentId: input.parentId ?? null,
+        branchId: input.branchId ?? null,
+      });
+      const [row] = await tx.select().from(costCenters).where(eq(costCenters.id, id));
+      return row;
+    });
+  }
+
+  // -------------------------------------------------------------- fiscal calendar
+
+  async listFiscalYears(tenantId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(fiscalYears).where(eq(fiscalYears.tenantId, tenantId)).orderBy(desc(fiscalYears.startDate)),
+    );
+  }
+
+  /**
+   * Creates the fiscal year and, unless told otherwise, the twelve monthly periods
+   * inside it. Without at least one open period nothing in the system can be posted,
+   * so this is the first screen a new tenant needs.
+   */
+  async createFiscalYear(tenantId: string, input: FiscalYearInput) {
+    const start = new Date(`${input.startDate}T00:00:00Z`);
+    const end = new Date(`${input.endDate}T00:00:00Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      throw new DomainError('VALIDATION_FAILED', 'Fiscal year end date must be after the start date', 422);
+    }
+
+    const yearId = newId();
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const overlapping = await tx
+        .select({ id: fiscalYears.id })
+        .from(fiscalYears)
+        .where(
+          and(
+            eq(fiscalYears.tenantId, tenantId),
+            lte(fiscalYears.startDate, input.endDate),
+            gte(fiscalYears.endDate, input.startDate),
+          ),
+        )
+        .limit(1);
+      if (overlapping.length > 0) {
+        throw new DomainError('FISCAL_YEAR_OVERLAP', 'Another fiscal year already covers this range', 409);
+      }
+
+      await tx.insert(fiscalYears).values({
+        id: yearId,
+        tenantId,
+        name: input.name,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        status: 'open',
+      });
+
+      if (input.generateMonthlyPeriods !== false) {
+        const periods: Array<{ id: string; tenantId: string; fiscalYearId: string; name: string; startDate: string; endDate: string; status: string }> = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          const periodStart = new Date(cursor);
+          const periodEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0));
+          const clampedEnd = periodEnd > end ? end : periodEnd;
+          periods.push({
+            id: newId(),
+            tenantId,
+            fiscalYearId: yearId,
+            name: `${periodStart.getUTCFullYear()}-${String(periodStart.getUTCMonth() + 1).padStart(2, '0')}`,
+            startDate: periodStart.toISOString().slice(0, 10),
+            endDate: clampedEnd.toISOString().slice(0, 10),
+            status: 'open',
+          });
+          cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
+        }
+        if (periods.length > 0) await tx.insert(fiscalPeriods).values(periods);
+      }
+
+      const [row] = await tx.select().from(fiscalYears).where(eq(fiscalYears.id, yearId));
+      return row;
+    });
+  }
+
+  // -------------------------------------------------------------- journal reads
+
+  /** `القيود اليومية` — the posted-journal register with its per-entry totals. */
+  async listJournalEntries(tenantId: string, query: JournalQuery = {}) {
+    const limit = Math.min(Math.max(query.limit ?? 200, 1), 1_000);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const filters = [eq(journalEntries.tenantId, tenantId)];
+      if (query.from) filters.push(gte(journalEntries.date, query.from));
+      if (query.to) filters.push(lte(journalEntries.date, query.to));
+      if (query.branchId) filters.push(eq(journalEntries.branchId, query.branchId));
+      if (query.fiscalPeriodId) filters.push(eq(journalEntries.fiscalPeriodId, query.fiscalPeriodId));
+      if (query.status) filters.push(eq(journalEntries.status, query.status));
+
+      return tx
+        .select({
+          id: journalEntries.id,
+          number: journalEntries.number,
+          date: journalEntries.date,
+          kind: journalEntries.kind,
+          status: journalEntries.status,
+          description: journalEntries.description,
+          branchId: journalEntries.branchId,
+          fiscalPeriodId: journalEntries.fiscalPeriodId,
+          sourceType: journalEntries.sourceType,
+          reversalOf: journalEntries.reversalOf,
+          postedAt: journalEntries.postedAt,
+          totalDebit: sql<string>`COALESCE((SELECT SUM(l.debit) FROM journal_entry_lines l WHERE l.entry_id = ${journalEntries.id}), 0)::text`,
+          totalCredit: sql<string>`COALESCE((SELECT SUM(l.credit) FROM journal_entry_lines l WHERE l.entry_id = ${journalEntries.id}), 0)::text`,
+          lineCount: sql<number>`(SELECT COUNT(*) FROM journal_entry_lines l WHERE l.entry_id = ${journalEntries.id})::int`,
+        })
+        .from(journalEntries)
+        .where(and(...filters))
+        .orderBy(desc(journalEntries.date), desc(journalEntries.number))
+        .limit(limit);
+    });
+  }
+
+  async readJournalEntry(tenantId: string, entryId: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [entry] = await tx
+        .select()
+        .from(journalEntries)
+        .where(and(eq(journalEntries.id, entryId), eq(journalEntries.tenantId, tenantId)));
+      if (!entry) throw new DomainError('NOT_FOUND', 'Journal entry not found', 404);
+
+      const lines = await tx
+        .select({
+          lineNo: journalEntryLines.lineNo,
+          accountId: journalEntryLines.accountId,
+          accountCode: accounts.code,
+          accountNameAr: accounts.nameAr,
+          debit: journalEntryLines.debit,
+          credit: journalEntryLines.credit,
+          costCenterId: journalEntryLines.costCenterId,
+          partyId: journalEntryLines.partyId,
+          description: journalEntryLines.description,
+        })
+        .from(journalEntryLines)
+        .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+        .where(eq(journalEntryLines.entryId, entryId))
+        .orderBy(asc(journalEntryLines.lineNo));
+
+      return { ...entry, lines };
     });
   }
 

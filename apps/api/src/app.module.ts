@@ -18,6 +18,7 @@ import {
   RateLimitGuard,
   TenantGuard,
 } from './modules/platform/index.js';
+import { PlatformAdminModule } from './modules/platform/admin/platform-admin.module.js';
 import { AccountingModule } from './modules/accounting/accounting.module.js';
 import { OrganizationModule } from './modules/organization/index.js';
 import { PartiesModule } from './modules/parties/parties.module.js';
@@ -77,6 +78,7 @@ import { OpsModule } from './ops/ops.module.js';
     PlatformModule,
     PlatformServicesModule,
     OrganizationModule,
+    PlatformAdminModule,
     CatalogModule,
     AccountingModule,
     PartiesModule,

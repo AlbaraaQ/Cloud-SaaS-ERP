@@ -44,6 +44,7 @@ export const baselineRoles: readonly BaselineRoleSeed[] = [
       'accounting.journal.create',
       'accounting.journal.post',
       'accounting.journal.reverse',
+      'accounting.period.view',
       'accounting.period.close',
       'accounting.period.reopen',
       'accounting.opening.manage',

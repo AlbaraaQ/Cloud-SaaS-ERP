@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import { describeEnvSources, loadEnvFiles } from './load-env.js';
+
+// Populate `process.env` from the workspace `.env` files *before* the schema reads it.
+// Without this the whole file validated an empty environment (see load-env.ts).
+loadEnvFiles();
+
 /**
  * Environment schema — SECURITY_ARCHITECTURE §9 ("Secrets via env only"),
  * TARGET_ARCHITECTURE §5 ("packages/config zod-validates at boot (fail-fast)").
@@ -58,6 +64,9 @@ const envSchema = z.object({
   RATE_LIMIT_LOGIN_PER_MINUTE: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_REGISTER_PER_MINUTE: z.coerce.number().int().positive().default(5),
 
+  /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
+  SIGNUP_ENABLED: booleanish.default(true),
+
   CORS_ALLOWED_ORIGINS: csv.default(''),
   OPENAPI_ENABLED: booleanish.default(true),
 
@@ -114,11 +123,37 @@ const envSchema = z.object({
   FILE_URL_SIGNING_SECRET: z.string().optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
-
-export const env: AppEnv = parsed.success ? parsed.data : envSchema.parse({});
-
 export type AppEnv = z.infer<typeof envSchema>;
+
+/**
+ * Lenient parse. A single bad value (say `PORT=abc`) used to make the *entire* env fall
+ * back to defaults, silently discarding a perfectly valid DATABASE_URL and producing a
+ * misleading "missing required variable" error. Offending keys are dropped one by one
+ * and reported through `envIssues` instead.
+ */
+function readEnv(source: Record<string, string | undefined>): { value: AppEnv; issues: string[] } {
+  const first = envSchema.safeParse(source);
+  if (first.success) return { value: first.data, issues: [] };
+
+  const issues = first.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`);
+  const sanitised: Record<string, unknown> = { ...source };
+  for (const issue of first.error.issues) {
+    const key = issue.path[0];
+    if (typeof key === 'string') delete sanitised[key];
+  }
+  const second = envSchema.safeParse(sanitised);
+  return { value: second.success ? second.data : envSchema.parse({}), issues };
+}
+
+const parsed = readEnv(process.env);
+
+export const env: AppEnv = parsed.value;
+
+/** Human-readable list of variables that failed validation and were ignored. */
+export const envIssues: readonly string[] = parsed.issues;
+
+/** Which `.env` files were picked up — safe to log, contains no values. */
+export { describeEnvSources, loadedEnvFiles } from './load-env.js';
 
 /** Normalises PEM material that arrived through an environment variable. */
 export function normalisePem(value: string | undefined): string | undefined {
@@ -139,8 +174,13 @@ export function assertRuntimeEnv(candidate: AppEnv = env): AppEnv {
   if (!normalisePem(candidate.JWT_PUBLIC_KEY)) missing.push('JWT_PUBLIC_KEY');
   if (candidate.NODE_ENV === 'production' && !candidate.DATA_ENC_KEY) missing.push('DATA_ENC_KEY');
 
-  if (missing.length > 0) {
-    throw new Error(`Invalid environment: missing required variable(s) ${missing.join(', ')}`);
+  if (missing.length > 0 || parsed.issues.length > 0) {
+    const lines = ['Invalid environment.'];
+    if (missing.length > 0) lines.push(`  Missing required variable(s): ${missing.join(', ')}`);
+    if (parsed.issues.length > 0) lines.push(`  Rejected value(s): ${parsed.issues.join('; ')}`);
+    lines.push(`  Loaded .env files: ${describeEnvSources()}`);
+    lines.push('  Fix: run `pnpm env:setup` at the repository root, then re-run the command.');
+    throw new Error(lines.join('\n'));
   }
   return candidate;
 }

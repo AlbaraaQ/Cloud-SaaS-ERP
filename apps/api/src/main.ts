@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
-import { assertRuntimeEnv, env } from '@erp/config';
+import { assertRuntimeEnv, describeEnvSources, env, envIssues } from '@erp/config';
 
 import { AppModule } from './app.module.js';
 import { applyHttpConfiguration, buildOpenApiDocument, registerOpenApi } from './bootstrap.js';
@@ -39,6 +39,11 @@ async function bootstrapWorker(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  // Say out loud where the configuration came from — the single most common support
+  // question was "the API does not see my .env".
+  console.log(`erp-api env sources: ${describeEnvSources()}`);
+  if (envIssues.length > 0) console.warn(`erp-api env warnings: ${envIssues.join('; ')}`);
+
   // PHASE_02 §8: fail fast on a missing runtime variable instead of degrading silently.
   assertRuntimeEnv();
 

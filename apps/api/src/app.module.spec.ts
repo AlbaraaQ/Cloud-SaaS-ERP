@@ -14,7 +14,10 @@ import {
   RateLimitGuard,
   TenantGuard,
 } from './modules/platform/index.js';
-import { AuditInterceptor, MetricsInterceptor } from './modules/platform-services/index.js';
+import { AuditInterceptor } from './modules/platform-services/index.js';
+// The metrics interceptor lives in the ops slice, not in platform-services; importing it
+// from the barrel silently yielded `undefined` and made this assertion pass vacuously.
+import { MetricsInterceptor } from './ops/metrics.interceptor.js';
 
 type ProviderEntry = { provide: string | symbol; useClass?: unknown };
 

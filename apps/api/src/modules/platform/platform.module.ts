@@ -44,6 +44,6 @@ import { TenantService } from './tenancy/tenant.service.js';
     TokenService,
     RateLimiterService,
   ],
-  exports: [AuthService, IdentityService, PasswordService, TokenService, RateLimiterService],
+  exports: [AuthService, IdentityService, PasswordService, TokenService, RateLimiterService, BillingService],
 })
 export class PlatformModule {}

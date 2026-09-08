@@ -20,6 +20,16 @@ export type SeedOptions = {
   ownerFullName?: string;
   /** Argon2id PHC string produced by the platform password service. */
   ownerPasswordHash?: string;
+  /**
+   * Platform operator (super admin). Created only when an email is supplied. This account
+   * belongs to no tenant: it carries `is_platform_admin` and can only reach `/platform/*`.
+   */
+  platformAdminEmail?: string;
+  platformAdminFullName?: string;
+  platformAdminPasswordHash?: string;
+  /** Internal tenant the operator logs into. Defaults to `platform`. */
+  platformTenantCode?: string;
+  platformTenantName?: string;
   log?: (message: string) => void;
 };
 
@@ -30,6 +40,8 @@ export type SeedReport = {
   membershipId: string;
   roles: string[];
   settingsInserted: number;
+  platformAdminUserId?: string;
+  platformTenantCode?: string;
 };
 
 export const DEMO_TENANT_CODE = 'demo';
@@ -180,6 +192,86 @@ export async function seedPlatform(
     }
     log(`seed  tenant_settings: ${settingsInserted} new`);
 
+    // 7. platform operator — the control-plane account. Optional on purpose: a deployment
+    //    that manages tenants by hand should not get a super admin it never asked for.
+    let platformAdminUserId: string | undefined;
+    if (options.platformAdminEmail) {
+      const adminRow = await client.query<{ id: string }>(
+        `INSERT INTO users (id, email, full_name, status, password_hash, must_change_password,
+                            password_changed_at, is_platform_admin)
+         VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5::text IS NULL THEN NULL ELSE now() END, true)
+         ON CONFLICT (email) DO UPDATE SET is_platform_admin = true,
+                                           full_name = EXCLUDED.full_name,
+                                           password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
+                                           status = EXCLUDED.status
+         RETURNING id`,
+        [
+          newId(),
+          options.platformAdminEmail,
+          options.platformAdminFullName ?? 'Platform Operator',
+          options.platformAdminPasswordHash ? 'active' : 'invited',
+          options.platformAdminPasswordHash ?? null,
+          !options.platformAdminPasswordHash,
+        ],
+      );
+      platformAdminUserId = adminRow.rows[0]?.id as string;
+
+      // The operator still needs a home tenant to obtain a token: `POST /auth/login` always
+      // authenticates *into* a tenant. A dedicated internal tenant keeps the control-plane
+      // account out of every customer's user list.
+      const opsTenantCode = options.platformTenantCode ?? 'platform';
+      const opsTenantRow = await client.query<{ id: string }>(
+        `INSERT INTO tenants (id, code, name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [newId(), opsTenantCode, options.platformTenantName ?? 'Platform Operations'],
+      );
+      const opsTenantId = opsTenantRow.rows[0]?.id as string;
+      await client.query(`SELECT set_config('app.tenant_id', $1, false)`, [opsTenantId]);
+
+      const opsMembershipRow = await client.query<{ id: string }>(
+        `INSERT INTO memberships (id, tenant_id, user_id, display_name, status, is_owner)
+         VALUES ($1, $2, $3, $4, 'active', true)
+         ON CONFLICT (tenant_id, user_id) WHERE deleted_at IS NULL
+           DO UPDATE SET is_owner = true, status = 'active'
+         RETURNING id`,
+        [newId(), opsTenantId, platformAdminUserId, options.platformAdminFullName ?? 'Platform Operator'],
+      );
+      const opsMembershipId = opsMembershipRow.rows[0]?.id as string;
+
+      for (const role of baselineRoles) {
+        const opsRoleRow = await client.query<{ id: string }>(
+          `INSERT INTO roles (id, tenant_id, name, is_system, description)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (tenant_id, name) WHERE deleted_at IS NULL
+             DO UPDATE SET is_system = EXCLUDED.is_system
+           RETURNING id`,
+          [newId(), opsTenantId, role.name, role.isSystem, role.description],
+        );
+        const opsRoleId = opsRoleRow.rows[0]?.id as string;
+        const opsCodes = role.permissions.includes(ALL_PERMISSIONS)
+          ? permissionRegistry.map((permission) => permission.code)
+          : role.permissions.filter((code) =>
+              permissionRegistry.some((permission) => permission.code === code),
+            );
+        for (const code of opsCodes) {
+          await client.query(
+            `INSERT INTO role_permissions (role_id, permission_code) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [opsRoleId, code],
+          );
+        }
+        if (role.code === 'owner') {
+          await client.query(
+            `INSERT INTO membership_roles (membership_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [opsMembershipId, opsRoleId],
+          );
+        }
+      }
+
+      log(`seed  platform admin: ${options.platformAdminEmail} (tenant ${opsTenantCode})`);
+    }
+
     return {
       permissions: permissionRegistry.length,
       tenantId,
@@ -187,6 +279,8 @@ export async function seedPlatform(
       membershipId,
       roles: roleNames,
       settingsInserted,
+      platformAdminUserId,
+      platformTenantCode: platformAdminUserId ? (options.platformTenantCode ?? 'platform') : undefined,
     };
   } finally {
     client.release();

@@ -90,6 +90,14 @@ export function setTenantContext(tx: DrizzleDb | DrizzleTx, tenantId: string): P
   return tx.execute(sql`SELECT set_config(${TENANT_GUC}, ${tenantId}, true)`);
 }
 
+/**
+ * Binds the platform-admin flag to the current transaction (MULTI_TENANCY §4). Used by
+ * `withPlatformAdminTx`; never call it from a tenant request path.
+ */
+export function setPlatformAdminContext(tx: DrizzleDb | DrizzleTx, enabled: boolean): Promise<unknown> {
+  return tx.execute(sql`SELECT set_config(${PLATFORM_ADMIN_GUC}, ${enabled ? 'on' : 'off'}, true)`);
+}
+
 export function clearTenantContext(tx: DrizzleDb | DrizzleTx): Promise<unknown> {
   return tx.execute(sql`SELECT set_config(${TENANT_GUC}, '', true)`);
 }

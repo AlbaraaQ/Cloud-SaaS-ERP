@@ -1,4 +1,3 @@
-/* global localStorage */
 import { Decimal } from 'decimal.js';
 
 export function moneyText(valueText: string, currency = 'SAR', locale = 'ar-SA'): string {

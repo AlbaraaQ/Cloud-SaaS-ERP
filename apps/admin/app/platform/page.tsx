@@ -1,17 +1,93 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
-import { KpiCard } from '../../components/kpi-card';
-import { apiFetch } from '../../lib/api';
+import { ErrorBox, Loading, Screen } from '../../components/screen';
+import { apiData } from '../../lib/api';
+import { useQuery } from '../../lib/use-query';
 
-type Tenant = { id: string; code: string; name: string; status: string; plan_name?: string };
+type Overview = {
+  tenants: { total: number; active: number; suspended: number; new_30d: number };
+  subscriptions: { active: number; past_due: number; canceled: number; mrr: string };
+  pendingActivations: number;
+  users: { total: number; active: number };
+};
 
-function token() { const value = globalThis.document.cookie.split('; ').find((part) => part.startsWith('erp_access_token=')); return value ? decodeURIComponent(value.split('=')[1] ?? '') : undefined; }
+export default function PlatformOverviewPage() {
+  const overview = useQuery<Overview>(() => apiData<Overview>('/platform/overview'), []);
 
-export default function PlatformPage() {
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => { apiFetch<{ data: Tenant }>('/tenant', token()).then((result) => setTenant(result.data)).catch(() => setError('تعذر تحميل بيانات الشركة. تحقق من صلاحيات الحساب.')); }, []);
-  return <div className="grid"><section className="section-title"><div><h1>إدارة الحسابات والشركات</h1><p className="muted">إدارة بيانات الشركة وسياق المستأجر المتصل حالياً.</p></div></section>{error && <p className="muted" role="alert">{error}</p>}<div className="grid cols"><KpiCard label="الشركة" value={tenant?.name ?? 'غير متاح'} /><KpiCard label="رمز الشركة" value={tenant?.code ?? '-'} /><KpiCard label="الحالة" value={tenant?.status ?? '-'} /><KpiCard label="الباقة" value={tenant?.plan_name ?? 'راجع الاشتراكات'} /></div><section className="card"><h2>إدارة الوصول</h2><p className="muted">طلبات التفعيل اليدوي والاشتراكات تتم إدارتها من صفحة اشتراكات العملاء.</p><a className="btn primary" href="/billing">فتح الاشتراكات</a></section></div>;
+  return (
+    <Screen
+      title="لوحة تحكم المنصة"
+      subtitle="مؤشرات تشغيل الخدمة: العملاء، التراخيص، الإيراد الشهري وطلبات التفعيل."
+      crumbs={['المنصة']}
+      actions={
+        <>
+          <Link className="btn primary" href="/platform/tenants/new">
+            عميل جديد
+          </Link>
+          <button className="btn" type="button" onClick={overview.reload}>
+            تحديث
+          </button>
+        </>
+      }
+    >
+      {overview.status === 'loading' && <Loading />}
+      {overview.status === 'error' && <ErrorBox message={overview.error} onRetry={overview.reload} />}
+      {overview.data && (
+        <>
+          <div className="grid cols">
+            <article className="card">
+              <p className="muted">إجمالي العملاء</p>
+              <div className="kpi">{overview.data.tenants.total}</div>
+              <small className="muted">{overview.data.tenants.new_30d} جديد خلال 30 يوماً</small>
+            </article>
+            <article className="card">
+              <p className="muted">عملاء نشطون</p>
+              <div className="kpi" style={{ color: '#047857' }}>{overview.data.tenants.active}</div>
+              <small className="muted">{overview.data.tenants.suspended} موقوف</small>
+            </article>
+            <article className="card">
+              <p className="muted">تراخيص فعّالة</p>
+              <div className="kpi">{overview.data.subscriptions.active}</div>
+              <small className="muted">
+                {overview.data.subscriptions.past_due} متأخر · {overview.data.subscriptions.canceled} ملغى
+              </small>
+            </article>
+            <article className="card">
+              <p className="muted">الإيراد الشهري المتكرر (MRR)</p>
+              <div className="kpi" style={{ fontSize: 22 }}>
+                {Number(overview.data.subscriptions.mrr || 0).toLocaleString('ar-SA', { minimumFractionDigits: 2 })}
+              </div>
+              <small className="muted">من الباقات الشهرية النشطة</small>
+            </article>
+          </div>
+
+          <div className="grid cols-2">
+            <section className="card">
+              <h2>طلبات التفعيل المعلقة</h2>
+              <div className="kpi">{overview.data.pendingActivations}</div>
+              <p className="muted small">طلبات اشتراك يدوية بانتظار موافقتك.</p>
+              <Link className="btn primary" href="/platform/activation-requests">
+                مراجعة الطلبات
+              </Link>
+            </section>
+
+            <section className="card">
+              <h2>المستخدمون</h2>
+              <dl className="kv">
+                <dt>إجمالي الحسابات</dt>
+                <dd>{overview.data.users.total}</dd>
+                <dt>نشط</dt>
+                <dd>{overview.data.users.active}</dd>
+              </dl>
+              <Link className="btn" href="/platform/users" style={{ marginTop: 10 }}>
+                إدارة المستخدمين
+              </Link>
+            </section>
+          </div>
+        </>
+      )}
+    </Screen>
+  );
 }

@@ -70,6 +70,7 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('accounting.journal.create', 'Create draft journal entries.'),
   perm('accounting.journal.post', 'Post journal entries.'),
   perm('accounting.journal.reverse', 'Reverse posted journal entries.'),
+  perm('accounting.period.view', 'Read fiscal years and periods.'),
   perm('accounting.period.close', 'Close fiscal periods.'),
   perm('accounting.period.reopen', 'Reopen closed fiscal periods.'),
   perm('accounting.opening.manage', 'Import and post opening balances.'),
