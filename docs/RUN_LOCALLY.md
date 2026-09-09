@@ -34,7 +34,13 @@ pnpm db:local      # يشغّل PostgreSQL 16 مدمجاً على نفس منف�
 
 ## 3. الترحيلات والبيانات الأولية
 
+> **أولاً ابنِ الحزم الداخلية.** أوامر `db:*` تستورد `@erp/config` و`@erp/contracts` عبر
+> مخرجاتها المبنية (`dist/`)، لذا يجب بناء الحزم الثلاث قبل أي أمر قاعدة بيانات، وإعادة
+> البناء بعد أي تعديل على `src` فيها:
+
 ```bash
+pnpm --filter @erp/config --filter @erp/contracts --filter @erp/database run build
+
 pnpm db:migrate    # يطبّق ملفات SQL بالترتيب مع تحقق من البصمة
 pnpm db:seed       # البيانات الأولية — لا يحتاج أي متغيّر إضافي بعد pnpm env:setup
 ```
@@ -214,4 +220,9 @@ pnpm test          # وحدات + تكامل (تشغّل PostgreSQL مدمجاً
 * **لا تضبط `NEXT_PUBLIC_API_BASE_URL`** إلا إذا كان الـ API على أصل مختلف؛ القيمة
   الافتراضية (فارغة) تعني نفس الأصل عبر وسيط Next، وهو ما يجعل الواجهة تعمل من أي جهاز
   في الشبكة بلا إعداد CORS.
+* **التشغيل متعدد المنصات.** سكربتات `dev`/`start` لتطبيقي Next تمر عبر `scripts/next-run.mjs`
+  الذي يقرأ المنفذ من `.env` (`ADMIN_PORT`/`CUSTOMER_PORT`) ويشغّل `next` عبر `node` مباشرة،
+  و`apps/api/scripts/dev.mjs` يشغّل `tsc` الحقيقي (`lib/tsc.js`) عبر `node` أيضاً. هذا
+  يتجنّب اصطلاحات bash (مثل `${VAR:-افتراضي}`) وروابط `.bin`/`.CMD` التي تختلف بين أنظمة
+  التشغيل، فيعمل `pnpm dev` نفسه على Windows وLinux وmacOS.
 * `SIGNUP_ENABLED=false` يعطّل نافذة الاشتراك الذاتي في النشرات الخاصة.

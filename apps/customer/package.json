@@ -19,10 +19,10 @@
     "vitest": "^2.1.9"
   },
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port ${CUSTOMER_PORT:-3002}",
+    "dev": "node ../../scripts/next-run.mjs customer dev",
     "build": "next build",
     "lint": "eslint app components lib tests next.config.mjs --config ../../eslint.config.mjs",
     "test": "vitest run",
-    "start": "next start --hostname 0.0.0.0 --port ${CUSTOMER_PORT:-3002}"
+    "start": "node ../../scripts/next-run.mjs customer start"
   }
 }

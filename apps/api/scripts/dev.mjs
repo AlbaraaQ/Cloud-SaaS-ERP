@@ -19,6 +19,7 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,11 +49,38 @@ function shutdown(code) {
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
-const tscBin = path.join(apiRoot, 'node_modules', '.bin', 'tsc');
-const tsc = existsSync(tscBin) ? tscBin : path.join(apiRoot, '..', '..', 'node_modules', '.bin', 'tsc');
+/**
+ * Locate the real `tsc` entry file inside the `typescript` package so we can run it
+ * through Node directly.
+ *
+ * We deliberately do NOT spawn the `.bin/tsc` shim: on Windows those links are
+ * `.CMD`/`.ps1` shell scripts (or an extension-less POSIX script), and Node's
+ * `spawn(..., { shell: false })` cannot launch any of them (ENOENT / EINVAL). Running
+ * `<node> <typescript>/lib/tsc.js` needs no shell and behaves identically everywhere.
+ */
+function resolveTscJs() {
+  try {
+    // typescript is a root devDependency; Node's upward resolution finds it from here.
+    const require = createRequire(import.meta.url);
+    const tsMain = require.resolve('typescript'); // .../typescript/lib/typescript.js
+    const pkgRoot = path.resolve(path.dirname(tsMain), '..');
+    const tscJs = path.join(pkgRoot, 'lib', 'tsc.js');
+    if (existsSync(tscJs)) return tscJs;
+  } catch {
+    /* not resolvable — fall back to letting the shell find `tsc` on PATH */
+  }
+  return null;
+}
 
-console.log('[api:dev] compiling with tsc --watch (decorator metadata is required by Nest DI)…');
-run(tsc, ['-p', 'tsconfig.json', '--watch', '--preserveWatchOutput']);
+const tscJs = resolveTscJs();
+
+if (tscJs) {
+  console.log('[api:dev] compiling with tsc --watch (decorator metadata is required by Nest DI)…');
+  run(process.execPath, [tscJs, '-p', 'tsconfig.json', '--watch', '--preserveWatchOutput']);
+} else {
+  console.log('[api:dev] compiling with tsc --watch (falling back to shell resolution)…');
+  run('tsc', ['-p', 'tsconfig.json', '--watch', '--preserveWatchOutput'], { shell: true });
+}
 
 // Wait for the first successful emit before starting the server, otherwise `node --watch`
 // exits immediately on a missing entry point.
