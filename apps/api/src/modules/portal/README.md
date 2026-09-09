@@ -31,7 +31,7 @@ confirm that an invoice id exists in a tenant the caller cannot see.
 |---|---|
 | `GET /portal-access?partyId=` | All portal logins in the tenant, or one customer's |
 | `GET /parties/:id/portal-access` | Logins for one customer |
-| `POST /parties/:id/portal-access` | Grant access: `{ email, fullName? }` |
+| `POST /parties/:id/portal-access` | Grant access: `{ email, fullName?, password?, notify? }` |
 | `PATCH /portal-access/:id` | `{ status: 'active' \| 'suspended' }` |
 | `DELETE /portal-access/:id` | Revoke: drops the link **and** soft-deletes the membership |
 
@@ -39,8 +39,10 @@ confirm that an invoice id exists in a tenant the caller cannot see.
 `temporaryPassword` **once** (`mustChangePassword = true`); if the email already belongs to a
 user it is linked instead and no password is returned. `409 PORTAL_ACCOUNT_TAKEN` means that
 login already serves a different customer in this tenant, `409 PORTAL_ACCOUNT_EXISTS` means it
-already serves this one. Admin UI: **المبيعات ← أخرى ← وصول العملاء للبوابة**
-(`/sales/portal-access`).
+already serves this one. When a password was generated, it is also e-mailed to the buyer
+through the configured mail transport (`MAIL_TRANSPORT=smtp`, MailHog in the compose file)
+unless the caller passes `notify: false`; a delivery failure is logged and never rolls back
+the grant. Admin UI: **المبيعات ← أخرى ← وصول العملاء للبوابة** (`/sales/portal-access`).
 
 ## Customer routes (no permission, portal account required)
 

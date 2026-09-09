@@ -60,6 +60,8 @@ export const users = pgTable(
     isPlatformAdmin: boolean('is_platform_admin').notNull().default(false),
     /** AES-256-GCM ciphertext of the TOTP secret (SECURITY_ARCHITECTURE §2). */
     mfaSecretEnc: bytea('mfa_secret_enc'),
+    /** True once the user confirmed the secret with a valid code — login now demands TOTP. */
+    mfaEnabled: boolean('mfa_enabled').notNull().default(false),
     /** SECURITY_ARCHITECTURE §2 — exponential lockout on repeated failures. */
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
     lockedUntil: timestamp('locked_until', { withTimezone: true }),
@@ -106,6 +108,30 @@ export const refreshTokens = pgTable(
     refreshTokensUserIdx: index('refresh_tokens_user_id_family_idx').on(table.userId, table.family),
   }),
 );
+
+/**
+ * One-time 2FA recovery codes — migration 0031. Platform table (no `tenant_id`) for the
+ * same reason `users` is one: they belong to the person and must be verifiable before any
+ * tenant context exists. Only SHA-256 hashes are stored.
+ */
+export const mfaRecoveryCodes = pgTable(
+  'mfa_recovery_codes',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    mfaRecoveryCodesUserIdx: index('mfa_recovery_codes_user_idx').on(table.userId),
+  }),
+);
+
+export type MfaRecoveryCode = typeof mfaRecoveryCodes.$inferSelect;
+export type NewMfaRecoveryCode = typeof mfaRecoveryCodes.$inferInsert;
 
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;

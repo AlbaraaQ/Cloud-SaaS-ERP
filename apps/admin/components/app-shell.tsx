@@ -4,15 +4,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
+import { useLang, type Lang } from '../lib/i18n';
 import { useSession } from '../lib/session';
-import { visibleModules, type ModuleNode } from '../lib/navigation';
+import { visibleModules, type ModuleNode, type ScreenItem } from '../lib/navigation';
 
-function statusDot(status: string) {
-  const title = status === 'ready' ? 'جاهز' : status === 'api' ? 'الواجهة البرمجية جاهزة' : 'قيد التطوير';
+const label = (lang: Lang, item: { labelAr: string; labelEn: string }): string =>
+  lang === 'ar' ? item.labelAr : item.labelEn;
+
+function statusDot(status: string, lang: Lang) {
+  const title =
+    status === 'ready'
+      ? lang === 'ar' ? 'جاهز' : 'Ready'
+      : status === 'api'
+        ? lang === 'ar' ? 'الواجهة البرمجية جاهزة' : 'API ready'
+        : lang === 'ar' ? 'قيد التطوير' : 'Planned';
   return <span className={`dot ${status}`} title={title} aria-label={title} />;
 }
 
-function ModuleBlock({ module, pathname, filter }: { module: ModuleNode; pathname: string; filter: string }) {
+function ModuleBlock({ module, pathname, filter, lang }: { module: ModuleNode; pathname: string; filter: string; lang: Lang }) {
   const matches = (text: string) => text.toLowerCase().includes(filter.toLowerCase());
   const groups = filter
     ? module.groups
@@ -33,8 +42,8 @@ function ModuleBlock({ module, pathname, filter }: { module: ModuleNode; pathnam
           {module.icon}
         </span>
         <span className="nav-module-label">
-          {module.labelAr}
-          <small>{module.labelEn}</small>
+          {label(lang, module)}
+          <small>{lang === 'ar' ? module.labelEn : module.labelAr}</small>
         </span>
         <span className="chev" aria-hidden>
           {expanded ? '▾' : '◂'}
@@ -44,15 +53,15 @@ function ModuleBlock({ module, pathname, filter }: { module: ModuleNode; pathnam
         <div className="nav-groups">
           {groups.map((group) => (
             <div className="nav-group" key={group.key}>
-              <p className="nav-group-title">{group.labelAr}</p>
-              {group.items.map((item) => (
+              <p className="nav-group-title">{label(lang, group)}</p>
+              {group.items.map((item: ScreenItem) => (
                 <Link
                   key={item.key}
                   href={item.href}
                   className={pathname === item.href.split('?')[0] ? 'nav-link active' : 'nav-link'}
                 >
-                  {statusDot(item.status)}
-                  <span>{item.labelAr}</span>
+                  {statusDot(item.status, lang)}
+                  <span>{label(lang, item)}</span>
                 </Link>
               ))}
             </div>
@@ -65,6 +74,7 @@ function ModuleBlock({ module, pathname, filter }: { module: ModuleNode; pathnam
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { me, isPlatformAdmin, signOut } = useSession();
+  const { lang, t } = useLang();
   const pathname = usePathname() ?? '/';
   const [filter, setFilter] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -86,32 +96,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <Link href="/" className={pathname === '/' ? 'nav-link home active' : 'nav-link home'}>
-          🏠 <span>الرئيسية</span>
+          🏠 <span>{t('nav.home')}</span>
         </Link>
 
         <input
           className="nav-search"
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
-          placeholder="بحث في الشاشات…"
-          aria-label="بحث في الشاشات"
+          placeholder={t('nav.searchPlaceholder')}
+          aria-label={t('nav.searchPlaceholder')}
         />
 
-        <nav className="nav" aria-label="أقسام النظام">
+        <nav className="nav" aria-label={t('nav.searchPlaceholder')}>
           {tree.map((module) => (
-            <ModuleBlock key={module.key} module={module} pathname={pathname} filter={filter} />
+            <ModuleBlock key={module.key} module={module} pathname={pathname} filter={filter} lang={lang} />
           ))}
         </nav>
 
         <div className="nav-legend">
           <span>
-            <span className="dot ready" /> جاهز
+            <span className="dot ready" /> {t('nav.status.ready')}
           </span>
           <span>
             <span className="dot api" /> API
           </span>
           <span>
-            <span className="dot planned" /> قيد التطوير
+            <span className="dot planned" /> {t('nav.status.planned')}
           </span>
         </div>
       </aside>
@@ -119,25 +129,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="main">
         <header className="topbar">
           <div className="row" style={{ alignItems: 'center' }}>
-            <button className="btn only-mobile" type="button" onClick={() => setMobileOpen(!mobileOpen)} aria-label="القائمة">
+            <button className="btn only-mobile" type="button" onClick={() => setMobileOpen(!mobileOpen)} aria-label={t('nav.searchPlaceholder')}>
               ☰
             </button>
             <div>
-              <strong>{me?.membership.tenantName ?? 'غير متصل'}</strong>
+              <strong>{me?.membership.tenantName ?? '—'}</strong>
               <p className="muted" style={{ margin: 0 }}>
-                {me?.membership.tenantCode ? `رمز المنشأة: ${me.membership.tenantCode}` : '—'}
-                {me?.membership.isOwner ? ' · مالك' : ''}
-                {isPlatformAdmin ? ' · مدير منصة' : ''}
+                {me?.membership.tenantCode
+                  ? lang === 'ar'
+                    ? `رمز المنشأة: ${me.membership.tenantCode}`
+                    : `Tenant code: ${me.membership.tenantCode}`
+                  : '—'}
+                {me?.membership.isOwner ? (lang === 'ar' ? ' · مالك' : ' · Owner') : ''}
+                {isPlatformAdmin ? (lang === 'ar' ? ' · مدير منصة' : ' · Platform admin') : ''}
               </p>
             </div>
           </div>
           <div className="row" style={{ alignItems: 'center' }}>
             <span className="muted">{me?.user.fullName}</span>
             <Link className="btn" href="/settings/change-password">
-              كلمة المرور
+              {lang === 'ar' ? 'كلمة المرور' : 'Password'}
+            </Link>
+            <Link className="btn" href="/settings/two-factor" title={lang === 'ar' ? 'التحقق بخطوتين' : 'Two-factor authentication'}>
+              🔐
             </Link>
             <button className="btn danger" type="button" onClick={() => void signOut()}>
-              خروج
+              {t('nav.logout')}
             </button>
           </div>
         </header>

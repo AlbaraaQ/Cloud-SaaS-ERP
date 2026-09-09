@@ -28,6 +28,8 @@ export const errorCodes = {
   INTERNAL: 'INTERNAL',
   // PHASE_05 §7 — no posting profile answers a (branch, doc_type) lookup.
   ACCOUNT_PROFILE_MISSING: 'ACCOUNT_PROFILE_MISSING',
+  // Round 11 — credentials were valid but the user has TOTP enabled and sent no code.
+  MFA_REQUIRED: 'MFA_REQUIRED',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -61,6 +63,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   RATE_LIMITED: 429,
   INTERNAL: 500,
   ACCOUNT_PROFILE_MISSING: 422,
+  MFA_REQUIRED: 401,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -88,6 +91,7 @@ export const errorTitle: Record<ErrorCode, string> = {
   RATE_LIMITED: 'Rate limited',
   INTERNAL: 'Internal error',
   ACCOUNT_PROFILE_MISSING: 'Posting profile missing',
+  MFA_REQUIRED: 'Verification code required',
 };
 
 export function statusForCode(code: string): number {

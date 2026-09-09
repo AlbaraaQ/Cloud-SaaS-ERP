@@ -30,11 +30,15 @@ Headers: `Authorization: Bearer`, `X-Branch-Id?`, `Idempotency-Key?`, `X-Request
 
 | Method & Path | Body → Response | Perm |
 |---|---|---|
-| POST `/auth/login` | `{email,password,tenantCode, mfaCode?}` → `{data:{accessToken, refreshToken, user, memberships}}` — `memberships` holds **only** the membership in the authenticated tenant (CR-003: returning the others would enumerate tenants). Wrong password, unknown e-mail and unknown tenant all return the same opaque 401. | public |
+| POST `/auth/login` | `{email,password,tenantCode, mfaCode?}` → `{data:{accessToken, refreshToken, user, memberships}}` — `memberships` holds **only** the membership in the authenticated tenant (CR-003: returning the others would enumerate tenants). Wrong password, unknown e-mail and unknown tenant all return the same opaque 401. When the user has TOTP enabled, a missing code returns 401 `MFA_REQUIRED` and a wrong code counts as a failed login. | public |
 | POST `/auth/refresh` | `{refreshToken}` → rotated pair | public |
 | POST `/auth/logout` | `{}` → 204 | auth |
 | GET `/me` | → user+membership+`permissions[]`+branch scope | auth |
 | POST `/auth/change-password` | `{current,new}` → 204 | auth |
+| GET `/auth/mfa` | → `{data:{enabled,enrolled,recoveryCodesLeft}}` | auth |
+| POST `/auth/mfa/enroll` | → 201 `{data:{secretBase32,otpauthUrl,issuer}}` — stores the AES-GCM-sealed secret; login unaffected until `enable` | auth |
+| POST `/auth/mfa/enable` | `{code}` → `{data:{recoveryCodes[]}}` (8 one-time codes, shown once) | auth |
+| POST `/auth/mfa/disable` | `{password}` → 204 | auth |
 | GET `/permissions` | → registry list | auth |
 
 ## 2. Tenancy & Access

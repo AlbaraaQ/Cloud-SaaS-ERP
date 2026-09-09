@@ -402,6 +402,37 @@ Still `planned` — 1 screen: إعدادات جهاز التحضير (preparatio
 - Tests: `apps/api/test/portal.spec.ts` (10, containment-first) and `apps/customer` 8.
   Repository total **475**.
 
+## Round 11 — security and settings the desktop edition always had
+
+- **TOTP two-factor authentication is real, end to end.** Migration `0031` adds
+  `users.mfa_enabled` and `mfa_recovery_codes` (SHA-256 hashes only). Enrolment is
+  two-phase: `POST /auth/mfa/enroll` seals a fresh secret under AES-256-GCM
+  (`secret-box.ts`, same `v1:` envelope as the e-invoicing credentials, key from
+  `DATA_ENC_KEY`) but does not enforce 2FA; `POST /auth/mfa/enable` flips
+  `mfa_enabled` only after a valid code proves the authenticator was actually
+  configured, and issues eight one-time `XXXX-XXXX` recovery codes (ambiguous glyphs
+  excluded) shown exactly once. Login with 2FA on returns 401 `MFA_REQUIRED` when the
+  code is missing and treats a wrong code as a failed login (lockout counter
+  advances). Recovery codes are single-use and accepted wherever the 6-digit code is.
+  Disabling requires the account password. `totp.ts` is RFC 4226/6238 on
+  `node:crypto`, pinned against the RFC 6238 test vectors. Admin UI: الإعدادات ←
+  المستخدمون ← التحقق بخطوتين, plus a code step on the login screen.
+- **Mail actually delivers.** `MAIL_TRANSPORT=smtp` now routes through a hand-rolled
+  SMTP client (`SmtpMailer` — EHLO, opportunistic STARTTLS, AUTH LOGIN, dot-stuffing,
+  RFC 2047 subjects; no new dependency), tested against an in-process fake relay.
+  Granting portal access e-mails the buyer their one-time password unless
+  `notify:false`; delivery failure never rolls back the grant. `console` stays the
+  default transport; MailHog in the compose file is the target (`SMTP_HOST=localhost
+  SMTP_PORT=1025`).
+- **The language screen exists.** الإعدادات ← عامة ← اللغة flips the whole document
+  between Arabic/RTL and English/LTR and persists in `localStorage`. The chrome — app
+  shell, navigation tree (both names already lived in `navigation.ts`), login, common
+  states — is fully bilingual via `lib/i18n.tsx`; screen content stays Arabic-first by
+  design and the page says so.
+- Tests: `test/mfa.spec.ts` (12), `totp.spec.ts` (7), `secret-box.spec.ts` (4),
+  `mailer.spec.ts` (3), portal suite +2 (invite mail, `notify:false`). API **372**,
+  admin **35**; repository total **508**. Migrations through **0031**.
+
 ## Conventions
 
 - `docs/` remains the authoritative documentation source.

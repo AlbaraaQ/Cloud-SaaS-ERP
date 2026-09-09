@@ -111,11 +111,23 @@ const envSchema = z.object({
   /** PHASE_04 idempotency — DATABASE_DESIGN §4 ("expires 24h"). */
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().int().positive().default(24),
 
-  /** PHASE_04 mail — `console` writes to the log, `smtp` targets MailHog/SES later. */
+  /** PHASE_04 mail — `console` writes to the log, `smtp` targets MailHog/SES. */
   MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
   MAIL_FROM: z.string().default('no-reply@erp.local'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  /** Round 11 — optional AUTH LOGIN credentials; omitted for MailHog. */
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  /** Implicit TLS on connect (port 465 style) instead of cleartext + STARTTLS. */
+  SMTP_SECURE: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .transform((value) => value === true || value === 'true')
+    .default('false'),
+  /** EHLO identity (some relays reject 'localhost'). */
+  SMTP_CLIENT_HOSTNAME: z.string().optional(),
+  /** Public URL of the customer portal, used inside outbound e-mails. */
+  CUSTOMER_PUBLIC_URL: z.string().default(''),
 
   /** AES-256-GCM data-encryption key, base64 (SECURITY_ARCHITECTURE §9). */
   DATA_ENC_KEY: z.string().optional(),

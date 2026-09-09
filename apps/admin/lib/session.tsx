@@ -13,7 +13,7 @@ export type SessionState = {
 type SessionContextValue = SessionState & {
   can: (permission?: string) => boolean;
   isPlatformAdmin: boolean;
-  signIn: (email: string, password: string, tenantCode: string) => Promise<void>;
+  signIn: (email: string, password: string, tenantCode: string, mfaCode?: string) => Promise<void>;
   signOut: () => Promise<void>;
   reload: () => Promise<void>;
 };
@@ -51,8 +51,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const signIn = useCallback(
-    async (email: string, password: string, tenantCode: string) => {
-      await apiLogin(email, password, tenantCode);
+    async (email: string, password: string, tenantCode: string, mfaCode?: string) => {
+      await apiLogin(email, password, tenantCode, mfaCode);
       const me = await fetchMe();
       setState({ status: 'authenticated', me });
     },

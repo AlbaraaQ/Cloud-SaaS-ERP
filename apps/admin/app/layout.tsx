@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 import { AuthGate } from '../components/auth-gate';
+import { LanguageProvider } from '../lib/i18n';
 import { SessionProvider } from '../lib/session';
 
 export const metadata: Metadata = {
@@ -17,9 +18,11 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="ar" dir="rtl">
       <body>
-        <SessionProvider>
-          <AuthGate>{children}</AuthGate>
-        </SessionProvider>
+        <LanguageProvider>
+          <SessionProvider>
+            <AuthGate>{children}</AuthGate>
+          </SessionProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

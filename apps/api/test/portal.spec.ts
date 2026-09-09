@@ -1,8 +1,75 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createServer, type Server } from 'node:net';
+
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
 import { api } from './http.js';
 import { createTestApp, type TestApp } from './test-app.js';
+
+/**
+ * The invite-mail assertions below run against a real (fake) SMTP relay. The env must be
+ * fixed *before* `@erp/config` parses — hence vi.hoisted.
+ */
+const smtp = vi.hoisted(() => {
+  const port = 20000 + Math.floor(Math.random() * 20000);
+  process.env.MAIL_TRANSPORT = 'smtp';
+  process.env.SMTP_HOST = '127.0.0.1';
+  process.env.SMTP_PORT = String(port);
+  process.env.MAIL_FROM = 'no-reply@erp.test';
+  process.env.CUSTOMER_PUBLIC_URL = 'https://portal.example.test';
+  return { port, mails: [] as Array<{ to: string; data: string }> };
+});
+
+/** Minimal happy-path SMTP server: enough of RFC 5321 to capture DATA. */
+function fakeSmtpServer(): Server {
+  return createServer((socket) => {
+    let buffer = '';
+    let inData = false;
+    let to = '';
+    socket.write('220 fake\r\n');
+    socket.on('data', (chunk) => {
+      buffer += chunk.toString('utf8');
+      for (;;) {
+        if (inData) {
+          const end = buffer.indexOf('\r\n.\r\n');
+          if (end === -1) return;
+          smtp.mails.push({ to, data: buffer.slice(0, end) });
+          buffer = buffer.slice(end + 5);
+          inData = false;
+          socket.write('250 OK\r\n');
+          continue;
+        }
+        const end = buffer.indexOf('\r\n');
+        if (end === -1) return;
+        const line = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        const upper = line.toUpperCase();
+        if (upper.startsWith('EHLO')) socket.write('250 fake\r\n');
+        else if (upper.startsWith('MAIL FROM')) socket.write('250 OK\r\n');
+        else if (upper.startsWith('RCPT TO')) {
+          to = line.slice(line.indexOf('<') + 1, line.lastIndexOf('>'));
+          socket.write('250 OK\r\n');
+        } else if (upper === 'DATA') {
+          inData = true;
+          socket.write('354 go\r\n');
+        } else if (upper === 'QUIT') {
+          socket.write('221 bye\r\n');
+          socket.end();
+        } else socket.write('250 OK\r\n');
+      }
+    });
+  });
+}
+
+async function waitForMail(predicate: (mail: { to: string; data: string }) => boolean, ms = 5_000) {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const found = smtp.mails.find(predicate);
+    if (found) return found;
+    if (Date.now() > deadline) return undefined;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
 
 /**
  * The customer self-service portal.
@@ -25,6 +92,7 @@ describe('customer portal', () => {
   let otherInvoiceId = '';
   let portalToken = '';
   let accessId = '';
+  let mailServer: Server;
 
   const body = (response: { body: Record<string, unknown> }) => (response.body.data ?? response.body) as Record<string, string>;
 
@@ -39,6 +107,8 @@ describe('customer portal', () => {
   }
 
   beforeAll(async () => {
+    mailServer = fakeSmtpServer();
+    await new Promise<void>((resolve) => mailServer.listen(smtp.port, '127.0.0.1', resolve));
     ctx = await createTestApp('customer-portal');
     staff = await createActor(ctx, {
       tenantCode: 'portalco',
@@ -76,7 +146,10 @@ describe('customer portal', () => {
     otherInvoiceId = await invoiceFor(otherBuyerId, '7');
   }, 240_000);
 
-  afterAll(async () => ctx.close());
+  afterAll(async () => {
+    await ctx.close();
+    await new Promise<void>((resolve) => mailServer.close(() => resolve()));
+  });
 
   it('grants a customer a login and hands over a one-time password', async () => {
     const granted = await api(ctx.server, 'post', `/api/v1/parties/${buyerId}/portal-access`, {
@@ -93,6 +166,29 @@ describe('customer portal', () => {
     expect(login.status).toBe(200);
     portalToken = ((login.body.data ?? login.body) as Record<string, string>).accessToken;
     expect(portalToken).toBeTruthy();
+  });
+
+  it('e-mails the generated credentials to the customer (best-effort, through SMTP)', async () => {
+    const invited = await waitForMail((mail) => mail.to === 'buyer@nokhba.test');
+    expect(invited, 'invite mail delivered to the fake relay').toBeTruthy();
+    // Subject arrives as a UTF-8 encoded word; the body carries the plaintext facts.
+    expect(invited!.data).toContain('Subject: =?UTF-8?B?');
+    expect(invited!.data).toContain('كلمة المرور المؤقتة');
+    expect(invited!.data).toContain('https://portal.example.test');
+  });
+
+  it('skips the e-mail when notify is false, but still returns the password', async () => {
+    const before = smtp.mails.length;
+    const granted = await api(ctx.server, 'post', `/api/v1/parties/${otherBuyerId}/portal-access`, {
+      token: staff.token,
+      body: { email: 'silent@monafis.test', notify: false },
+    });
+    expect(granted.status).toBe(201);
+    expect((body(granted) as Record<string, string>).temporaryPassword).toMatch(/.{12,}/);
+    // Give an erroneously-sent mail a moment to arrive before asserting its absence.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(smtp.mails.some((mail) => mail.to === 'silent@monafis.test')).toBe(false);
+    expect(smtp.mails.length).toBe(before);
   });
 
   it('shows the customer their own party, balance and invoices', async () => {

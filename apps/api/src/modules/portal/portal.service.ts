@@ -1,16 +1,24 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { env } from '@erp/config';
 import { DomainError, newId } from '@erp/contracts';
 import { memberships, membershipRoles, parties, portalAccounts, roles, salesInvoices, users, withTenantTx, type DatabaseHandle, type DrizzleTx } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { PasswordService } from '../platform/auth/password.service.js';
+import { MAILER, type MailerPort } from '../platform-services/notifications/mailer.js';
 import { PrintTemplatesService } from '../reporting/print-templates.service.js';
 
 /** The role every portal login gets: a real membership with an empty permission set. */
 export const PORTAL_ROLE_NAME = 'Customer portal';
 
-export type PortalGrantInput = { email: string; fullName?: string; password?: string };
+export type PortalGrantInput = {
+  email: string;
+  fullName?: string;
+  password?: string;
+  /** E-mail the credentials to the customer (only meaningful when a password was generated). */
+  notify?: boolean;
+};
 
 /**
  * Customer self-service.
@@ -22,8 +30,11 @@ export type PortalGrantInput = { email: string; fullName?: string; password?: st
  */
 @Injectable()
 export class PortalService {
+  private readonly logger = new Logger(PortalService.name);
+
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    @Inject(MAILER) private readonly mailer: MailerPort,
     private readonly passwords: PasswordService,
     private readonly print: PrintTemplatesService,
   ) {}
@@ -113,6 +124,40 @@ export class PortalService {
       await tx.insert(portalAccounts).values({ id, tenantId, partyId, userId, status: 'active', invitedAt: new Date(), createdAt: new Date(), createdBy: actorUserId });
       // The password is echoed only when this call generated it; a caller-supplied one is theirs already.
       return { id, partyId, email, status: 'active', temporaryPassword: input.password ? null : generated };
+    }).then(async (result) => {
+      // Best-effort: a failed e-mail must never roll back a working grant — the password is
+      // in the API response and the back office can hand it over manually.
+      if (result.temporaryPassword && input.notify !== false) {
+        await this.sendInviteEmail(tenantId, email, party.name, result.temporaryPassword).catch((error) => {
+          this.logger.warn({ tenantId, partyId, err: error instanceof Error ? error.message : String(error) }, 'portal invite e-mail was not delivered');
+        });
+      }
+      return result;
+    });
+  }
+
+  private async sendInviteEmail(tenantId: string, email: string, partyName: string, temporaryPassword: string): Promise<void> {
+    // Live read: tests set CUSTOMER_PUBLIC_URL per file after @erp/config was cached.
+    const publicUrl = process.env.CUSTOMER_PUBLIC_URL || env.CUSTOMER_PUBLIC_URL;
+    const portalLink = publicUrl ? `\nرابط البوابة: ${publicUrl}\n` : '';
+    await this.mailer.send({
+      to: email,
+      subject: 'بيانات الدخول إلى بوابة العملاء',
+      tenantId,
+      text: [
+        `مرحباً،`,
+        ``,
+        `تم إنشاء حساب لكم في بوابة العملاء الخاصة بـ «${partyName}».`,
+        `يمكنكم من خلالها متابعة فواتيركم وكشف حسابكم ومدفوعاتكم وطباعة الفواتير.`,
+        ``,
+        `البريد الإلكتروني: ${email}`,
+        `كلمة المرور المؤقتة: ${temporaryPassword}`,
+        ``,
+        `سيُطلب منكم تغيير كلمة المرور عند أول تسجيل دخول.`,
+        portalLink,
+        `مع التحية،`,
+        `نظام المحاسبة السحابي`,
+      ].join('\n'),
     });
   }
 

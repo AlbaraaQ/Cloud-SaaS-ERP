@@ -21,8 +21,8 @@ export type { VirusScannerPort, ScanVerdict } from './files/virus-scanner.js';
 
 export { NotificationsService } from './notifications/notifications.service.js';
 export type { NotificationInput } from './notifications/notifications.service.js';
-export { MAILER, ConsoleMailer } from './notifications/mailer.js';
-export type { MailerPort, MailMessage } from './notifications/mailer.js';
+export { MAILER, ConsoleMailer, SmtpMailer, createMailer, smtpOptionsFromEnv } from './notifications/mailer.js';
+export type { MailerPort, MailMessage, SmtpOptions } from './notifications/mailer.js';
 
 export { OutboxService } from './jobs/outbox.service.js';
 export { OutboxPublisher } from './jobs/outbox.publisher.js';

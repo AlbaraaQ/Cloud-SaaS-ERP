@@ -15,7 +15,7 @@ import { OutboxPublisher } from './jobs/outbox.publisher.js';
 import { OutboxService } from './jobs/outbox.service.js';
 import { QUEUE_PORT, QueueService } from './jobs/queue.service.js';
 import { WorkerRunner } from './jobs/worker.runner.js';
-import { ConsoleMailer, MAILER } from './notifications/mailer.js';
+import { createMailer, MAILER } from './notifications/mailer.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
 import { NotificationsSubscriber } from './notifications/notifications.subscriber.js';
@@ -32,7 +32,7 @@ import { SequencesService } from './sequences/sequences.service.js';
  * | token            | default          | production                        |
  * | ---------------- | ---------------- | --------------------------------- |
  * | `OBJECT_STORAGE` | `S3ObjectStorage`| S3/MinIO (already real)           |
- * | `MAILER`         | `ConsoleMailer`  | SMTP adapter — PHASE_04 §14 defers|
+ * | `MAILER`         | `createMailer()` | console by default, SMTP when MAIL_TRANSPORT=smtp (Round 11)|
  * | `VIRUS_SCANNER`  | `NoopVirusScanner`| ClamAV — PHASE_04 §14 defers     |
  * | `QUEUE_PORT`     | `QueueService`   | same class, Redis configured      |
  *
@@ -64,7 +64,8 @@ import { SequencesService } from './sequences/sequences.service.js';
     // useFactory, not useClass: the adapter takes an optional config object that Nest
     // would otherwise try to resolve as a dependency.
     { provide: OBJECT_STORAGE, useFactory: () => new S3ObjectStorage() },
-    { provide: MAILER, useClass: ConsoleMailer },
+    // Factory reads MAIL_TRANSPORT: 'console' logs, 'smtp' delivers via SmtpMailer.
+    { provide: MAILER, useFactory: createMailer },
     { provide: VIRUS_SCANNER, useClass: NoopVirusScanner },
     { provide: QUEUE_PORT, useClass: QueueService },
   ],

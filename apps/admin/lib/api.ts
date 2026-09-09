@@ -241,11 +241,16 @@ export type LoginPayload = {
   memberships: Array<{ id: string; tenantId: string; tenantCode: string; tenantName: string; isOwner: boolean; status: string }>;
 };
 
-export async function login(email: string, password: string, tenantCode: string): Promise<LoginPayload> {
+export async function login(
+  email: string,
+  password: string,
+  tenantCode: string,
+  mfaCode?: string,
+): Promise<LoginPayload> {
   const data = await apiData<LoginPayload>('/auth/login', {
     anonymous: true,
     method: 'POST',
-    body: JSON.stringify({ email, password, tenantCode }),
+    body: JSON.stringify({ email, password, tenantCode, ...(mfaCode ? { mfaCode } : {}) }),
   });
   writeSession({
     accessToken: data.accessToken,

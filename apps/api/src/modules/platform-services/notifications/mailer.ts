@@ -1,12 +1,20 @@
+import { connect as netConnect, type Socket } from 'node:net';
+import { connect as tlsConnect } from 'node:tls';
+
 import { Injectable, Logger } from '@nestjs/common';
 import { env } from '@erp/config';
 
 /**
  * Mail port — TARGET_ARCHITECTURE §8 ("email (SMTP/SES port)").
  *
- * PHASE_04 §4 scopes this to "an interface + console/mailhog stub": no provider SDK, no
- * templates, no retries here. Delivery is queued through `outbox_jobs` → the
- * `notifications` queue, so the transport can be swapped without touching a caller.
+ * `MAIL_TRANSPORT=console` (default) logs the message; `MAIL_TRANSPORT=smtp` delivers
+ * through the SMTP client below — tested against MailHog in `infrastructure/docker-compose.yml`
+ * (service `mailhog`, port 1025) and against any real relay that accepts plain or LOGIN auth.
+ *
+ * The client is deliberately hand-rolled on `node:net`/`node:tls` (no nodemailer): the
+ * subset we need — EHLO, optional STARTTLS, optional AUTH LOGIN, MAIL/RCPT/DATA — is small,
+ * and keeping the dependency surface at zero matters more in this codebase than SMTP
+ * conveniences we would never use.
  */
 
 export type MailMessage = {
@@ -24,11 +32,7 @@ export interface MailerPort {
 
 export const MAILER = 'ERP_MAILER';
 
-/**
- * The wired implementation. In development `MAIL_TRANSPORT=console` prints the message;
- * MailHog (compose service `mailhog`, SMTP 1025) is the target once an SMTP transport is
- * implemented in a later phase — the port is what keeps that a one-file change.
- */
+/** In development `MAIL_TRANSPORT=console` prints the message instead of delivering it. */
 @Injectable()
 export class ConsoleMailer implements MailerPort {
   private readonly logger = new Logger(ConsoleMailer.name);
@@ -46,4 +50,255 @@ export class ConsoleMailer implements MailerPort {
       'outbound mail (console transport)',
     );
   }
+}
+
+export type SmtpOptions = {
+  host: string;
+  port: number;
+  from: string;
+  username?: string;
+  password?: string;
+  /** Implicit TLS on connect (port 465 style) instead of cleartext + STARTTLS. */
+  secure?: boolean;
+  timeoutMs?: number;
+};
+
+/**
+ * Reads `process.env` directly instead of the parsed `env` snapshot: the snapshot is
+ * materialised once per process, and tests flip these values per file (vi.hoisted) after
+ * another suite in the same worker has already imported `@erp/config`.
+ */
+function live(name: string, fallback: string): string {
+  const value = process.env[name];
+  return value === undefined || value === '' ? fallback : value;
+}
+
+export function smtpOptionsFromEnv(): SmtpOptions {
+  return {
+    host: live('SMTP_HOST', env.SMTP_HOST ?? 'localhost'),
+    port: Number(live('SMTP_PORT', String(env.SMTP_PORT))),
+    from: live('MAIL_FROM', env.MAIL_FROM),
+    username: process.env.SMTP_USER || undefined,
+    password: process.env.SMTP_PASS || undefined,
+    secure: live('SMTP_SECURE', 'false') === 'true',
+  };
+}
+
+type Reply = { code: number; lines: string[] };
+
+const encodedWord = (text: string): string => `=?UTF-8?B?${Buffer.from(text, 'utf8').toString('base64')}?=`;
+
+export class SmtpMailer implements MailerPort {
+  readonly transport = 'smtp';
+
+  constructor(private readonly options: SmtpOptions) {}
+
+  async send(message: MailMessage): Promise<void> {
+    const session = await SmtpSession.open(this.options);
+    try {
+      await session.deliver({
+        from: this.options.from,
+        to: message.to,
+        subject: message.subject,
+        text: message.text,
+      });
+    } finally {
+      await session.quit().catch(() => undefined);
+    }
+  }
+}
+
+/**
+ * One connection per send. Transactional volume here is a handful of messages per grant or
+ * password event — pooling would be premature, and short-lived connections are what
+ * MailHog-lookalikes in CI expect anyway.
+ */
+class SmtpSession {
+  private buffer = '';
+  /** One waiter at a time — SMTP is strictly lock-step. */
+  private notify: (() => void) | undefined;
+  /** Set by socket-level failures; surfaced to whichever reply wait is in flight. */
+  private failure: Error | undefined;
+
+  private constructor(
+    private socket: Socket,
+    private readonly options: SmtpOptions,
+  ) {}
+
+  static async open(options: SmtpOptions): Promise<SmtpSession> {
+    const socket: Socket = options.secure
+      ? tlsConnect({ host: options.host, port: options.port })
+      : netConnect({ host: options.host, port: options.port });
+    const session = new SmtpSession(socket, options);
+    session.attach(socket);
+
+    const greeting = await session.readReply();
+    if (greeting.code !== 220) session.fail(`unexpected greeting ${greeting.code}`);
+
+    const ehlo = await session.command(`EHLO ${clientHostname()}`, [250]);
+    if (!options.secure && ehlo.lines.some((line) => line.toUpperCase().includes('STARTTLS'))) {
+      await session.command('STARTTLS', [220]);
+      await session.upgradeToTls();
+      await session.command(`EHLO ${clientHostname()}`, [250]);
+    }
+
+    if (options.username && options.password) {
+      await session.command('AUTH LOGIN', [334]);
+      await session.command(Buffer.from(options.username, 'utf8').toString('base64'), [334]);
+      await session.command(Buffer.from(options.password, 'utf8').toString('base64'), [235]);
+    }
+
+    return session;
+  }
+
+  async deliver(message: { from: string; to: string; subject: string; text: string }): Promise<void> {
+    await this.command(`MAIL FROM:<${message.from}>`, [250]);
+    await this.command(`RCPT TO:<${message.to}>`, [250, 251]);
+    await this.command('DATA', [354]);
+
+    const headers = [
+      `From: ${message.from}`,
+      `To: ${message.to}`,
+      `Subject: ${encodedWord(message.subject)}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      `Date: ${new Date().toUTCString()}`,
+    ].join('\r\n');
+
+    // Dot-stuffing (RFC 5321 §4.5.2): a line starting with '.' gets one extra '.'.
+    const body = message.text.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+    this.socket.write(`${headers}\r\n\r\n${body}\r\n.\r\n`, 'utf8');
+    await this.expect([250]);
+  }
+
+  async quit(): Promise<void> {
+    try {
+      if (!this.socket.destroyed && !this.failure) await this.command('QUIT', [221]);
+    } finally {
+      this.socket.destroy();
+    }
+  }
+
+  // --- protocol plumbing -------------------------------------------------------
+
+  private readonly onData = (chunk: Buffer): void => {
+    this.buffer += chunk.toString('utf8');
+    this.notify?.();
+  };
+
+  private readonly onError = (error: Error): void => {
+    this.abort(new Error(`SMTP ${this.options.host}:${this.options.port} — ${error.message}`));
+  };
+
+  private readonly onTimeout = (): void => {
+    this.abort(new Error(`SMTP ${this.options.host}:${this.options.port} — timed out waiting for the server`));
+  };
+
+  private readonly onClose = (): void => {
+    if (!this.failure) {
+      this.abort(new Error(`SMTP ${this.options.host}:${this.options.port} — connection closed unexpectedly`));
+    }
+  };
+
+  /** Pipes socket bytes into `buffer` and wakes whoever is waiting for a reply. */
+  private attach(socket: Socket): void {
+    socket.setTimeout(this.options.timeoutMs ?? 15_000, this.onTimeout);
+    socket.on('data', this.onData);
+    socket.once('error', this.onError);
+    socket.once('close', this.onClose);
+  }
+
+  private detach(socket: Socket): void {
+    socket.off('data', this.onData);
+    socket.off('error', this.onError);
+    socket.off('close', this.onClose);
+    socket.setTimeout(0);
+  }
+
+  private upgradeToTls(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // The raw listeners must come off *before* the TLS layer takes the socket over,
+      // otherwise they would be fed encrypted bytes.
+      this.detach(this.socket);
+      const secured = tlsConnect({ socket: this.socket, servername: this.options.host });
+      secured.once('secureConnect', () => {
+        this.socket = secured;
+        this.buffer = '';
+        this.attach(secured);
+        resolve();
+      });
+      secured.once('error', reject);
+    });
+  }
+
+  private async command(line: string, accepted: number[]): Promise<Reply> {
+    this.socket.write(`${line}\r\n`, 'utf8');
+    return this.expect(accepted);
+  }
+
+  private async expect(accepted: number[]): Promise<Reply> {
+    const reply = await this.readReply();
+    if (!accepted.includes(reply.code)) {
+      this.fail(`expected ${accepted.join('/')} but got ${reply.code}: ${reply.lines.join(' | ')}`);
+    }
+    return reply;
+  }
+
+  /** Waits until a complete (possibly multi-line) reply can be parsed from the buffer. */
+  private async readReply(): Promise<Reply> {
+    for (;;) {
+      if (this.failure) throw this.failure;
+      const parsed = this.parseReply();
+      if (parsed) return parsed;
+      await new Promise<void>((resolve) => {
+        this.notify = resolve;
+      });
+      this.notify = undefined;
+    }
+  }
+
+  /**
+   * Multi-line replies use `code-` continuation lines; `code ` (space) ends the reply.
+   * Returns `undefined` until a full reply is present.
+   */
+  private parseReply(): Reply | undefined {
+    const lines: string[] = [];
+    let cursor = 0;
+    for (;;) {
+      const end = this.buffer.indexOf('\r\n', cursor);
+      if (end === -1) return undefined;
+      const line = this.buffer.slice(cursor, end);
+      if (line.length < 4 || !/^\d{3}[- ]/.test(line)) return undefined;
+      lines.push(line.slice(4));
+      if (line[3] === ' ') {
+        this.buffer = this.buffer.slice(end + 2);
+        return { code: Number(line.slice(0, 3)), lines };
+      }
+      cursor = end + 2;
+    }
+  }
+
+  /** Socket-level failure: record, destroy, wake the waiter so it can throw. */
+  private abort(error: Error): void {
+    this.failure = error;
+    this.socket.destroy();
+    this.notify?.();
+  }
+
+  /** Command-level failure: throw synchronously. */
+  private fail(reason: string): never {
+    this.socket.destroy();
+    throw new Error(`SMTP ${this.options.host}:${this.options.port} — ${reason}`);
+  }
+}
+
+function clientHostname(): string {
+  return env.SMTP_CLIENT_HOSTNAME || 'erp-saas.local';
+}
+
+/** Chooses the wired implementation from `MAIL_TRANSPORT` (read live — see `live`). */
+export function createMailer(): MailerPort {
+  if (live('MAIL_TRANSPORT', env.MAIL_TRANSPORT) === 'smtp') return new SmtpMailer(smtpOptionsFromEnv());
+  return new ConsoleMailer();
 }

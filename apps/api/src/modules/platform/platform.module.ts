@@ -4,6 +4,8 @@ import { AuthController } from './auth/auth.controller.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
 import { AuthService } from './auth/auth.service.js';
+import { MfaController } from './auth/mfa.controller.js';
+import { MfaService } from './auth/mfa.service.js';
 import { PasswordService } from './auth/password.service.js';
 import { TokenService } from './auth/token.service.js';
 import { IdentityController } from './identity/identity.controller.js';
@@ -25,6 +27,7 @@ import { TenantService } from './tenancy/tenant.service.js';
 @Module({
   controllers: [
     AuthController,
+    MfaController,
     BillingController,
     IdentityController,
     TenantController,
@@ -40,10 +43,11 @@ import { TenantService } from './tenancy/tenant.service.js';
     RolesService,
     SettingsService,
     TenantService,
+    MfaService,
     PasswordService,
     TokenService,
     RateLimiterService,
   ],
-  exports: [AuthService, IdentityService, PasswordService, TokenService, RateLimiterService, BillingService],
+  exports: [AuthService, IdentityService, MfaService, PasswordService, TokenService, RateLimiterService, BillingService],
 })
 export class PlatformModule {}

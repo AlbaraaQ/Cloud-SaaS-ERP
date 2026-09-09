@@ -17,7 +17,8 @@ export const loginRequestSchema = z
     email: z.string().trim().email().max(320),
     password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
     tenantCode: z.string().trim().min(1).max(64),
-    mfaCode: z.string().trim().length(6).optional(),
+    /** 6-digit TOTP code, or a one-time recovery code (XXXX-XXXX) as a fallback. */
+    mfaCode: z.string().trim().min(6).max(12).optional(),
   })
   .strict();
 
@@ -123,3 +124,51 @@ export const permissionDtoSchema = z.object({
 });
 
 export type PermissionDto = z.infer<typeof permissionDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// Two-factor authentication (TOTP, RFC 6238) — Round 11.
+// ---------------------------------------------------------------------------
+
+export const mfaStatusResponseSchema = z.object({
+  /** The user can log in only with password + authenticator code. */
+  enabled: z.boolean(),
+  /** A secret is stored but not yet confirmed with a code (enrolment in flight). */
+  enrolled: z.boolean(),
+  /** How many one-time recovery codes are still unused. */
+  recoveryCodesLeft: z.number().int().nonnegative(),
+});
+
+export type MfaStatusResponse = z.infer<typeof mfaStatusResponseSchema>;
+
+export const mfaEnrollResponseSchema = z.object({
+  /** Base32 secret for manual entry into an authenticator app. */
+  secretBase32: z.string(),
+  /** `otpauth://totp/…` provisioning URI (QR payload). */
+  otpauthUrl: z.string(),
+  issuer: z.string(),
+});
+
+export type MfaEnrollResponse = z.infer<typeof mfaEnrollResponseSchema>;
+
+export const mfaEnableRequestSchema = z
+  .object({
+    code: z.string().trim().length(6),
+  })
+  .strict();
+
+export type MfaEnableRequest = z.infer<typeof mfaEnableRequestSchema>;
+
+export const mfaEnableResponseSchema = z.object({
+  /** Shown exactly once; afterwards only hashes are kept. */
+  recoveryCodes: z.array(z.string()),
+});
+
+export type MfaEnableResponse = z.infer<typeof mfaEnableResponseSchema>;
+
+export const mfaDisableRequestSchema = z
+  .object({
+    password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+  })
+  .strict();
+
+export type MfaDisableRequest = z.infer<typeof mfaDisableRequestSchema>;

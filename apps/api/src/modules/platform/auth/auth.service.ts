@@ -25,6 +25,7 @@ import type { AuthContextValue } from '../../../request-context/request-context.
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
 import { toMembershipDto, toUserDto, type MembershipRow, type UserRow } from '../mappers.js';
 
+import { MfaService } from './mfa.service.js';
 import { PasswordService } from './password.service.js';
 import { TokenService } from './token.service.js';
 
@@ -52,6 +53,7 @@ const USER_COLUMNS = {
   status: users.status,
   isPlatformAdmin: users.isPlatformAdmin,
   mustChangePassword: users.mustChangePassword,
+  mfaEnabled: users.mfaEnabled,
   lastLoginAt: users.lastLoginAt,
 };
 
@@ -72,6 +74,7 @@ export class AuthService {
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly tokens: TokenService,
     private readonly passwords: PasswordService,
+    private readonly mfa: MfaService,
   ) {}
 
   async login(input: LoginRequest, meta: RequestMeta = {}): Promise<LoginResponse> {
@@ -125,11 +128,21 @@ export class AuthService {
       throw new DomainError(errorCodes.UNAUTHENTICATED, 'Invalid e-mail, tenant or password', 401);
     }
 
-    if (input.mfaCode) {
-      // MFA data columns exist (DATABASE_DESIGN §1) but enrolment/verification is out of
-      // scope for PHASE_03 (§4 "DO NOT DO"). Rejecting an supplied code is safer than
-      // silently ignoring it. TODO(phase:23): TOTP verification.
-      throw new DomainError(errorCodes.VALIDATION_FAILED, 'MFA is not enabled for this tenant', 400, {
+    // TOTP second factor (SECURITY_ARCHITECTURE §2). `MFA_REQUIRED` tells the client the
+    // credentials were fine and only the authenticator code is missing — the status is
+    // still 401, so account enumeration does not change: an attacker cannot distinguish
+    // "wrong password" from "code needed" without already knowing a valid password.
+    if (user.mfaEnabled) {
+      if (!input.mfaCode) {
+        throw new DomainError(errorCodes.MFA_REQUIRED, 'Enter the verification code from your authenticator app', 401);
+      }
+      const codeOk = await this.mfa.verifyLogin(user.id, input.mfaCode);
+      if (!codeOk) {
+        await this.registerFailedLogin(user.id);
+        throw new DomainError(errorCodes.UNAUTHENTICATED, 'Invalid e-mail, tenant, password or verification code', 401);
+      }
+    } else if (input.mfaCode) {
+      throw new DomainError(errorCodes.VALIDATION_FAILED, 'Two-factor authentication is not enabled for this user', 400, {
         field: 'mfaCode',
       });
     }

@@ -576,6 +576,7 @@ const settings: ModuleNode = {
         screen('user-card', 'بطاقة مستخدم', 'User card', '/settings/users', 'ready', { permission: 'platform.membership.manage', endpoint: '/memberships' }),
         screen('user-permissions', 'صلاحيات المستخدمين', 'User permissions', '/settings/roles', 'ready', { permission: 'platform.role.manage', endpoint: '/roles' }),
         screen('change-password', 'تغيير كلمة المرور', 'Change password', '/settings/change-password', 'ready', { endpoint: 'POST /auth/change-password' }),
+        screen('two-factor', 'التحقق بخطوتين', 'Two-factor authentication', '/settings/two-factor', 'ready', { endpoint: '/auth/mfa' }),
       ],
     },
     {
@@ -584,6 +585,7 @@ const settings: ModuleNode = {
       labelEn: 'General',
       items: [
         screen('general-settings', 'إعدادات عامة', 'General settings', '/settings/general', 'ready', { permission: 'platform.settings.manage', endpoint: '/settings' }),
+        screen('language', 'اللغة', 'Language', '/settings/language', 'ready', { endpoint: 'client-side preference (localStorage)' }),
         screen('prep-device', 'إعدادات جهاز التحضير', 'Preparation device', '/s/settings/prep-device', 'planned'),
         screen('salla-settings', 'إعدادات ربط سلة', 'Salla integration', '/integrations/salla/settings', 'ready', { permission: 'salla.integration.view', endpoint: '/integrations/salla/settings' }),
       ],
