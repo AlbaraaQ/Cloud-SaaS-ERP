@@ -42,6 +42,7 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 .nav-link { display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 8px; color: #b6c2d4; font-size: 12.5px; }
 .nav-link:hover { background: #16233c; color: #fff; }
 .nav-link.active { background: var(--brand); color: #fff; }
+.nav-link.disabled { opacity: .55; cursor: not-allowed; }
 .nav-link.home { font-weight: 700; color: #e2e8f0; padding: 9px 10px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: #475569; flex: none; }
 .dot.ready { background: #22c55e; }

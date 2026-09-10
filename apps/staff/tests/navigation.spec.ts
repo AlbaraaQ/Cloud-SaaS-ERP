@@ -87,7 +87,7 @@ describe('staff navigation tree', () => {
   });
 
   it('implements the operational screens promised by the desktop menu', () => {
-    for (const key of ['expense-card', 'barcode', 'sn-credit', 'sn-debit', 'sales-debit-note', 'zatca-settings', 'sync-zatca', 'sync-prices', 'import-export', 'offers']) {
+    for (const key of ['expense-card', 'barcode', 'sn-credit', 'sales-debit-note', 'zatca-settings', 'sync-zatca', 'sync-prices', 'import-export', 'offers']) {
       const item = allScreens.find((screen) => screen.key === key);
       expect(item, key).toBeDefined();
       expect(item?.status, key).toBe('ready');
@@ -96,7 +96,7 @@ describe('staff navigation tree', () => {
   });
 
   it('implements both sides of the credit/debit note story', () => {
-    for (const key of ['sn-credit', 'sn-debit', 'pn-credit', 'pn-debit', 'purchase-credit-note', 'quotation', 'customer-payment-method']) {
+    for (const key of ['sn-credit', 'pn-debit', 'sales-debit-note', 'purchase-credit-note', 'quotation', 'payment-methods']) {
       const item = allScreens.find((screen) => screen.key === key);
       expect(item, key).toBeDefined();
       expect(item?.status, key).toBe('ready');
@@ -210,6 +210,17 @@ describe('staff navigation tree', () => {
       expect(item?.status, key).toBe('ready');
       expect(item?.permission, key).toBeTruthy();
     }
+  });
+
+  it('gives every href exactly one home — no duplicate menu entries', () => {
+    const seen = new Map<string, string>();
+    const dupes: string[] = [];
+    for (const screen of allScreens) {
+      const first = seen.get(screen.href);
+      if (first) dupes.push(`${screen.href} (keys: ${first}, ${screen.key})`);
+      else seen.set(screen.href, screen.key);
+    }
+    expect(dupes).toEqual([]);
   });
 
   it('reports honest implementation counts', () => {

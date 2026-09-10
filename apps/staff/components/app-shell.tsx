@@ -51,21 +51,33 @@ function ModuleBlock({ module, pathname, filter, lang }: { module: ModuleNode; p
       </button>
       {expanded && (
         <div className="nav-groups">
-          {groups.map((group) => (
-            <div className="nav-group" key={group.key}>
-              <p className="nav-group-title">{label(lang, group)}</p>
-              {group.items.map((item: ScreenItem) => (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={pathname === item.href.split('?')[0] ? 'nav-link active' : 'nav-link'}
-                >
-                  {statusDot(item.status, lang)}
-                  <span>{label(lang, item)}</span>
-                </Link>
+              {groups.map((group) => (
+                <div className="nav-group" key={group.key}>
+                  <p className="nav-group-title">{label(lang, group)}</p>
+                  {group.items.map((item: ScreenItem) =>
+                    item.status === 'ready' ? (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        className={pathname === item.href.split('?')[0] ? 'nav-link active' : 'nav-link'}
+                      >
+                        {statusDot(item.status, lang)}
+                        <span>{label(lang, item)}</span>
+                      </Link>
+                    ) : (
+                      <span
+                        key={item.key}
+                        className="nav-link disabled"
+                        title={item.endpoint ?? (lang === 'ar' ? 'قيد التطوير' : 'Planned')}
+                        aria-disabled="true"
+                      >
+                        {statusDot(item.status, lang)}
+                        <span>{label(lang, item)}</span>
+                      </span>
+                    ),
+                  )}
+                </div>
               ))}
-            </div>
-          ))}
         </div>
       )}
     </div>
