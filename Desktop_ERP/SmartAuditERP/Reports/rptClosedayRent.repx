@@ -1,0 +1,197 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<XtraReportsLayoutSerializer SerializerVersion="18.2.7.0" Ref="0" ControlType="DevExpress.XtraReports.UI.XtraReport, DevExpress.XtraReports.v18.2, Version=18.2.7.0, Culture=neutral, PublicKeyToken=b88d1754d700e49a" Name="Report1" Margins="0, 3, 36, 100" PrinterName="ZDesigner GK420t (Copy 1)" PaperKind="Custom" PageWidth="321" PageHeight="1100" Version="18.2" ShowPrintMarginsWarning="false" Font="Arial, 9.75pt">
+  <Bands>
+    <Item1 Ref="1" ControlType="TopMarginBand" Name="TopMargin" HeightF="36" />
+    <Item2 Ref="2" ControlType="DetailBand" Name="Detail" HeightF="47.8331261" />
+    <Item3 Ref="3" ControlType="BottomMarginBand" Name="BottomMargin" />
+    <Item4 Ref="4" ControlType="GroupFooterBand" Name="GroupFooter1" Expanded="false" HeightF="408.792236" />
+    <Item5 Ref="5" ControlType="PageHeaderBand" Name="PageHeader" HeightF="0" />
+    <Item6 Ref="6" ControlType="ReportHeaderBand" Name="ReportHeader" HeightF="590.708">
+      <Controls>
+        <Item1 Ref="7" ControlType="XRLabel" Name="label20" Multiline="true" Text="التاريخ" TextAlignment="MiddleCenter" SizeF="110.8878,23.0000343" LocationFloat="18.7916756, 68.66659" Font="Arial, 8.75pt, style=Bold" Padding="2,2,0,0,100">
+          <ExpressionBindings>
+            <Item1 Ref="8" Expression="[dateTo]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="9" UseFont="false" UseTextAlignment="false" />
+        </Item1>
+        <Item2 Ref="10" ControlType="XRLabel" Name="label6" Multiline="true" Text="صافي الايجارات" TextAlignment="MiddleCenter" SizeF="142.906815,23.00003" LocationFloat="143.820511, 329.166656" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="11" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item2>
+        <Item3 Ref="12" ControlType="XRLabel" Name="label25" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="125.028778,23" LocationFloat="18.7916756, 329.166748" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="13" Expression="[Net]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="14" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item3>
+        <Item4 Ref="15" ControlType="XRLabel" Name="label36" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4455261, 470.833435" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="16" Expression="[VAT]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="17" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item4>
+        <Item5 Ref="18" ControlType="XRLabel" Name="label35" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4455261, 447.8334" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="19" Expression="[Discount ]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="20" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item5>
+        <Item6 Ref="21" ControlType="XRLabel" Name="label34" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4455261, 425.250061" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="22" Expression="[HostingVall]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="23" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item6>
+        <Item7 Ref="24" ControlType="XRLabel" Name="label33" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4455261, 402.250031" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="25" Expression="[AdditionVal]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="26" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item7>
+        <Item8 Ref="27" ControlType="XRLabel" Name="label32" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.445507, 305.958374" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="28" Expression="[PostPoneRet]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="29" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item8>
+        <Item9 Ref="30" ControlType="XRLabel" Name="label30" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.445507, 282.958435" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="31" Expression="[PostPoneSales]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="32" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item9>
+        <Item10 Ref="33" ControlType="XRLabel" Name="label28" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.445507, 260.375122" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="34" Expression="[NetworkSales]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="35" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item10>
+        <Item11 Ref="36" ControlType="XRLabel" Name="label27" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.445507, 238.375092" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="37" Expression="[ReturnSales]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="38" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item11>
+        <Item12 Ref="39" ControlType="XRLabel" Name="label26" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4454918, 215.5" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="40" Expression="[CashVal]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="41" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item12>
+        <Item13 Ref="42" ControlType="XRLabel" Name="label24" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4454517, 351.166748" Font="Arial, 9.75pt, style=Bold" BackColor="White" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="43" Expression="[NetWithoutVAT]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="44" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item13>
+        <Item14 Ref="45" ControlType="XRLabel" Name="label22" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.445507, 178.708267" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="46" Expression="[DiffVal]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="47" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item14>
+        <Item15 Ref="48" ControlType="XRLabel" Name="label18" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4454918, 155.708252" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="49" Expression="[CasherValue]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="50" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item15>
+        <Item16 Ref="51" ControlType="XRLabel" Name="label17" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="19.4454918, 132.708237" Font="Arial, 9.75pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="52" Expression="[SAfeNetVal]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="53" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item16>
+        <Item17 Ref="54" ControlType="XRLabel" Name="label16" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="52.91666,23.00003" LocationFloat="158.8205, 68.66659" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100">
+          <ExpressionBindings>
+            <Item1 Ref="55" Expression="[shiftNo]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="56" UseFont="false" UseTextAlignment="false" />
+        </Item17>
+        <Item18 Ref="57" ControlType="XRLabel" Name="label15" Multiline="true" Text=": المستلم" TextAlignment="MiddleLeft" SizeF="56.3839569,23" LocationFloat="205.820511, 538.958" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100">
+          <StylePriority Ref="58" UseFont="false" UseTextAlignment="false" />
+        </Item18>
+        <Item19 Ref="59" ControlType="XRLabel" Name="label14" Multiline="true" Text=": المسلم" TextAlignment="MiddleLeft" SizeF="56.3840179,23" LocationFloat="205.82045, 515.958" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100">
+          <StylePriority Ref="60" UseFont="false" UseTextAlignment="false" />
+        </Item19>
+        <Item20 Ref="61" ControlType="XRLabel" Name="label9" Multiline="true" Text="إجمالي الضيافة" TextAlignment="MiddleCenter" SizeF="143.560638,23.00003" LocationFloat="143.820526, 425.250061" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="62" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item20>
+        <Item21 Ref="63" ControlType="XRLabel" Name="label11" Multiline="true" Text="إجمالي الإضافات" TextAlignment="MiddleCenter" SizeF="143.560638,23" LocationFloat="143.820526, 402.2501" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="64" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item21>
+        <Item22 Ref="65" ControlType="XRLabel" Name="label12" Multiline="true" Text="إجمالي الخصومات" TextAlignment="MiddleCenter" SizeF="143.5607,23.00003" LocationFloat="143.820465, 447.8334" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="66" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item22>
+        <Item23 Ref="67" ControlType="XRLabel" Name="label13" Multiline="true" Text="إجمالي الضريبة" TextAlignment="MiddleCenter" SizeF="143.5607,23.00003" LocationFloat="143.820465, 470.833374" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="68" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item23>
+        <Item24 Ref="69" ControlType="XRLabel" Name="label7" Multiline="true" Text="مرتجع الايجارات الآجلة" TextAlignment="MiddleCenter" SizeF="143.5607,23.00003" LocationFloat="143.820465, 305.958374" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="70" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item24>
+        <Item25 Ref="71" ControlType="XRLabel" Name="label8" Multiline="true" Text="الايجارات الآجلة" TextAlignment="MiddleCenter" SizeF="143.5607,23" LocationFloat="143.820465, 282.958435" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="72" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item25>
+        <Item26 Ref="73" ControlType="XRLabel" Name="label3" Multiline="true" Text="مرتجع الايجارات النقدية" TextAlignment="MiddleCenter" SizeF="143.560669,23" LocationFloat="143.8205, 238.375061" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="74" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item26>
+        <Item27 Ref="75" ControlType="XRLabel" Name="label4" Multiline="true" Text="الايجارات الشبكة" TextAlignment="MiddleCenter" SizeF="143.560669,23.00003" LocationFloat="143.8205, 260.3751" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="76" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item27>
+        <Item28 Ref="77" ControlType="XRLabel" Name="label5" Multiline="true" Text="الايجارات النقدية" TextAlignment="MiddleCenter" SizeF="143.560669,23" LocationFloat="143.8205, 215.5" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="78" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item28>
+        <Item29 Ref="79" ControlType="XRLabel" Name="label2" Multiline="true" Text=": إلى" SizeF="28.487175,23.0000229" LocationFloat="130.333328, 68.66665" Padding="2,2,0,0,100" Borders="None">
+          <StylePriority Ref="80" UseBorders="false" />
+        </Item29>
+        <Item30 Ref="81" ControlType="XRLabel" Name="label1" Multiline="true" Text=": من" SizeF="28.487175,23.0000229" LocationFloat="130.333328, 45.66663" Padding="2,2,0,0,100" Borders="None">
+          <StylePriority Ref="82" UseBorders="false" />
+        </Item30>
+        <Item31 Ref="83" ControlType="XRLabel" Name="label23" Multiline="true" Text="صافي الصندوق" TextAlignment="MiddleCenter" SizeF="143.560669,23.0000153" LocationFloat="143.8205, 132.708237" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="84" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item31>
+        <Item32 Ref="85" ControlType="XRLabel" Name="label29" Multiline="true" Text="القيمة المدخلة" TextAlignment="MiddleCenter" SizeF="143.560669,23.0000153" LocationFloat="143.8205, 155.708313" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="86" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item32>
+        <Item33 Ref="87" ControlType="XRLabel" Name="label31" Multiline="true" Text="صافي الصندوق بدون ضريبة" TextAlignment="MiddleCenter" SizeF="143.560669,23.00003" LocationFloat="143.82045, 351.166748" Font="Arial, 10pt, style=Bold" BackColor="White" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="88" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item33>
+        <Item34 Ref="89" ControlType="XRLabel" Name="label40" Multiline="true" Text="فرق الصندوق" TextAlignment="MiddleCenter" SizeF="143.560669,23.0000153" LocationFloat="143.820526, 178.708328" Font="Arial, 10pt, style=Bold" BackColor="255,191,191,191" Padding="2,2,0,0,100" Borders="All">
+          <StylePriority Ref="90" UseFont="false" UseBackColor="false" UseBorders="false" UseTextAlignment="false" />
+        </Item34>
+        <Item35 Ref="91" ControlType="XRLabel" Name="label19" Multiline="true" Text="التاريخ" TextAlignment="MiddleCenter" SizeF="110.8878,23.0000343" LocationFloat="19.44553, 45.66663" Font="Arial, 8.75pt, style=Bold" Padding="2,2,0,0,100">
+          <ExpressionBindings>
+            <Item1 Ref="92" Expression="[datefrom]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="93" UseFont="false" UseTextAlignment="false" />
+        </Item35>
+        <Item36 Ref="94" ControlType="XRLabel" Name="label10" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="52.91666,23.00003" LocationFloat="158.8205, 45.66663" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100">
+          <ExpressionBindings>
+            <Item1 Ref="95" Expression="[CloseNo]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="96" UseFont="false" UseTextAlignment="false" />
+        </Item36>
+        <Item37 Ref="97" ControlType="XRLabel" Name="label21" Multiline="true" Text="المستخدم" TextAlignment="MiddleCenter" SizeF="52.91666,23.00003" LocationFloat="158.820465, 97.6666641" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100">
+          <ExpressionBindings>
+            <Item1 Ref="98" Expression="[Username]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="99" UseFont="false" UseTextAlignment="false" />
+        </Item37>
+        <Item38 Ref="100" ControlType="XRLabel" Name="label41" Multiline="true" Text="اسم المنشأة" TextAlignment="MiddleCenter" SizeF="267.660278,23.0000381" LocationFloat="10.2525234, 10.0000067" Font="Arial, 16pt, style=Bold" Padding="2,2,0,0,100">
+          <ExpressionBindings>
+            <Item1 Ref="101" Expression="[Foundation]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="102" UseFont="false" UseTextAlignment="false" />
+        </Item38>
+        <Item39 Ref="103" ControlType="XRLabel" Name="label45" Multiline="true" Text=": الموظف" SizeF="77.44551,23.0000153" LocationFloat="215.935669, 97.6666" Padding="2,2,0,0,100" Borders="None">
+          <StylePriority Ref="104" UseBorders="false" />
+        </Item39>
+        <Item40 Ref="105" ControlType="XRLabel" Name="label44" Multiline="true" Text=": الرقم اليومي" SizeF="77.44551,23.0000153" LocationFloat="215.935669, 68.66662" Padding="2,2,0,0,100" Borders="None">
+          <StylePriority Ref="106" UseBorders="false" />
+        </Item40>
+        <Item41 Ref="107" ControlType="XRLabel" Name="label42" Multiline="true" Text=": الرقم" SizeF="77.44551,23.00002" LocationFloat="215.935669, 45.66663" Padding="2,2,0,0,100" Borders="None">
+          <StylePriority Ref="108" UseBorders="false" />
+        </Item41>
+      </Controls>
+    </Item6>
+  </Bands>
+</XtraReportsLayoutSerializer>
