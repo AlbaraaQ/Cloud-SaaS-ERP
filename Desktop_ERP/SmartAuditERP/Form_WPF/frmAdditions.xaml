@@ -1,0 +1,318 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmAdditions"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:fa="http://schemas.fontawesome.io/icons/"
+        Title="📋 إضافات" 
+        Height="550" 
+        Width="650"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        ResizeMode="NoResize"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None">
+
+    <Window.Resources>
+        <!-- Gradient Brushes -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#6366f1" Offset="0"/>
+            <GradientStop Color="#8b5cf6" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#f8fafc" Offset="0"/>
+            <GradientStop Color="#e2e8f0" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Button Style -->
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" Opacity="0.3" BlurRadius="10" ShadowDepth="3"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- TextBox Style -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="#cbd5e1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" Opacity="0.1" BlurRadius="5" ShadowDepth="2"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="#6366f1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Label Style -->
+        <Style x:Key="ModernLabel" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+
+        <!-- DataGrid Style -->
+        <Style x:Key="ModernDataGrid" TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="AlternatingRowBackground" Value="#f8fafc"/>
+            <Setter Property="RowHeight" Value="40"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderGradient}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#e0e7ff"/>
+                    <Setter Property="Foreground" Value="#1e293b"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Border CornerRadius="15" Background="{StaticResource BackgroundGradient}">
+        <Border.Effect>
+            <DropShadowEffect Color="#000000" Opacity="0.3" BlurRadius="20" ShadowDepth="5"/>
+        </Border.Effect>
+
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" 
+                    Background="{StaticResource HeaderGradient}" 
+                    CornerRadius="10" 
+                    Padding="20,15"
+                    Margin="0,0,0,20">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" Opacity="0.2" BlurRadius="10" ShadowDepth="3"/>
+                </Border.Effect>
+                <Grid>
+                    <TextBlock Text="📋 إدارة الإضافات" 
+                               FontSize="24" 
+                               FontWeight="Bold" 
+                               Foreground="White"
+                               HorizontalAlignment="Right"/>
+                    <Button x:Name="btnClose"
+                            HorizontalAlignment="Left"
+                            Width="35" Height="35"
+                            Background="#dc2626"
+                            BorderThickness="0"
+                            ToolTip="إغلاق"
+                            Cursor="Hand"
+                            Click="btnClose_Click">
+                        <Button.Template>
+                            <ControlTemplate>
+                                <Border Background="{TemplateBinding Background}" 
+                                        CornerRadius="8">
+                                    <TextBlock Text="✖" 
+                                               FontSize="18" 
+                                               FontWeight="Bold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Input Form -->
+            <Border Grid.Row="1" 
+                    Background="White" 
+                    CornerRadius="10" 
+                    Padding="20"
+                    Margin="0,0,0,15">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" Opacity="0.1" BlurRadius="10" ShadowDepth="3"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="15"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="15"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Row 1: Number -->
+                    <TextBlock Grid.Row="0" Grid.Column="0" 
+                               Text="🔢 الرقم" 
+                               Style="{StaticResource ModernLabel}"/>
+                    <TextBox x:Name="txtNo"
+                             Grid.Row="0" Grid.Column="1"
+                             Style="{StaticResource ModernTextBox}"
+                             TextAlignment="Center"
+                             MaxLength="50"
+                             IsReadOnly="True"/>
+
+                    <!-- Row 2: Name and Price -->
+                    <TextBlock Grid.Row="2" Grid.Column="0" 
+                               Text="📝 الاسم" 
+                               Style="{StaticResource ModernLabel}"/>
+                    <TextBox x:Name="txtName"
+                             Grid.Row="2" Grid.Column="1"
+                             Style="{StaticResource ModernTextBox}"
+                             MaxLength="50"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="3" 
+                               Text="💰 القيمة" 
+                               Style="{StaticResource ModernLabel}"/>
+                    <TextBox x:Name="txtSalePrice"
+                             Grid.Row="2" Grid.Column="4"
+                             Style="{StaticResource ModernTextBox}"
+                             TextAlignment="Center"
+                             MaxLength="50"/>
+                </Grid>
+            </Border>
+
+            <!-- DataGrid -->
+            <Border Grid.Row="2" 
+                    Background="White" 
+                    CornerRadius="10" 
+                    Padding="10"
+                    Margin="0,0,0,15">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" Opacity="0.1" BlurRadius="10" ShadowDepth="3"/>
+                </Border.Effect>
+                <DataGrid x:Name="dgvData"
+                          Style="{StaticResource ModernDataGrid}"
+                          SelectionChanged="dgvData_SelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="🔢 الرقم" 
+                                            Binding="{Binding AdditionId}" 
+                                            Width="80"/>
+                        <DataGridTextColumn Header="📝 الاسم" 
+                                            Binding="{Binding AdditionName}" 
+                                            Width="*"/>
+                        <DataGridTextColumn Header="💰 القيمة" 
+                                            Binding="{Binding SalePrice}" 
+                                            Width="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- Action Buttons -->
+            <StackPanel Grid.Row="3" 
+                        Orientation="Horizontal" 
+                        HorizontalAlignment="Right">
+
+                <Button x:Name="btnNew"
+                        Width="50" Height="50"
+                        Background="#6366f1"
+                        Style="{StaticResource ModernButton}"
+                        ToolTip="➕ جديد"
+                        Click="btnNew_Click">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="{TemplateBinding Background}" 
+                                    CornerRadius="10">
+                                <TextBlock Text="➕" 
+                                           FontSize="24"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button x:Name="btnSave"
+                        Width="50" Height="50"
+                        Background="#6366f1"
+                        Style="{StaticResource ModernButton}"
+                        ToolTip="💾 حفظ"
+                        Click="btnSave_Click">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="{TemplateBinding Background}" 
+                                    CornerRadius="10">
+                                <TextBlock Text="💾" 
+                                           FontSize="24"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button x:Name="btnDelete"
+                        Width="50" Height="50"
+                        Background="#6366f1"
+                        Style="{StaticResource ModernButton}"
+                        ToolTip="🗑️ حذف"
+                        Click="btnDelete_Click">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="{TemplateBinding Background}" 
+                                    CornerRadius="10">
+                                <TextBlock Text="🗑️" 
+                                           FontSize="24"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+            </StackPanel>
+
+        </Grid>
+    </Border>
+</Window>

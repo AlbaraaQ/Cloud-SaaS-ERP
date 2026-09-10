@@ -1,0 +1,315 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmActsInvTotal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="تقرير إجمالي مشتريات ومبيعات جهات العمل" 
+        Height="650" Width="900"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#F4F6F7"
+        WindowState="Maximized"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <!-- Gradients -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#4e54c8" Offset="0"/>
+            <GradientStop Color="#8f94fb" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="PurchaseGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#E74C3C" Offset="0"/>
+            <GradientStop Color="#C0392B" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaleGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#27AE60" Offset="0"/>
+            <GradientStop Color="#229954" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Styles -->
+        <Style x:Key="ModernLabel" TargetType="Label">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style x:Key="ModernDatePicker" TargetType="DatePicker">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SummaryLabel" TargetType="Label">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- منطقة الفلاتر والأزرار -->
+        <Border Grid.Row="0" Background="White" BorderBrush="#E0E6ED" BorderThickness="0,0,0,1" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" Opacity="0.1" ShadowDepth="0" Direction="270"/>
+            </Border.Effect>
+
+            <StackPanel>
+                <!-- العنوان -->
+                <Border Background="{StaticResource HeaderGradient}" CornerRadius="10" Padding="15" Margin="0,0,0,20">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="📊" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="بيانات التقرير" Foreground="White" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- الفلاتر -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="250"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- جهة العمل -->
+                    <Label Grid.Row="0" Grid.Column="0" Content="جهة العمل" Style="{StaticResource ModernLabel}" Margin="0,0,10,0"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical">
+                        <ComboBox x:Name="cmbActs" Style="{StaticResource ModernComboBox}"/>
+                        <CheckBox x:Name="chkAllActs" Content="الكل" Margin="0,5,0,0" FontWeight="SemiBold"
+                                  Checked="chkAllActs_Toggle" Unchecked="chkAllActs_Toggle"/>
+                    </StackPanel>
+
+                    <!-- من تاريخ -->
+                    <Label Grid.Row="0" Grid.Column="2" Content="من التاريخ" Style="{StaticResource ModernLabel}" Margin="20,0,10,0"/>
+                    <DatePicker x:Name="txtDateFrom" Grid.Row="0" Grid.Column="3" Style="{StaticResource ModernDatePicker}"/>
+
+                    <!-- إلى تاريخ -->
+                    <Label Grid.Row="0" Grid.Column="4" Content="إلى التاريخ" Style="{StaticResource ModernLabel}" Margin="20,0,10,0"/>
+                    <DatePicker x:Name="txtDateTo" Grid.Row="0" Grid.Column="5" Style="{StaticResource ModernDatePicker}"/>
+
+                    <!-- الأزرار -->
+                    <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="7" Orientation="Horizontal" 
+                                HorizontalAlignment="Center" Margin="0,20,0,0">
+
+                        <Button x:Name="btnShow" Content="🔍 عرض" Background="#3498DB" 
+                                Style="{StaticResource ActionButton}" Click="btnShow_Click"/>
+
+                        <Button x:Name="btnPreview" Content="👁️ معاينة" Background="#9B59B6" 
+                                Style="{StaticResource ActionButton}" Click="btnPreview_Click"/>
+
+                        <Button x:Name="btnPrint" Content="🖨️ طباعة" Background="#34495E" 
+                                Style="{StaticResource ActionButton}" Click="btnPrint_Click"/>
+
+                        <Button x:Name="btnClose" Content="✖️ خروج" Background="#C0392B" 
+                                Style="{StaticResource ActionButton}" Click="btnClose_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- شريط التقدم -->
+                <ProgressBar x:Name="ProgressBar1" Height="8" Margin="0,15,0,0" 
+                             Foreground="#3498DB" Background="#ECF0F1" 
+                             Visibility="Collapsed"/>
+            </StackPanel>
+        </Border>
+
+        <!-- منطقة التقرير -->
+        <Border Grid.Row="1" Background="White" Margin="10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- عناوين الأعمدة -->
+                <Grid Grid.Row="0" Margin="10,10,10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- عنوان المشتريات -->
+                    <Border Grid.Column="0" Background="{StaticResource PurchaseGradient}" 
+                            CornerRadius="8" Padding="15" Margin="0,0,5,0">
+                        <TextBlock Text="📦 إجمالي المشتريات" Foreground="White" 
+                                   FontSize="15" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    </Border>
+
+                    <!-- عنوان المبيعات -->
+                    <Border Grid.Column="1" Background="{StaticResource SaleGradient}" 
+                            CornerRadius="8" Padding="15" Margin="5,0,0,0">
+                        <TextBlock Text="💰 إجمالي المبيعات" Foreground="White" 
+                                   FontSize="15" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    </Border>
+                </Grid>
+
+                <!-- الجدول -->
+                <DataGrid x:Name="dgvItems" Grid.Row="1"
+                          AutoGenerateColumns="False" 
+                          IsReadOnly="True" 
+                          Background="Transparent" 
+                          BorderThickness="0" 
+                          AlternatingRowBackground="#F9FBFD" 
+                          RowHeight="45"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          Margin="10"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False">
+                    <DataGrid.ColumnHeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#2C3E50"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="FontSize" Value="12"/>
+                            <Setter Property="Padding" Value="10"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        </Style>
+                    </DataGrid.ColumnHeaderStyle>
+                    <DataGrid.Columns>
+                        <!-- م -->
+                        <DataGridTextColumn Header="م" Binding="{Binding RowNumber}" Width="60">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- جهة العمل (مشتريات) -->
+                        <DataGridTextColumn Header="جهة العمل" Binding="{Binding PurchaseName}" Width="*" MinWidth="150">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- الإجمالي (مشتريات) -->
+                        <DataGridTextColumn Header="الإجمالي" Binding="{Binding PurchaseTotal, StringFormat=N2}" Width="*" MinWidth="180">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Foreground" Value="#E74C3C"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- جهة العمل (مبيعات) -->
+                        <DataGridTextColumn Header="جهة العمل" Binding="{Binding SaleName}" Width="*" MinWidth="150">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- الإجمالي (مبيعات) -->
+                        <DataGridTextColumn Header="الإجمالي" Binding="{Binding SaleTotal, StringFormat=N2}" Width="*" MinWidth="180">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Foreground" Value="#27AE60"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- الإجماليات -->
+                <Grid Grid.Row="2" Margin="10,0,10,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- إجمالي المشتريات -->
+                    <Border Grid.Column="0" Background="{StaticResource PurchaseGradient}" 
+                            CornerRadius="8" Padding="15" Margin="0,0,5,0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="إجمالي المشتريات" Foreground="White" 
+                                       FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <Label x:Name="txtSumPurch" Content="0.00" Style="{StaticResource SummaryLabel}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- إجمالي المبيعات -->
+                    <Border Grid.Column="1" Background="{StaticResource SaleGradient}" 
+                            CornerRadius="8" Padding="15" Margin="5,0,0,0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="إجمالي المبيعات" Foreground="White" 
+                                       FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <Label x:Name="txtSumSale" Content="0.00" Style="{StaticResource SummaryLabel}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

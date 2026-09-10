@@ -1,0 +1,283 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmContractSrchPM"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxg="clr-namespace:DevExpress.Xpf.Grid;assembly=DevExpress.Xpf.Grid.v25.2"
+    Title="إضافة بند إلى العقد"
+    Width="680"
+    Height="460"
+    WindowStartupLocation="CenterOwner"
+    WindowStyle="None"
+    ResizeMode="NoResize"
+    AllowsTransparency="True"
+    Background="Transparent"
+    FlowDirection="RightToLeft"
+    FontFamily="Cairo, Tahoma, Arial"
+    Deactivated="Window_Deactivated">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══════════════ Brushes ═══════════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SearchPanelBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F8F9FD" Offset="0"/>
+            <GradientStop Color="#EEF1F8" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderBrushLight" Color="#D0D7E8"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1B2642"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5C6D91"/>
+
+        <!-- ═══════════════ Effects ═══════════════ -->
+        <DropShadowEffect x:Key="WindowShadow"
+                          BlurRadius="20"
+                          ShadowDepth="4"
+                          Direction="270"
+                          Opacity="0.25"
+                          Color="#000000"/>
+
+        <!-- ═══════════════ TextBox Style ═══════════════ -->
+        <Style x:Key="SearchTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush"
+                                        Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness"
+                                        Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════════ ComboBox Style ═══════════════ -->
+        <Style x:Key="SearchComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══════════════ Label Style ═══════════════ -->
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- ═══════════════ Close Button Style ═══════════════ -->
+        <Style x:Key="CloseButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="#E74C3C"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="#C0392B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!--              Main Container                -->
+    <!-- ═══════════════════════════════════════════ -->
+    <Border CornerRadius="18"
+            Background="White"
+            BorderBrush="{StaticResource BorderBrushLight}"
+            BorderThickness="1"
+            Effect="{StaticResource WindowShadow}"
+            Margin="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ════════════════════════════════════ -->
+            <!--         Title Bar (Panel2)          -->
+            <!-- ════════════════════════════════════ -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource HeaderBrush}"
+                    CornerRadius="18,18,0,0"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Close Button -->
+                    <Button x:Name="btnClose"
+                            Grid.Column="0"
+                            Style="{StaticResource CloseButtonStyle}"
+                            Content="✖"
+                            ToolTip="إغلاق"
+                            Click="btnClose_Click"/>
+
+                    <!-- Title -->
+                    <TextBlock Grid.Column="1"
+                               Text="📋 إضافة بند إلى العقد"
+                               Foreground="White"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Window ID -->
+                    <TextBlock Grid.Column="2"
+                               Text="🔍"
+                               Foreground="#DDE6FF"
+                               FontSize="18"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- ════════════════════════════════════ -->
+            <!--       Search Panel (Panel3)         -->
+            <!-- ════════════════════════════════════ -->
+            <Border Grid.Row="1"
+                    Background="{StaticResource SearchPanelBrush}"
+                    BorderBrush="{StaticResource BorderBrushLight}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- رقم العقد -->
+                    <StackPanel Grid.Row="0" Grid.Column="0">
+                        <TextBlock Text="🔖 رقم العقد"
+                                   Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBox x:Name="txtSrchCode"
+                                 Style="{StaticResource SearchTextBoxStyle}"
+                                 TextChanged="txtSrchCode_TextChanged"/>
+                    </StackPanel>
+
+                    <!-- العميل -->
+                    <StackPanel Grid.Row="0" Grid.Column="2">
+                        <TextBlock Text="👤 العميل"
+                                   Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="cmbClient"
+                                  Style="{StaticResource SearchComboBoxStyle}"
+                                  SelectionChanged="cmbClient_SelectionChanged"/>
+                    </StackPanel>
+
+                    <!-- حالة العقد -->
+                    <StackPanel Grid.Row="2" Grid.Column="0">
+                        <TextBlock Text="📌 حالة العقد"
+                                   Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="cmbStatus"
+                                  Style="{StaticResource SearchComboBoxStyle}"
+                                  SelectionChanged="cmbStatus_SelectionChanged"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ════════════════════════════════════ -->
+            <!--        Data Grid (dgvItems)         -->
+            <!-- ════════════════════════════════════ -->
+            <dxg:GridControl x:Name="dgvItems"
+                             Grid.Row="2"
+                             Margin="8,8,8,12"
+                             AutoGenerateColumns="None"
+                             MouseDoubleClick="dgvItems_MouseDoubleClick">
+
+                <dxg:GridControl.View>
+                    <dxg:TableView x:Name="dgvItemsView"
+                                   ShowGroupPanel="False"
+                                   AutoWidth="True"
+                                   NavigationStyle="Row"
+                                   AllowEditing="False"
+                                   ShowIndicator="False"
+                                   AllowPerPixelScrolling="True"
+                                   RowMinHeight="30"/>
+                </dxg:GridControl.View>
+
+                <dxg:GridControl.Columns>
+                    <dxg:GridColumn FieldName="ContrNo"
+                                    Header="🔢 الرقم"
+                                    Width="80"/>
+                    <dxg:GridColumn FieldName="name"
+                                    Header="📌 الحالة"
+                                    Width="120"/>
+                    <dxg:GridColumn FieldName="statusPk"
+                                    Header="رقم الحالة"
+                                    Visible="False"/>
+                    <dxg:GridColumn FieldName="ClientPk"
+                                    Header="رقم العميل"
+                                    Visible="False"/>
+                    <dxg:GridColumn FieldName="RegsDate"
+                                    Header="📅 تاريخ البدء"
+                                    Width="120"/>
+                </dxg:GridControl.Columns>
+            </dxg:GridControl>
+        </Grid>
+    </Border>
+</dx:ThemedWindow>

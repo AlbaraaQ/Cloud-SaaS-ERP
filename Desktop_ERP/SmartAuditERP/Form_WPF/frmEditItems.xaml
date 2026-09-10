@@ -1,0 +1,469 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmEditItems"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="✏️ تعديل الأصناف"
+    Width="640" Height="360"
+    MinWidth="580" MinHeight="320"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    ShowIcon="False">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="OrangeBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FF9E57" Offset="0"/>
+            <GradientStop Color="#E67817" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"/>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernCombo" TargetType="dxe:ComboBoxEdit">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="ModernCheckBox" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Tab Control -->
+        <dx:DXTabControl x:Name="TabControl1"
+                         Grid.Row="0"
+                         Margin="8,8,8,0">
+
+            <!-- Tab 1: General -->
+            <dx:DXTabItem Header="⚙️ عام">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,12"
+                            Margin="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Unit -->
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,10">
+                                <TextBlock Text="🔩 الوحدة الافتراضية"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <dxe:ComboBoxEdit x:Name="cmbUnit"
+                                                  Style="{StaticResource ModernCombo}"
+                                                  AutoComplete="True"
+                                                  NullText="اختر الوحدة..."/>
+                            </StackPanel>
+
+                            <!-- Group -->
+                            <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,10">
+                                <TextBlock x:Name="lblGroup"
+                                           Text="🗂️ المجموعة"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <dxe:ComboBoxEdit x:Name="cmbGroups"
+                                                  Style="{StaticResource ModernCombo}"
+                                                  AutoComplete="True"
+                                                  NullText="اختر المجموعة..."/>
+                            </StackPanel>
+
+                            <!-- Item Properties -->
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,10">
+                                <TextBlock x:Name="Label3"
+                                           Text="📦 خواص الصنف"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <dxe:ComboBoxEdit x:Name="cmbItemProperties"
+                                                  Style="{StaticResource ModernCombo}"
+                                                  IsTextEditable="False">
+                                    <dxe:ComboBoxEdit.Items>
+                                        <dxe:ComboBoxEditItem Content="غير محدد"/>
+                                        <dxe:ComboBoxEditItem Content="ميزان"/>
+                                        <dxe:ComboBoxEditItem Content="تعبئة"/>
+                                        <dxe:ComboBoxEditItem Content="مساحة"/>
+                                        <dxe:ComboBoxEditItem Content="متر طولي"/>
+                                        <dxe:ComboBoxEditItem Content="رقم تسلسلي"/>
+                                        <dxe:ComboBoxEditItem Content="موصوف"/>
+                                        <dxe:ComboBoxEditItem Content="صنف مؤقت"/>
+                                        <dxe:ComboBoxEditItem Content="تاريخ انتهاء"/>
+                                    </dxe:ComboBoxEdit.Items>
+                                </dxe:ComboBoxEdit>
+                            </StackPanel>
+
+                            <!-- Min/Max Limits -->
+                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,10">
+                                <TextBlock x:Name="lblMinimunQuantityLimit"
+                                           Text="📉 الحد الأدنى"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="txtLimit"
+                                         Style="{StaticResource ModernTextBox}"
+                                         TextAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Scale Panel -->
+                            <Border Grid.Row="2" Grid.Column="0"
+                                    x:Name="PnlProperty"
+                                    Background="#F0F3FA"
+                                    BorderBrush="{StaticResource BorderLight}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10,8"
+                                    Margin="0,0,0,10"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="ckWeightScale"
+                                                 Content="وزن"
+                                                 FontFamily="Tahoma"
+                                                 FontWeight="Bold"
+                                                 Cursor="Hand"
+                                                 Margin="0,0,20,0"/>
+                                    <RadioButton x:Name="ckScalePrice"
+                                                 Content="سعر"
+                                                 FontFamily="Tahoma"
+                                                 FontWeight="Bold"
+                                                 Cursor="Hand"
+                                                 Margin="0,0,20,0"/>
+                                    <TextBox x:Name="txtFillVal"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Width="130"
+                                             TextAlignment="Center"
+                                             Visibility="Collapsed"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Max Limit -->
+                            <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,10">
+                                <TextBlock x:Name="lblMaxQtyLimit"
+                                           Text="📈 الحد الأعلى"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="txtMaxQtyLimit"
+                                         Style="{StaticResource ModernTextBox}"
+                                         TextAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Tax -->
+                            <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,0,10">
+                                <TextBlock x:Name="Label1"
+                                           Text="💹 نسبة الضريبة"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="txtTaxPrec"
+                                         Style="{StaticResource ModernTextBox}"
+                                         TextAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Checkboxes -->
+                            <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"
+                                    Background="#F8FAFF"
+                                    BorderBrush="{StaticResource BorderLight}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="clkShowInPOS"
+                                              Content="🖥️ الظهور في نقطة البيع"
+                                              IsChecked="True"
+                                              Style="{StaticResource ModernCheckBox}"
+                                              Margin="0,0,20,0"/>
+                                    <CheckBox x:Name="chkshowInAndroid"
+                                              Content="📱 الظهور في أندرويد"
+                                              Style="{StaticResource ModernCheckBox}"
+                                              Margin="0,0,20,0"/>
+                                    <CheckBox x:Name="ckNoTax"
+                                              Content="🚫 معفي من الضريبة"
+                                              Style="{StaticResource ModernCheckBox}"/>
+                                </StackPanel>
+                            </Border>
+
+                        </Grid>
+                    </Border>
+                </ScrollViewer>
+            </dx:DXTabItem>
+
+            <!-- Tab 2: Apply Price -->
+            <dx:DXTabItem Header="💰 تطبيق سعر">
+                <Border Background="White"
+                        BorderBrush="{StaticResource BorderLight}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="14,12"
+                        Margin="5">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Labels -->
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   x:Name="lblApply"
+                                   Text="تطبيق"
+                                   Style="{StaticResource FieldLabel}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,10,8"/>
+
+                        <!-- Sale Price -->
+                        <CheckBox x:Name="chkSalePrice"
+                                  Grid.Row="1" Grid.Column="0"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  HorizontalAlignment="Center"
+                                  Margin="0,0,10,8"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2"
+                                   x:Name="lblSalePrice"
+                                   Text="💵 سعر البيع"
+                                   Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,10,8"/>
+                        <TextBox x:Name="txtSalePrice"
+                                 Grid.Row="1" Grid.Column="3"
+                                 Style="{StaticResource ModernTextBox}"
+                                 Margin="0,0,0,8"/>
+
+                        <!-- Purchase Price -->
+                        <CheckBox x:Name="chkPurchPrice"
+                                  Grid.Row="2" Grid.Column="0"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  HorizontalAlignment="Center"
+                                  Margin="0,0,10,8"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2"
+                                   x:Name="lblPurchPrice"
+                                   Text="🛒 سعر الشراء"
+                                   Style="{StaticResource FieldLabel}"
+                                   Margin="0,0,10,8"/>
+                        <TextBox x:Name="txtPurchPrice"
+                                 Grid.Row="2" Grid.Column="3"
+                                 Style="{StaticResource ModernTextBox}"
+                                 Margin="0,0,0,8"/>
+
+                        <!-- Lowest Price -->
+                        <CheckBox x:Name="chkLowestSellingPrice"
+                                  Grid.Row="3" Grid.Column="0"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  Visibility="Collapsed"
+                                  HorizontalAlignment="Center"
+                                  Margin="0,0,10,8"/>
+                        <TextBlock Grid.Row="3" Grid.Column="2"
+                                   x:Name="lblLowestSellingPrice"
+                                   Text="📊 أقل سعر بيع"
+                                   Style="{StaticResource FieldLabel}"
+                                   Visibility="Collapsed"
+                                   Margin="0,0,10,8"/>
+                        <TextBox x:Name="txtLastSalePrice"
+                                 Grid.Row="3" Grid.Column="3"
+                                 Style="{StaticResource ModernTextBox}"
+                                 Visibility="Collapsed"
+                                 Margin="0,0,0,8"/>
+
+                        <!-- Action Buttons -->
+                        <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="4"
+                                Background="#F8FAFF"
+                                BorderBrush="{StaticResource BorderLight}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="10,8">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center">
+                                <Button x:Name="btnApplyPrice"
+                                        Content="✅ تطبيق سعر"
+                                        Margin="0,0,8,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                                            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button x:Name="btnApplyInc"
+                                        Content="➕ تطبيق زيادة"
+                                        Margin="0,0,8,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                                            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button x:Name="btnIncPerc"
+                                        Content="📈 زيادة %"
+                                        Margin="0,0,8,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                                            <Setter Property="Background" Value="{StaticResource OrangeBrush}"/>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button x:Name="btnDecPerc"
+                                        Content="📉 خصم %">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                                            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                    </Grid>
+                </Border>
+            </dx:DXTabItem>
+
+        </dx:DXTabControl>
+
+        <!-- Footer -->
+        <Border Grid.Row="1"
+                Background="{StaticResource FooterBrush}"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left">
+                <Button x:Name="BtnClose"
+                        Content="✖ خروج"
+                        Margin="0,0,8,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button x:Name="btnSave"
+                        Content="✅ تطبيق">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>
