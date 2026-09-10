@@ -109,15 +109,20 @@ export default function NewPurchaseInvoicePage() {
             </select>
           </label>
           <label className="field">
-            <span>المستودع *</span>
-            <select className="input" value={effectiveWarehouse} onChange={(event) => setWarehouseId(event.target.value)} required>
-              <option value="">— اختر —</option>
-              {warehouseRows.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {arabicName(row)}
-                </option>
-              ))}
+            <span>المستودع</span>
+            <select className="input" value={effectiveWarehouse} onChange={(event) => setWarehouseId(event.target.value)}>
+              <option value="">— بدون حركة مخزنية —</option>
+              {warehouseRows
+                .filter((row) => !effectiveBranch || row.branchId === effectiveBranch)
+                .map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {arabicName(row)}
+                  </option>
+                ))}
             </select>
+            {filledLines(lines).some((line) => line.itemId) && !effectiveWarehouse && (
+              <span className="muted small">ترحيل فاتورة فيها أصناف مخزنية يتطلب اختيار مستودع.</span>
+            )}
           </label>
           <label className="field">
             <span>المورد *</span>
@@ -148,6 +153,7 @@ export default function NewPurchaseInvoicePage() {
           <label className="field">
             <span>خصم على الفاتورة</span>
             <input className="input" dir="ltr" inputMode="decimal" value={invoiceDiscountText} onChange={(event) => setInvoiceDiscountText(event.target.value)} />
+            <span className="muted small">يُخفّض وعاء الضريبة قبل احتسابها.</span>
           </label>
           <label className="field">
             <span>توزيع المصاريف</span>

@@ -7,9 +7,12 @@ import { useState } from 'react';
 import { DataTable, Notice } from '../../../../components/data-view';
 import { ErrorBox, Loading, Screen } from '../../../../components/screen';
 import { ApiError, apiData, apiPost } from '../../../../lib/api';
+import { accountLabel, listAccounts, postableOf, typeOf, type Account } from '../../../../lib/accounts';
 import {
+  cashLocationLabel,
   dateTime,
   itemLabel,
+  listCashLocations,
   listItems,
   listParties,
   money,
@@ -17,16 +20,15 @@ import {
   quantity,
   shortDate,
   statusLabel,
-  today,
+  type CashLocation,
   type Item,
   type Party,
 } from '../../../../lib/lookups';
-import { loadPostingProfile, periodForDate, purchaseJournalLines } from '../../../../lib/posting';
 import { useSession } from '../../../../lib/session';
 import { useQuery } from '../../../../lib/use-query';
 
 type InvoiceLine = { id: string; lineNo: number; itemId: string; description: string | null; quantity: string; unitPrice: string; net: string; tax: string; total: string; allocatedCost: string; unitCostAtPost: string | null };
-type LandedCost = { id: string; costName: string; amount: string; allocationTarget: string };
+type LandedCost = { id: string; costName: string; amount: string; allocationTarget: string; accountId: string | null };
 type Invoice = {
   id: string;
   number: string | null;
@@ -55,10 +57,15 @@ export default function PurchaseInvoiceDetailPage() {
   const invoice = useQuery<Invoice>(() => apiData<Invoice>(`/purchase-invoices/${invoiceId}`), [invoiceId]);
   const items = useQuery<Item[]>(() => listItems(), []);
   const suppliers = useQuery<Party[]>(() => listParties('supplier'), []);
+  const cashLocations = useQuery<CashLocation[]>(() => listCashLocations(), []);
+  const accounts = useQuery<Account[]>(() => listAccounts(), []);
 
   const [settlement, setSettlement] = useState<'credit' | 'cash' | 'bank'>('credit');
+  const [settleLocationId, setSettleLocationId] = useState('');
   const [costName, setCostName] = useState('');
   const [costAmountText, setCostAmountText] = useState('');
+  const [costTarget, setCostTarget] = useState<'inventory' | 'expense'>('inventory');
+  const [costAccountId, setCostAccountId] = useState('');
   const [payAmountText, setPayAmountText] = useState('');
   const [voidReason, setVoidReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -74,7 +81,6 @@ export default function PurchaseInvoiceDetailPage() {
   }
 
   const doc = invoice.data;
-  const isReturn = doc.kind === 'purchase_return';
   const supplier = (suppliers.data ?? []).find((row) => row.id === doc.partyId);
   const dueValue = Number(doc.total) - Number(doc.paidTotal);
 
@@ -93,19 +99,24 @@ export default function PurchaseInvoiceDetailPage() {
   }
 
   async function post() {
-    const profile = await loadPostingProfile(doc.branchId, isReturn ? 'purchase_return' : 'purchase_invoice');
-    const period = await periodForDate(today());
-    if (!period) throw new ApiError(422, 'PERIOD_NOT_FOUND', 'لا توجد فترة محاسبية مفتوحة تغطي تاريخ اليوم.');
-    const costsValue = doc.costs.reduce((sum, entry) => sum + Number(entry.amount), 0);
-    const grandValue = Number(doc.total) + costsValue;
-
+    // The posting engine builds the journal from the branch's posting profile,
+    // receives the stock at landed cost, and distributes the additional costs —
+    // all in one transaction. The screen only declares how the invoice settles.
+    if (settlement !== 'credit' && !settleLocationId) {
+      throw new ApiError(422, 'VALIDATION_FAILED', 'اختر الصندوق أو البنك الذي سدد المبلغ.');
+    }
+    const location = (cashLocations.data ?? []).find((row) => row.id === settleLocationId);
+    const settlementAccountId = location?.accountId ?? location?.account_id ?? undefined;
+    if (settlement !== 'credit' && !settlementAccountId) {
+      throw new ApiError(422, 'VALIDATION_FAILED', 'الموقع المختار غير مربوط بحساب محاسبي.');
+    }
+    if (doc.costs.some((entry) => entry.allocationTarget === 'expense' && !entry.accountId)) {
+      throw new ApiError(422, 'VALIDATION_FAILED', 'مصروف مباشر بلا حساب — احذفه وأعده مربوطاً بحساب مصروف.');
+    }
     await apiPost(`/purchase-invoices/${doc.id}/post`, {
-      fiscalPeriodId: period.id,
-      journalLines: purchaseJournalLines(
-        profile,
-        { subtotal: String(Number(doc.subtotal) + costsValue), taxTotal: doc.taxTotal, total: String(grandValue) },
-        { settlement, partyId: doc.partyId, isReturn, description: `فاتورة مشتريات ${doc.supplierReferenceNo ?? ''}`.trim() },
-      ),
+      settlement,
+      settlementAccountId,
+      settlementCashLocationId: settleLocationId || undefined,
     });
   }
 
@@ -170,17 +181,45 @@ export default function PurchaseInvoiceDetailPage() {
                   <span>المبلغ</span>
                   <input className="input" dir="ltr" inputMode="decimal" value={costAmountText} onChange={(event) => setCostAmountText(event.target.value)} />
                 </label>
+                <label className="field">
+                  <span>التوزيع</span>
+                  <select className="input" value={costTarget} onChange={(event) => setCostTarget(event.target.value as 'inventory' | 'expense')}>
+                    <option value="inventory">على تكلفة الأصناف (يُنسب للمخزون)</option>
+                    <option value="expense">مصروف مباشر (حساب مصروف)</option>
+                  </select>
+                </label>
+                {costTarget === 'expense' && (
+                  <label className="field">
+                    <span>حساب المصروف *</span>
+                    <select className="input" value={costAccountId} onChange={(event) => setCostAccountId(event.target.value)}>
+                      <option value="">— اختر —</option>
+                      {(accounts.data ?? [])
+                        .filter((row) => postableOf(row) && typeOf(row) === 'expense')
+                        .map((row) => (
+                          <option key={row.id} value={row.id}>
+                            {accountLabel(row)}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
               </div>
               <button
                 className="btn"
                 type="button"
-                disabled={busy || !costName.trim() || !costAmountText.trim()}
+                disabled={busy || !costName.trim() || !costAmountText.trim() || (costTarget === 'expense' && !costAccountId)}
                 onClick={() =>
                   run(async () => {
-                    await apiPost(`/purchase-invoices/${doc.id}/costs`, { costName: costName.trim(), amount: costAmountText.trim(), allocationTarget: 'inventory' });
+                    await apiPost(`/purchase-invoices/${doc.id}/costs`, {
+                      costName: costName.trim(),
+                      amount: costAmountText.trim(),
+                      allocationTarget: costTarget,
+                      accountId: costTarget === 'expense' ? costAccountId : undefined,
+                    });
                     setCostName('');
                     setCostAmountText('');
-                  }, 'تمت إضافة المصروف؛ سيوزَّع على تكلفة الأصناف عند الترحيل.')
+                    setCostAccountId('');
+                  }, costTarget === 'inventory' ? 'تمت إضافة المصروف؛ سيوزَّع على تكلفة الأصناف عند الترحيل.' : 'تمت إضافة المصروف المباشر.')
                 }
               >
                 إضافة المصروف
@@ -199,6 +238,20 @@ export default function PurchaseInvoiceDetailPage() {
                   <option value="bank">تحويل بنكي</option>
                 </select>
               </label>
+              {settlement !== 'credit' && (
+                <label className="field">
+                  <span>الصندوق / البنك المسدد *</span>
+                  <select className="input" value={settleLocationId} onChange={(event) => setSettleLocationId(event.target.value)}>
+                    <option value="">— اختر —</option>
+                    {(cashLocations.data ?? []).map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {cashLocationLabel(row)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="muted small">يُقيَّد المبلغ على حساب هذا الموقع وتُسجَّل دفعة بنفس القيمة.</span>
+                </label>
+              )}
               <button className="btn primary" type="button" disabled={busy} onClick={() => run(post, 'تم ترحيل الفاتورة وأُدخلت البضاعة للمخزون بتكلفتها النهائية.')}>
                 {busy ? 'جارٍ الترحيل…' : 'ترحيل الفاتورة'}
               </button>
