@@ -1,1 +1,0 @@
-export default function ContactPage() { return <section className="card"><h1>تواصل معنا</h1><form className="form"><input className="input" placeholder="الاسم" /><input className="input" placeholder="البريد" /><textarea className="input" placeholder="كيف نساعدك؟" /><button className="btn primary" type="button">إرسال</button></form></section>; }
