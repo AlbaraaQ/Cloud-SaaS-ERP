@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
+  accounts,
   branches,
   cashLocationBalances,
   cashLocations,
   currencies,
+  DEMO_CHART_OF_ACCOUNTS,
   newId,
   priceLists,
   tenants,
@@ -79,6 +81,8 @@ export class OrgProvisioningService {
     let created = false;
 
     const currencyCode = await this.ensureBaseCurrency(tx, tenantId, actorUserId, now);
+    const mainCashAccountId = await this.ensureChartOfAccounts(tx, tenantId, actorUserId, now);
+    if (mainCashAccountId) created = true;
 
     let branchId = await firstId(
       tx
@@ -154,8 +158,8 @@ export class OrgProvisioningService {
         branchId,
         kind: 'safe',
         name: 'Main safe',
-        // account_id stays NULL until PHASE_07 creates the chart of accounts (CR-006).
-        accountId: null,
+        // The desktop chart is seeded above, so the safe posts to 1211001 from day one.
+        accountId: mainCashAccountId,
         currencyCode: null,
         isDefault: true,
         isActive: true,
@@ -204,6 +208,66 @@ export class OrgProvisioningService {
     }
 
     return { tenantId, branchId, warehouseId, cashLocationId, priceListId, currencyCode, created };
+  }
+
+  /**
+   * Seeds the desktop default chart of accounts (`Accounts_Index`, 112 accounts + the
+   * cloud COGS extension) for a tenant that has none yet.
+   *
+   * Idempotent: a tenant with any live account is left untouched, so re-running
+   * provisioning never duplicates or renames the accountant's chart. Parents precede
+   * children in `DEMO_CHART_OF_ACCOUNTS`, so one ordered pass resolves every `parent_id`,
+   * `level` and ltree `path` exactly the way `AccountingService.create` would.
+   *
+   * Returns the id of 1211001 (الصندوق الرئيسي) so the main safe can post to it —
+   * or `null` when the chart already existed (the safe keeps whatever link it has).
+   */
+  private async ensureChartOfAccounts(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<string | null> {
+    const [existing] = await tx
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)))
+      .limit(1);
+    if (existing) return null;
+
+    const idByCode = new Map<string, string>();
+    const pathByCode = new Map<string, string>();
+    const levelByCode = new Map<string, number>();
+    for (const account of DEMO_CHART_OF_ACCOUNTS) {
+      const id = newId();
+      const parentId = account.parent ? idByCode.get(account.parent) : undefined;
+      const parentPath = account.parent ? pathByCode.get(account.parent) : undefined;
+      const level = account.parent ? (levelByCode.get(account.parent) ?? 0) + 1 : 0;
+      const path = parentPath ? `${parentPath}.${id}` : id;
+      await tx.insert(accounts).values({
+        id,
+        tenantId,
+        code: account.code,
+        nameAr: account.nameAr,
+        nameEn: account.nameEn ?? null,
+        parentId: parentId ?? null,
+        level,
+        path,
+        type: account.type,
+        normalBalance: account.normalBalance ?? (account.type === 'asset' || account.type === 'expense' ? 'debit' : 'credit'),
+        isPostable: account.postable !== false,
+        allowManual: true,
+        createdAt: now,
+        createdBy: actorUserId,
+        legacySource: 'desktop-erp',
+        legacyId: `Accounts_Index:${account.code}`,
+      });
+      idByCode.set(account.code, id);
+      pathByCode.set(account.code, path);
+      levelByCode.set(account.code, level);
+    }
+    this.logger.log({ tenantId, count: idByCode.size }, 'desktop chart of accounts seeded');
+    return idByCode.get('1211001') ?? null;
   }
 
   /**

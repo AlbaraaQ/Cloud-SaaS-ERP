@@ -23,5 +23,7 @@ export type { MigrationFile, MigrationLogger, MigrationOutcome } from './migrate
 
 export { DEMO_TENANT_CODE, seedPermissionRegistry, seedPlatform } from './seed.js';
 export type { SeedOptions, SeedReport } from './seed.js';
-export { DEMO_CHART_OF_ACCOUNTS, DEMO_PLANS, seedDemoData } from './seed-demo.js';
+export { DESKTOP_DEFAULT_COA } from './desktop-coa.js';
+export type { DesktopSeedAccount } from './desktop-coa.js';
+export { DEMO_CHART_OF_ACCOUNTS, DEMO_PLANS, seedDefaultChartOfAccounts, seedDemoData } from './seed-demo.js';
 export type { DemoSeedOptions, DemoSeedReport, DemoUserSpec } from './seed-demo.js';

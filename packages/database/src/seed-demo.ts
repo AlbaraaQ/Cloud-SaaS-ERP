@@ -11,7 +11,7 @@
  *
  *   • the billing catalogue (three plans) and an active licence for the tenant
  *   • organisation defaults: base currency, main branch, warehouse, safe, bank, price list
- *   • a real Arabic chart of accounts (5 classes, 40+ accounts) wired to the safe/bank
+ *   • the desktop chart of accounts (4 roots, 112 accounts + COGS) wired to the safe/bank
  *   • cost centres, the fiscal year and its twelve monthly periods
  *   • a balanced opening journal entry, posted, with the document sequence advanced
  *   • an accountant and a cashier user next to the owner
@@ -22,6 +22,7 @@
  */
 import { Client } from 'pg';
 
+import { DESKTOP_DEFAULT_COA } from './desktop-coa.js';
 import { newId } from './ids.js';
 
 export type DemoUserSpec = {
@@ -70,7 +71,7 @@ export type DemoSeedReport = {
 type AccountSeed = {
   code: string;
   nameAr: string;
-  nameEn: string;
+  nameEn?: string;
   type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
   /** Overrides the natural side — used by contra accounts. */
   normalBalance?: 'debit' | 'credit';
@@ -79,76 +80,15 @@ type AccountSeed = {
 };
 
 /**
- * A small but complete Arabic chart of accounts. It mirrors what the desktop product
- * ships with, so the trial balance, the ledger and the voucher screens all have something
- * meaningful to show on the first run.
+ * The default chart of accounts every tenant — demo or subscribed — starts with.
+ * It is the desktop product's real `Accounts_Index` (see `./desktop-coa.js`, generated
+ * from the legacy `CrystalLiteDB.txt`/`AlterDb.txt` scripts), plus one cloud extension:
+ * sales/inventory postings need a cost-of-goods account the desktop seed never shipped,
+ * so `3200004` hangs under group 32 with the next free leaf code.
  */
 export const DEMO_CHART_OF_ACCOUNTS: AccountSeed[] = [
-  // 1 — الأصول
-  { code: '1', nameAr: 'الأصول', nameEn: 'Assets', type: 'asset', postable: false },
-  { code: '11', nameAr: 'الأصول المتداولة', nameEn: 'Current assets', type: 'asset', parent: '1', postable: false },
-  { code: '1101', nameAr: 'الصندوق الرئيسي', nameEn: 'Main cash', type: 'asset', parent: '11' },
-  { code: '1102', nameAr: 'البنك', nameEn: 'Bank', type: 'asset', parent: '11' },
-  { code: '1103', nameAr: 'العملاء (ذمم مدينة)', nameEn: 'Accounts receivable', type: 'asset', parent: '11' },
-  { code: '1104', nameAr: 'المخزون', nameEn: 'Inventory', type: 'asset', parent: '11' },
-  { code: '1105', nameAr: 'ضريبة القيمة المضافة - المدخلات', nameEn: 'Input VAT', type: 'asset', parent: '11' },
-  { code: '1106', nameAr: 'مصروفات مدفوعة مقدماً', nameEn: 'Prepaid expenses', type: 'asset', parent: '11' },
-  { code: '1107', nameAr: 'سلف الموظفين', nameEn: 'Employee advances', type: 'asset', parent: '11' },
-  { code: '12', nameAr: 'الأصول الثابتة', nameEn: 'Fixed assets', type: 'asset', parent: '1', postable: false },
-  { code: '1201', nameAr: 'أثاث ومعدات', nameEn: 'Furniture and equipment', type: 'asset', parent: '12' },
-  { code: '1202', nameAr: 'أجهزة حاسب', nameEn: 'Computers', type: 'asset', parent: '12' },
-  { code: '1203', nameAr: 'سيارات', nameEn: 'Vehicles', type: 'asset', parent: '12' },
-  {
-    code: '1209',
-    nameAr: 'مجمع إهلاك الأصول الثابتة',
-    nameEn: 'Accumulated depreciation',
-    type: 'asset',
-    parent: '12',
-    normalBalance: 'credit',
-  },
-
-  // 2 — الخصوم
-  { code: '2', nameAr: 'الخصوم', nameEn: 'Liabilities', type: 'liability', postable: false },
-  { code: '21', nameAr: 'الخصوم المتداولة', nameEn: 'Current liabilities', type: 'liability', parent: '2', postable: false },
-  { code: '2101', nameAr: 'الموردون (ذمم دائنة)', nameEn: 'Accounts payable', type: 'liability', parent: '21' },
-  { code: '2102', nameAr: 'ضريبة القيمة المضافة - المخرجات', nameEn: 'Output VAT', type: 'liability', parent: '21' },
-  { code: '2103', nameAr: 'رواتب مستحقة', nameEn: 'Accrued payroll', type: 'liability', parent: '21' },
-  { code: '2104', nameAr: 'مصروفات مستحقة', nameEn: 'Accrued expenses', type: 'liability', parent: '21' },
-  { code: '2105', nameAr: 'دفعات مقدمة من العملاء', nameEn: 'Customer advances', type: 'liability', parent: '21' },
-  { code: '22', nameAr: 'الخصوم طويلة الأجل', nameEn: 'Long-term liabilities', type: 'liability', parent: '2', postable: false },
-  { code: '2201', nameAr: 'قروض طويلة الأجل', nameEn: 'Long-term loans', type: 'liability', parent: '22' },
-
-  // 3 — حقوق الملكية
-  { code: '3', nameAr: 'حقوق الملكية', nameEn: 'Equity', type: 'equity', postable: false },
-  { code: '3101', nameAr: 'رأس المال', nameEn: 'Capital', type: 'equity', parent: '3' },
-  { code: '3102', nameAr: 'جاري الشركاء', nameEn: "Partners' current account", type: 'equity', parent: '3' },
-  { code: '3103', nameAr: 'الأرباح المرحّلة', nameEn: 'Retained earnings', type: 'equity', parent: '3' },
-  { code: '3104', nameAr: 'أرباح وخسائر الفترة', nameEn: 'Current period result', type: 'equity', parent: '3' },
-
-  // 4 — الإيرادات
-  { code: '4', nameAr: 'الإيرادات', nameEn: 'Revenue', type: 'revenue', postable: false },
-  { code: '4101', nameAr: 'إيرادات المبيعات', nameEn: 'Sales revenue', type: 'revenue', parent: '4' },
-  { code: '4102', nameAr: 'مردودات المبيعات', nameEn: 'Sales returns', type: 'revenue', parent: '4', normalBalance: 'debit' },
-  { code: '4103', nameAr: 'خصم مسموح به', nameEn: 'Sales discounts', type: 'revenue', parent: '4', normalBalance: 'debit' },
-  { code: '4104', nameAr: 'إيرادات أخرى', nameEn: 'Other income', type: 'revenue', parent: '4' },
-
-  // 5 — المصروفات
-  { code: '5', nameAr: 'المصروفات', nameEn: 'Expenses', type: 'expense', postable: false },
-  { code: '51', nameAr: 'تكلفة المبيعات', nameEn: 'Cost of sales', type: 'expense', parent: '5', postable: false },
-  { code: '5101', nameAr: 'تكلفة البضاعة المباعة', nameEn: 'Cost of goods sold', type: 'expense', parent: '51' },
-  { code: '5102', nameAr: 'مردودات المشتريات', nameEn: 'Purchase returns', type: 'expense', parent: '51', normalBalance: 'credit' },
-  { code: '5103', nameAr: 'خصم مكتسب', nameEn: 'Purchase discounts', type: 'expense', parent: '51', normalBalance: 'credit' },
-  { code: '52', nameAr: 'مصروفات تشغيلية', nameEn: 'Operating expenses', type: 'expense', parent: '5', postable: false },
-  { code: '5201', nameAr: 'الرواتب والأجور', nameEn: 'Salaries and wages', type: 'expense', parent: '52' },
-  { code: '5202', nameAr: 'الإيجارات', nameEn: 'Rent', type: 'expense', parent: '52' },
-  { code: '5203', nameAr: 'الكهرباء والماء', nameEn: 'Utilities', type: 'expense', parent: '52' },
-  { code: '5204', nameAr: 'الاتصالات والإنترنت', nameEn: 'Telecom and internet', type: 'expense', parent: '52' },
-  { code: '5205', nameAr: 'الصيانة والنظافة', nameEn: 'Maintenance', type: 'expense', parent: '52' },
-  { code: '5206', nameAr: 'قرطاسية ومطبوعات', nameEn: 'Office supplies', type: 'expense', parent: '52' },
-  { code: '5207', nameAr: 'مصاريف بنكية', nameEn: 'Bank charges', type: 'expense', parent: '52' },
-  { code: '5208', nameAr: 'إهلاك الأصول الثابتة', nameEn: 'Depreciation', type: 'expense', parent: '52' },
-  { code: '5209', nameAr: 'دعاية وإعلان', nameEn: 'Marketing', type: 'expense', parent: '52' },
-  { code: '5210', nameAr: 'مصروفات أخرى', nameEn: 'Other expenses', type: 'expense', parent: '52' },
+  ...DESKTOP_DEFAULT_COA,
+  { code: '3200004', nameAr: 'تكلفة المبيعات', type: 'expense', parent: '32' },
 ];
 
 /**
@@ -170,7 +110,7 @@ const DEMO_CATEGORIES = [
 
 /** Rate is stored as a fraction (0.1500 = 15%), matching `tax_groups.rate`. */
 const DEMO_TAX_GROUPS = [
-  { nameAr: 'ضريبة القيمة المضافة 15%', nameEn: 'VAT 15%', rate: '0.1500', vatAccountCode: '2102' },
+  { nameAr: 'ضريبة القيمة المضافة 15%', nameEn: 'VAT 15%', rate: '0.1500', vatAccountCode: '2222001' },
   { nameAr: 'معفاة من الضريبة', nameEn: 'Exempt', rate: '0.0000', vatAccountCode: undefined },
 ];
 
@@ -181,20 +121,21 @@ const DEMO_TAX_GROUPS = [
  * from the chart above and are resolved to ids at seed time.
  */
 export const DEMO_POSTING_PROFILE: Record<string, string> = {
-  salesAccountId: '4101',
-  salesReturnAccountId: '4102',
-  purchasesAccountId: '1104',
-  purchaseReturnAccountId: '5102',
-  discountGivenAccountId: '4103',
-  discountReceivedAccountId: '5103',
-  vatOutputAccountId: '2102',
-  vatInputAccountId: '1105',
-  inventoryAccountId: '1104',
-  cogsAccountId: '5101',
-  cashAccountId: '1101',
-  bankAccountId: '1102',
-  receivableAccountId: '1103',
-  payableAccountId: '2101',
+  salesAccountId: '4100001',
+  salesReturnAccountId: '4100002',
+  purchasesAccountId: '3200001',
+  purchaseReturnAccountId: '3200002',
+  discountGivenAccountId: '4100003',
+  discountReceivedAccountId: '3200003',
+  // The desktop seed ships a single VAT account shared by both sides.
+  vatOutputAccountId: '2222001',
+  vatInputAccountId: '2222001',
+  inventoryAccountId: '1270001',
+  cogsAccountId: '3200004',
+  cashAccountId: '1211001',
+  bankAccountId: '1221001',
+  receivableAccountId: '12310001',
+  payableAccountId: '22111001',
 };
 
 const DEMO_COST_CENTERS = [
@@ -257,7 +198,7 @@ export async function seedDemoData(
     const org = await seedOrganisation(client, tenantId, currencyCode);
     log(`seed  organisation: branch ${org.branchCode}, warehouse, safe + bank`);
 
-    const chart = await seedChartOfAccounts(client, tenantId);
+    const chart = await seedDefaultChartOfAccounts(client, tenantId);
     log(`seed  chart of accounts: ${chart.inserted} new (${chart.total} total)`);
 
     await linkCashAccounts(client, tenantId, org.safeId, org.bankId, chart.byCode);
@@ -464,7 +405,8 @@ async function seedOrganisation(
 
 // ------------------------------------------------------------------------ accounting
 
-async function seedChartOfAccounts(
+/** Seeds `DEMO_CHART_OF_ACCOUNTS`, skipping codes the tenant already has. Exported for the `seed:coa` backfill CLI. */
+export async function seedDefaultChartOfAccounts(
   client: Client,
   tenantId: string,
 ): Promise<{ inserted: number; total: number; byCode: Map<string, string> }> {
@@ -502,7 +444,7 @@ async function seedChartOfAccounts(
         tenantId,
         account.code,
         account.nameAr,
-        account.nameEn,
+        account.nameEn ?? null,
         parentId ?? null,
         level,
         path,
@@ -530,8 +472,8 @@ async function linkCashAccounts(
   byCode: Map<string, string>,
 ): Promise<void> {
   const pairs: Array<[string, string | undefined]> = [
-    [safeId, byCode.get('1101')],
-    [bankId, byCode.get('1102')],
+    [safeId, byCode.get('1211001')],
+    [bankId, byCode.get('1221001')],
   ];
   for (const [cashLocationId, accountId] of pairs) {
     if (!accountId) continue;
@@ -678,10 +620,10 @@ async function seedOpeningEntry(
   );
   if ((already.rowCount ?? 0) > 0) return already.rows[0]?.number ?? undefined;
 
-  const cash = input.byCode.get('1101');
-  const bank = input.byCode.get('1102');
-  const furniture = input.byCode.get('1201');
-  const capital = input.byCode.get('3101');
+  const cash = input.byCode.get('1211001');
+  const bank = input.byCode.get('1221001');
+  const furniture = input.byCode.get('1160001');
+  const capital = input.byCode.get('2110001');
   if (!cash || !bank || !furniture || !capital || !input.periodId) return undefined;
 
   const entryId = newId();

@@ -26,6 +26,8 @@ describe('DEMO_CHART_OF_ACCOUNTS', () => {
     const typeByCode = new Map(DEMO_CHART_OF_ACCOUNTS.map((account) => [account.code, account.type]));
     for (const account of DEMO_CHART_OF_ACCOUNTS) {
       if (!account.parent) continue;
+      // Documented exception: the desktop hangs equity (21) under the liabilities root (2).
+      if (account.code === '21') continue;
       expect(account.type, `type of ${account.code}`).toBe(typeByCode.get(account.parent));
     }
   });
@@ -48,19 +50,19 @@ describe('DEMO_CHART_OF_ACCOUNTS', () => {
 
   it('opens the five classes and only uses contra accounts deliberately', () => {
     const roots = DEMO_CHART_OF_ACCOUNTS.filter((account) => !account.parent).map((account) => account.code);
-    expect(roots).toEqual(['1', '2', '3', '4', '5']);
+    expect(roots).toEqual(['1', '2', '3', '4']);
 
     // A contra account is the only reason to override the natural side of its class.
     const naturalSide = (type: string) => (type === 'asset' || type === 'expense' ? 'debit' : 'credit');
     const overridden = DEMO_CHART_OF_ACCOUNTS.filter(
       (account) => account.normalBalance && account.normalBalance !== naturalSide(account.type),
     ).map((account) => account.code);
-    expect(overridden).toEqual(['1209', '4102', '4103', '5102', '5103']);
+    expect(overridden).toEqual(['3200002', '3200003', '4100002', '4100003']);
   });
 
   it('contains the accounts the opening entry and the cash locations depend on', () => {
     const codes = new Set(DEMO_CHART_OF_ACCOUNTS.map((account) => account.code));
-    for (const code of ['1101', '1102', '1201', '3101']) expect(codes).toContain(code);
+    for (const code of ['1211001', '1221001', '1160001', '2110001', '3200004']) expect(codes).toContain(code);
   });
 });
 
