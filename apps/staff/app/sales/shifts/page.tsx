@@ -6,9 +6,26 @@ import { useState } from 'react';
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
 import { ApiError, apiData, apiList, apiPost } from '../../../lib/api';
-import { branchOptions, dateTime, defaultOf, listBranches, money, statusLabel, type Branch } from '../../../lib/lookups';
+import {
+  branchOptions,
+  dateTime,
+  defaultOf,
+  listBranches,
+  money,
+  statusLabel,
+  type Branch,
+} from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
+
+type Takings = {
+  vouchers: number;
+  vouchersCash: string;
+  invoices: number;
+  sales: { cash: string; card: string; bank: string; credit: string };
+  returns: { cash: string; card: string; bank: string; credit: string };
+  expectedCash: string;
+};
 
 type Shift = {
   id: string;
@@ -19,6 +36,10 @@ type Shift = {
   expectedCash: string;
   countedCash: string;
   diff: string;
+  /** Takings so far — only present on the open shift (Phase 04). */
+  live?: Takings;
+  /** Frozen at closing; carries the same shape as `live` plus the count. */
+  summary?: Takings & { countedCash: string; diff: string };
 };
 
 const DENOMINATIONS = ['500', '200', '100', '50', '20', '10', '5', '1', '0.5'];
@@ -30,9 +51,15 @@ export default function ShiftsPage() {
   const [branchId, setBranchId] = useState('');
   const effectiveBranch = branchId || defaultOf(branchRows)?.id || '';
 
-  const shifts = useQuery<Shift[]>(() => apiList<Shift>(`/shift-closes${effectiveBranch ? `?branch_id=${effectiveBranch}` : ''}`), [effectiveBranch]);
+  const shifts = useQuery<Shift[]>(
+    () => apiList<Shift>(`/shift-closes${effectiveBranch ? `?branch_id=${effectiveBranch}` : ''}`),
+    [effectiveBranch],
+  );
   const current = useQuery<Shift | null>(
-    () => (effectiveBranch ? apiData<Shift | null>(`/shift-closes/current?branch_id=${effectiveBranch}`) : Promise.resolve(null)),
+    () =>
+      effectiveBranch
+        ? apiData<Shift | null>(`/shift-closes/current?branch_id=${effectiveBranch}`)
+        : Promise.resolve(null),
     [effectiveBranch],
   );
 
@@ -40,7 +67,10 @@ export default function ShiftsPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
-  const countedValue = DENOMINATIONS.reduce((sum, denomination) => sum + Number(denomination) * Number(counts[denomination] ?? 0), 0);
+  const countedValue = DENOMINATIONS.reduce(
+    (sum, denomination) => sum + Number(denomination) * Number(counts[denomination] ?? 0),
+    0,
+  );
 
   async function run(action: () => Promise<unknown>, okText: string) {
     setBusy(true);
@@ -62,13 +92,17 @@ export default function ShiftsPage() {
   return (
     <Screen
       title="إغلاق اليومية"
-      subtitle="فتح وردية الكاشير، ثم جرد النقد وإغلاقها بمقارنة المتوقع بالمعدود."
+      subtitle="فتح وردية الكاشير، ثم جرد النقد وإغلاقها بمقارنة المتوقع بالمعدود — نقداً وشبكة وآجل."
       crumbs={['المبيعات', 'العمليات']}
     >
       <div className="card toolbar">
         <label className="field">
           <span>الفرع</span>
-          <select className="input" value={effectiveBranch} onChange={(event) => setBranchId(event.target.value)}>
+          <select
+            className="input"
+            value={effectiveBranch}
+            onChange={(event) => setBranchId(event.target.value)}
+          >
             {branchOptions(branchRows).map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -86,8 +120,20 @@ export default function ShiftsPage() {
             <dl className="kv">
               <dt>فُتحت</dt>
               <dd>{dateTime(openShift.openedAt)}</dd>
-              <dt>النقد المتوقع</dt>
-              <dd>{money(openShift.expectedCash)}</dd>
+              <dt>مبيعات نقدية</dt>
+              <dd>{money(openShift.live?.sales.cash ?? '0')}</dd>
+              <dt>شبكة</dt>
+              <dd>{money(openShift.live?.sales.card ?? '0')}</dd>
+              <dt>تحويل بنكي</dt>
+              <dd>{money(openShift.live?.sales.bank ?? '0')}</dd>
+              <dt>مبيعات آجلة</dt>
+              <dd>{money(openShift.live?.sales.credit ?? '0')}</dd>
+              <dt>سندات قبض نقدية</dt>
+              <dd>{money(openShift.live?.vouchersCash ?? '0')}</dd>
+              <dt>النقد المتوقع الآن</dt>
+              <dd>
+                <strong>{money(openShift.live?.expectedCash ?? '0')}</strong>
+              </dd>
             </dl>
 
             <h3>جرد النقد</h3>
@@ -100,7 +146,9 @@ export default function ShiftsPage() {
                     dir="ltr"
                     inputMode="numeric"
                     value={counts[denomination] ?? ''}
-                    onChange={(event) => setCounts((data) => ({ ...data, [denomination]: event.target.value }))}
+                    onChange={(event) =>
+                      setCounts((data) => ({ ...data, [denomination]: event.target.value }))
+                    }
                   />
                 </label>
               ))}
@@ -121,7 +169,9 @@ export default function ShiftsPage() {
                   run(
                     () =>
                       apiPost(`/shift-closes/${openShift.id}/close`, {
-                        counts: DENOMINATIONS.filter((denomination) => Number(counts[denomination] ?? 0) > 0).map((denomination) => ({
+                        counts: DENOMINATIONS.filter(
+                          (denomination) => Number(counts[denomination] ?? 0) > 0,
+                        ).map((denomination) => ({
                           denomination,
                           count: Number(counts[denomination] ?? 0),
                         })),
@@ -138,7 +188,14 @@ export default function ShiftsPage() {
           <>
             <p className="muted">لا توجد وردية مفتوحة لهذا الفرع.</p>
             {can('treasury.shift.close') && (
-              <button className="btn primary" type="button" disabled={busy || !effectiveBranch} onClick={() => run(() => apiPost('/shift-closes/open', { branchId: effectiveBranch }), 'تم فتح الوردية.')}>
+              <button
+                className="btn primary"
+                type="button"
+                disabled={busy || !effectiveBranch}
+                onClick={() =>
+                  run(() => apiPost('/shift-closes/open', { branchId: effectiveBranch }), 'تم فتح الوردية.')
+                }
+              >
                 فتح وردية
               </button>
             )}
@@ -153,11 +210,38 @@ export default function ShiftsPage() {
             rowKey={(row) => row.id}
             columns={[
               { key: 'opened', header: 'الفتح', align: 'ltr', cell: (row) => dateTime(row.openedAt) },
-              { key: 'closed', header: 'الإغلاق', align: 'ltr', cell: (row) => (row.closedAt ? dateTime(row.closedAt) : '—') },
+              {
+                key: 'closed',
+                header: 'الإغلاق',
+                align: 'ltr',
+                cell: (row) => (row.closedAt ? dateTime(row.closedAt) : '—'),
+              },
               { key: 'expected', header: 'المتوقع', align: 'num', cell: (row) => money(row.expectedCash) },
               { key: 'counted', header: 'المعدود', align: 'num', cell: (row) => money(row.countedCash) },
               { key: 'diff', header: 'الفرق', align: 'num', cell: (row) => money(row.diff) },
-              { key: 'status', header: 'الحالة', cell: (row) => <span className="badge">{statusLabel(row.status)}</span> },
+              {
+                key: 'cash',
+                header: 'نقداً',
+                align: 'num',
+                cell: (row) => (row.summary ? money(row.summary.sales.cash) : '—'),
+              },
+              {
+                key: 'card',
+                header: 'شبكة',
+                align: 'num',
+                cell: (row) => (row.summary ? money(row.summary.sales.card) : '—'),
+              },
+              {
+                key: 'credit',
+                header: 'آجل',
+                align: 'num',
+                cell: (row) => (row.summary ? money(row.summary.sales.credit) : '—'),
+              },
+              {
+                key: 'status',
+                header: 'الحالة',
+                cell: (row) => <span className="badge">{statusLabel(row.status)}</span>,
+              },
               {
                 key: 'print',
                 header: '',

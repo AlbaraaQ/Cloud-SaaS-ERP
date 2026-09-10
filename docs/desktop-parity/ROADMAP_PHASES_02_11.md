@@ -4,9 +4,9 @@ How to run a phase: read its desktop sources below + the matching cloud module,
 port behaviours rule-by-rule behind real endpoints with specs, update the screen(s),
 then flip this file's checkbox and `README.md`. Every phase keeps API compatibility.
 
-## Phase 02 — Sales invoice engine
+## Phase 02 — Sales invoice engine ✅ (2026-09, `PHASE_02_SALES_ENGINE.md`)
 
-- [ ] Desktop: `Class/InvoiceOper.cs` (`SaveInvoice` L1310, `BindToEntry` L2252,
+- [x] Desktop: `Class/InvoiceOper.cs` (`SaveInvoice` L1310, `BindToEntry` L2252,
   `InvoiceCalc` L5009, `InvoicePayments`, `DeleteInvoice`, `CheckForOffer`),
   `Form_WPF/frmSalesInvoice.xaml.cs`, `frmInvSale*`, `frmInvoice*`, `frmCreditNote*`,
   `frmDebtNote*`, `frmOffers*`, `Class/Number2Arabic.cs` (تفقيط on print).
@@ -20,9 +20,9 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Accept: create/post/return/credit-note flows pass specs; printed invoice shows
   amount-in-words; Zatca-ready fields populated (send itself is phase 11).
 
-## Phase 03 — Purchase engine
+## Phase 03 — Purchase engine ✅ (2026-09, `PHASE_03_PURCHASE_ENGINE.md`)
 
-- [ ] Desktop: `InvoiceOper` invType 1 paths, `frmInvPurch*`, `frmPurchInv*`,
+- [x] Desktop: `InvoiceOper` invType 1 paths, `frmInvPurch*`, `frmPurchInv*`,
   `frmAdditionalCost*`, `frmSuppliers*`, `frmInvReturnTypes*`.
 - [ ] Cloud: `modules/purchases/**`, staff `/purchases/invoices`.
 - [ ] Behaviours: goods-receipt vs invoice separation; additional costs distributed
@@ -30,9 +30,9 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   post (confirm in `ItemOper`).
 - [ ] Accept: purchase → post → stock+average-cost updated; return + debit note specs green.
 
-## Phase 04 — POS + shifts + cashier close
+## Phase 04 — POS + shifts + cashier close ✅ (2026-09, `PHASE_04_POS_SHIFTS.md`)
 
-- [ ] Desktop: `frmPOS*`, `frmInvPOS*`, `frmCloseShift*`, `frmCasherSetting*`,
+- [x] Desktop: `frmPOS*`, `frmInvPOS*`, `frmCloseShift*`, `frmCasherSetting*`,
   `frmHoldM*`, `frmPOSBill*`, `frmPOSPay*`, `frmShortCutInv*`, `frmQueueM*`,
   `frmTables*`, `Class/CasherClosed*.cs`, `EntryOper.BindCloseShiftToEntry` (L402).
 - [ ] Cloud: `modules/pos/**`, staff `/pos`, `/sales/shifts`.

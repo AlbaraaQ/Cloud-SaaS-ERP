@@ -33,28 +33,32 @@ export class PermissionsGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const required = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_PERMISSION_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (!required) return true;
+    const required = this.reflector.getAllAndOverride<string | string[] | undefined>(
+      REQUIRED_PERMISSION_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    // A route may declare several codes (`RequiresPermission('a', 'b')`) when it
+    // spans two modules; every one of them must be granted.
+    const codes = required === undefined ? [] : Array.isArray(required) ? required : [required];
+    if (codes.length === 0) return true;
+    const requiredLabel = codes.join(', ');
 
     const tenant = getRequestContext().tenant;
     if (tenant?.kind === 'portal') {
-      throw new DomainError(
-        errorCodes.FORBIDDEN,
-        'portal memberships cannot access staff endpoints',
-        403,
-        { field: 'permission', message: required },
-      );
+      throw new DomainError(errorCodes.FORBIDDEN, 'portal memberships cannot access staff endpoints', 403, {
+        field: 'permission',
+        message: requiredLabel,
+      });
     }
 
     const granted = tenant?.permissions ?? [];
-    if (permissionGrants(granted, required)) return true;
-
-    throw new DomainError(errorCodes.FORBIDDEN, `permission ${required} required`, 403, {
-      field: 'permission',
-      message: required,
-    });
+    for (const code of codes) {
+      if (permissionGrants(granted, code)) continue;
+      throw new DomainError(errorCodes.FORBIDDEN, `permission ${code} required`, 403, {
+        field: 'permission',
+        message: code,
+      });
+    }
+    return true;
   }
 }

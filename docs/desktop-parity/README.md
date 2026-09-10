@@ -23,10 +23,10 @@ Postgres, multi-tenant, RBAC).
 |---|---|---|---|
 | 00 | Survey: architecture map, invoice matrix, file index | ✅ done | `PHASE_00_SURVEY.md` |
 | 01 | Staff users/permissions UI + navigation dedup | ✅ done | `PHASE_01_USERS_NAV.md` |
-| 02 | Sales invoice engine (calc, save, post, returns, notes) | ⬜ next | `ROADMAP_PHASES_02_11.md` |
-| 03 | Purchase engine (invoices, returns, landed cost) | ⬜ | `ROADMAP_PHASES_02_11.md` |
-| 04 | POS + shifts + cashier close | ⬜ | `ROADMAP_PHASES_02_11.md` |
-| 05 | Inventory (stock in/out, transfers, serials, barcode, expiry) | ⬜ | `ROADMAP_PHASES_02_11.md` |
+| 02 | Sales invoice engine (calc, save, post, returns, notes) | ✅ done | `PHASE_02_SALES_ENGINE.md` |
+| 03 | Purchase engine (invoices, returns, landed cost) | ✅ done | `PHASE_03_PURCHASE_ENGINE.md` |
+| 04 | POS checkout + cashier shifts + day close | ✅ done | `PHASE_04_POS_SHIFTS.md` |
+| 05 | Inventory (stock in/out, transfers, serials, barcode, expiry) | ⬜ next | `ROADMAP_PHASES_02_11.md` |
 | 06 | Treasury (receipts, payments, safes/banks, cheques) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 07 | Accounting (manual entries, periods, trial balance, cost centres) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 08 | HRM (employees, attendance, payroll, custody) | ⬜ | `ROADMAP_PHASES_02_11.md` |
