@@ -33,6 +33,8 @@ function run(headers: Record<string, string>, branchScope: string[] | null): voi
     permissions: [],
     branchScope,
     isOwner: false,
+    kind: 'staff',
+    scopes: [],
   };
 
   requestContextStorage.run({ traceId: 'trace', startTime: 0, tenant }, () => {

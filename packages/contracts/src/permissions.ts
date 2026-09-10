@@ -6,32 +6,109 @@
  * This code list is the single source that the `permissions` table is seeded from
  * (PHASE_03 §5.7). The matrix in SECURITY_ARCHITECTURE §5 is a summary of it.
  * Extend only forward — never rename or remove a code without an ADR.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-09 architecture/RBAC reorganisation — namespace fix (docs/architecture-rbac/).
+ *
+ * The historic `platform.*` prefix was semantically wrong: those ten codes never
+ * described the SaaS *platform* — they describe a tenant **administering itself**
+ * (own tenant record, own memberships, own roles, own audit log…). Their canonical
+ * home is now the `tenant.*` namespace. The old codes stay in this registry,
+ * flagged `deprecated`, and keep working forever through the alias map below:
+ *
+ *   - reads (`PermissionsGuard`, `GET /me`) accept either spelling;
+ *   - writes (`POST /roles`, seed scripts) normalise legacy → canonical, so the
+ *     database converges on the canonical spelling without a lossy migration.
+ *
+ * The `console.*` namespace is the opposite side of the same fix: permissions of
+ * the *platform console* (apps/platform-admin). They live in
+ * `platformPermissionRegistry` — deliberately NOT in `permissionRegistry` — so no
+ * tenant flow (role editor, owner expansion, `*` wildcard) can ever grant them.
+ * `RolesService` additionally rejects them with 422 if they are submitted.
  */
 
 export type PermissionDefinition = {
   readonly code: string;
   readonly module: string;
   readonly description: string;
+  /**
+   * Legacy spelling kept for compatibility. New grants must use `canonical`
+   * instead; seed and role-write paths normalise automatically.
+   */
+  readonly deprecated?: boolean;
+  /** Canonical replacement of a deprecated code. */
+  readonly canonical?: string;
 };
 
 function perm(code: string, description: string): PermissionDefinition {
   return { code, module: code.split('.')[0] as string, description };
 }
 
-export const permissionRegistry: readonly PermissionDefinition[] = [
-  // platform (PHASE_03)
-  perm('platform.tenant.view', 'Read the own tenant record and its effective settings.'),
-  perm('platform.tenant.manage', 'Update the own tenant record and typed settings in bulk.'),
-  perm('platform.membership.manage', 'Invite, update and remove tenant memberships.'),
-  perm('platform.role.manage', 'Create and maintain roles and their permission sets.'),
-  perm('platform.settings.manage', 'Read and write individual typed tenant settings.'),
-  perm('platform.audit.view', 'Read the tenant audit log.'),
-  perm('platform.file.upload', 'Request pre-signed uploads, attach and download files.'),
+function legacy(code: string, canonical: string, description: string): PermissionDefinition {
+  return { code, module: code.split('.')[0] as string, description, deprecated: true, canonical };
+}
 
-  // platform services (PHASE_04)
-  perm('platform.notification.view', 'Read own in-app notifications and mark them read.'),
-  perm('platform.notification.manage', 'Create notifications for other memberships of the tenant.'),
-  perm('platform.job.view', 'Read the transactional outbox and background-queue health.'),
+/**
+ * Legacy → canonical reclassification. A tenant permission granted under either
+ * spelling authorises the same operation (see `permissionGrants`).
+ */
+export const permissionAliases: Readonly<Record<string, string>> = {
+  'platform.tenant.view': 'tenant.view',
+  'platform.tenant.manage': 'tenant.manage',
+  'platform.membership.manage': 'tenant.membership.manage',
+  'platform.role.manage': 'tenant.role.manage',
+  'platform.settings.manage': 'tenant.settings.manage',
+  'platform.audit.view': 'tenant.audit.view',
+  'platform.file.upload': 'tenant.file.upload',
+  'platform.notification.view': 'tenant.notification.view',
+  'platform.notification.manage': 'tenant.notification.manage',
+  'platform.job.view': 'tenant.job.view',
+} as const;
+
+/** Reverse lookup: canonical → legacy spelling (kept for audit display of old rows). */
+export const canonicalToLegacy: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(permissionAliases).map(([oldCode, newCode]) => [newCode, oldCode]),
+);
+
+export const permissionRegistry: readonly PermissionDefinition[] = [
+  // tenant self-administration — canonical `tenant.*` spelling (2026-09).
+  perm('tenant.view', 'Read the own tenant record and its effective settings.'),
+  perm('tenant.manage', 'Update the own tenant record and typed settings in bulk.'),
+  perm('tenant.membership.manage', 'Invite, update and remove tenant memberships.'),
+  perm('tenant.role.manage', 'Create and maintain roles and their permission sets.'),
+  perm('tenant.settings.manage', 'Read and write individual typed tenant settings.'),
+  perm('tenant.audit.view', 'Read the tenant audit log.'),
+  perm('tenant.file.upload', 'Request pre-signed uploads, attach and download files.'),
+  perm('tenant.notification.view', 'Read own in-app notifications and mark them read.'),
+  perm('tenant.notification.manage', 'Create notifications for other memberships of the tenant.'),
+  perm('tenant.job.view', 'Read the transactional outbox and background-queue health.'),
+  // tenant device registry (2026-09) — canonical Device entity, see `devices` table.
+  perm('tenant.device.view', 'List and read registered tenant devices.'),
+  perm('tenant.device.manage', 'Register, activate, suspend and rotate credentials of tenant devices.'),
+
+  // tenant self-administration — legacy `platform.*` spelling (deprecated, still honoured).
+  legacy('platform.tenant.view', 'tenant.view', 'Read the own tenant record and its effective settings.'),
+  legacy('platform.tenant.manage', 'tenant.manage', 'Update the own tenant record and typed settings in bulk.'),
+  legacy('platform.membership.manage', 'tenant.membership.manage', 'Invite, update and remove tenant memberships.'),
+  legacy('platform.role.manage', 'tenant.role.manage', 'Create and maintain roles and their permission sets.'),
+  legacy('platform.settings.manage', 'tenant.settings.manage', 'Read and write individual typed tenant settings.'),
+  legacy('platform.audit.view', 'tenant.audit.view', 'Read the tenant audit log.'),
+  legacy('platform.file.upload', 'tenant.file.upload', 'Request pre-signed uploads, attach and download files.'),
+  legacy(
+    'platform.notification.view',
+    'tenant.notification.view',
+    'Read own in-app notifications and mark them read.',
+  ),
+  legacy(
+    'platform.notification.manage',
+    'tenant.notification.manage',
+    'Create notifications for other memberships of the tenant.',
+  ),
+  legacy(
+    'platform.job.view',
+    'tenant.job.view',
+    'Read the transactional outbox and background-queue health.',
+  ),
 
   // organization (PHASE_05)
   perm('organization.branch.view', 'List and read branches.'),
@@ -188,17 +265,98 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('salla.integration.manage', 'Manage Salla OAuth connections, mappings, export queues and webhooks.'),
 ] as const;
 
+/**
+ * Platform-console permissions (2026-09). Granted only through
+ * `platform_memberships` — never through tenant `role_permissions`, never through
+ * the `*` wildcard. Kept out of `permissionRegistry` on purpose: every tenant
+ * flow that enumerates that registry (role editor, owner expansion, `GET
+ * /permissions`) stays blind to these codes by construction.
+ */
+export const platformPermissionRegistry: readonly PermissionDefinition[] = [
+  perm('console.tenants.view', 'List and read tenants in the platform console.'),
+  perm('console.tenants.manage', 'Create, suspend and reactivate tenants.'),
+  perm('console.subscriptions.manage', 'Create, renew and cancel tenant subscriptions.'),
+  perm('console.plans.manage', 'Create and retire billing plans.'),
+  perm('console.activation.review', 'Approve or reject tenant activation requests.'),
+  perm('console.users.view', 'List platform users.'),
+  perm('console.users.manage', 'Grant and revoke platform roles.'),
+  perm('console.audit.view', 'Read the cross-tenant audit trail.'),
+  perm('console.health.view', 'Read system health and readiness.'),
+  perm('console.jobs.view', 'Read background-queue and outbox health.'),
+  perm('console.billing.manage', 'Manage billing operations and dunning.'),
+  perm('console.support.manage', 'Handle platform support tickets and break-glass access.'),
+] as const;
+
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));
+const platformRegistryByCode = new Map(platformPermissionRegistry.map((entry) => [entry.code, entry]));
 
 /** Wildcard granted to the baseline `owner` role (see packages/config/src/seeds/roles.ts). */
 export const ALL_PERMISSIONS = '*';
 
+/**
+ * Tenant-grantable codes minus deprecated spellings. Seed scripts and the owner
+ * `*` expansion use this list so new databases converge on canonical codes while
+ * old rows keep working through the alias map.
+ */
+export const canonicalPermissionCodes: readonly string[] = permissionRegistry
+  .filter((entry) => !entry.deprecated)
+  .map((entry) => entry.code);
+
+/** Every code the `permissions` table is seeded from: tenant + platform registries. */
+export const seedablePermissionCodes: readonly string[] = [
+  ...permissionRegistry.map((entry) => entry.code),
+  ...platformPermissionRegistry.map((entry) => entry.code),
+];
+
+/** Normalises a legacy spelling to its canonical code; unknown codes pass through. */
+export function canonicalizePermissionCode(code: string): string {
+  return permissionAliases[code] ?? code;
+}
+
+/** True when the code belongs to the platform console (`console.*` namespace). */
+export function isConsolePermissionCode(code: string): boolean {
+  return code === 'console' || code.startsWith('console.') || platformRegistryByCode.has(code);
+}
+
+/**
+ * True when the code may be stored in a tenant `role_permissions` row: any tenant
+ * registry code (canonical or deprecated). Console codes and `*` are rejected —
+ * `*` is a seed-time macro, not a storable code.
+ */
+export function isTenantGrantablePermissionCode(code: string): boolean {
+  if (code === ALL_PERMISSIONS) return false;
+  return registryByCode.has(code) && !isConsolePermissionCode(code);
+}
+
 export function isKnownPermissionCode(code: string): boolean {
-  return registryByCode.has(code);
+  return registryByCode.has(code) || platformRegistryByCode.has(code);
 }
 
 export function findPermission(code: string): PermissionDefinition | undefined {
-  return registryByCode.get(code);
+  return registryByCode.get(code) ?? platformRegistryByCode.get(code);
+}
+
+/**
+ * Alias-aware authorisation check shared by `PermissionsGuard` and unit tests.
+ *
+ * A granted code satisfies the required code when it is identical, when it is the
+ * legacy spelling of the required canonical code, or when it is the canonical
+ * spelling of a required legacy code (controllers migrate at their own pace).
+ * The `*` wildcard satisfies every *tenant* code and never a `console.*` code.
+ */
+export function permissionGrants(granted: readonly string[], required: string): boolean {
+  if (granted.includes(required)) return true;
+  if (isConsolePermissionCode(required)) return false;
+  const grantedSet = new Set(granted);
+  if (grantedSet.has(ALL_PERMISSIONS)) return true;
+  const requiredCanonical = canonicalizePermissionCode(required);
+  if (grantedSet.has(requiredCanonical)) return true;
+  const legacySpelling = canonicalToLegacy[requiredCanonical];
+  if (legacySpelling && grantedSet.has(legacySpelling)) return true;
+  for (const code of grantedSet) {
+    if (canonicalizePermissionCode(code) === requiredCanonical) return true;
+  }
+  return false;
 }
 
 export function permissionsForModule(moduleName: string): PermissionDefinition[] {

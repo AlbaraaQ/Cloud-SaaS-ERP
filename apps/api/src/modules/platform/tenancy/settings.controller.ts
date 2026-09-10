@@ -17,7 +17,7 @@ export class SettingsController {
   constructor(private readonly settings: SettingsService) {}
 
   @Get()
-  @RequiresPermission('platform.settings.manage')
+  @RequiresPermission('tenant.settings.manage')
   @ApiOperation({ summary: 'Effective tenant settings plus the typed key registry' })
   @ApiResponse({ status: 200, description: 'Settings' })
   async list(): Promise<{ data: SettingsListResponse }> {
@@ -25,7 +25,7 @@ export class SettingsController {
   }
 
   @Put(':key')
-  @RequiresPermission('platform.settings.manage')
+  @RequiresPermission('tenant.settings.manage')
   @zodApiBody(settingValueSchema)
   @ApiOperation({ summary: 'Write one typed tenant setting' })
   @ApiResponse({ status: 200, description: 'Stored value' })

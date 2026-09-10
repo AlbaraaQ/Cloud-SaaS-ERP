@@ -31,7 +31,7 @@ export class JobsController {
   ) {}
 
   @Get('outbox')
-  @RequiresPermission('platform.job.view')
+  @RequiresPermission('tenant.job.view')
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   @ApiQuery({ name: 'filter[status]', required: false, description: 'pending | published | dead' })
@@ -46,7 +46,7 @@ export class JobsController {
   }
 
   @Get('health')
-  @RequiresPermission('platform.job.view')
+  @RequiresPermission('tenant.job.view')
   @ApiOperation({ summary: 'Queue driver state and this tenant outbox backlog' })
   @ApiResponse({ status: 200, description: 'Queue health' })
   async health(): Promise<{ data: QueueHealthDto }> {

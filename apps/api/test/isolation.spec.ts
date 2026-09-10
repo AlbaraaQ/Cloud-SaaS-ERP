@@ -182,6 +182,9 @@ describe('tenant isolation (TESTING_STRATEGY §6)', () => {
       'price_lists',
       'price_list_items',
       'branch_posting_profiles',
+      // 2026-09 architecture/RBAC reorganisation (migration 0032).
+      'devices',
+      'membership_role_scopes',
     ]);
   });
 

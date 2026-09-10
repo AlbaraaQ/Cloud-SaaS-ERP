@@ -114,10 +114,17 @@ export class PortalService {
           displayName: input.fullName?.trim() || party.name,
           status: 'active',
           isOwner: false,
+          // External-customer audience: denied on every `@RequiresPermission` route
+          // by `PermissionsGuard`, whatever roles the row may carry.
+          kind: 'portal',
           createdAt: new Date(),
           createdBy: actorUserId,
         });
         await tx.insert(membershipRoles).values({ membershipId, roleId });
+      } else if (membership.kind !== 'portal') {
+        // An existing staff membership promoted to portal access becomes portal-only:
+        // one login, one audience — a buyer must never double as back-office staff.
+        await tx.update(memberships).set({ kind: 'portal' }).where(eq(memberships.id, membership.id));
       }
 
       const id = newId();

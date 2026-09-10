@@ -21,6 +21,8 @@ export type AccessTokenClaims = {
   scope: string[];
   jti: string;
   pam?: boolean;
+  /** Platform role codes (2026-09). Optional: tokens issued before the reorganisation lack it. */
+  proles?: string[];
 };
 
 const ISSUER = 'erp-saas';
@@ -68,6 +70,7 @@ export class TokenService {
       tid: claims.tid,
       mid: claims.mid,
       ...(claims.pam ? { pam: true } : {}),
+      ...(claims.proles && claims.proles.length > 0 ? { proles: claims.proles } : {}),
     })
       .setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: env.JWT_KEY_ID })
       .setSubject(claims.sub)
@@ -112,6 +115,8 @@ export class TokenService {
       throw new DomainError(errorCodes.UNAUTHENTICATED, 'Access token is missing required claims', 401);
     }
 
+    const proles = payload.proles;
+
     return {
       sub,
       tid,
@@ -119,6 +124,9 @@ export class TokenService {
       jti,
       scope: scope.filter((entry): entry is string => typeof entry === 'string'),
       pam: payload.pam === true,
+      proles: Array.isArray(proles)
+        ? proles.filter((entry): entry is string => typeof entry === 'string')
+        : [],
     };
   }
 

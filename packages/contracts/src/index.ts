@@ -33,16 +33,43 @@ export type { RequestId } from './request-id.js';
 
 export {
   ALL_PERMISSIONS,
+  canonicalPermissionCodes,
+  canonicalToLegacy,
+  canonicalizePermissionCode,
   findPermission,
+  isConsolePermissionCode,
   isKnownPermissionCode,
+  isTenantGrantablePermissionCode,
+  permissionAliases,
+  permissionGrants,
   permissionModules,
   permissionRegistry,
   permissionsForModule,
+  platformPermissionRegistry,
+  seedablePermissionCodes,
 } from './permissions.js';
 export type { PermissionDefinition } from './permissions.js';
 
+export {
+  erpFunctionalRoleCatalog,
+  findErpFunctionalRole,
+  findPlatformRole,
+  findTenantAdminRole,
+  isPlatformRoleCode,
+  platformPermissionsForRoles,
+  platformRoleCatalog,
+  tenantAdminRoleCatalog,
+} from './rbac.js';
+export type {
+  ErpFunctionalRoleCode,
+  PlatformRoleCode,
+  RoleCatalogEntry,
+  TenantAdminRoleCode,
+} from './rbac.js';
+
 export * from './platform/index.js';
 export * from './organization/index.js';
+export * from './devices.js';
 export * from './invoice-math.js';
 export * from './inventory-valuation.js';
 export * from './inventory-lifecycle.js';
