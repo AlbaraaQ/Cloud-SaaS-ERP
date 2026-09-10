@@ -1,0 +1,613 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmImportDataGeneral"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="استيراد عام"
+    Width="760" Height="500"
+    MinWidth="700" MinHeight="460"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    ResizeMode="CanResizeWithGrip"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══ Brushes ═══ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ImportBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F0A500" Offset="0"/>
+            <GradientStop Color="#C07800" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+        <SolidColorBrush x:Key="TabBg"       Color="#FFFFFF"/>
+
+        <!-- ═══ Effects ═══ -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══ FieldLabel ═══ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- ═══ InfoLabel ═══ -->
+        <Style x:Key="InfoLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#333355"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4"/>
+        </Style>
+
+        <!-- ═══ ModernTextBox ═══ -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══ ModernComboBox ═══ -->
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══ ActionBtn ═══ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <Style x:Key="ImportBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource ImportBrush}"/>
+        </Style>
+
+        <Style x:Key="SaveBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+        </Style>
+
+        <!-- ═══ DataGrid Headers ═══ -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="6,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="28"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ═══ TabItem Style ═══ -->
+        <Style x:Key="ModernTabItem" TargetType="TabItem">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                                Background="#E8EDF5"
+                                BorderBrush="{StaticResource BorderLight}"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="8,8,0,0"
+                                Margin="2,0,2,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background"
+                                        Value="{StaticResource HeaderBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#CDD7F0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!--              Main Layout                  -->
+    <!-- ══════════════════════════════════════════ -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════ -->
+        <!--           TabControl                  -->
+        <!-- ══════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="White"
+                Margin="8,8,8,0"
+                CornerRadius="10"
+                Effect="{StaticResource CardShadow}">
+
+            <TabControl x:Name="TabControl1"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FlowDirection="RightToLeft"
+                        SelectionChanged="TabControl1_SelectionChanged">
+
+                <!-- ══ Tab 0: تعليمات ══ -->
+                <TabItem Header="📋 تعليمات"
+                         Style="{StaticResource ModernTabItem}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="تعليمات الاستيراد"
+                                       FontSize="16" FontWeight="Bold"
+                                       Foreground="#2344A0"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,10,0,20"/>
+
+                            <Border Background="#EEF3FF"
+                                    CornerRadius="8"
+                                    Padding="14,10"
+                                    Margin="0,0,0,8"
+                                    BorderBrush="{StaticResource BorderLight}"
+                                    BorderThickness="1">
+                                <TextBlock Style="{StaticResource InfoLabel}"
+                                           Text="1- عند استيراد المواد المجموعة يجب أن تكون بالرقم أو الاسم"/>
+                            </Border>
+
+                            <Border Background="#EEF3FF"
+                                    CornerRadius="8"
+                                    Padding="14,10"
+                                    Margin="0,0,0,8"
+                                    BorderBrush="{StaticResource BorderLight}"
+                                    BorderThickness="1">
+                                <TextBlock Style="{StaticResource InfoLabel}"
+                                           Text="2- عند استيراد المواد الوحدة يجب أن تكون بالرقم أو الاسم"/>
+                            </Border>
+
+                            <Border Background="#FFF8E8"
+                                    CornerRadius="8"
+                                    Padding="14,10"
+                                    BorderBrush="#F0D080"
+                                    BorderThickness="1">
+                                <TextBlock Style="{StaticResource InfoLabel}"
+                                           Foreground="#7A5000"
+                                           Text="⚠️ تأكد من إغلاق ملف Excel قبل اختياره لتجنب أخطاء القراءة"/>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ══ Tab 1: اختار الملف ══ -->
+                <TabItem Header="📂 اختر الملف"
+                         Style="{StaticResource ModernTabItem}">
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Width="420">
+
+                            <TextBlock Text="📊 استيراد بيانات من Excel"
+                                       FontSize="16" FontWeight="Bold"
+                                       Foreground="#2344A0"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,30"/>
+
+                            <TextBlock Text="📄 اسم الملف"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,0,6"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox x:Name="txtFileName"
+                                         Grid.Column="0"
+                                         Style="{StaticResource ModernTextBox}"
+                                         IsReadOnly="True"/>
+
+                                <Button x:Name="btnChooseFile"
+                                        Grid.Column="2"
+                                        Content="..."
+                                        Style="{StaticResource ActionBtn}"
+                                        Width="46"
+                                        Click="btnChooseFile_Click"/>
+                            </Grid>
+
+                            <TextBlock Text="اضغط '...' لاختيار ملف Excel بصيغة .xls أو .xlsx"
+                                       FontSize="11"
+                                       Foreground="#888"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+
+                <!-- ══ Tab 2: عرض البيانات ══ -->
+                <TabItem Header="👁️ عرض البيانات"
+                         Style="{StaticResource ModernTabItem}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- شريط اختيار الصفحة -->
+                        <Border Grid.Row="0"
+                                Background="#F0F4FF"
+                                BorderBrush="{StaticResource BorderLight}"
+                                BorderThickness="0,0,0,1"
+                                Padding="14,8">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="📑 صفحة البيانات"
+                                           Style="{StaticResource FieldLabel}"
+                                           Margin="0,0,12,0"/>
+                                <ComboBox x:Name="cboSheet"
+                                          Style="{StaticResource ModernComboBox}"
+                                          Width="180"
+                                          SelectionChanged="cboSheet_SelectionChanged"/>
+                                <TextBlock x:Name="lblSheet"
+                                           Text="الصفحة"
+                                           Style="{StaticResource FieldLabel}"
+                                           Margin="12,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- جدول البيانات -->
+                        <DataGrid x:Name="dgvData"
+                                  Grid.Row="1"
+                                  AutoGenerateColumns="True"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                                  RowStyle="{StaticResource DgvRow}"
+                                  Background="White"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="#E8EBF5"
+                                  AlternatingRowBackground="#F8F9FD"
+                                  BorderThickness="0"
+                                  FlowDirection="RightToLeft"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- ══ Tab 3: تطابق الأعمدة ══ -->
+                <TabItem Header="🔗 تطابق الأعمدة"
+                         Style="{StaticResource ModernTabItem}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- شريط الخيارات -->
+                        <Border Grid.Row="0"
+                                Background="#F0F4FF"
+                                BorderBrush="{StaticResource BorderLight}"
+                                BorderThickness="0,0,0,1"
+                                Padding="14,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="📦 جدول البيانات"
+                                           Style="{StaticResource FieldLabel}"/>
+
+                                <ComboBox x:Name="cmbDataTable"
+                                          Grid.Column="2"
+                                          Style="{StaticResource ModernComboBox}"
+                                          SelectionChanged="cmbDataTable_SelectionChanged">
+                                    <ComboBoxItem Content="المواد"/>
+                                    <ComboBoxItem Content="مجموعات المواد"/>
+                                    <ComboBoxItem Content="العملاء"/>
+                                    <ComboBoxItem Content="الموردين"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Column="4"
+                                           Text="🧾 نوع الفاتورة"
+                                           Style="{StaticResource FieldLabel}"
+                                           Visibility="{Binding Visibility,
+                                                        ElementName=cmbInv}"/>
+
+                                <ComboBox x:Name="cmbInv"
+                                          Grid.Column="6"
+                                          Style="{StaticResource ModernComboBox}"
+                                          Visibility="Collapsed"
+                                          SelectionChanged="cmbInv_SelectionChanged">
+                                    <ComboBoxItem Content="فاتورة مبيعات"/>
+                                    <ComboBoxItem Content="فاتورة مشتريات"/>
+                                    <ComboBoxItem Content="قيد افتتاحي"/>
+                                    <ComboBoxItem Content="سند قيد"/>
+                                    <ComboBoxItem Content="فاتورة تسوية جردية"/>
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+
+                        <!-- جدول تطابق الأعمدة -->
+                        <DataGrid x:Name="dgvImportedData"
+                                  Grid.Row="1"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                                  RowStyle="{StaticResource DgvRow}"
+                                  Background="White"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="#E8EBF5"
+                                  AlternatingRowBackground="#F8F9FD"
+                                  BorderThickness="0"
+                                  FlowDirection="RightToLeft"
+                                  CellEditEnding="dgvImportedData_CellEditEnding">
+
+                            <DataGrid.Columns>
+
+                                <!-- ✅ عمود الاختيار (CheckBox) -->
+                                <DataGridCheckBoxColumn Header="✔"
+                                                        Binding="{Binding IsSelected,
+                                                                  UpdateSourceTrigger=PropertyChanged}"
+                                                        Width="50"/>
+
+                                <!-- حقل البيانات -->
+                                <DataGridTextColumn Header="📋 حقل البيانات"
+                                                    Binding="{Binding FieldName}"
+                                                    Width="200"
+                                                    IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- الحقل البديل (ComboBox) -->
+                                <!-- الحقل البديل (ComboBox) -->
+                                <DataGridComboBoxColumn Header="🔄 الحقل البديل"
+                        x:Name="colMappedColumn"
+                        SelectedValueBinding="{Binding MappedColumnIndex, UpdateSourceTrigger=PropertyChanged}"
+                        SelectedValuePath="Key"
+                        DisplayMemberPath="Value"
+                        Width="200"/>
+
+                                <!-- قيمة افتراضية -->
+                                <DataGridTextColumn Header="⚙️ قيمة افتراضية"
+                                                    Binding="{Binding DefaultValue,
+                                                              UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ══ Tab 4: انتهاء ══ -->
+                <TabItem Header="✅ انتهاء"
+                         Style="{StaticResource ModernTabItem}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- شريط التقدم -->
+                        <ProgressBar x:Name="ProgressBar1"
+                                     Grid.Row="0"
+                                     Height="22"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Value="0"
+                                     Foreground="#2CC36B"
+                                     Background="#E8EBF5"
+                                     BorderThickness="0"
+                                     Margin="0,0,0,0"/>
+
+                        <!-- رسالة النجاح -->
+                        <StackPanel Grid.Row="1"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center">
+
+                            <TextBlock x:Name="lblSuccess"
+                                       Text="🎉 تهانينا، تمت العملية بنجاح!&#x0a;اضغط &quot;خروج&quot; لإغلاق النافذة"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="#1B8E4A"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Visibility="Collapsed"
+                                       Margin="0,20"/>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+
+            </TabControl>
+        </Border>
+
+        <!-- ══════════════════════════════════════ -->
+        <!--           Footer Buttons              -->
+        <!-- ══════════════════════════════════════ -->
+        <Border Grid.Row="1"
+                Background="{StaticResource FooterBrush}"
+                Padding="12,8"
+                Margin="0,6,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- خروج (يمين RTL) -->
+                <Button x:Name="btnClose"
+                        Grid.Column="0"
+                        Content="✖ خروج"
+                        Style="{StaticResource DangerBtn}"
+                        Width="88"
+                        Click="btnClose_Click"/>
+
+                <!-- أزرار التنقل (وسط) -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center">
+
+                    <Button x:Name="btnPrevious"
+                            Content="◀ السابق"
+                            Style="{StaticResource ActionBtn}"
+                            Width="90"
+                            Margin="0,0,8,0"
+                            IsEnabled="False"
+                            Click="btnPrevious_Click"/>
+
+                    <Button x:Name="btnNext"
+                            Content="التالي ▶"
+                            Style="{StaticResource SaveBtn}"
+                            Width="90"
+                            Click="btnNext_Click"/>
+                </StackPanel>
+
+                <!-- بدء الاستيراد (يسار RTL) -->
+                <Button x:Name="btnImport"
+                        Grid.Column="2"
+                        Content="🚀 بدء الاستيراد"
+                        Style="{StaticResource ImportBtn}"
+                        Width="120"
+                        Visibility="Collapsed"
+                        Click="btnImport_Click"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

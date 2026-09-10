@@ -1,0 +1,181 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmItemsExpire"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="صلاحية الصنف"
+    Width="620"
+    Height="520"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResize"
+    FlowDirection="RightToLeft"
+    Background="White"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="frmSafeGrd_Load">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="10" ShadowDepth="2"
+                          Direction="270" Opacity="0.12"
+                          Color="#000000"/>
+
+        <Style x:Key="GridHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="GridCellText" TargetType="TextBlock">
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="GridRowStyle" TargetType="DataGridRow">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Background" Value="White"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#DCE7FF"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F4FF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Width" Value="90"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="8,0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="14,10">
+            <TextBlock x:Name="lblItemName"
+                       Text="⏰ صلاحية الصنف"
+                       Foreground="White"
+                       FontSize="15"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- DataGrid -->
+        <Border Grid.Row="1"
+                Margin="6"
+                Background="White"
+                CornerRadius="8"
+                Effect="{StaticResource CardShadow}">
+
+            <DataGrid x:Name="GridControl1"
+                      AutoGenerateColumns="False"
+                      HeadersVisibility="Column"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      RowStyle="{StaticResource GridRowStyle}"
+                      ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                      AlternatingRowBackground="#F8F9FD"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#E7ECF5"
+                      Background="White"
+                      MouseDoubleClick="GridControl1_MouseDoubleClick"
+                      KeyDown="GridView1_KeyDown">
+
+                <DataGrid.Columns>
+
+                    <DataGridTextColumn Header="🔑 رمز الصنف"
+                                        Binding="{Binding ItemCode}"
+                                        Width="130"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="🏷️ الصنف"
+                                        Binding="{Binding ItemName}"
+                                        Width="*"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="📦 الكمية"
+                                        Binding="{Binding ItemStock}"
+                                        Width="100"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="📅 تاريخ الانتهاء"
+                                        Binding="{Binding ItemExpire}"
+                                        Width="150"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="ItemId"
+                                        Binding="{Binding ItemId}"
+                                        Width="80"
+                                        Visibility="Collapsed"/>
+
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="#F8FAFD"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,1,0,0"
+                Padding="12,10">
+            <Button x:Name="BtnExit"
+                    Content="✖ خروج"
+                    Style="{StaticResource DangerBtn}"
+                    HorizontalAlignment="Right"
+                    Click="BtnExit_Click"/>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>
