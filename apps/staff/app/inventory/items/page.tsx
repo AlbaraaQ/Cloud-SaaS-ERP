@@ -30,7 +30,27 @@ export default function ItemsPage() {
   const taxGroups = useQuery<TaxGroup[]>(() => listTaxGroups(), []);
 
   const [open, setOpen] = useState(false);
-  const blank = { sku: '', barcode: '', nameAr: '', nameEn: '', categoryId: '', baseUnitId: '', kind: 'stock', salePrice: '', purchasePrice: '', taxGroupId: '' };
+  /**
+   * حد الطلب / حد الطلب الأقصى وتتبع الدفعات والأرقام التسلسلية: the fields that turn a
+   * catalogue card into something the stock engine can act on — a reorder report needs
+   * `minQty`, and a lot-controlled item cannot be received without naming its lot.
+   */
+  const blank = {
+    sku: '',
+    barcode: '',
+    nameAr: '',
+    nameEn: '',
+    categoryId: '',
+    baseUnitId: '',
+    kind: 'stock',
+    salePrice: '',
+    purchasePrice: '',
+    taxGroupId: '',
+    minQty: '',
+    maxQty: '',
+    trackLot: false,
+    trackSerial: false,
+  };
   const [form, setForm] = useState(blank);
   const [editing, setEditing] = useState<Item | undefined>();
   const [busy, setBusy] = useState(false);
@@ -52,6 +72,10 @@ export default function ItemsPage() {
       salePrice: row.salePrice ?? row.sale_price ?? '',
       purchasePrice: row.purchasePrice ?? row.purchase_price ?? '',
       taxGroupId: row.taxGroupId ?? row.tax_group_id ?? '',
+      minQty: row.minQty ?? row.min_qty ?? '',
+      maxQty: row.maxQty ?? row.max_qty ?? '',
+      trackLot: Boolean(row.trackLot ?? row.track_lot),
+      trackSerial: Boolean(row.trackSerial ?? row.track_serial),
     });
     setNotice(undefined);
     setOpen(true);
@@ -81,6 +105,10 @@ export default function ItemsPage() {
           salePrice: form.salePrice.trim() || undefined,
           purchasePrice: form.purchasePrice.trim() || undefined,
           taxGroupId: form.taxGroupId || null,
+          minQty: form.minQty.trim() || undefined,
+          maxQty: form.maxQty.trim() || null,
+          trackLot: form.trackLot,
+          trackSerial: form.trackSerial,
         });
         setNotice({ kind: 'ok', text: `تم حفظ تعديل المادة ${form.sku}.` });
         cancelEdit();
@@ -96,9 +124,18 @@ export default function ItemsPage() {
           salePrice: form.salePrice.trim() || undefined,
           purchasePrice: form.purchasePrice.trim() || undefined,
           taxGroupId: form.taxGroupId || undefined,
+          minQty: form.minQty.trim() || undefined,
+          maxQty: form.maxQty.trim() || undefined,
+          trackLot: form.trackLot,
+          trackSerial: form.trackSerial,
         });
         setNotice({ kind: 'ok', text: `تمت إضافة المادة ${form.sku}.` });
-        setForm({ ...blank, categoryId: form.categoryId, baseUnitId: form.baseUnitId, taxGroupId: form.taxGroupId });
+        setForm({
+          ...blank,
+          categoryId: form.categoryId,
+          baseUnitId: form.baseUnitId,
+          taxGroupId: form.taxGroupId,
+        });
       }
       items.reload();
     } catch (error) {
@@ -114,7 +151,12 @@ export default function ItemsPage() {
     setNotice(undefined);
     try {
       const result = await apiDelete<{ archived?: boolean }>(`/organization/catalog/items/${row.id}`);
-      setNotice({ kind: 'ok', text: result?.archived ? `للمادة ${row.sku} حركات سابقة، فتمت أرشفتها بدل حذفها.` : `تم حذف المادة ${row.sku}.` });
+      setNotice({
+        kind: 'ok',
+        text: result?.archived
+          ? `للمادة ${row.sku} حركات سابقة، فتمت أرشفتها بدل حذفها.`
+          : `تم حذف المادة ${row.sku}.`,
+      });
       if (editing?.id === row.id) cancelEdit();
       items.reload();
     } catch (error) {
@@ -163,7 +205,13 @@ export default function ItemsPage() {
             </label>
             <label className="field">
               <span>الباركود</span>
-              <input className="input" dir="ltr" value={form.barcode} onChange={set('barcode')} placeholder="يُستخدم الرمز (SKU) عند تركه فارغاً" />
+              <input
+                className="input"
+                dir="ltr"
+                value={form.barcode}
+                onChange={set('barcode')}
+                placeholder="يُستخدم الرمز (SKU) عند تركه فارغاً"
+              />
             </label>
             <label className="field">
               <span>الاسم العربي *</span>
@@ -184,7 +232,13 @@ export default function ItemsPage() {
             </label>
             <label className="field">
               <span>وحدة القياس *</span>
-              <select className="input" value={form.baseUnitId} onChange={set('baseUnitId')} required disabled={Boolean(editing)}>
+              <select
+                className="input"
+                value={form.baseUnitId}
+                onChange={set('baseUnitId')}
+                required
+                disabled={Boolean(editing)}
+              >
                 <option value="">— اختر —</option>
                 {unitRows.map((row) => (
                   <option key={row.id} value={row.id}>{`${row.code} — ${arabicName(row)}`}</option>
@@ -202,18 +256,80 @@ export default function ItemsPage() {
             </label>
             <label className="field">
               <span>سعر البيع</span>
-              <input className="input" dir="ltr" inputMode="decimal" value={form.salePrice} onChange={set('salePrice')} />
+              <input
+                className="input"
+                dir="ltr"
+                inputMode="decimal"
+                value={form.salePrice}
+                onChange={set('salePrice')}
+              />
             </label>
             <label className="field">
               <span>سعر الشراء</span>
-              <input className="input" dir="ltr" inputMode="decimal" value={form.purchasePrice} onChange={set('purchasePrice')} />
+              <input
+                className="input"
+                dir="ltr"
+                inputMode="decimal"
+                value={form.purchasePrice}
+                onChange={set('purchasePrice')}
+              />
+            </label>
+            <label className="field">
+              <span>حد الطلب (أدنى رصيد)</span>
+              <input
+                className="input"
+                dir="ltr"
+                inputMode="decimal"
+                value={form.minQty}
+                onChange={set('minQty')}
+                placeholder="0"
+              />
+            </label>
+            <label className="field">
+              <span>الحد الأقصى</span>
+              <input
+                className="input"
+                dir="ltr"
+                inputMode="decimal"
+                value={form.maxQty}
+                onChange={set('maxQty')}
+                placeholder="—"
+              />
+            </label>
+            <label className="field">
+              <span>تتبع بدفعات / تواريخ صلاحية</span>
+              <select
+                className="input"
+                value={form.trackLot ? 'yes' : 'no'}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, trackLot: event.target.value === 'yes' }))
+                }
+              >
+                <option value="no">لا</option>
+                <option value="yes">نعم</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>تتبع بأرقام تسلسلية</span>
+              <select
+                className="input"
+                value={form.trackSerial ? 'yes' : 'no'}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, trackSerial: event.target.value === 'yes' }))
+                }
+              >
+                <option value="no">لا</option>
+                <option value="yes">نعم</option>
+              </select>
             </label>
             <label className="field">
               <span>المجموعة الضريبية</span>
               <select className="input" value={form.taxGroupId} onChange={set('taxGroupId')}>
                 <option value="">— بدون —</option>
                 {(taxGroups.data ?? []).map((row) => (
-                  <option key={row.id} value={row.id}>{arabicName(row)}</option>
+                  <option key={row.id} value={row.id}>
+                    {arabicName(row)}
+                  </option>
                 ))}
               </select>
             </label>
@@ -270,9 +386,24 @@ export default function ItemsPage() {
               { key: 'sku', header: 'الرمز', align: 'ltr', cell: (row) => row.sku },
               { key: 'barcode', header: 'الباركود', align: 'ltr', cell: (row) => row.barcode ?? '—' },
               { key: 'name', header: 'الاسم', cell: (row) => arabicName(row) },
-              { key: 'kind', header: 'النوع', cell: (row) => (row.kind === 'service' ? 'خدمة' : row.kind === 'composite' ? 'مركبة' : 'مخزنية') },
-              { key: 'sale', header: 'سعر البيع', align: 'num', cell: (row) => money(row.salePrice ?? row.sale_price) },
-              { key: 'purchase', header: 'سعر الشراء', align: 'num', cell: (row) => money(row.purchasePrice ?? row.purchase_price) },
+              {
+                key: 'kind',
+                header: 'النوع',
+                cell: (row) =>
+                  row.kind === 'service' ? 'خدمة' : row.kind === 'composite' ? 'مركبة' : 'مخزنية',
+              },
+              {
+                key: 'sale',
+                header: 'سعر البيع',
+                align: 'num',
+                cell: (row) => money(row.salePrice ?? row.sale_price),
+              },
+              {
+                key: 'purchase',
+                header: 'سعر الشراء',
+                align: 'num',
+                cell: (row) => money(row.purchasePrice ?? row.purchase_price),
+              },
               ...(can('catalog.item.manage')
                 ? [
                     {
@@ -280,10 +411,20 @@ export default function ItemsPage() {
                       header: '',
                       cell: (row: Item) => (
                         <span className="row">
-                          <button className="btn sm" type="button" onClick={() => startEdit(row)} disabled={busy}>
+                          <button
+                            className="btn sm"
+                            type="button"
+                            onClick={() => startEdit(row)}
+                            disabled={busy}
+                          >
                             تعديل
                           </button>
-                          <button className="btn sm danger" type="button" onClick={() => void remove(row)} disabled={busy}>
+                          <button
+                            className="btn sm danger"
+                            type="button"
+                            onClick={() => void remove(row)}
+                            disabled={busy}
+                          >
                             حذف
                           </button>
                         </span>

@@ -1,15 +1,24 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
+  accounts,
   inventoryTransactions,
+  journalEntries,
+  journalEntryLines,
   itemLots,
   itemSerials,
+  items,
+  stockAdjustmentLines,
+  stockAdjustments,
   stockBalances,
   stockTransfers,
   stockTransferLines,
+  stockVoucherLines,
+  stockVouchers,
+  warehouses,
   withTenantTx,
   type DatabaseHandle,
   type DrizzleTx,
@@ -17,6 +26,9 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
+import { getRequestContext } from '../../request-context/request-context.js';
 import { SequencesService } from '../platform-services/index.js';
 
 export type InventoryLine = {
@@ -33,11 +45,46 @@ export type InventoryLine = {
   serialId?: string;
 };
 
+/** One line of a stock voucher (سند إدخال / إخراج / بضاعة أول المدة). */
+export type StockVoucherLineInput = {
+  itemId: string;
+  qty: string;
+  unitCost?: string;
+  lotId?: string;
+  serialId?: string;
+  note?: string;
+};
+export type StockVoucherInput = {
+  branchId: string;
+  warehouseId: string;
+  kind: 'stock_in' | 'stock_out' | 'opening';
+  voucherDate?: string;
+  reason?: string;
+  /** An explicit contra account (تالف، هالك، عينة…); defaults to the variance account. */
+  counterAccountId?: string;
+  notes?: string;
+  lines: StockVoucherLineInput[];
+};
+export type StockAdjustmentInput = {
+  branchId: string;
+  warehouseId: string;
+  reason: string;
+  lines: Array<{ itemId: string; countedQty: string; unitCost?: string; lotId?: string; note?: string }>;
+};
+
+export const VOUCHER_KIND_LABELS: Record<string, string> = {
+  stock_in: 'سند إدخال مخزني',
+  stock_out: 'سند إخراج مخزني',
+  opening: 'بضاعة أول المدة',
+};
+
 @Injectable()
 export class InventoryService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly sequences: SequencesService,
+    private readonly accounting: AccountingService,
+    private readonly profiles: PostingProfilesService,
   ) {}
 
   /**
@@ -49,14 +96,24 @@ export class InventoryService {
       const rows = await tx
         .select()
         .from(stockTransfers)
-        .where(and(eq(stockTransfers.tenantId, tenantId), status ? eq(stockTransfers.status, status) : undefined))
+        .where(
+          and(eq(stockTransfers.tenantId, tenantId), status ? eq(stockTransfers.status, status) : undefined),
+        )
         .orderBy(sql`${stockTransfers.createdAt} DESC`)
         .limit(200);
       if (rows.length === 0) return [];
       const lines = await tx
         .select()
         .from(stockTransferLines)
-        .where(and(eq(stockTransferLines.tenantId, tenantId), inArray(stockTransferLines.transferId, rows.map((row) => row.id))));
+        .where(
+          and(
+            eq(stockTransferLines.tenantId, tenantId),
+            inArray(
+              stockTransferLines.transferId,
+              rows.map((row) => row.id),
+            ),
+          ),
+        );
       return rows.map((row) => ({ ...row, lines: lines.filter((line) => line.transferId === row.id) }));
     });
   }
@@ -65,34 +122,57 @@ export class InventoryService {
     return withTenantTx(this.database.db, tenantId, (tx) => this.recordInTx(tx, tenantId, lines));
   }
 
-  async recordInTx(tx: DrizzleTx, tenantId: string, lines: InventoryLine[]) {
-    if (!lines.length) throw new DomainError('INVENTORY_LINES_REQUIRED', 'At least one inventory line is required', 422);
+  /**
+   * `allowNegative` lets a caller post an issuing document that takes the balance below
+   * zero — a back-dated issue, or a shop that simply sells before it books the receipt.
+   * It is gated on `inventory.negative.override`, and the caller's own request is the
+   * only place the permission can be read honestly.
+   */
+  async recordInTx(
+    tx: DrizzleTx,
+    tenantId: string,
+    lines: InventoryLine[],
+    options: { allowNegative?: boolean } = {},
+  ) {
+    if (!lines.length)
+      throw new DomainError('INVENTORY_LINES_REQUIRED', 'At least one inventory line is required', 422);
     const created: string[] = [];
     for (const line of lines) {
       const quantity = new Decimal(line.qty);
-      if (!quantity.isFinite() || quantity.lte(0)) throw new DomainError('INVALID_STOCK_QUANTITY', 'Quantity must be positive', 422);
+      if (!quantity.isFinite() || quantity.lte(0))
+        throw new DomainError('INVALID_STOCK_QUANTITY', 'Quantity must be positive', 422);
 
       await tx.execute(sql`
         INSERT INTO stock_balances (tenant_id, item_id, warehouse_id, quantity, value, average_cost, version, updated_at)
         VALUES (${tenantId}, ${line.itemId}, ${line.warehouseId}, 0, 0, 0, 1, now())
         ON CONFLICT (tenant_id, item_id, warehouse_id) DO NOTHING
       `);
-      const [balance] = rowsOf<StockBalance>(await tx.execute(sql`
+      const [balance] = rowsOf<StockBalance>(
+        await tx.execute(sql`
         SELECT tenant_id AS "tenantId", item_id AS "itemId", warehouse_id AS "warehouseId",
                quantity, value, average_cost AS "averageCost", version, updated_at AS "updatedAt"
         FROM stock_balances
         WHERE tenant_id = ${tenantId} AND item_id = ${line.itemId} AND warehouse_id = ${line.warehouseId}
         FOR UPDATE
-      `));
-      if (!balance) throw new DomainError('STOCK_BALANCE_LOCK_FAILED', 'Could not lock stock balance row', 500);
+      `),
+      );
+      if (!balance)
+        throw new DomainError('STOCK_BALANCE_LOCK_FAILED', 'Could not lock stock balance row', 500);
 
       const currentQty = new Decimal(balance.quantity);
       const currentValue = new Decimal(balance.value);
       const average = currentQty.gt(0) ? currentValue.div(currentQty) : new Decimal(line.unitCost ?? '0');
       const unitCost = line.direction === 'in' ? new Decimal(line.unitCost ?? '0') : average;
       const nextQty = line.direction === 'in' ? currentQty.plus(quantity) : currentQty.minus(quantity);
-      if (nextQty.lt(0)) throw new DomainError('STOCK_INSUFFICIENT', 'Stock is insufficient for this movement', 422);
-      const nextValue = line.direction === 'in' ? currentValue.plus(quantity.mul(unitCost)) : currentValue.minus(quantity.mul(average));
+      if (nextQty.lt(0) && !options.allowNegative) {
+        throw new DomainError('STOCK_INSUFFICIENT', 'Stock is insufficient for this movement', 422, {
+          field: 'lines',
+        });
+      }
+      const nextValue =
+        line.direction === 'in'
+          ? currentValue.plus(quantity.mul(unitCost))
+          : currentValue.minus(quantity.mul(average));
       const averageCost = nextQty.isZero() ? '0.0000' : nextValue.div(nextQty).toFixed(4);
       const id = newId();
 
@@ -114,143 +194,1586 @@ export class InventoryService {
         lotId: line.lotId,
         serialId: line.serialId,
       });
-      await tx.update(stockBalances).set({
-        quantity: nextQty.toFixed(4),
-        value: nextValue.toFixed(4),
-        averageCost,
-        version: balance.version + 1,
-        updatedAt: new Date(),
-      }).where(and(eq(stockBalances.tenantId, tenantId), eq(stockBalances.itemId, line.itemId), eq(stockBalances.warehouseId, line.warehouseId)));
+      await tx
+        .update(stockBalances)
+        .set({
+          quantity: nextQty.toFixed(4),
+          value: nextValue.toFixed(4),
+          averageCost,
+          version: balance.version + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(stockBalances.tenantId, tenantId),
+            eq(stockBalances.itemId, line.itemId),
+            eq(stockBalances.warehouseId, line.warehouseId),
+          ),
+        );
 
       if (line.serialId) {
-        await tx.update(itemSerials).set({
-          status: line.direction === 'out' ? 'sold' : 'available',
-          warehouseId: line.direction === 'out' ? null : line.warehouseId,
-          updatedAt: new Date(),
-        }).where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, line.serialId)));
+        await tx
+          .update(itemSerials)
+          .set({
+            status: line.direction === 'out' ? 'sold' : 'available',
+            warehouseId: line.direction === 'out' ? null : line.warehouseId,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, line.serialId)));
       }
       created.push(id);
     }
     return { transactionIds: created };
   }
 
-  levels(tenantId: string, warehouseId?: string, itemId?: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(stockBalances).where(and(eq(stockBalances.tenantId, tenantId), warehouseId ? eq(stockBalances.warehouseId, warehouseId) : undefined, itemId ? eq(stockBalances.itemId, itemId) : undefined)).orderBy(asc(stockBalances.itemId))); }
-  movements(tenantId: string, itemId?: string, warehouseId?: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(inventoryTransactions).where(and(eq(inventoryTransactions.tenantId, tenantId), itemId ? eq(inventoryTransactions.itemId, itemId) : undefined, warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined)).orderBy(asc(inventoryTransactions.occurredAt))); }
+  levels(tenantId: string, warehouseId?: string, itemId?: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(stockBalances)
+        .where(
+          and(
+            eq(stockBalances.tenantId, tenantId),
+            warehouseId ? eq(stockBalances.warehouseId, warehouseId) : undefined,
+            itemId ? eq(stockBalances.itemId, itemId) : undefined,
+          ),
+        )
+        .orderBy(asc(stockBalances.itemId)),
+    );
+  }
+  movements(tenantId: string, itemId?: string, warehouseId?: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(inventoryTransactions)
+        .where(
+          and(
+            eq(inventoryTransactions.tenantId, tenantId),
+            itemId ? eq(inventoryTransactions.itemId, itemId) : undefined,
+            warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined,
+          ),
+        )
+        .orderBy(asc(inventoryTransactions.occurredAt)),
+    );
+  }
 
   async valuationAsOf(tenantId: string, asOf: Date, warehouseId?: string, itemId?: string) {
-    const rows = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(inventoryTransactions).where(and(eq(inventoryTransactions.tenantId, tenantId), sql`${inventoryTransactions.occurredAt} <= ${asOf}`, warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined, itemId ? eq(inventoryTransactions.itemId, itemId) : undefined)).orderBy(asc(inventoryTransactions.occurredAt)));
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(inventoryTransactions)
+        .where(
+          and(
+            eq(inventoryTransactions.tenantId, tenantId),
+            sql`${inventoryTransactions.occurredAt} <= ${asOf}`,
+            warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined,
+            itemId ? eq(inventoryTransactions.itemId, itemId) : undefined,
+          ),
+        )
+        .orderBy(asc(inventoryTransactions.occurredAt)),
+    );
     const totals = new Map<string, { quantity: Decimal; value: Decimal }>();
     for (const row of rows) {
       const key = `${row.itemId}:${row.warehouseId}`;
       const current = totals.get(key) ?? { quantity: new Decimal(0), value: new Decimal(0) };
       const quantity = new Decimal(row.baseQty);
       const value = new Decimal(row.totalCost);
-      if (row.direction === 'in') { current.quantity = current.quantity.plus(quantity); current.value = current.value.plus(value); } else { current.quantity = current.quantity.minus(quantity); current.value = current.value.minus(value); }
+      if (row.direction === 'in') {
+        current.quantity = current.quantity.plus(quantity);
+        current.value = current.value.plus(value);
+      } else {
+        current.quantity = current.quantity.minus(quantity);
+        current.value = current.value.minus(value);
+      }
       totals.set(key, current);
     }
-    return [...totals].map(([key, total]) => { const parts = key.split(':'); const resultItemId = parts[0]; const resultWarehouseId = parts[1]; if (!resultItemId || !resultWarehouseId) throw new DomainError('INVENTORY_REPLAY_INVALID_KEY', 'Inventory replay produced an invalid balance key', 500); return { itemId: resultItemId, warehouseId: resultWarehouseId, quantity: total.quantity.toFixed(4), value: total.value.toFixed(4), averageCost: total.quantity.isZero() ? '0.0000' : total.value.div(total.quantity).toFixed(4) }; });
+    return [...totals].map(([key, total]) => {
+      const parts = key.split(':');
+      const resultItemId = parts[0];
+      const resultWarehouseId = parts[1];
+      if (!resultItemId || !resultWarehouseId)
+        throw new DomainError(
+          'INVENTORY_REPLAY_INVALID_KEY',
+          'Inventory replay produced an invalid balance key',
+          500,
+        );
+      return {
+        itemId: resultItemId,
+        warehouseId: resultWarehouseId,
+        quantity: total.quantity.toFixed(4),
+        value: total.value.toFixed(4),
+        averageCost: total.quantity.isZero() ? '0.0000' : total.value.div(total.quantity).toFixed(4),
+      };
+    });
   }
 
   async recomputeBalances(tenantId: string, warehouseId?: string, itemId?: string) {
-    const valuation = await this.valuationAsOf(tenantId, new Date('9999-12-31T23:59:59.999Z'), warehouseId, itemId);
+    const valuation = await this.valuationAsOf(
+      tenantId,
+      new Date('9999-12-31T23:59:59.999Z'),
+      warehouseId,
+      itemId,
+    );
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       for (const row of valuation) {
-        await tx.insert(stockBalances).values({ tenantId, itemId: row.itemId, warehouseId: row.warehouseId, quantity: row.quantity, value: row.value, averageCost: row.averageCost, version: 1, updatedAt: new Date() }).onConflictDoUpdate({ target: [stockBalances.tenantId, stockBalances.itemId, stockBalances.warehouseId], set: { quantity: row.quantity, value: row.value, averageCost: row.averageCost, version: sql`${stockBalances.version} + 1`, updatedAt: new Date() } });
+        await tx
+          .insert(stockBalances)
+          .values({
+            tenantId,
+            itemId: row.itemId,
+            warehouseId: row.warehouseId,
+            quantity: row.quantity,
+            value: row.value,
+            averageCost: row.averageCost,
+            version: 1,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [stockBalances.tenantId, stockBalances.itemId, stockBalances.warehouseId],
+            set: {
+              quantity: row.quantity,
+              value: row.value,
+              averageCost: row.averageCost,
+              version: sql`${stockBalances.version} + 1`,
+              updatedAt: new Date(),
+            },
+          });
       }
       return { recomputed: valuation.length };
     });
   }
 
-  async transfer(tenantId: string, input: { transferId: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialId?: string }> }) {
-    if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId) throw new DomainError('INVALID_STOCK_TRANSFER', 'A transfer requires distinct warehouses and at least one line', 422);
-    const outbound = input.lines.map((line) => ({ ...line, warehouseId: input.fromWarehouseId, direction: 'out' as const, docType: 'stock_transfer', docId: input.transferId, costing: 'outAtAvg' as const }));
-    const inbound = input.lines.map((line) => ({ ...line, warehouseId: input.toWarehouseId, direction: 'in' as const, docType: 'stock_transfer', docId: input.transferId, costing: 'inWithCost' as const }));
+  async transfer(
+    tenantId: string,
+    input: {
+      transferId: string;
+      fromWarehouseId: string;
+      toWarehouseId: string;
+      lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialId?: string }>;
+    },
+  ) {
+    if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId)
+      throw new DomainError(
+        'INVALID_STOCK_TRANSFER',
+        'A transfer requires distinct warehouses and at least one line',
+        422,
+      );
+    const outbound = input.lines.map((line) => ({
+      ...line,
+      warehouseId: input.fromWarehouseId,
+      direction: 'out' as const,
+      docType: 'stock_transfer',
+      docId: input.transferId,
+      costing: 'outAtAvg' as const,
+    }));
+    const inbound = input.lines.map((line) => ({
+      ...line,
+      warehouseId: input.toWarehouseId,
+      direction: 'in' as const,
+      docType: 'stock_transfer',
+      docId: input.transferId,
+      costing: 'inWithCost' as const,
+    }));
     return this.record(tenantId, [...outbound, ...inbound]);
   }
 
-  async adjust(tenantId: string, input: { adjustmentId: string; itemId: string; warehouseId: string; countedQty: string; unitCost?: string; approved: boolean; journalEntryId?: string }) {
-    if (!input.approved) throw new DomainError('ADJUSTMENT_APPROVAL_REQUIRED', 'Stock adjustments require approval before posting', 422);
-    if (!input.journalEntryId) throw new DomainError('ADJUSTMENT_JOURNAL_REQUIRED', 'An approved adjustment must reference a journal entry', 422);
+  async adjust(
+    tenantId: string,
+    input: {
+      adjustmentId: string;
+      itemId: string;
+      warehouseId: string;
+      countedQty: string;
+      unitCost?: string;
+      approved: boolean;
+      journalEntryId?: string;
+    },
+  ) {
+    if (!input.approved)
+      throw new DomainError(
+        'ADJUSTMENT_APPROVAL_REQUIRED',
+        'Stock adjustments require approval before posting',
+        422,
+      );
+    if (!input.journalEntryId)
+      throw new DomainError(
+        'ADJUSTMENT_JOURNAL_REQUIRED',
+        'An approved adjustment must reference a journal entry',
+        422,
+      );
     const current = await this.levels(tenantId, input.warehouseId, input.itemId);
     const existing = current[0];
     const delta = new Decimal(input.countedQty).minus(existing?.quantity ?? '0');
     if (delta.isZero()) return { adjustmentId: input.adjustmentId, transactionIds: [] };
-    return this.record(tenantId, [{ itemId: input.itemId, warehouseId: input.warehouseId, qty: delta.abs().toFixed(4), unitCost: input.unitCost ?? existing?.averageCost ?? '0', direction: delta.gt(0) ? 'in' : 'out', docType: 'stock_adjustment', docId: input.adjustmentId, costing: delta.gt(0) ? 'inWithCost' : 'outAtAvg' }]);
+    return this.record(tenantId, [
+      {
+        itemId: input.itemId,
+        warehouseId: input.warehouseId,
+        qty: delta.abs().toFixed(4),
+        unitCost: input.unitCost ?? existing?.averageCost ?? '0',
+        direction: delta.gt(0) ? 'in' : 'out',
+        docType: 'stock_adjustment',
+        docId: input.adjustmentId,
+        costing: delta.gt(0) ? 'inWithCost' : 'outAtAvg',
+      },
+    ]);
   }
 
-  async createLot(tenantId: string, input: { itemId: string; lotNo: string; expiryDate?: string; receivedAt?: string }) {
-    const [lot] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(itemLots).values({ id: newId(), tenantId, itemId: input.itemId, lotNo: input.lotNo, expiryDate: input.expiryDate, receivedAt: input.receivedAt ? new Date(input.receivedAt) : null }).returning());
+  async createLot(
+    tenantId: string,
+    input: { itemId: string; lotNo: string; expiryDate?: string; receivedAt?: string },
+  ) {
+    const [lot] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .insert(itemLots)
+        .values({
+          id: newId(),
+          tenantId,
+          itemId: input.itemId,
+          lotNo: input.lotNo,
+          expiryDate: input.expiryDate,
+          receivedAt: input.receivedAt ? new Date(input.receivedAt) : null,
+        })
+        .returning(),
+    );
     return lot;
   }
 
-  listLots(tenantId: string, itemId?: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(itemLots).where(and(eq(itemLots.tenantId, tenantId), itemId ? eq(itemLots.itemId, itemId) : undefined)).orderBy(asc(itemLots.lotNo))); }
+  listLots(tenantId: string, itemId?: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(itemLots)
+        .where(and(eq(itemLots.tenantId, tenantId), itemId ? eq(itemLots.itemId, itemId) : undefined))
+        .orderBy(asc(itemLots.lotNo)),
+    );
+  }
 
-  async createSerial(tenantId: string, input: { itemId: string; serialNo: string; lotId?: string; warehouseId?: string; status?: string }) {
-    const [serial] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(itemSerials).values({ id: newId(), tenantId, itemId: input.itemId, serialNo: input.serialNo, lotId: input.lotId, warehouseId: input.warehouseId, status: input.status ?? 'available' }).returning());
+  async createSerial(
+    tenantId: string,
+    input: { itemId: string; serialNo: string; lotId?: string; warehouseId?: string; status?: string },
+  ) {
+    const [serial] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .insert(itemSerials)
+        .values({
+          id: newId(),
+          tenantId,
+          itemId: input.itemId,
+          serialNo: input.serialNo,
+          lotId: input.lotId,
+          warehouseId: input.warehouseId,
+          status: input.status ?? 'available',
+        })
+        .returning(),
+    );
     return serial;
   }
 
-  listSerials(tenantId: string, itemId?: string, status?: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(itemSerials).where(and(eq(itemSerials.tenantId, tenantId), itemId ? eq(itemSerials.itemId, itemId) : undefined, status ? eq(itemSerials.status, status) : undefined)).orderBy(asc(itemSerials.serialNo))); }
+  listSerials(tenantId: string, itemId?: string, status?: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(itemSerials)
+        .where(
+          and(
+            eq(itemSerials.tenantId, tenantId),
+            itemId ? eq(itemSerials.itemId, itemId) : undefined,
+            status ? eq(itemSerials.status, status) : undefined,
+          ),
+        )
+        .orderBy(asc(itemSerials.serialNo)),
+    );
+  }
 
   async reserveSerials(tenantId: string, serialIds: string[]) {
     if (!serialIds.length) throw new DomainError('SERIALS_REQUIRED', 'At least one serial is required', 422);
     return this.transitionSerials(tenantId, serialIds, ['available'], 'reserved');
   }
 
-  releaseSerials(tenantId: string, serialIds: string[]) { return this.transitionSerials(tenantId, serialIds, ['reserved'], 'available'); }
-  consumeSerials(tenantId: string, serialIds: string[]) { return this.transitionSerials(tenantId, serialIds, ['available', 'reserved'], 'sold'); }
-  returnSerials(tenantId: string, serialIds: string[]) { return this.transitionSerials(tenantId, serialIds, ['sold'], 'available'); }
+  releaseSerials(tenantId: string, serialIds: string[]) {
+    return this.transitionSerials(tenantId, serialIds, ['reserved'], 'available');
+  }
+  consumeSerials(tenantId: string, serialIds: string[]) {
+    return this.transitionSerials(tenantId, serialIds, ['available', 'reserved'], 'sold');
+  }
+  returnSerials(tenantId: string, serialIds: string[]) {
+    return this.transitionSerials(tenantId, serialIds, ['sold'], 'available');
+  }
 
-  private async transitionSerials(tenantId: string, serialIds: string[], fromStatuses: string[], toStatus: string) {
+  private async transitionSerialsInTx(
+    tx: DrizzleTx,
+    tenantId: string,
+    serialIds: string[],
+    fromStatuses: string[],
+    toStatus: string,
+    warehouseId?: string,
+  ) {
+    if (!serialIds.length) return;
+    const rows = await tx
+      .select()
+      .from(itemSerials)
+      .where(and(eq(itemSerials.tenantId, tenantId), inArray(itemSerials.id, serialIds)));
+    if (rows.length !== serialIds.length || rows.some((row) => !fromStatuses.includes(row.status)))
+      throw new DomainError(
+        'SERIAL_INVALID_STATE',
+        'One or more serials cannot transition to the requested state',
+        422,
+        { field: 'serialIds' },
+      );
+    for (const serial of rows) {
+      await tx
+        .update(itemSerials)
+        .set({ status: toStatus, ...(warehouseId ? { warehouseId } : {}), updatedAt: new Date() })
+        .where(
+          and(
+            eq(itemSerials.tenantId, tenantId),
+            eq(itemSerials.id, serial.id),
+            inArray(itemSerials.status, fromStatuses),
+          ),
+        );
+    }
+  }
+
+  private async transitionSerials(
+    tenantId: string,
+    serialIds: string[],
+    fromStatuses: string[],
+    toStatus: string,
+  ) {
     if (!serialIds.length) throw new DomainError('SERIALS_REQUIRED', 'At least one serial is required', 422);
-    return withTenantTx(this.database.db, tenantId, async (tx) => {
-      const rows = await tx.select().from(itemSerials).where(and(eq(itemSerials.tenantId, tenantId), inArray(itemSerials.id, serialIds)));
-      if (rows.length !== serialIds.length || rows.some((row) => !fromStatuses.includes(row.status))) throw new DomainError('SERIAL_INVALID_STATE', 'One or more serials cannot transition to the requested state', 422);
-      for (const serial of rows) await tx.update(itemSerials).set({ status: toStatus, updatedAt: new Date() }).where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, serial.id), inArray(itemSerials.status, fromStatuses)));
-      return { serialIds, status: toStatus };
-    });
+    return withTenantTx(this.database.db, tenantId, async (tx) =>
+      this.transitionSerialsInTx(tx, tenantId, serialIds, fromStatuses, toStatus).then(() => ({
+        serialIds,
+        status: toStatus,
+      })),
+    );
   }
 
   /**
    * `number` is optional: when the caller omits it the transfer takes the next value from
    * the document sequence. Letting the browser mint one (the old `TR-<timestamp>`) gives
    * an auditor a series with holes in it and no guarantee of uniqueness.
+   *
+   * `branchId` is what lets the transfer find a posting profile later — the two
+   * warehouses may sit in different branches (مناقلة بين الفروع), and the branch of the
+   * receiving warehouse is the one that owns the goods once they arrive.
    */
-  async createTransfer(tenantId: string, input: { id?: string; number?: string; fromWarehouseId: string; toWarehouseId: string; lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }> }) {
-    if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId) throw new DomainError('INVALID_STOCK_TRANSFER', 'A transfer requires distinct warehouses and at least one line', 422);
+  async createTransfer(
+    tenantId: string,
+    input: {
+      id?: string;
+      number?: string;
+      branchId?: string;
+      fromWarehouseId: string;
+      toWarehouseId: string;
+      lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }>;
+    },
+  ) {
+    if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId)
+      throw new DomainError(
+        'INVALID_STOCK_TRANSFER',
+        'A transfer requires distinct warehouses and at least one line',
+        422,
+        { field: 'lines' },
+      );
+    if (input.lines.some((line) => !new Decimal(line.qty).gt(0)))
+      throw new DomainError(
+        'TRANSFER_QUANTITY_INVALID',
+        'Transfer quantities must be greater than zero',
+        422,
+        { field: 'qty' },
+      );
     const id = input.id ?? newId();
     return withTenantTx(this.database.db, tenantId, async (tx) => {
-      const number = input.number ?? (await this.sequences.next({ tenantId, docType: 'stock_transfer' }, tx, { prefix: 'TR-', padding: 6 })).display;
-      await tx.insert(stockTransfers).values({ id, tenantId, number, fromWarehouseId: input.fromWarehouseId, toWarehouseId: input.toWarehouseId, status: 'draft' });
-      await tx.insert(stockTransferLines).values(input.lines.map((line, index) => ({ transferId: id, tenantId, lineNo: index + 1, itemId: line.itemId, qty: line.qty, unitCost: line.unitCost ?? '0', lotId: line.lotId, serialIds: line.serialIds ?? [] })));
-      return { id, number, status: 'draft' };
+      const rows = await tx
+        .select()
+        .from(warehouses)
+        .where(
+          and(
+            eq(warehouses.tenantId, tenantId),
+            inArray(warehouses.id, [input.fromWarehouseId, input.toWarehouseId]),
+          ),
+        );
+      const from = rows.find((row) => row.id === input.fromWarehouseId);
+      const to = rows.find((row) => row.id === input.toWarehouseId);
+      if (!from || !to)
+        throw new DomainError(
+          'TRANSFER_WAREHOUSE_INVALID',
+          'Both warehouses must belong to this tenant',
+          422,
+          { field: 'fromWarehouseId' },
+        );
+      await this.assertStockable(tx, tenantId, input.lines);
+      const branchId = input.branchId ?? to.branchId ?? from.branchId;
+      if (!branchId)
+        throw new DomainError(
+          'TRANSFER_BRANCH_REQUIRED',
+          'A transfer needs a branch — set the branch on the warehouse or send one',
+          422,
+          { field: 'branchId' },
+        );
+      const number =
+        input.number ??
+        (
+          await this.sequences.next({ tenantId, branchId, docType: 'stock_transfer' }, tx, {
+            prefix: 'TR-',
+            padding: 6,
+          })
+        ).display;
+      await tx
+        .insert(stockTransfers)
+        .values({
+          id,
+          tenantId,
+          number,
+          branchId,
+          fromWarehouseId: input.fromWarehouseId,
+          toWarehouseId: input.toWarehouseId,
+          status: 'draft',
+        });
+      await tx
+        .insert(stockTransferLines)
+        .values(
+          input.lines.map((line, index) => ({
+            transferId: id,
+            tenantId,
+            lineNo: index + 1,
+            itemId: line.itemId,
+            qty: line.qty,
+            unitCost: line.unitCost ?? '0',
+            lotId: line.lotId,
+            serialIds: line.serialIds ?? [],
+          })),
+        );
+      return { id, number, branchId, status: 'draft' };
     });
   }
 
-  async sendTransfer(tenantId: string, transferId: string) {
-    const transfer = await withTenantTx(this.database.db, tenantId, async (tx) => (await tx.select().from(stockTransfers).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))))[0]);
-    if (!transfer || transfer.status !== 'draft') throw new DomainError('TRANSFER_INVALID_STATE', 'Only draft transfers can be sent', 422);
-    const lines = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(stockTransferLines).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId))));
-    const result = await this.record(tenantId, lines.map((line) => ({ itemId: line.itemId, warehouseId: transfer.fromWarehouseId, qty: line.qty, unitCost: line.unitCost, direction: 'out' as const, docType: 'stock_transfer', docId: transferId, lineId: newId(), lotId: line.lotId ?? undefined, costing: 'outAtAvg' as const })));
-    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(stockTransfers).set({ status: 'in_transit', sentAt: new Date(), updatedAt: new Date() }).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))));
-    return { transferId, status: 'in_transit', transactionIds: result.transactionIds };
+  private async loadTransfer(tx: DrizzleTx, tenantId: string, transferId: string) {
+    const [transfer] = await tx
+      .select()
+      .from(stockTransfers)
+      .where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId)));
+    if (!transfer) throw new DomainError('TRANSFER_NOT_FOUND', 'Transfer was not found', 404);
+    const lines = await tx
+      .select()
+      .from(stockTransferLines)
+      .where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId)));
+    return { ...transfer, lines };
   }
 
-  async receiveTransfer(tenantId: string, transferId: string, received: Array<{ lineNo: number; qty: string }>) {
-    const transfer = await withTenantTx(this.database.db, tenantId, async (tx) => (await tx.select().from(stockTransfers).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))))[0]);
-    if (!transfer || !['in_transit', 'partially_received'].includes(transfer.status)) throw new DomainError('TRANSFER_INVALID_STATE', 'Transfer is not awaiting receipt', 422);
-    const lines = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(stockTransferLines).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId))));
-    const byLine = new Map(lines.map((line) => [line.lineNo, line]));
-    const movements: InventoryLine[] = [];
-    for (const input of received) { const line = byLine.get(input.lineNo); if (!line) throw new DomainError('TRANSFER_LINE_NOT_FOUND', 'Transfer line was not found', 404); const qty = new Decimal(input.qty); const already = new Decimal(line.receivedQty); const requested = new Decimal(line.qty); if (!qty.gt(0) || already.plus(qty).gt(requested)) throw new DomainError('TRANSFER_RECEIPT_INVALID', 'Received quantity exceeds transfer quantity', 422); movements.push({ itemId: line.itemId, warehouseId: transfer.toWarehouseId, qty: qty.toFixed(4), unitCost: line.unitCost, direction: 'in', docType: 'stock_transfer_receipt', docId: transferId, lineId: newId(), lotId: line.lotId ?? undefined, costing: 'inWithCost' }); }
-    const result = await this.record(tenantId, movements);
-    await withTenantTx(this.database.db, tenantId, async (tx) => { for (const input of received) { const line = byLine.get(input.lineNo); if (line) await tx.update(stockTransferLines).set({ receivedQty: sql`${stockTransferLines.receivedQty} + ${input.qty}` }).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId), eq(stockTransferLines.lineNo, input.lineNo))); } const updated = await tx.select().from(stockTransferLines).where(and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transferId))); const complete = updated.every((line) => new Decimal(line.receivedQty).eq(new Decimal(line.qty))); await tx.update(stockTransfers).set({ status: complete ? 'received' : 'partially_received', receivedAt: complete ? new Date() : undefined, updatedAt: new Date() }).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))); });
-    return { transferId, transactionIds: result.transactionIds };
+  /**
+   * Sending a transfer moves the goods out of the source warehouse and into بضاعة تحت
+   * التحويل: Dr in-transit / Cr المخزون. Without that entry the stock is nowhere at all
+   * for the days it spends on the road, and the inventory account is short by the value
+   * that left it.
+   */
+  async sendTransfer(
+    tenantId: string,
+    transferId: string,
+    options: { fiscalPeriodId?: string; allowNegative?: boolean } = {},
+  ) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const transfer = await this.loadTransfer(tx, tenantId, transferId);
+      if (transfer.status !== 'draft')
+        throw new DomainError('TRANSFER_INVALID_STATE', 'Only draft transfers can be sent', 409);
+      if (!transfer.lines.length)
+        throw new DomainError('INVENTORY_LINES_REQUIRED', 'A transfer needs at least one line', 422);
+      const allowNegative = options.allowNegative === true && this.canOverrideNegative();
+      const branchId =
+        transfer.branchId ??
+        (
+          await tx
+            .select({ branchId: warehouses.branchId })
+            .from(warehouses)
+            .where(and(eq(warehouses.tenantId, tenantId), eq(warehouses.id, transfer.toWarehouseId)))
+        )[0]?.branchId;
+      if (!branchId)
+        throw new DomainError(
+          'TRANSFER_BRANCH_REQUIRED',
+          'A transfer needs a branch before it can be sent',
+          422,
+          { field: 'branchId' },
+        );
+
+      const sent = await this.recordInTx(
+        tx,
+        tenantId,
+        transfer.lines.map((line) => ({
+          itemId: line.itemId,
+          warehouseId: transfer.fromWarehouseId,
+          qty: line.qty,
+          unitCost: line.unitCost,
+          direction: 'out' as const,
+          docType: 'stock_transfer',
+          docId: transferId,
+          lineId: newId(),
+          lotId: line.lotId ?? undefined,
+          costing: 'outAtAvg' as const,
+        })),
+        { allowNegative },
+      );
+      /**
+       * Stamp the cost the stock ledger actually used back onto the line. A مناقلة must
+       * be value-neutral: the destination receives at exactly the cost the source
+       * relieved, so the goods never change value on the road. Leaving the line's cost
+       * at its `0` default (or at whatever the clerk typed) is how a transfer quietly
+       * destroys value — the goods arrive worth nothing, and بضاعة تحت التحويل keeps a
+       * balance that can never be cleared.
+       */
+      const sentMovements = await tx
+        .select()
+        .from(inventoryTransactions)
+        .where(
+          and(
+            eq(inventoryTransactions.tenantId, tenantId),
+            inArray(inventoryTransactions.id, sent.transactionIds),
+          ),
+        );
+      for (const [index, line] of transfer.lines.entries()) {
+        const movement = sentMovements.find((row) => row.id === sent.transactionIds[index]);
+        if (!movement) continue;
+        await tx
+          .update(stockTransferLines)
+          .set({ unitCost: movement.unitCost, sentQty: movement.qty })
+          .where(
+            and(
+              eq(stockTransferLines.tenantId, tenantId),
+              eq(stockTransferLines.transferId, transferId),
+              eq(stockTransferLines.lineNo, line.lineNo),
+            ),
+          );
+      }
+      for (const line of transfer.lines)
+        await this.transitionSerialsInTx(tx, tenantId, line.serialIds ?? [], ['available'], 'reserved');
+
+      const value = await this.valueOfMovements(tx, tenantId, transferId, 'stock_transfer');
+      let sentJournalEntryId: string | undefined;
+      if (value.gt(0)) {
+        const inventoryAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          branchId,
+          'stock_transfer',
+          'inventoryAccountId',
+        );
+        const transitAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          branchId,
+          'stock_transfer',
+          'stockInTransitAccountId',
+        );
+        const fiscalPeriodId =
+          options.fiscalPeriodId ??
+          (await this.accounting.openPeriodForDateInTx(tx, tenantId, new Date().toISOString().slice(0, 10)));
+        const entry = await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId,
+          fiscalPeriodId,
+          date: new Date().toISOString().slice(0, 10),
+          description: `مناقلة ${transfer.number} — إرسال إلى بضاعة تحت التحويل`,
+          lines: [
+            { accountId: transitAccount, debit: value.toFixed(4), description: 'بضاعة تحت التحويل' },
+            { accountId: inventoryAccount, credit: value.toFixed(4), description: 'خروج من المخزون' },
+          ],
+          sourceType: 'stock_transfer',
+          sourceId: transferId,
+          idempotencyKey: `stock-transfer-send:${transferId}`,
+        });
+        sentJournalEntryId = entry?.id;
+      }
+
+      await tx
+        .update(stockTransfers)
+        .set({
+          status: 'in_transit',
+          branchId,
+          sentAt: new Date(),
+          sentJournalEntryId: sentJournalEntryId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(stockTransfers.tenantId, tenantId),
+            eq(stockTransfers.id, transferId),
+            eq(stockTransfers.status, 'draft'),
+          ),
+        );
+      const updated = await this.loadTransfer(tx, tenantId, transferId);
+      return {
+        transferId,
+        number: updated.number,
+        status: updated.status,
+        value: value.toFixed(4),
+        journalEntryId: sentJournalEntryId ?? null,
+        lines: updated.lines.length,
+      };
+    });
   }
 
-  async cancelTransfer(tenantId: string, transferId: string) {
-    const result = await withTenantTx(this.database.db, tenantId, async (tx) => { const row = (await tx.select().from(stockTransfers).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))))[0]; if (!row || ['received', 'cancelled'].includes(row.status)) throw new DomainError('TRANSFER_INVALID_STATE', 'Transfer cannot be cancelled', 422); await tx.update(stockTransfers).set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date() }).where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId))); return { transferId, status: 'cancelled' }; });
-    return result;
+  /**
+   * Receiving closes the in-transit balance: Dr المخزون / Cr بضاعة تحت التحويل at the
+   * value that left, so a transfer is value-neutral and never re-prices the goods.
+   */
+  async receiveTransfer(
+    tenantId: string,
+    transferId: string,
+    received: Array<{ lineNo: number; qty: string }>,
+    options: { fiscalPeriodId?: string } = {},
+  ) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const transfer = await this.loadTransfer(tx, tenantId, transferId);
+      if (!['in_transit', 'partially_received'].includes(transfer.status))
+        throw new DomainError('TRANSFER_INVALID_STATE', 'Transfer is not awaiting receipt', 409);
+      const byLine = new Map(transfer.lines.map((line) => [line.lineNo, line]));
+      const movements: InventoryLine[] = [];
+      const serialIds: string[] = [];
+      for (const input of received) {
+        const line = byLine.get(input.lineNo);
+        if (!line) throw new DomainError('TRANSFER_LINE_NOT_FOUND', 'Transfer line was not found', 404);
+        const qty = new Decimal(input.qty);
+        const already = new Decimal(line.receivedQty);
+        const requested = new Decimal(line.qty);
+        if (!qty.gt(0) || already.plus(qty).gt(requested))
+          throw new DomainError(
+            'TRANSFER_RECEIPT_INVALID',
+            'Received quantity exceeds transfer quantity',
+            422,
+            { field: 'qty' },
+          );
+        movements.push({
+          itemId: line.itemId,
+          warehouseId: transfer.toWarehouseId,
+          qty: qty.toFixed(4),
+          unitCost: line.unitCost,
+          direction: 'in',
+          docType: 'stock_transfer_receipt',
+          docId: transferId,
+          lineId: newId(),
+          lotId: line.lotId ?? undefined,
+          costing: 'inWithCost',
+        });
+        serialIds.push(...(line.serialIds ?? []));
+      }
+      if (!movements.length) throw new DomainError('TRANSFER_RECEIPT_REQUIRED', 'Nothing to receive', 422);
+      await this.recordInTx(tx, tenantId, movements);
+      await this.transitionSerialsInTx(
+        tx,
+        tenantId,
+        serialIds,
+        ['reserved'],
+        'available',
+        transfer.toWarehouseId,
+      );
+
+      const value = await this.valueOfMovements(tx, tenantId, transferId, 'stock_transfer_receipt');
+      let receivedJournalEntryId: string | undefined;
+      if (value.gt(0)) {
+        const branchId =
+          transfer.branchId ??
+          (
+            await tx
+              .select({ branchId: warehouses.branchId })
+              .from(warehouses)
+              .where(and(eq(warehouses.tenantId, tenantId), eq(warehouses.id, transfer.toWarehouseId)))
+          )[0]?.branchId;
+        if (!branchId)
+          throw new DomainError(
+            'TRANSFER_BRANCH_REQUIRED',
+            'A transfer needs a branch before it can be received',
+            422,
+            { field: 'branchId' },
+          );
+        const inventoryAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          branchId,
+          'stock_transfer',
+          'inventoryAccountId',
+        );
+        const transitAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          branchId,
+          'stock_transfer',
+          'stockInTransitAccountId',
+        );
+        const fiscalPeriodId =
+          options.fiscalPeriodId ??
+          (await this.accounting.openPeriodForDateInTx(tx, tenantId, new Date().toISOString().slice(0, 10)));
+        const entry = await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId,
+          fiscalPeriodId,
+          date: new Date().toISOString().slice(0, 10),
+          description: `مناقلة ${transfer.number} — استلام`,
+          lines: [
+            { accountId: inventoryAccount, debit: value.toFixed(4), description: 'دخول إلى المخزون' },
+            { accountId: transitAccount, credit: value.toFixed(4), description: 'خروج من بضاعة تحت التحويل' },
+          ],
+          sourceType: 'stock_transfer_receipt',
+          sourceId: transferId,
+          idempotencyKey: `stock-transfer-receive:${transferId}:${received.map((row) => `${row.lineNo}-${row.qty}`).join('|')}`,
+        });
+        receivedJournalEntryId = entry?.id;
+        await tx
+          .update(stockTransfers)
+          .set({ receivedJournalEntryId, updatedAt: new Date() })
+          .where(eq(stockTransfers.id, transferId));
+      }
+
+      for (const input of received) {
+        await tx
+          .update(stockTransferLines)
+          .set({ receivedQty: sql`${stockTransferLines.receivedQty} + ${input.qty}` })
+          .where(
+            and(
+              eq(stockTransferLines.tenantId, tenantId),
+              eq(stockTransferLines.transferId, transferId),
+              eq(stockTransferLines.lineNo, input.lineNo),
+            ),
+          );
+      }
+      const updated = await this.loadTransfer(tx, tenantId, transferId);
+      const complete = updated.lines.every((line) => new Decimal(line.receivedQty).eq(new Decimal(line.qty)));
+      await tx
+        .update(stockTransfers)
+        .set({
+          status: complete ? 'received' : 'partially_received',
+          receivedAt: complete ? new Date() : undefined,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId)));
+      return {
+        transferId,
+        status: complete ? 'received' : 'partially_received',
+        value: value.toFixed(4),
+        journalEntryId: receivedJournalEntryId ?? null,
+        lines: updated.lines,
+      };
+    });
+  }
+
+  /**
+   * Cancelling a draft just stops it. Cancelling an in-transit transfer has to put the
+   * goods back: a reverse movement into the source warehouse, a reversal of the send
+   * entry, and the serials released — otherwise the stock has simply disappeared.
+   */
+  async cancelTransfer(tenantId: string, transferId: string, reason?: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const transfer = await this.loadTransfer(tx, tenantId, transferId);
+      if (['received', 'cancelled'].includes(transfer.status))
+        throw new DomainError('TRANSFER_INVALID_STATE', 'Transfer cannot be cancelled', 409);
+      if (transfer.status === 'in_transit') {
+        const sent = await tx
+          .select()
+          .from(inventoryTransactions)
+          .where(
+            and(
+              eq(inventoryTransactions.tenantId, tenantId),
+              eq(inventoryTransactions.docId, transferId),
+              eq(inventoryTransactions.docType, 'stock_transfer'),
+            ),
+          );
+        const mirrors: InventoryLine[] = sent.map((movement) => ({
+          itemId: movement.itemId,
+          warehouseId: movement.warehouseId,
+          qty: movement.qty,
+          unitCost: movement.unitCost ?? '0',
+          direction: 'in' as const,
+          docType: 'stock_transfer_cancel',
+          docId: transferId,
+          lineId: movement.lineId ?? undefined,
+          lotId: movement.lotId ?? undefined,
+          costing: 'returnAtOriginalCost' as const,
+        }));
+        if (mirrors.length) await this.recordInTx(tx, tenantId, mirrors, { allowNegative: true });
+        if (transfer.sentJournalEntryId)
+          await this.reversalEntry(
+            tx,
+            tenantId,
+            transfer.sentJournalEntryId,
+            reason ?? `إلغاء مناقلة ${transfer.number}`,
+          );
+        const serialIds = transfer.lines.flatMap((line) => line.serialIds ?? []);
+        await this.transitionSerialsInTx(
+          tx,
+          tenantId,
+          serialIds,
+          ['reserved'],
+          'available',
+          transfer.fromWarehouseId,
+        );
+      }
+      await tx
+        .update(stockTransfers)
+        .set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId)));
+      return { transferId, status: 'cancelled' as const };
+    });
+  }
+
+  getTransfer(tenantId: string, transferId: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) => this.loadTransfer(tx, tenantId, transferId));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Phase 05 — سند إدخال / إخراج مخزني · بضاعة أول المدة · مناقلة · جرد وتسوية
+  //
+  // The desktop saved these documents with `entry = null` and let the accountant
+  // repair the ledger by hand (`frmInvInOutput`, `frmInventoryTransfer`). The cloud
+  // cannot: sales and purchases already post to the inventory account, so a document
+  // that moved quantity without a journal would leave the ledger permanently
+  // disagreeing with the stock balance — the exact drift `recomputeBalances` exists
+  // to detect. Every document below therefore writes its movements *and* its balanced
+  // journal inside one transaction.
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private canOverrideNegative(): boolean {
+    const permissions = getRequestContext().tenant?.permissions ?? [];
+    return permissions.includes('*') || permissions.includes('inventory.negative.override');
+  }
+
+  private async nextNumber(
+    tx: DrizzleTx,
+    tenantId: string,
+    branchId: string,
+    docType: string,
+    prefix: string,
+  ): Promise<string> {
+    const allocated = await this.sequences.next({ tenantId, branchId, docType }, tx, { prefix, padding: 6 });
+    return allocated.display;
+  }
+
+  /** Resolves the branch posting profile and refuses to invent any account. */
+  private async profileAccount(
+    tx: DrizzleTx,
+    tenantId: string,
+    branchId: string,
+    docType: string,
+    key: string,
+  ): Promise<string> {
+    const profile = await this.profiles.resolvePostProfileInTx(tx, tenantId, branchId, docType);
+    const accountId = (profile.mapping as unknown as Record<string, string | null | undefined>)[key];
+    if (!accountId) {
+      throw new DomainError(
+        'INVENTORY_PROFILE_KEY_MISSING',
+        `Posting profile has no ${key} — map it in Settings › Posting profiles`,
+        422,
+        { field: key },
+      );
+    }
+    return accountId;
+  }
+
+  /** An account handed to us by a caller must belong to this tenant. */
+  private async assertAccount(tx: DrizzleTx, tenantId: string, accountId: string): Promise<string> {
+    const [row] = await tx
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.tenantId, tenantId), eq(accounts.id, accountId)));
+    if (!row)
+      throw new DomainError('INVENTORY_ACCOUNT_INVALID', 'The account does not belong to this tenant', 422, {
+        field: 'counterAccountId',
+      });
+    return row.id;
+  }
+
+  /**
+   * Only `stock` items move through the stock ledger, and an item that declares it is
+   * tracked by lot or by serial must name one — otherwise the traceability the master
+   * data promises is a lie the movement silently tells.
+   */
+  private async assertStockable(
+    tx: DrizzleTx,
+    tenantId: string,
+    lines: Array<{ itemId: string; lotId?: string | null; serialId?: string | null }>,
+  ): Promise<
+    Map<string, { kind: string; trackLot: boolean; trackSerial: boolean; purchasePrice: string | null }>
+  > {
+    const ids = [...new Set(lines.map((line) => line.itemId))];
+    const rows = await tx
+      .select({
+        id: items.id,
+        kind: items.kind,
+        trackLot: items.trackLot,
+        trackSerial: items.trackSerial,
+        purchasePrice: items.purchasePrice,
+      })
+      .from(items)
+      .where(and(eq(items.tenantId, tenantId), inArray(items.id, ids)));
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    for (const line of lines) {
+      const item = byId.get(line.itemId);
+      if (!item)
+        throw new DomainError('INVENTORY_ITEM_NOT_FOUND', 'Item was not found in this tenant', 404, {
+          field: 'itemId',
+        });
+      if (item.kind !== 'stock')
+        throw new DomainError(
+          'INVENTORY_ITEM_NOT_STOCKED',
+          'Only stock items can appear on a stock document',
+          422,
+          { field: 'itemId' },
+        );
+      if (item.trackLot && !line.lotId)
+        throw new DomainError('INVENTORY_LOT_REQUIRED', 'This item is tracked by lot — choose a lot', 422, {
+          field: 'lotId',
+        });
+      if (item.trackSerial && !line.serialId)
+        throw new DomainError(
+          'INVENTORY_SERIAL_REQUIRED',
+          'This item is tracked by serial — scan a serial',
+          422,
+          { field: 'serialId' },
+        );
+    }
+    return byId;
+  }
+
+  /** The value the movements actually booked — read back, never recomputed on faith. */
+  private async valueOfMovements(
+    tx: DrizzleTx,
+    tenantId: string,
+    docId: string,
+    docType?: string,
+  ): Promise<Decimal> {
+    const txns = await tx
+      .select({ totalCost: inventoryTransactions.totalCost })
+      .from(inventoryTransactions)
+      .where(
+        and(
+          eq(inventoryTransactions.tenantId, tenantId),
+          eq(inventoryTransactions.docId, docId),
+          docType ? eq(inventoryTransactions.docType, docType) : undefined,
+        ),
+      );
+    return txns.reduce((sum, row) => sum.plus(row.totalCost ?? '0'), new Decimal(0));
+  }
+
+  private async reversalEntry(
+    tx: DrizzleTx,
+    tenantId: string,
+    entryId: string,
+    reason: string,
+  ): Promise<string | undefined> {
+    const [entry] = await tx
+      .select()
+      .from(journalEntries)
+      .where(and(eq(journalEntries.tenantId, tenantId), eq(journalEntries.id, entryId)));
+    if (!entry || entry.status === 'void') return undefined;
+    const lines = await tx
+      .select()
+      .from(journalEntryLines)
+      .where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntryLines.entryId, entryId)));
+    const fiscalPeriodId = await this.accounting.openPeriodForDateInTx(
+      tx,
+      tenantId,
+      new Date().toISOString().slice(0, 10),
+    );
+    const created = await this.accounting.postJournalInTx(tx, tenantId, {
+      branchId: entry.branchId,
+      fiscalPeriodId,
+      date: new Date().toISOString().slice(0, 10),
+      description: `عكس قيد: ${reason}`,
+      lines: lines.map((line) => ({
+        accountId: line.accountId,
+        debit: line.credit,
+        credit: line.debit,
+        description: line.description ?? undefined,
+      })),
+      sourceType: entry.sourceType ?? 'reversal',
+      sourceId: entry.sourceId ?? entryId,
+      idempotencyKey: `reversal:${entryId}`,
+    });
+    await tx
+      .update(journalEntries)
+      .set({ status: 'void', updatedAt: new Date() })
+      .where(eq(journalEntries.id, entryId));
+    return created?.id;
+  }
+
+  // ── سند إدخال / إخراج مخزني ────────────────────────────────────────────────
+
+  async createVoucher(tenantId: string, input: StockVoucherInput) {
+    if (!input.lines.length)
+      throw new DomainError('INVENTORY_LINES_REQUIRED', 'At least one stock line is required', 422);
+    if (!['stock_in', 'stock_out', 'opening'].includes(input.kind))
+      throw new DomainError('INVENTORY_VOUCHER_KIND_INVALID', 'Unknown stock voucher kind', 422, {
+        field: 'kind',
+      });
+    const id = newId();
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      // Refused here as well as at posting time: a clerk who scans a service item into
+      // a stock voucher should hear it now, not after the document is saved and sent
+      // for approval.
+      await this.assertStockable(tx, tenantId, input.lines);
+      const prefix = input.kind === 'opening' ? 'OP-' : input.kind === 'stock_in' ? 'SIN-' : 'SOU-';
+      const number = await this.nextNumber(
+        tx,
+        tenantId,
+        input.branchId,
+        `stock_voucher:${input.kind}`,
+        prefix,
+      );
+      const [voucher] = await tx
+        .insert(stockVouchers)
+        .values({
+          id,
+          tenantId,
+          branchId: input.branchId,
+          warehouseId: input.warehouseId,
+          kind: input.kind,
+          number,
+          status: 'draft',
+          voucherDate: input.voucherDate ?? new Date().toISOString().slice(0, 10),
+          reason: input.reason,
+          counterAccountId: input.counterAccountId ?? null,
+          notes: input.notes,
+          createdBy: getRequestContext().tenant?.userId,
+        })
+        .returning();
+      await tx.insert(stockVoucherLines).values(
+        input.lines.map((line, index) => ({
+          voucherId: id,
+          lineNo: index + 1,
+          tenantId,
+          itemId: line.itemId,
+          qty: line.qty,
+          unitCost: line.unitCost ?? null,
+          lotId: line.lotId,
+          serialId: line.serialId,
+          note: line.note,
+        })),
+      );
+      return { ...voucher, lines: await this.voucherLines(tx, tenantId, id) };
+    });
+  }
+
+  private async voucherLines(tx: DrizzleTx, tenantId: string, voucherId: string) {
+    return tx
+      .select()
+      .from(stockVoucherLines)
+      .where(and(eq(stockVoucherLines.tenantId, tenantId), eq(stockVoucherLines.voucherId, voucherId)));
+  }
+
+  private async getVoucherInTx(tx: DrizzleTx, tenantId: string, id: string) {
+    const [voucher] = await tx
+      .select()
+      .from(stockVouchers)
+      .where(and(eq(stockVouchers.tenantId, tenantId), eq(stockVouchers.id, id)));
+    if (!voucher) throw new DomainError('INVENTORY_VOUCHER_NOT_FOUND', 'Stock voucher was not found', 404);
+    return { ...voucher, lines: await this.voucherLines(tx, tenantId, id) };
+  }
+
+  getVoucher(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) => this.getVoucherInTx(tx, tenantId, id));
+  }
+
+  listVouchers(tenantId: string, filters: { kind?: string; status?: string; warehouseId?: string } = {}) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(stockVouchers)
+        .where(
+          and(
+            eq(stockVouchers.tenantId, tenantId),
+            filters.kind ? eq(stockVouchers.kind, filters.kind) : undefined,
+            filters.status ? eq(stockVouchers.status, filters.status) : undefined,
+            filters.warehouseId ? eq(stockVouchers.warehouseId, filters.warehouseId) : undefined,
+          ),
+        )
+        .orderBy(sql`${stockVouchers.createdAt} DESC`)
+        .limit(200);
+      return rows.map((row) => ({ ...row, lines: [] as Array<unknown> }));
+    });
+  }
+
+  /**
+   * Posts a stock voucher: moves the stock and writes the balanced journal that keeps
+   * the inventory account equal to the stock ledger.
+   *
+   * | kind       | movement          | journal                                        |
+   * |------------|-------------------|------------------------------------------------|
+   * | stock_in   | in @ given cost   | Dr المخزون / Cr الحساب المقابل                  |
+   * | stock_out  | out @ average     | Dr الحساب المقابل / Cr المخزون                  |
+   * | opening    | in @ given cost   | Dr المخزون / Cr بضاعة أول المدة                 |
+   */
+  async postVoucher(
+    tenantId: string,
+    id: string,
+    options: { fiscalPeriodId?: string; allowNegative?: boolean } = {},
+  ) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const voucher = await this.getVoucherInTx(tx, tenantId, id);
+      // A second post is refused rather than silently ignored: the caller asked for a
+      // state change that has already happened, and saying so is safer than implying
+      // this call did the work.
+      if (voucher.status !== 'draft')
+        throw new DomainError('INVENTORY_VOUCHER_INVALID_STATUS', 'Only draft vouchers can be posted', 409);
+      if (!voucher.lines.length)
+        throw new DomainError('INVENTORY_LINES_REQUIRED', 'At least one stock line is required', 422);
+      const allowNegative = options.allowNegative === true && this.canOverrideNegative();
+
+      const catalogue = await this.assertStockable(tx, tenantId, voucher.lines);
+      const direction = voucher.kind === 'stock_out' ? 'out' : 'in';
+      const balances = await tx
+        .select()
+        .from(stockBalances)
+        .where(
+          and(
+            eq(stockBalances.tenantId, tenantId),
+            eq(stockBalances.warehouseId, voucher.warehouseId),
+            inArray(stockBalances.itemId, [...catalogue.keys()]),
+          ),
+        );
+      const balanceOf = new Map(balances.map((row) => [row.itemId, row]));
+
+      const movements: InventoryLine[] = voucher.lines.map((line) => {
+        const item = catalogue.get(line.itemId);
+        const average = balanceOf.get(line.itemId)?.averageCost ?? item?.purchasePrice ?? '0';
+        const unitCost =
+          direction === 'in'
+            ? (line.unitCost ?? (Number(average) > 0 ? average : (item?.purchasePrice ?? '0')))
+            : undefined;
+        return {
+          itemId: line.itemId,
+          warehouseId: voucher.warehouseId,
+          qty: line.qty,
+          unitCost,
+          direction: direction as 'in' | 'out',
+          docType: voucher.kind === 'opening' ? 'opening' : 'stock_voucher',
+          docId: id,
+          lineId: newId(),
+          lotId: line.lotId ?? undefined,
+          serialId: line.serialId ?? undefined,
+          costing: direction === 'in' ? 'inWithCost' : 'outAtAvg',
+        };
+      });
+      await this.recordInTx(tx, tenantId, movements, { allowNegative });
+      const value = await this.valueOfMovements(tx, tenantId, id);
+
+      const inventoryAccount = await this.profileAccount(
+        tx,
+        tenantId,
+        voucher.branchId,
+        'stock_voucher',
+        'inventoryAccountId',
+      );
+      const counterKey =
+        voucher.kind === 'opening' ? 'openingBalanceAccountId' : 'inventoryAdjustmentAccountId';
+      const counterAccount = voucher.counterAccountId
+        ? await this.assertAccount(tx, tenantId, voucher.counterAccountId)
+        : await this.profileAccount(tx, tenantId, voucher.branchId, 'stock_voucher', counterKey);
+
+      let journalEntryId: string | undefined;
+      if (value.abs().gt(0)) {
+        const fiscalPeriodId =
+          options.fiscalPeriodId ??
+          (await this.accounting.openPeriodForDateInTx(tx, tenantId, voucher.voucherDate));
+        const entry = await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId: voucher.branchId,
+          fiscalPeriodId,
+          date: voucher.voucherDate,
+          description: `${VOUCHER_KIND_LABELS[voucher.kind] ?? 'سند مخزني'} ${voucher.number}`,
+          lines:
+            direction === 'in'
+              ? [
+                  {
+                    accountId: inventoryAccount,
+                    debit: value.toFixed(4),
+                    description: voucher.reason ?? undefined,
+                  },
+                  {
+                    accountId: counterAccount,
+                    credit: value.toFixed(4),
+                    description: voucher.reason ?? undefined,
+                  },
+                ]
+              : [
+                  {
+                    accountId: counterAccount,
+                    debit: value.toFixed(4),
+                    description: voucher.reason ?? undefined,
+                  },
+                  {
+                    accountId: inventoryAccount,
+                    credit: value.toFixed(4),
+                    description: voucher.reason ?? undefined,
+                  },
+                ],
+          sourceType: 'stock_voucher',
+          sourceId: id,
+          idempotencyKey: `stock-voucher:${id}`,
+        });
+        journalEntryId = entry?.id;
+      }
+
+      await tx
+        .update(stockVouchers)
+        .set({
+          status: 'posted',
+          postedAt: new Date(),
+          totalCost: value.toFixed(4),
+          journalEntryId: journalEntryId ?? null,
+          updatedAt: new Date(),
+          createdBy: voucher.createdBy,
+        })
+        .where(
+          and(
+            eq(stockVouchers.tenantId, tenantId),
+            eq(stockVouchers.id, id),
+            eq(stockVouchers.status, 'draft'),
+          ),
+        );
+      if (journalEntryId)
+        await tx
+          .update(stockVoucherLines)
+          .set({ lineCost: sql`${stockVoucherLines.qty} * COALESCE(${stockVoucherLines.unitCost}, 0)` })
+          .where(and(eq(stockVoucherLines.tenantId, tenantId), eq(stockVoucherLines.voucherId, id)));
+      return this.getVoucherInTx(tx, tenantId, id);
+    });
+  }
+
+  /** العكس الكامل: حركة معاكسة + قيد عكسي + حالة ملغى. */
+  async voidVoucher(tenantId: string, id: string, reason: string) {
+    if (!reason.trim())
+      throw new DomainError('INVENTORY_VOID_REASON_REQUIRED', 'A void reason is required', 422);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const voucher = await this.getVoucherInTx(tx, tenantId, id);
+      if (voucher.status !== 'posted')
+        throw new DomainError('INVENTORY_VOUCHER_INVALID_STATUS', 'Only posted vouchers can be voided', 409);
+      const movements = await tx
+        .select()
+        .from(inventoryTransactions)
+        .where(and(eq(inventoryTransactions.tenantId, tenantId), eq(inventoryTransactions.docId, id)));
+      const mirrors: InventoryLine[] = movements.map((movement) => ({
+        itemId: movement.itemId,
+        warehouseId: movement.warehouseId,
+        qty: movement.qty,
+        unitCost: movement.unitCost ?? '0',
+        direction: movement.direction === 'out' ? 'in' : 'out',
+        docType: 'stock_voucher_void',
+        docId: id,
+        lineId: movement.lineId ?? undefined,
+        lotId: movement.lotId ?? undefined,
+        serialId: movement.serialId ?? undefined,
+        costing: movement.direction === 'out' ? 'returnAtOriginalCost' : 'outAtAvg',
+      }));
+      if (mirrors.length) await this.recordInTx(tx, tenantId, mirrors, { allowNegative: true });
+      if (voucher.journalEntryId) await this.reversalEntry(tx, tenantId, voucher.journalEntryId, reason);
+      await tx
+        .update(stockVouchers)
+        .set({
+          status: 'voided',
+          voidedAt: new Date(),
+          updatedAt: new Date(),
+          notes: [voucher.notes, `إلغاء: ${reason}`].filter(Boolean).join(' · '),
+        })
+        .where(
+          and(
+            eq(stockVouchers.tenantId, tenantId),
+            eq(stockVouchers.id, id),
+            eq(stockVouchers.status, 'posted'),
+          ),
+        );
+      return this.getVoucherInTx(tx, tenantId, id);
+    });
+  }
+
+  // ── جرد وتسوية (multi-line) ────────────────────────────────────────────────
+
+  async createAdjustment(tenantId: string, input: StockAdjustmentInput) {
+    if (!input.lines.length)
+      throw new DomainError('INVENTORY_LINES_REQUIRED', 'At least one counted line is required', 422);
+    if (!input.reason.trim())
+      throw new DomainError('ADJUSTMENT_REASON_REQUIRED', 'A stock count needs a reason', 422, {
+        field: 'reason',
+      });
+    const id = newId();
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.assertStockable(tx, tenantId, input.lines);
+      const number = await this.nextNumber(tx, tenantId, input.branchId, 'stock_adjustment', 'ADJ-');
+      const [adjustment] = await tx
+        .insert(stockAdjustments)
+        .values({
+          id,
+          tenantId,
+          branchId: input.branchId,
+          warehouseId: input.warehouseId,
+          number,
+          status: 'draft',
+          reason: input.reason,
+          createdBy: getRequestContext().tenant?.userId,
+        })
+        .returning();
+      await tx.insert(stockAdjustmentLines).values(
+        input.lines.map((line, index) => ({
+          adjustmentId: id,
+          lineNo: index + 1,
+          tenantId,
+          itemId: line.itemId,
+          expectedQty: '0',
+          countedQty: line.countedQty,
+          unitCost: line.unitCost ?? null,
+          lotId: line.lotId,
+          note: line.note,
+        })),
+      );
+      return { ...adjustment, lines: await this.adjustmentLines(tx, tenantId, id) };
+    });
+  }
+
+  private async adjustmentLines(tx: DrizzleTx, tenantId: string, adjustmentId: string) {
+    return tx
+      .select()
+      .from(stockAdjustmentLines)
+      .where(
+        and(eq(stockAdjustmentLines.tenantId, tenantId), eq(stockAdjustmentLines.adjustmentId, adjustmentId)),
+      );
+  }
+
+  private async getAdjustmentInTx(tx: DrizzleTx, tenantId: string, id: string) {
+    const [adjustment] = await tx
+      .select()
+      .from(stockAdjustments)
+      .where(and(eq(stockAdjustments.tenantId, tenantId), eq(stockAdjustments.id, id)));
+    if (!adjustment) throw new DomainError('ADJUSTMENT_NOT_FOUND', 'Stock adjustment was not found', 404);
+    return { ...adjustment, lines: await this.adjustmentLines(tx, tenantId, id) };
+  }
+
+  getAdjustment(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, (tx) => this.getAdjustmentInTx(tx, tenantId, id));
+  }
+
+  listAdjustments(tenantId: string, status?: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(stockAdjustments)
+        .where(
+          and(
+            eq(stockAdjustments.tenantId, tenantId),
+            status ? eq(stockAdjustments.status, status) : undefined,
+          ),
+        )
+        .orderBy(sql`${stockAdjustments.createdAt} DESC`)
+        .limit(200);
+      if (!rows.length) return [];
+      const lines = await tx
+        .select()
+        .from(stockAdjustmentLines)
+        .where(
+          and(
+            eq(stockAdjustmentLines.tenantId, tenantId),
+            inArray(
+              stockAdjustmentLines.adjustmentId,
+              rows.map((row) => row.id),
+            ),
+          ),
+        );
+      return rows.map((row) => ({ ...row, lines: lines.filter((line) => line.adjustmentId === row.id) }));
+    });
+  }
+
+  /**
+   * Posts a counted variance: every line is brought from its book quantity to the
+   * counted one, and the net value of the difference is posted against the variance
+   * account. An overage credits the variance account (Dr المخزون), a shortage debits
+   * it (Cr المخزون) — one balanced entry for the whole count, because a count is one
+   * decision, not one decision per line.
+   */
+  async postAdjustment(
+    tenantId: string,
+    id: string,
+    options: {
+      approved?: boolean;
+      fiscalPeriodId?: string;
+      counterAccountId?: string;
+      allowNegative?: boolean;
+    } = {},
+  ) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const adjustment = await this.getAdjustmentInTx(tx, tenantId, id);
+      if (adjustment.status !== 'draft')
+        throw new DomainError('ADJUSTMENT_INVALID_STATE', 'Only draft counts can be posted', 409);
+      if (!adjustment.lines.length)
+        throw new DomainError('INVENTORY_LINES_REQUIRED', 'At least one counted line is required', 422);
+      if (options.approved !== true)
+        throw new DomainError(
+          'ADJUSTMENT_APPROVAL_REQUIRED',
+          'Stock adjustments require approval before posting',
+          422,
+          { field: 'approved' },
+        );
+      const allowNegative = options.allowNegative === true && this.canOverrideNegative();
+
+      const catalogue = await this.assertStockable(tx, tenantId, adjustment.lines);
+      const balances = await tx
+        .select()
+        .from(stockBalances)
+        .where(
+          and(
+            eq(stockBalances.tenantId, tenantId),
+            eq(stockBalances.warehouseId, adjustment.warehouseId),
+            inArray(stockBalances.itemId, [...catalogue.keys()]),
+          ),
+        );
+      const balanceOf = new Map(balances.map((row) => [row.itemId, row]));
+
+      const movements: InventoryLine[] = [];
+      for (const line of adjustment.lines) {
+        const current = new Decimal(balanceOf.get(line.itemId)?.quantity ?? '0');
+        const counted = new Decimal(line.countedQty);
+        const variance = counted.minus(current);
+        if (variance.isZero()) {
+          await tx
+            .update(stockAdjustmentLines)
+            .set({ expectedQty: current.toFixed(4), varianceQty: '0.0000', varianceValue: '0.0000' })
+            .where(
+              and(
+                eq(stockAdjustmentLines.tenantId, tenantId),
+                eq(stockAdjustmentLines.adjustmentId, id),
+                eq(stockAdjustmentLines.lineNo, line.lineNo),
+              ),
+            );
+          continue;
+        }
+        const average =
+          balanceOf.get(line.itemId)?.averageCost ?? catalogue.get(line.itemId)?.purchasePrice ?? '0';
+        const unitCost = line.unitCost ?? average;
+        movements.push({
+          itemId: line.itemId,
+          warehouseId: adjustment.warehouseId,
+          qty: variance.abs().toFixed(4),
+          unitCost: variance.gt(0) ? unitCost : undefined,
+          direction: variance.gt(0) ? 'in' : 'out',
+          docType: 'stock_adjustment',
+          docId: id,
+          lineId: newId(),
+          lotId: line.lotId ?? undefined,
+          costing: variance.gt(0) ? 'inWithCost' : 'outAtAvg',
+        });
+        await tx
+          .update(stockAdjustmentLines)
+          .set({
+            expectedQty: current.toFixed(4),
+            varianceQty: variance.toFixed(4),
+            varianceValue: variance.abs().mul(unitCost).toFixed(4),
+            unitCost,
+          })
+          .where(
+            and(
+              eq(stockAdjustmentLines.tenantId, tenantId),
+              eq(stockAdjustmentLines.adjustmentId, id),
+              eq(stockAdjustmentLines.lineNo, line.lineNo),
+            ),
+          );
+      }
+      if (movements.length) await this.recordInTx(tx, tenantId, movements, { allowNegative });
+
+      const lines = await this.adjustmentLines(tx, tenantId, id);
+      const net = lines.reduce(
+        (sum, row) =>
+          sum.plus(
+            new Decimal(row.varianceQty ?? '0').gte(0)
+              ? (row.varianceValue ?? '0')
+              : `-${row.varianceValue ?? '0'}`,
+          ),
+        new Decimal(0),
+      );
+
+      let journalEntryId: string | undefined;
+      if (net.abs().gt(0)) {
+        const inventoryAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          adjustment.branchId,
+          'stock_adjustment',
+          'inventoryAccountId',
+        );
+        const counterAccount = options.counterAccountId
+          ? await this.assertAccount(tx, tenantId, options.counterAccountId)
+          : await this.profileAccount(
+              tx,
+              tenantId,
+              adjustment.branchId,
+              'stock_adjustment',
+              'inventoryAdjustmentAccountId',
+            );
+        const fiscalPeriodId =
+          options.fiscalPeriodId ??
+          (await this.accounting.openPeriodForDateInTx(tx, tenantId, new Date().toISOString().slice(0, 10)));
+        const entry = await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId: adjustment.branchId,
+          fiscalPeriodId,
+          date: new Date().toISOString().slice(0, 10),
+          description: `تسوية مخزنية ${adjustment.number} — ${adjustment.reason}`,
+          lines: net.gt(0)
+            ? [
+                { accountId: inventoryAccount, debit: net.toFixed(4), description: 'زيادة جرد' },
+                { accountId: counterAccount, credit: net.toFixed(4), description: 'زيادة جرد' },
+              ]
+            : [
+                { accountId: counterAccount, debit: net.abs().toFixed(4), description: 'عجز جرد' },
+                { accountId: inventoryAccount, credit: net.abs().toFixed(4), description: 'عجز جرد' },
+              ],
+          sourceType: 'stock_adjustment',
+          sourceId: id,
+          idempotencyKey: `stock-adjustment:${id}`,
+        });
+        journalEntryId = entry?.id;
+      }
+
+      await tx
+        .update(stockAdjustments)
+        .set({
+          status: 'posted',
+          approvedAt: new Date(),
+          approvedBy: getRequestContext().tenant?.userId ?? null,
+          journalEntryId: journalEntryId ?? adjustment.journalEntryId,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(stockAdjustments.tenantId, tenantId),
+            eq(stockAdjustments.id, id),
+            eq(stockAdjustments.status, 'draft'),
+          ),
+        );
+      return this.getAdjustmentInTx(tx, tenantId, id);
+    });
+  }
+
+  /** Items at or below their reorder point — the desktop's `CalcItemsStockLimits`. */
+  async belowMinimum(tenantId: string, warehouseId?: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select({ item: items, balance: stockBalances })
+        .from(stockBalances)
+        .innerJoin(items, eq(items.id, stockBalances.itemId))
+        .where(
+          and(
+            eq(stockBalances.tenantId, tenantId),
+            warehouseId ? eq(stockBalances.warehouseId, warehouseId) : undefined,
+            sql`${stockBalances.quantity} <= ${items.minQty}`,
+            sql`${items.minQty} > 0`,
+            isNull(items.deletedAt),
+          ),
+        )
+        .orderBy(asc(items.nameAr))
+        .limit(200);
+      return rows.map((row) => ({
+        itemId: row.item.id,
+        sku: row.item.sku,
+        nameAr: row.item.nameAr,
+        warehouseId: row.balance.warehouseId,
+        quantity: row.balance.quantity,
+        minQty: row.item.minQty,
+        maxQty: row.item.maxQty,
+        shortage: new Decimal(row.item.minQty).minus(row.balance.quantity).toFixed(4),
+      }));
+    });
   }
 }
 

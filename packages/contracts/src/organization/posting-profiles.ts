@@ -26,6 +26,7 @@ export const docTypeSchema = z.enum([
   'payment_voucher',
   'journal_entry',
   'stock_adjustment',
+  'stock_voucher',
   'stock_transfer',
   'cash_transfer',
   'payroll_run',
@@ -61,6 +62,17 @@ export const POST_PROFILE_ACCOUNT_KEYS = [
   'exciseTaxAccountId',
   'inventoryAccountId',
   'cogsAccountId',
+  /**
+   * Phase 05 — the three accounts the stock ledger needs besides `inventory`:
+   *
+   * - `openingBalanceAccountId`: the other side of بضاعة أول المدة (opening stock).
+   * - `inventoryAdjustmentAccountId`: variance — shortage and overage found by a count.
+   * - `stockInTransitAccountId`: goods on the road between two warehouses, so a
+   *   transfer in transit belongs to neither warehouse's balance.
+   */
+  'openingBalanceAccountId',
+  'inventoryAdjustmentAccountId',
+  'stockInTransitAccountId',
   'cashAccountId',
   'bankAccountId',
   'receivableAccountId',

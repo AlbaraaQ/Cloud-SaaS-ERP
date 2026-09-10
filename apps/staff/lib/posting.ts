@@ -32,6 +32,9 @@ export type PostingProfile = {
   vatInputAccountId?: string | null;
   inventoryAccountId?: string | null;
   cogsAccountId?: string | null;
+  openingBalanceAccountId?: string | null;
+  inventoryAdjustmentAccountId?: string | null;
+  stockInTransitAccountId?: string | null;
   cashAccountId?: string | null;
   bankAccountId?: string | null;
   receivableAccountId?: string | null;
@@ -50,6 +53,9 @@ export const POSTING_ACCOUNT_LABELS: Record<string, string> = {
   vatInputAccountId: 'ضريبة المدخلات',
   inventoryAccountId: 'المخزون',
   cogsAccountId: 'تكلفة البضاعة المباعة',
+  openingBalanceAccountId: 'بضاعة أول المدة',
+  inventoryAdjustmentAccountId: 'تسويات المخزون (عجز/زيادة)',
+  stockInTransitAccountId: 'بضاعة تحت التحويل',
   cashAccountId: 'الصندوق',
   bankAccountId: 'البنك',
   receivableAccountId: 'العملاء (ذمم مدينة)',

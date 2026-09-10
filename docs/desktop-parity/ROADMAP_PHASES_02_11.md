@@ -40,16 +40,19 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   shift open/close with expected-vs-actual + variance entry, cashier permissions.
 - [ ] Accept: full shift lifecycle posts balanced entries; variance account configurable.
 
-## Phase 05 — Inventory
+## Phase 05 — Inventory ✅ (2026-09, `PHASE_05_INVENTORY.md`)
 
-- [ ] Desktop: `Class/ItemOper*.cs`, `frmItems*` (35 forms: balances, serials,
-  barcode, expiry, limits, transfers `frmInventoryTransfer*`, production
-  `frmProductionOrder*`, `frmInputs*`, `frmInvInOutput*`).
-- [ ] Cloud: `modules/inventory/**`, staff `/inventory/**`.
-- [ ] Behaviours: stock in/out (invType 4/5), branch transfers (invType 8 both legs),
-  serial tracking in/out, multi-barcode + multi-unit conversion, expiry batches,
-  reorder limits, opening stock (invType 9), item assembly/production.
-- [ ] Accept: every movement keeps stock ledger balanced; transfer creates both legs.
+- [x] Desktop: `frmInvInOutput*` (invType 4 إدخال / 5 إخراج / 9 بضاعة أول المدة — all
+  saved with `entry = null`, ledger repaired later by `frmReGenerateEntries`),
+  `frmInventoryTransfer*`, `Class/Inventory.UpdateItemStock`, `Class/ItemOper*`.
+- [x] Cloud: `modules/inventory/**` (vouchers, adjustments, transfers, below-minimum),
+  staff `/inventory/vouchers`, `/inventory/adjustments`, `/inventory/transfers`,
+  `/inventory/below-minimum`, `/inventory/items`.
+- [x] Behaviours: stock in/out + opening as numbered postable documents with balanced
+  journals; transfer both legs through بضاعة تحت التحويل (value-neutral); multi-line
+  count with approval; serial/lot enforcement; reorder limits; negative-stock override.
+- [ ] Still open: multi-barcode + multi-unit conversion, expiry alert report, printing
+  the stock documents (phase 10). Production/assembly keeps its own service.
 
 ## Phase 06 — Treasury
 

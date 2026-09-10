@@ -64,17 +64,11 @@ export class OrgProvisioningService {
   constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
 
   async provisionOrgDefaults(tenantId: string, options: ProvisionOptions = {}): Promise<OrgDefaults> {
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      this.provisionInTx(tx, tenantId, options),
-    );
+    return withTenantTx(this.database.db, tenantId, (tx) => this.provisionInTx(tx, tenantId, options));
   }
 
   /** Same work inside a caller's transaction — the tenant factory creates both at once. */
-  async provisionInTx(
-    tx: DrizzleTx,
-    tenantId: string,
-    options: ProvisionOptions = {},
-  ): Promise<OrgDefaults> {
+  async provisionInTx(tx: DrizzleTx, tenantId: string, options: ProvisionOptions = {}): Promise<OrgDefaults> {
     const actorUserId = options.actorUserId ?? null;
     const now = new Date();
     const code = (options.code ?? DEFAULT_CODE).toUpperCase();
@@ -207,7 +201,10 @@ export class OrgProvisioningService {
     }
 
     if (created) {
-      this.logger.log({ tenantId, branchId, warehouseId, cashLocationId }, 'organization defaults provisioned');
+      this.logger.log(
+        { tenantId, branchId, warehouseId, cashLocationId },
+        'organization defaults provisioned',
+      );
     }
 
     return { tenantId, branchId, warehouseId, cashLocationId, priceListId, currencyCode, created };
@@ -231,17 +228,25 @@ export class OrgProvisioningService {
     actorUserId: string | null,
     now: Date,
   ): Promise<string | null> {
-    const [existing] = await tx
-      .select({ id: accounts.id })
+    /**
+     * An existing chart is *completed*, never rewritten. Later phases add leaves to
+     * `DEMO_CHART_OF_ACCOUNTS` (بضاعة تحت التحويل، تسويات المخزون …) and a tenant
+     * provisioned before them would otherwise post every new document straight into
+     * `ACCOUNT_PROFILE_MISSING` — with no way out short of hand-editing the chart.
+     * Inserting the codes that are missing, and only those, keeps an accountant's
+     * own edits intact while letting an old tenant use new features.
+     */
+    const existingRows = await tx
+      .select({ id: accounts.id, code: accounts.code, path: accounts.path, level: accounts.level })
       .from(accounts)
-      .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)))
-      .limit(1);
-    if (existing) return null;
+      .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)));
+    const idByCode = new Map(existingRows.map((row) => [row.code.trim(), row.id]));
+    const pathByCode = new Map(existingRows.map((row) => [row.code.trim(), row.path]));
+    const levelByCode = new Map(existingRows.map((row) => [row.code.trim(), row.level]));
 
-    const idByCode = new Map<string, string>();
-    const pathByCode = new Map<string, string>();
-    const levelByCode = new Map<string, number>();
+    let inserted = 0;
     for (const account of DEMO_CHART_OF_ACCOUNTS) {
+      if (idByCode.has(account.code)) continue;
       const id = newId();
       const parentId = account.parent ? idByCode.get(account.parent) : undefined;
       const parentPath = account.parent ? pathByCode.get(account.parent) : undefined;
@@ -257,7 +262,9 @@ export class OrgProvisioningService {
         level,
         path,
         type: account.type,
-        normalBalance: account.normalBalance ?? (account.type === 'asset' || account.type === 'expense' ? 'debit' : 'credit'),
+        normalBalance:
+          account.normalBalance ??
+          (account.type === 'asset' || account.type === 'expense' ? 'debit' : 'credit'),
         isPostable: account.postable !== false,
         allowManual: true,
         createdAt: now,
@@ -268,9 +275,14 @@ export class OrgProvisioningService {
       idByCode.set(account.code, id);
       pathByCode.set(account.code, path);
       levelByCode.set(account.code, level);
+      inserted += 1;
     }
-    this.logger.log({ tenantId, count: idByCode.size }, 'desktop chart of accounts seeded');
-    return idByCode.get('1211001') ?? null;
+
+    if (inserted > 0) {
+      this.logger.log({ tenantId, inserted, total: idByCode.size }, 'desktop chart of accounts seeded');
+    }
+    // A chart that already existed keeps whatever account its main safe is linked to.
+    return existingRows.length > 0 ? null : (idByCode.get('1211001') ?? null);
   }
 
   /**
@@ -290,7 +302,7 @@ export class OrgProvisioningService {
     now: Date,
   ): Promise<boolean> {
     const [existing] = await tx
-      .select({ id: branchPostingProfiles.id })
+      .select({ id: branchPostingProfiles.id, mapping: branchPostingProfiles.mapping })
       .from(branchPostingProfiles)
       .where(
         and(
@@ -300,19 +312,43 @@ export class OrgProvisioningService {
         ),
       )
       .limit(1);
-    if (existing) return false;
-
     const codes = [...new Set(Object.values(DEMO_POSTING_PROFILE))];
     const rows = await tx
       .select({ id: accounts.id, code: accounts.code })
       .from(accounts)
       .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt), inArray(accounts.code, codes)));
-    const byCode = new Map(rows.map((row) => [row.code, row.id]));
+    const byCode = new Map(rows.map((row) => [row.code.trim(), row.id]));
     const mapping: Record<string, string | number> = { version: 1 };
     for (const [key, code] of Object.entries(DEMO_POSTING_PROFILE)) {
       const accountId = byCode.get(code);
       if (accountId) mapping[key] = accountId;
     }
+
+    /**
+     * The same reasoning as the chart: when a later phase adds a key
+     * (`stockInTransitAccountId` …) an already-provisioned tenant would never see it.
+     * Keys the accountant has *cleared* stay cleared — we only fill ones that are
+     * absent, never overwrite ones she changed.
+     */
+    if (existing) {
+      const current = (existing.mapping ?? {}) as Record<string, unknown>;
+      const missing = Object.entries(mapping).filter(
+        ([key, value]) => key !== 'version' && typeof value === 'string' && !(key in current),
+      );
+      if (!missing.length) return false;
+      const nextMapping: Record<string, unknown> = {
+        ...current,
+        ...Object.fromEntries(missing),
+        version: Number(current.version ?? 1) + 1,
+      };
+      await tx
+        .update(branchPostingProfiles)
+        .set({ mapping: nextMapping, updatedAt: now, updatedBy: actorUserId })
+        .where(eq(branchPostingProfiles.id, existing.id));
+      this.logger.log({ tenantId, added: missing.map(([key]) => key) }, 'tenant posting profile completed');
+      return true;
+    }
+
     await tx.insert(branchPostingProfiles).values({
       id: newId(),
       tenantId,

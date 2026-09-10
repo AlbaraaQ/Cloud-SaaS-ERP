@@ -10,27 +10,161 @@ import { apiList } from './api';
 
 export type Option = { id: string; label: string };
 
-export type Branch = { id: string; code?: string; nameAr?: string; name_ar?: string; nameEn?: string; isDefault?: boolean };
-export type Warehouse = { id: string; code?: string; name?: string; nameAr?: string; name_ar?: string; branchId?: string; isDefault?: boolean };
-export type Item = { id: string; sku: string; barcode?: string | null; nameAr?: string; name_ar?: string; nameEn?: string; salePrice?: string | null; sale_price?: string | null; purchasePrice?: string | null; purchase_price?: string | null; categoryId?: string; category_id?: string; baseUnitId?: string; base_unit_id?: string; taxGroupId?: string | null; tax_group_id?: string | null; kind?: string; showInPos?: boolean };
-export type Party = { id: string; code?: string; name: string; paymentMethodId?: string | null; kind?: string; phone?: string | null; taxNo?: string | null; tax_no?: string | null; creditLimit?: string | null };
-export type CashLocation = { id: string; name: string; kind?: string; accountId?: string | null; account_id?: string | null; currencyCode?: string; currency_code?: string; isDefault?: boolean; is_default?: boolean; branchId?: string | null; branch_id?: string | null };
-export type Category = { id: string; code: string; nameAr?: string; name_ar?: string; nameEn?: string | null; parentId?: string | null };
+export type Branch = {
+  id: string;
+  code?: string;
+  nameAr?: string;
+  name_ar?: string;
+  nameEn?: string;
+  isDefault?: boolean;
+};
+export type Warehouse = {
+  id: string;
+  code?: string;
+  name?: string;
+  nameAr?: string;
+  name_ar?: string;
+  branchId?: string;
+  isDefault?: boolean;
+};
+export type Item = {
+  id: string;
+  sku: string;
+  barcode?: string | null;
+  nameAr?: string;
+  name_ar?: string;
+  nameEn?: string;
+  salePrice?: string | null;
+  sale_price?: string | null;
+  purchasePrice?: string | null;
+  purchase_price?: string | null;
+  categoryId?: string;
+  category_id?: string;
+  baseUnitId?: string;
+  base_unit_id?: string;
+  taxGroupId?: string | null;
+  tax_group_id?: string | null;
+  kind?: string;
+  showInPos?: boolean;
+  minQty?: string | null;
+  min_qty?: string | null;
+  maxQty?: string | null;
+  max_qty?: string | null;
+  trackLot?: boolean;
+  track_lot?: boolean;
+  trackSerial?: boolean;
+  track_serial?: boolean;
+};
+export type Party = {
+  id: string;
+  code?: string;
+  name: string;
+  paymentMethodId?: string | null;
+  kind?: string;
+  phone?: string | null;
+  taxNo?: string | null;
+  tax_no?: string | null;
+  creditLimit?: string | null;
+};
+export type CashLocation = {
+  id: string;
+  name: string;
+  kind?: string;
+  accountId?: string | null;
+  account_id?: string | null;
+  currencyCode?: string;
+  currency_code?: string;
+  isDefault?: boolean;
+  is_default?: boolean;
+  branchId?: string | null;
+  branch_id?: string | null;
+};
+export type Category = {
+  id: string;
+  code: string;
+  nameAr?: string;
+  name_ar?: string;
+  nameEn?: string | null;
+  parentId?: string | null;
+};
 export type Unit = { id: string; code: string; nameAr?: string; name_ar?: string; nameEn?: string | null };
-export type TaxGroup = { id: string; nameAr?: string; name_ar?: string; nameEn?: string | null; rate: string; isInclusiveDefault?: boolean };
+export type TaxGroup = {
+  id: string;
+  nameAr?: string;
+  name_ar?: string;
+  nameEn?: string | null;
+  rate: string;
+  isInclusiveDefault?: boolean;
+};
 export type Salesman = { id: string; name: string; active?: boolean };
-export type CostCenter = { id: string; code: string; nameAr?: string; name_ar?: string; nameEn?: string | null; parentId?: string | null; branchId?: string | null };
-export type FiscalPeriod = { id: string; name: string; status: string; startDate?: string; start_date?: string; endDate?: string; end_date?: string; fiscalYearId?: string; fiscal_year_id?: string };
-export type Employee = { id: string; employeeNo?: string; employee_no?: string; name: string; departmentId?: string | null; jobId?: string | null; status?: string; salaryComponents?: Record<string, string>; salary_components?: Record<string, string> };
+export type CostCenter = {
+  id: string;
+  code: string;
+  nameAr?: string;
+  name_ar?: string;
+  nameEn?: string | null;
+  parentId?: string | null;
+  branchId?: string | null;
+};
+export type FiscalPeriod = {
+  id: string;
+  name: string;
+  status: string;
+  startDate?: string;
+  start_date?: string;
+  endDate?: string;
+  end_date?: string;
+  fiscalYearId?: string;
+  fiscal_year_id?: string;
+};
+export type Employee = {
+  id: string;
+  employeeNo?: string;
+  employee_no?: string;
+  name: string;
+  departmentId?: string | null;
+  jobId?: string | null;
+  status?: string;
+  salaryComponents?: Record<string, string>;
+  salary_components?: Record<string, string>;
+};
+/** A lot (دفعة) — expiry tracking for a lot-controlled item. */
+export type Lot = {
+  id: string;
+  itemId: string;
+  item_id?: string;
+  lotNo: string;
+  lot_no?: string;
+  expiryDate?: string | null;
+  expiry_date?: string | null;
+};
+/** A serialised unit (رقم تسلسلي) — one tracked piece of stock. */
+export type Serial = {
+  id: string;
+  itemId: string;
+  item_id?: string;
+  serialNo: string;
+  serial_no?: string;
+  status: string;
+  warehouseId?: string | null;
+  warehouse_id?: string | null;
+};
 
 /** Both spellings exist in the API surface (DTOs vs. raw rows); ask once, here. */
-export function arabicName(row: { nameAr?: string | null; name_ar?: string | null; nameEn?: string | null; name?: string | null; code?: string }): string {
+export function arabicName(row: {
+  nameAr?: string | null;
+  name_ar?: string | null;
+  nameEn?: string | null;
+  name?: string | null;
+  code?: string;
+}): string {
   return row.nameAr ?? row.name_ar ?? row.name ?? row.nameEn ?? row.code ?? '—';
 }
 
 export const listBranches = () => apiList<Branch>('/branches');
 export const listWarehouses = () => apiList<Warehouse>('/warehouses');
-export const listItems = (q?: string) => apiList<Item>(`/organization/catalog/items${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+export const listItems = (q?: string) =>
+  apiList<Item>(`/organization/catalog/items${q ? `?q=${encodeURIComponent(q)}` : ''}`);
 export const listCategories = () => apiList<Category>('/organization/catalog/categories');
 export const listUnits = () => apiList<Unit>('/organization/catalog/units');
 export const listTaxGroups = () => apiList<TaxGroup>('/organization/catalog/tax-groups');
@@ -40,6 +174,10 @@ export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');
 export const listCostCenters = () => apiList<CostCenter>('/cost-centers');
 export const listPeriods = () => apiList<FiscalPeriod>('/fiscal-periods');
 export const listEmployees = () => apiList<Employee>('/hrm/employees');
+export const listLots = (itemId?: string) =>
+  apiList<Lot>(`/inventory/lots${itemId ? `?item_id=${itemId}` : ''}`);
+export const listSerials = (itemId?: string) =>
+  apiList<Serial>(`/inventory/serials${itemId ? `?item_id=${itemId}` : ''}`);
 
 export function branchOptions(rows: Branch[]): Option[] {
   return rows.map((row) => ({ id: row.id, label: `${row.code ? `${row.code} — ` : ''}${arabicName(row)}` }));
@@ -105,6 +243,11 @@ export function dateTime(value: string | Date | null | undefined): string {
 
 export function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** A running money total computed in the browser — never sent to the API. */
+export function amountLabel(value: number): string {
+  return Number.isFinite(value) ? String(Math.round(value * 10000) / 10000) : '0';
 }
 
 export const DOC_STATUS_LABELS: Record<string, string> = {

@@ -89,6 +89,10 @@ type AccountSeed = {
 export const DEMO_CHART_OF_ACCOUNTS: AccountSeed[] = [
   ...DESKTOP_DEFAULT_COA,
   { code: '3200004', nameAr: 'تكلفة المبيعات', type: 'expense', parent: '32' },
+  // Phase 05 extensions — a perpetual stock ledger cannot post transfers or counts
+  // without an in-transit and a variance account, and the desktop chart has none.
+  { code: '1270003', nameAr: 'بضاعة تحت التحويل', type: 'asset', parent: '127' },
+  { code: '3121004', nameAr: 'تسويات المخزون', type: 'expense', parent: '3121' },
 ];
 
 /**
@@ -133,6 +137,9 @@ export const DEMO_POSTING_PROFILE: Record<string, string> = {
   exciseTaxAccountId: '2222002',
   inventoryAccountId: '1270001',
   cogsAccountId: '3200004',
+  openingBalanceAccountId: '1270002',
+  inventoryAdjustmentAccountId: '3121004',
+  stockInTransitAccountId: '1270003',
   cashAccountId: '1211001',
   bankAccountId: '1221001',
   receivableAccountId: '12310001',
@@ -149,7 +156,13 @@ const DEMO_COST_CENTERS = [
 export const DEMO_PLANS = [
   { code: 'starter-monthly', name: 'الباقة الأساسية', interval: 'month', amount: '199.00', currency: 'SAR' },
   { code: 'pro-monthly', name: 'الباقة الاحترافية', interval: 'month', amount: '499.00', currency: 'SAR' },
-  { code: 'pro-yearly', name: 'الباقة الاحترافية (سنوي)', interval: 'year', amount: '4990.00', currency: 'SAR' },
+  {
+    code: 'pro-yearly',
+    name: 'الباقة الاحترافية (سنوي)',
+    interval: 'year',
+    amount: '4990.00',
+    currency: 'SAR',
+  },
 ];
 
 function normalSideOf(account: AccountSeed): 'debit' | 'credit' {
@@ -205,7 +218,9 @@ export async function seedDemoData(
     await linkCashAccounts(client, tenantId, org.safeId, org.bankId, chart.byCode);
 
     const catalog = await seedCatalogBasics(client, tenantId, chart.byCode);
-    log(`seed  catalog: ${catalog.units} units, ${catalog.categories} categories, ${catalog.taxGroups} tax groups`);
+    log(
+      `seed  catalog: ${catalog.units} units, ${catalog.categories} categories, ${catalog.taxGroups} tax groups`,
+    );
 
     const costCenters = await seedCostCenters(client, tenantId, org.branchId);
     log(`seed  cost centers: ${costCenters}`);
@@ -310,7 +325,9 @@ async function seedOrganisation(
     [tenantId, currencyCode, ['KWD', 'BHD', 'OMR'].includes(currencyCode) ? 3 : 2],
   );
 
-  const companyName = await client.query<{ name: string }>(`SELECT name FROM tenants WHERE id = $1`, [tenantId]);
+  const companyName = await client.query<{ name: string }>(`SELECT name FROM tenants WHERE id = $1`, [
+    tenantId,
+  ]);
   await client.query(
     `INSERT INTO company_profiles (tenant_id, name_ar, name_en, tax_no, cr_no, phones, email, country_code)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
@@ -376,7 +393,11 @@ async function seedOrganisation(
           tenantId,
           branch,
           currencyCode,
-          JSON.stringify({ bankName: 'البنك الأهلي', iban: 'SA0000000000000000000000', accountNo: '000000000000' }),
+          JSON.stringify({
+            bankName: 'البنك الأهلي',
+            iban: 'SA0000000000000000000000',
+            accountNo: '000000000000',
+          }),
         ],
       ),
   );
@@ -514,7 +535,14 @@ async function seedCatalogBasics(
       `INSERT INTO tax_groups (id, tenant_id, name_ar, name_en, rate, vat_account_id)
        SELECT $1, $2, $3, $4, $5, $6
        WHERE NOT EXISTS (SELECT 1 FROM tax_groups WHERE tenant_id = $2 AND name_ar = $3 AND deleted_at IS NULL)`,
-      [newId(), tenantId, group.nameAr, group.nameEn, group.rate, group.vatAccountCode ? (byCode.get(group.vatAccountCode) ?? null) : null],
+      [
+        newId(),
+        tenantId,
+        group.nameAr,
+        group.nameEn,
+        group.rate,
+        group.vatAccountCode ? (byCode.get(group.vatAccountCode) ?? null) : null,
+      ],
     );
   }
 
@@ -645,7 +673,16 @@ async function seedOpeningEntry(
     `INSERT INTO journal_entries (id, tenant_id, branch_id, fiscal_period_id, date, number, kind, status,
                                   description, idempotency_key, posted_at)
      VALUES ($1, $2, $3, $4, $5, $6, 'manual', 'posted', $7, $8, now())`,
-    [entryId, tenantId, input.branchId, input.periodId, input.date, number, 'قيد افتتاحي — رأس المال', idempotencyKey],
+    [
+      entryId,
+      tenantId,
+      input.branchId,
+      input.periodId,
+      input.date,
+      number,
+      'قيد افتتاحي — رأس المال',
+      idempotencyKey,
+    ],
   );
 
   const lines: Array<[string, string, string, string]> = [

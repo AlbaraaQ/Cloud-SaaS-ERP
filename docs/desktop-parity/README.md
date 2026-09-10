@@ -26,7 +26,7 @@ Postgres, multi-tenant, RBAC).
 | 02 | Sales invoice engine (calc, save, post, returns, notes) | ✅ done | `PHASE_02_SALES_ENGINE.md` |
 | 03 | Purchase engine (invoices, returns, landed cost) | ✅ done | `PHASE_03_PURCHASE_ENGINE.md` |
 | 04 | POS checkout + cashier shifts + day close | ✅ done | `PHASE_04_POS_SHIFTS.md` |
-| 05 | Inventory (stock in/out, transfers, serials, barcode, expiry) | ⬜ next | `ROADMAP_PHASES_02_11.md` |
+| 05 | Inventory (vouchers, transfers, counts, serials/lots, reorder) | ✅ done | `PHASE_05_INVENTORY.md` |
 | 06 | Treasury (receipts, payments, safes/banks, cheques) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 07 | Accounting (manual entries, periods, trial balance, cost centres) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 08 | HRM (employees, attendance, payroll, custody) | ⬜ | `ROADMAP_PHASES_02_11.md` |
@@ -37,3 +37,5 @@ Postgres, multi-tenant, RBAC).
 Deferred by the owner: marketing CMS, per-tenant mobile-shop module.
 Done earlier, outside this programme: RBAC reorganisation (PR #4), desktop chart
 seeding (112 accounts + COGS extension, `packages/database/src/desktop-coa.ts`).
+Phase 05 added two more leaves (115 accounts) and three posting-profile keys; an
+existing tenant is completed in place by `OrgProvisioningService`.
