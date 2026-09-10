@@ -14,12 +14,14 @@ import {
   listBranches,
   listItems,
   listParties,
+  listSalesmen,
   listTaxGroups,
   listWarehouses,
   partyLabel,
   type Branch,
   type Item,
   type Party,
+  type Salesman,
   type TaxGroup,
   type Warehouse,
 } from '../../../../lib/lookups';
@@ -34,6 +36,7 @@ export default function NewSalesInvoicePage() {
   const parties = useQuery<Party[]>(() => listParties('customer'), []);
   const items = useQuery<Item[]>(() => listItems(), []);
   const taxGroups = useQuery<TaxGroup[]>(() => listTaxGroups(), []);
+  const salesmen = useQuery<Salesman[]>(() => listSalesmen(), []);
 
   const [branchId, setBranchId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -108,15 +111,20 @@ export default function NewSalesInvoicePage() {
             </select>
           </label>
           <label className="field">
-            <span>المستودع</span>
+            <span>المستودع{filledLines(lines).some((line) => line.itemId) ? ' *' : ''}</span>
             <select className="input" value={effectiveWarehouse} onChange={(event) => setWarehouseId(event.target.value)}>
               <option value="">— بدون حركة مخزنية —</option>
-              {warehouseRows.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {arabicName(row)}
-                </option>
-              ))}
+              {warehouseRows
+                .filter((row) => !effectiveBranch || row.branchId === effectiveBranch)
+                .map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {arabicName(row)}
+                  </option>
+                ))}
             </select>
+            {filledLines(lines).some((line) => line.itemId) && !effectiveWarehouse && (
+              <span className="muted small">ترحيل فاتورة فيها أصناف مخزنية يتطلب اختيار مستودع.</span>
+            )}
           </label>
           <label className="field">
             <span>العميل</span>
@@ -143,11 +151,19 @@ export default function NewSalesInvoicePage() {
           )}
           <label className="field">
             <span>المندوب</span>
-            <input className="input" dir="ltr" placeholder="معرّف المندوب (اختياري)" value={salesmanId} onChange={(event) => setSalesmanId(event.target.value)} />
+            <select className="input" value={salesmanId} onChange={(event) => setSalesmanId(event.target.value)}>
+              <option value="">— بدون مندوب —</option>
+              {(salesmen.data ?? []).filter((row) => row.active !== false).map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>خصم على الفاتورة</span>
             <input className="input" dir="ltr" inputMode="decimal" value={invoiceDiscountText} onChange={(event) => setInvoiceDiscountText(event.target.value)} />
+            <span className="muted small">يُخفّض وعاء الضريبة قبل احتسابها.</span>
           </label>
           <label className="field">
             <span>الأسعار شاملة الضريبة</span>

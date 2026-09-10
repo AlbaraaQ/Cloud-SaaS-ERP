@@ -3,6 +3,8 @@ import { inflateRawSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
+
+import { OrgProvisioningService } from '../src/modules/organization/provisioning/org-provisioning.service.js';
 import { api } from './http.js';
 import { createTestApp, type TestApp } from './test-app.js';
 
@@ -55,6 +57,7 @@ describe('document printing and master-data editing', () => {
         'sales.view',
         'sales.invoice.create',
         'sales.invoice.post',
+        'accounting.period.close',
         'sales.salesman.manage',
         'treasury.view',
         'treasury.voucher.create',
@@ -65,8 +68,16 @@ describe('document printing and master-data editing', () => {
       ],
     });
 
-    const branch = await api(ctx.server, 'post', '/api/v1/branches', { token: actor.token, body: { code: 'MAIN', nameAr: 'الفرع الرئيسي' } });
-    branchId = body(branch).id;
+
+    const defaults = await ctx.app.get(OrgProvisioningService).provisionOrgDefaults(actor.tenantId);
+    branchId = defaults.branchId;
+
+    const year = new Date().getUTCFullYear();
+    const fiscal = await api(ctx.server, 'post', '/api/v1/fiscal-years', {
+      token: actor.token,
+      body: { name: `FY${year}`, startDate: `${year}-01-01`, endDate: `${year}-12-31` },
+    });
+    expect(fiscal.status).toBe(201);
     const warehouse = await api(ctx.server, 'post', '/api/v1/warehouses', { token: actor.token, body: { branchId, code: 'WH1', name: 'المستودع الرئيسي' } });
     warehouseId = body(warehouse).id;
     const unit = await api(ctx.server, 'post', '/api/v1/organization/catalog/units', { token: actor.token, body: { code: 'PCS', nameAr: 'حبة' } });

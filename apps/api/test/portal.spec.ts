@@ -3,6 +3,8 @@ import { createServer, type Server } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
+
+import { OrgProvisioningService } from '../src/modules/organization/provisioning/org-provisioning.service.js';
 import { api } from './http.js';
 import { createTestApp, type TestApp } from './test-app.js';
 
@@ -127,11 +129,21 @@ describe('customer portal', () => {
         'sales.view',
         'sales.invoice.create',
         'sales.invoice.post',
+        'accounting.period.close',
         'reporting.view',
       ],
     });
 
-    branchId = body(await api(ctx.server, 'post', '/api/v1/branches', { token: staff.token, body: { code: 'MAIN', nameAr: 'الفرع الرئيسي' } })).id;
+
+    const defaults = await ctx.app.get(OrgProvisioningService).provisionOrgDefaults(staff.tenantId);
+    branchId = defaults.branchId;
+
+    const year = new Date().getUTCFullYear();
+    const fiscal = await api(ctx.server, 'post', '/api/v1/fiscal-years', {
+      token: staff.token,
+      body: { name: `FY${year}`, startDate: `${year}-01-01`, endDate: `${year}-12-31` },
+    });
+    expect(fiscal.status).toBe(201);
     warehouseId = body(await api(ctx.server, 'post', '/api/v1/warehouses', { token: staff.token, body: { branchId, code: 'WH1', name: 'المستودع' } })).id;
     const unitId = body(await api(ctx.server, 'post', '/api/v1/organization/catalog/units', { token: staff.token, body: { code: 'PCE', nameAr: 'حبة' } })).id;
     const categoryId = body(await api(ctx.server, 'post', '/api/v1/organization/catalog/categories', { token: staff.token, body: { code: 'GEN', nameAr: 'عام' } })).id;

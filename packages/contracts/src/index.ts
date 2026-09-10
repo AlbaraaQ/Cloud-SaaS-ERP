@@ -70,6 +70,7 @@ export type {
 export * from './platform/index.js';
 export * from './organization/index.js';
 export * from './devices.js';
+export * from './arabic-words.js';
 export * from './invoice-math.js';
 export * from './inventory-valuation.js';
 export * from './inventory-lifecycle.js';

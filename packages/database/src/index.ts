@@ -25,5 +25,5 @@ export { DEMO_TENANT_CODE, seedPermissionRegistry, seedPlatform } from './seed.j
 export type { SeedOptions, SeedReport } from './seed.js';
 export { DESKTOP_DEFAULT_COA } from './desktop-coa.js';
 export type { DesktopSeedAccount } from './desktop-coa.js';
-export { DEMO_CHART_OF_ACCOUNTS, DEMO_PLANS, seedDefaultChartOfAccounts, seedDemoData } from './seed-demo.js';
+export { DEMO_CHART_OF_ACCOUNTS, DEMO_PLANS, DEMO_POSTING_PROFILE, seedDefaultChartOfAccounts, seedDemoData } from './seed-demo.js';
 export type { DemoSeedOptions, DemoSeedReport, DemoUserSpec } from './seed-demo.js';

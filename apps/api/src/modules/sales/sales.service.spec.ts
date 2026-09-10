@@ -38,7 +38,7 @@ describe('SalesService phase 10 lifecycle guards', () => {
 
   it('requires a fiscal period before inventory side effects', async () => {
     const service = Object.create(SalesService.prototype) as SalesService;
-    service.get = vi.fn().mockResolvedValue({ id: 'invoice-1', status: 'draft', kind: 'sale', branchId: 'branch-1', total: '10' }) as never;
+    service.get = vi.fn().mockResolvedValue({ id: 'invoice-1', status: 'draft', kind: 'sale', branchId: 'branch-1', warehouseId: 'warehouse-1', partyId: 'party-1', total: '10' }) as never;
     const record = vi.fn();
     Object.assign(service as unknown as Record<string, unknown>, {
       inventory: { record },

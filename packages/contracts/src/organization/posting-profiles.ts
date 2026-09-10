@@ -58,6 +58,7 @@ export const POST_PROFILE_ACCOUNT_KEYS = [
   'discountReceivedAccountId',
   'vatOutputAccountId',
   'vatInputAccountId',
+  'exciseTaxAccountId',
   'inventoryAccountId',
   'cogsAccountId',
   'cashAccountId',

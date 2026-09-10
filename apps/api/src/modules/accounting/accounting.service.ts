@@ -388,6 +388,29 @@ export class AccountingService {
     return { branchId: resolvedBranchId, fiscalPeriodId: resolvedPeriodId };
   }
 
+  /**
+   * Resolves the open fiscal period containing `date` (every auto-posting engine
+   * calls this when the caller names no period). Throws `FISCAL_PERIOD_CLOSED`
+   * when the date falls in no open period — back-dating into a closed period is
+   * never silently re-routed, the accountant reopens or picks a period explicitly.
+   */
+  async openPeriodForDateInTx(tx: DrizzleTx, tenantId: string, date: string): Promise<string> {
+    const [period] = await tx
+      .select({ id: fiscalPeriods.id })
+      .from(fiscalPeriods)
+      .where(
+        and(
+          eq(fiscalPeriods.tenantId, tenantId),
+          eq(fiscalPeriods.status, 'open'),
+          lte(fiscalPeriods.startDate, date),
+          gte(fiscalPeriods.endDate, date),
+        ),
+      )
+      .limit(1);
+    if (!period) throw new DomainError('FISCAL_PERIOD_CLOSED', `No open fiscal period contains ${date}`, 409);
+    return period.id;
+  }
+
   async postJournalInTx(tx: DrizzleTx, tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string }) {
     if (input.lines.length < 2) throw new DomainError('JOURNAL_LINES_REQUIRED', 'A journal entry needs at least two lines', 422);
     const debit = input.lines.reduce((sum, line) => sum.plus(line.debit ?? '0'), new Decimal(0));

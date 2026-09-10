@@ -61,7 +61,7 @@ export type DemoSeedReport = {
   costCenters: number;
   catalog: { units: number; categories: number; taxGroups: number };
   /** `created` the first time the tenant-wide posting profile is written. */
-  postingProfile: 'created' | 'existing';
+  postingProfile: 'created' | 'existing' | 'extended';
   fiscalYearId: string;
   periods: number;
   openingEntryNumber?: string;
@@ -130,6 +130,7 @@ export const DEMO_POSTING_PROFILE: Record<string, string> = {
   // The desktop seed ships a single VAT account shared by both sides.
   vatOutputAccountId: '2222001',
   vatInputAccountId: '2222001',
+  exciseTaxAccountId: '2222002',
   inventoryAccountId: '1270001',
   cogsAccountId: '3200004',
   cashAccountId: '1211001',
@@ -524,7 +525,7 @@ async function seedPostingProfile(
   client: Client,
   tenantId: string,
   byCode: Map<string, string>,
-): Promise<'created' | 'existing'> {
+): Promise<'created' | 'existing' | 'extended'> {
   const mapping: Record<string, string | number> = { version: 1 };
   for (const [key, code] of Object.entries(DEMO_POSTING_PROFILE)) {
     const accountId = byCode.get(code);
@@ -541,8 +542,20 @@ async function seedPostingProfile(
      RETURNING id`,
     [newId(), tenantId, JSON.stringify(mapping)],
   );
+  if (inserted.rowCount) return 'created';
 
-  return inserted.rowCount ? 'created' : 'existing';
+  // Tenants seeded before a mapping key existed (e.g. `exciseTaxAccountId`) keep
+  // their profile, but the missing defaults are merged in — keys the accountant
+  // already set are never touched.
+  const merged = await client.query(
+    `UPDATE branch_posting_profiles
+     SET mapping = $3::jsonb || mapping
+     WHERE tenant_id = $1 AND branch_id IS NULL AND doc_type = '*'
+       AND NOT (mapping ?& $2::text[])
+     RETURNING id`,
+    [tenantId, Object.keys(mapping).filter((key) => key !== 'version'), JSON.stringify(mapping)],
+  );
+  return merged.rowCount ? 'extended' : 'existing';
 }
 
 async function seedCostCenters(client: Client, tenantId: string, branchId: string): Promise<number> {

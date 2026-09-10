@@ -19,12 +19,10 @@ import {
   quantity,
   shortDate,
   statusLabel,
-  today,
   type CashLocation,
   type Item,
   type Party,
 } from '../../../../lib/lookups';
-import { cogsAmountFor, inventoryLinesFor, loadPostingProfile, periodForDate, requireAccount, salesJournalLines } from '../../../../lib/posting';
 import { useSession } from '../../../../lib/session';
 import { useQuery } from '../../../../lib/use-query';
 
@@ -61,6 +59,7 @@ export default function SalesInvoiceDetailPage() {
   const cashLocations = useQuery<CashLocation[]>(() => listCashLocations(), []);
 
   const [settlement, setSettlement] = useState<'credit' | 'cash' | 'bank'>('credit');
+  const [settleLocationId, setSettleLocationId] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
   const [payAmountText, setPayAmountText] = useState('');
@@ -78,7 +77,6 @@ export default function SalesInvoiceDetailPage() {
   }
 
   const doc = invoice.data;
-  const isReturn = doc.kind === 'sale_return';
   const partyName = doc.cashCustomerName
     ? `${doc.cashCustomerName} (نقدي)`
     : partyLabel((parties.data ?? []).find((row) => row.id === doc.partyId) ?? { id: '', name: '—' });
@@ -99,36 +97,22 @@ export default function SalesInvoiceDetailPage() {
   }
 
   async function post() {
-    const profile = await loadPostingProfile(doc.branchId, 'sales_invoice');
-    const period = await periodForDate(today());
-    if (!period) throw new ApiError(422, 'PERIOD_NOT_FOUND', 'لا توجد فترة محاسبية مفتوحة تغطي تاريخ اليوم.');
-
-    await apiPost(`/sales/invoices/${doc.id}/post`, {
-      fiscalPeriodId: period.id,
-      journalLines: salesJournalLines(
-        profile,
-        { subtotal: doc.subtotal, taxTotal: doc.taxTotal, total: doc.total },
-        { settlement, partyId: doc.partyId ?? undefined, isReturn, description: `فاتورة مبيعات ${doc.number ?? ''}`.trim() },
-      ),
-      inventoryLines: inventoryLinesFor(doc.lines.map((line) => ({ itemId: line.itemId ?? undefined, quantity: line.quantity })), doc.warehouseId ?? undefined, isReturn ? 'in' : 'out', 'sales_invoice'),
-    });
-
-    // Cost of sales, from what inventory actually valued the outgoing movements at.
-    if (!isReturn && doc.warehouseId) {
-      const cogsValue = await cogsAmountFor(doc.id, doc.warehouseId);
-      if (cogsValue > 0) {
-        await apiPost('/journal-entries', {
-          branchId: doc.branchId,
-          fiscalPeriodId: period.id,
-          date: today(),
-          description: `تكلفة البضاعة المباعة — ${doc.number ?? doc.id.slice(0, 8)}`,
-          lines: [
-            { accountId: requireAccount(profile, 'cogsAccountId'), debit: cogsValue.toFixed(4) },
-            { accountId: requireAccount(profile, 'inventoryAccountId'), credit: cogsValue.toFixed(4) },
-          ],
-        });
-      }
+    // The posting engine builds the journal from the branch's posting profile,
+    // relieves the warehouse at average cost, and stamps each line's cost — all
+    // in one transaction. The screen only declares how the invoice settles.
+    if (settlement !== 'credit' && !settleLocationId) {
+      throw new ApiError(422, 'VALIDATION_FAILED', 'اختر الصندوق أو البنك الذي استلم المبلغ.');
     }
+    const location = (cashLocations.data ?? []).find((row) => row.id === settleLocationId);
+    const settlementAccountId = location?.accountId ?? location?.account_id ?? undefined;
+    if (settlement !== 'credit' && !settlementAccountId) {
+      throw new ApiError(422, 'VALIDATION_FAILED', 'الموقع المختار غير مربوط بحساب محاسبي.');
+    }
+    await apiPost(`/sales/invoices/${doc.id}/post`, {
+      settlement,
+      settlementAccountId,
+      settlementCashLocationId: settleLocationId || undefined,
+    });
   }
 
   return (
@@ -186,6 +170,20 @@ export default function SalesInvoiceDetailPage() {
                   <option value="bank">بنك</option>
                 </select>
               </label>
+              {settlement !== 'credit' && (
+                <label className="field">
+                  <span>الصندوق / البنك المستلم *</span>
+                  <select className="input" value={settleLocationId} onChange={(event) => setSettleLocationId(event.target.value)}>
+                    <option value="">— اختر —</option>
+                    {(cashLocations.data ?? []).map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {cashLocationLabel(row)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="muted small">يُقيَّد المبلغ على حساب هذا الموقع وتُسجَّل دفعة بنفس القيمة.</span>
+                </label>
+              )}
               <button className="btn primary" type="button" disabled={busy} onClick={() => run(post, 'تم ترحيل الفاتورة وقيدها المحاسبي وحركتها المخزنية.')}>
                 {busy ? 'جارٍ الترحيل…' : 'ترحيل الفاتورة'}
               </button>

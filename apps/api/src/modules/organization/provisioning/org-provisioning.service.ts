@@ -1,12 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import {
   accounts,
   branches,
+  branchPostingProfiles,
   cashLocationBalances,
   cashLocations,
   currencies,
   DEMO_CHART_OF_ACCOUNTS,
+  DEMO_POSTING_PROFILE,
   newId,
   priceLists,
   tenants,
@@ -83,6 +85,7 @@ export class OrgProvisioningService {
     const currencyCode = await this.ensureBaseCurrency(tx, tenantId, actorUserId, now);
     const mainCashAccountId = await this.ensureChartOfAccounts(tx, tenantId, actorUserId, now);
     if (mainCashAccountId) created = true;
+    if (await this.ensurePostingProfile(tx, tenantId, actorUserId, now)) created = true;
 
     let branchId = await firstId(
       tx
@@ -268,6 +271,59 @@ export class OrgProvisioningService {
     }
     this.logger.log({ tenantId, count: idByCode.size }, 'desktop chart of accounts seeded');
     return idByCode.get('1211001') ?? null;
+  }
+
+  /**
+   * Seeds the tenant-wide posting profile (`branch NULL`, doc `*`) that every
+   * auto-posting engine resolves through `PostingProfilesService` — the cloud heir
+   * of the desktop `SettingGeneral.*Acc` defaults.
+   *
+   * Idempotent: an existing `*` profile is left untouched (the accountant may have
+   * customised it). Codes that resolve to no account are omitted rather than
+   * guessed — posting then fails with a named key error instead of corrupting the
+   * ledger. Returns whether a profile was created.
+   */
+  private async ensurePostingProfile(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<boolean> {
+    const [existing] = await tx
+      .select({ id: branchPostingProfiles.id })
+      .from(branchPostingProfiles)
+      .where(
+        and(
+          eq(branchPostingProfiles.tenantId, tenantId),
+          isNull(branchPostingProfiles.branchId),
+          eq(branchPostingProfiles.docType, '*'),
+        ),
+      )
+      .limit(1);
+    if (existing) return false;
+
+    const codes = [...new Set(Object.values(DEMO_POSTING_PROFILE))];
+    const rows = await tx
+      .select({ id: accounts.id, code: accounts.code })
+      .from(accounts)
+      .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt), inArray(accounts.code, codes)));
+    const byCode = new Map(rows.map((row) => [row.code, row.id]));
+    const mapping: Record<string, string | number> = { version: 1 };
+    for (const [key, code] of Object.entries(DEMO_POSTING_PROFILE)) {
+      const accountId = byCode.get(code);
+      if (accountId) mapping[key] = accountId;
+    }
+    await tx.insert(branchPostingProfiles).values({
+      id: newId(),
+      tenantId,
+      branchId: null,
+      docType: '*',
+      mapping,
+      createdAt: now,
+      createdBy: actorUserId,
+    });
+    this.logger.log({ tenantId, keys: Object.keys(mapping).length - 1 }, 'tenant posting profile seeded');
+    return true;
   }
 
   /**

@@ -1,28 +1,36 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { calculateInvoiceTotals, DomainError, newId } from '@erp/contracts';
 import {
+  accounts,
+  inventoryTransactions,
   invoicePayments,
+  items,
+  journalEntries,
+  journalEntryLines,
   offers,
   salesAdjustmentNotes,
   salesInvoiceLines,
   salesInvoices,
   salesmen,
+  stockBalances,
   withTenantTx,
   type DatabaseHandle,
+  type DrizzleTx,
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
+import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
 import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
 
 export type SalesLineInput = { itemId?: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
 export type SalesInvoiceInput = { branchId: string; warehouseId?: string; partyId?: string; salesmanId?: string; referenceInvoiceId?: string; validUntil?: string; kind?: 'sale' | 'sale_return' | 'credit_note' | 'debit_note' | 'quotation'; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; lines: SalesLineInput[]; cashCustomerName?: string; cashCustomerMobile?: string; orderType?: string };
 export type PaymentInput = { method: 'cash' | 'card' | 'bank' | 'credit' | 'split'; amount: string; idempotencyKey: string; cashLocationId?: string; reference?: string };
-export type PostingInput = { fiscalPeriodId?: string; journalLines?: { accountId: string; debit?: string; credit?: string; partyId?: string; description?: string }[]; inventoryLines?: InventoryLine[] };
+export type PostingInput = { fiscalPeriodId?: string; journalLines?: { accountId: string; debit?: string; credit?: string; partyId?: string; description?: string }[]; inventoryLines?: InventoryLine[]; settlement?: 'credit' | 'cash' | 'bank'; settlementAccountId?: string; settlementCashLocationId?: string };
 
 const money = (value: string) => new Decimal(value);
 
@@ -33,6 +41,7 @@ export class SalesService {
     private readonly inventory: InventoryService,
     private readonly accounting: AccountingService,
     private readonly sequences: SequencesService,
+    private readonly profiles: PostingProfilesService,
   ) {}
 
   async list(tenantId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salesInvoices).where(eq(salesInvoices.tenantId, tenantId)).orderBy(desc(salesInvoices.createdAt)).limit(100)); }
@@ -76,6 +85,28 @@ export class SalesService {
     if (invoice.status === 'posted') return invoice;
     if (invoice.status !== 'draft') throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only draft invoices can be posted', 409);
     if (invoice.kind === 'quotation') throw new DomainError('SALES_QUOTATION_NOT_POSTABLE', 'A quotation is converted into an invoice, never posted', 409);
+    // Desktop `SaveInvoice` gates, enforced at posting (drafts may stay incomplete).
+    // Service-only invoices (progress bills, retentions) carry no stock, so the
+    // warehouse gate applies only when stocked lines are present; callers that hand
+    // us no lines (unit mocks) stay on the conservative path and must pass one.
+    const stockedLines = (invoice.lines ?? []) as Array<{ itemId?: string | null; quantity?: string }>;
+    const candidateIds = stockedLines.filter((line) => line.itemId && money(line.quantity ?? '0').gt(0)).map((line) => line.itemId!);
+    // Unit mocks hand us no lines at all — stay conservative and require a warehouse.
+    let movesStock = invoice.lines === undefined || candidateIds.length > 0;
+    if (movesStock && invoice.lines !== undefined && candidateIds.length > 0 && !invoice.warehouseId) {
+      // Service-only invoices carry item rows too; check their kinds before gating.
+      const kinds = await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx.select({ kind: items.kind }).from(items).where(and(eq(items.tenantId, tenantId), inArray(items.id, candidateIds))),
+      );
+      movesStock = kinds.some((row) => row.kind === 'stock');
+    }
+    if ((invoice.kind === 'sale' || invoice.kind === 'sale_return') && movesStock && !invoice.warehouseId) {
+      throw new DomainError('SALES_WAREHOUSE_REQUIRED', 'A warehouse is required to post a stock-moving invoice', 422);
+    }
+    if ((invoice.kind === 'sale' || invoice.kind === 'debit_note') && money(invoice.total).lt(0)) {
+      throw new DomainError('SALES_TOTAL_INVALID', 'A sales total cannot be negative', 422);
+    }
+    if (!invoice.partyId && !invoice.cashCustomerName) throw new DomainError('SALES_CUSTOMER_REQUIRED', 'Party or cash customer name is required', 422);
     if (posting.journalLines?.length && !posting.fiscalPeriodId) throw new DomainError('SALES_FISCAL_PERIOD_REQUIRED', 'A fiscal period is required for accounting posting', 422);
 
     await withTenantTx(this.database.db, tenantId, async (tx) => {
@@ -84,29 +115,309 @@ export class SalesService {
       const prefix = locked.kind === 'sale_return' ? 'SR-' : locked.kind === 'credit_note' ? 'CN-' : locked.kind === 'debit_note' ? 'DN-' : 'SI-';
       const allocated = await this.sequences.next({ tenantId, branchId: locked.branchId, docType: locked.kind }, tx, { prefix, padding: 6 });
       const number = allocated.display;
+      const today = new Date().toISOString().slice(0, 10);
 
-      if (posting.inventoryLines?.length) await this.inventory.recordInTx(tx, tenantId, posting.inventoryLines.map((line) => ({ ...line, docType: line.docType || 'sales_invoice', docId: id })));
+      if (posting.inventoryLines?.length) {
+        await this.inventory.recordInTx(tx, tenantId, posting.inventoryLines.map((line) => ({ ...line, docType: line.docType || 'sales_invoice', docId: id })));
+      } else if (locked.warehouseId && (locked.kind === 'sale' || locked.kind === 'sale_return')) {
+        await this.recordAutoStock(tx, tenantId, locked);
+      }
+
       if (posting.journalLines?.length) {
         await this.accounting.postJournalInTx(tx, tenantId, {
           branchId: locked.branchId,
           fiscalPeriodId: posting.fiscalPeriodId!,
-          date: new Date().toISOString().slice(0, 10),
+          date: today,
           description: `Sales invoice ${number}`,
           lines: posting.journalLines,
           sourceType: 'sales_invoice',
           sourceId: id,
         });
+      } else if (money(locked.total).abs().gt(0)) {
+        const docType = locked.kind === 'sale_return' ? 'sales_return' : locked.kind === 'credit_note' ? 'credit_note' : locked.kind === 'debit_note' ? 'debit_note' : 'sales_invoice';
+        const profile = await this.profiles.resolvePostProfileInTx(tx, tenantId, locked.branchId, docType);
+        const fiscalPeriodId = posting.fiscalPeriodId ?? (await this.accounting.openPeriodForDateInTx(tx, tenantId, today));
+        const costRows = await tx
+          .select({ costTotal: salesInvoiceLines.costTotal })
+          .from(salesInvoiceLines)
+          .where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.invoiceId, id)));
+        const cogsTotal = costRows.reduce((sum, row) => sum.plus(row.costTotal ?? '0'), new Decimal(0));
+        const mapping = profile.mapping as unknown as Record<string, string | null | undefined>;
+        if (!posting.journalLines?.length && posting.settlement !== undefined && posting.settlement !== 'credit' && posting.settlementAccountId) {
+          const [settlementAccount] = await tx
+            .select({ id: accounts.id })
+            .from(accounts)
+            .where(and(eq(accounts.tenantId, tenantId), eq(accounts.id, posting.settlementAccountId)));
+          if (!settlementAccount) throw new DomainError('SALES_SETTLEMENT_ACCOUNT_INVALID', 'The settlement account does not belong to this tenant', 422, { field: 'settlementAccountId' });
+        }
+        const lines = this.buildAutoJournal(locked, mapping, cogsTotal, posting.settlement ?? 'credit', posting.settlementAccountId);
+        await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId: locked.branchId,
+          fiscalPeriodId,
+          date: today,
+          description: `Sales invoice ${number}`,
+          lines,
+          sourceType: 'sales_invoice',
+          sourceId: id,
+          idempotencyKey: `sales-post:${id}`,
+        });
       }
-      await tx.update(salesInvoices).set({ status: 'posted', number, postedAt: new Date(), paymentStatus: locked.total === '0' ? 'paid' : 'unpaid' }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft')));
+      // Immediate settlement (cash/bank) is recorded as the invoice's first payment
+      // in the same transaction, so a cash sale lands fully paid with a payment
+      // row the portal and the statements can see — not just a flipped flag.
+      const isReturnKind = locked.kind === 'sale_return' || locked.kind === 'credit_note';
+      const settled = !posting.journalLines?.length && !isReturnKind && posting.settlement !== undefined && posting.settlement !== 'credit' && money(locked.total).gt(0);
+      if (settled) {
+        await tx.insert(invoicePayments).values({
+          id: newId(),
+          tenantId,
+          invoiceId: id,
+          method: posting.settlement!,
+          amount: locked.total,
+          cashLocationId: posting.settlementCashLocationId ?? null,
+          reference: number,
+          idempotencyKey: `sales-settle:${id}`,
+        });
+      }
+      const paymentStatus = locked.total === '0' || settled ? 'paid' : 'unpaid';
+      await tx.update(salesInvoices).set({ status: 'posted', number, postedAt: new Date(), paidTotal: settled ? locked.total : locked.paidTotal, paymentStatus }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'draft')));
     });
     return this.get(tenantId, id);
+  }
+
+  /**
+   * Relieves (sale) or restores (return) stock for every stocked line and stamps
+   * each line's `cost_total` from the movement's average cost — the desktop
+   * `SumCost` behaviour. Returns restore at the source invoice's original cost
+   * (`returnAtOriginalCost`); when the source cost is unknown the current average
+   * is used so the return stays value-neutral instead of corrupting the average.
+   */
+  private async recordAutoStock(
+    tx: DrizzleTx,
+    tenantId: string,
+    locked: { id: string; kind: string; warehouseId: string | null; referenceInvoiceId: string | null },
+  ): Promise<void> {
+    const lines = await tx.select().from(salesInvoiceLines).where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.invoiceId, locked.id)));
+    const candidates = lines.filter((line) => line.itemId && money(line.quantity).gt(0));
+    if (!candidates.length || !locked.warehouseId) return;
+    // Services never touch the stock ledger — only `stock`-kind items relieve /
+    // restore and stamp costs.
+    const itemRows = await tx
+      .select({ id: items.id, kind: items.kind })
+      .from(items)
+      .where(and(eq(items.tenantId, tenantId), inArray(items.id, candidates.map((line) => line.itemId!))));
+    const stockable = new Set(itemRows.filter((row) => row.kind === 'stock').map((row) => row.id));
+    const stocked = candidates.filter((line) => stockable.has(line.itemId!));
+    if (!stocked.length) return;
+
+    const sourceCost = new Map<string, Decimal>();
+    if (locked.kind === 'sale_return' && locked.referenceInvoiceId) {
+      const sourceLines = await tx
+        .select()
+        .from(salesInvoiceLines)
+        .where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.invoiceId, locked.referenceInvoiceId)));
+      const cost = new Map<string, Decimal>();
+      const qty = new Map<string, Decimal>();
+      for (const line of sourceLines) {
+        if (!line.itemId) continue;
+        cost.set(line.itemId, (cost.get(line.itemId) ?? new Decimal(0)).plus(line.costTotal ?? '0'));
+        qty.set(line.itemId, (qty.get(line.itemId) ?? new Decimal(0)).plus(line.quantity));
+      }
+      for (const [itemId, total] of cost) {
+        const totalQty = qty.get(itemId) ?? new Decimal(0);
+        if (totalQty.gt(0)) sourceCost.set(itemId, total.div(totalQty));
+      }
+    }
+
+    const movements: InventoryLine[] = [];
+    for (const line of stocked) {
+      if (locked.kind === 'sale_return') {
+        let unitCost = sourceCost.get(line.itemId!);
+        if (!unitCost || unitCost.lte(0)) {
+          const [balance] = await tx
+            .select({ averageCost: stockBalances.averageCost })
+            .from(stockBalances)
+            .where(and(eq(stockBalances.tenantId, tenantId), eq(stockBalances.itemId, line.itemId!), eq(stockBalances.warehouseId, locked.warehouseId)));
+          unitCost = money(balance?.averageCost ?? '0');
+        }
+        movements.push({ itemId: line.itemId!, warehouseId: locked.warehouseId, qty: line.quantity, unitCost: unitCost.toFixed(4), direction: 'in', docType: 'sales_return', docId: locked.id, lineId: line.id, costing: 'returnAtOriginalCost' });
+      } else {
+        movements.push({ itemId: line.itemId!, warehouseId: locked.warehouseId, qty: line.quantity, direction: 'out', docType: 'sales_invoice', docId: locked.id, lineId: line.id, costing: 'outAtAvg' });
+      }
+    }
+    await this.inventory.recordInTx(tx, tenantId, movements);
+
+    const txns = await tx
+      .select({ lineId: inventoryTransactions.lineId, unitCost: inventoryTransactions.unitCost })
+      .from(inventoryTransactions)
+      .where(and(eq(inventoryTransactions.tenantId, tenantId), eq(inventoryTransactions.docId, locked.id)));
+    for (const txn of txns) {
+      if (!txn.lineId) continue;
+      const line = stocked.find((candidate) => candidate.id === txn.lineId);
+      if (!line) continue;
+      const costTotal = money(line.quantity).mul(txn.unitCost ?? '0').toFixed(4);
+      await tx.update(salesInvoiceLines).set({ costTotal }).where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.id, line.id)));
+    }
+  }
+
+  /**
+   * The desktop `BindToEntry` journal for sales (Sale/ProcType 1), mirrored for
+   * returns and notes:
+   *
+   * | sale / debit note              | sale_return / credit note          |
+   * |--------------------------------|----------------------------------|
+   * | Dr receivable — total          | Cr receivable — total              |
+   * | Cr sales — gross of discount   | Dr sales return — gross            |
+   * | Dr discount given — discount   | Cr discount given — discount       |
+   * | Cr VAT output — VAT            | Dr VAT output — VAT                |
+   * | Cr excise — extra tax          | Dr excise — extra tax              |
+   * | Dr COGS / Cr inventory — cost  | Dr inventory / Cr COGS — cost      |
+   *
+   * Sales is credited gross of the header discount with a separate discount leg —
+   * exactly as the desktop credits `Net − VAT + TotDiscount` and debits 4100003.
+   * Line discounts stay netted inside the sales leg (the cloud persists line nets,
+   * not grosses). Withholding has no desktop account, so an invoice carrying it
+   * must be posted with explicit journal lines.
+   */
+  private buildAutoJournal(
+    locked: { kind: string; subtotal: string; invoiceDiscount: string | null; taxTotal: string; extraTax: string | null; withholding: string | null; total: string; partyId: string | null },
+    mapping: Record<string, string | null | undefined>,
+    cogsTotal: Decimal,
+    settlement: 'credit' | 'cash' | 'bank',
+    settlementAccountId?: string,
+  ): { accountId: string; debit?: string; credit?: string; partyId?: string }[] {
+    const need = (key: string): string => {
+      const accountId = mapping[key];
+      if (!accountId) throw new DomainError('SALES_PROFILE_KEY_MISSING', `Posting profile has no ${key}`, 422, { field: key });
+      return accountId;
+    };
+    // Cash and bank sales debit the till/bank account instead of the receivable,
+    // exactly like the desktop's payment-method choice at save time. The account
+    // must come from a real cash location — never from an unvalidated mapping.
+    const settlementAccount =
+      settlement === 'credit'
+        ? need('receivableAccountId')
+        : (settlementAccountId ?? (() => { throw new DomainError('SALES_SETTLEMENT_ACCOUNT_REQUIRED', 'A cash or bank account is required for immediate settlement', 422, { field: 'settlementAccountId' }); })());
+    if (money(locked.withholding ?? '0').abs().gt(0)) {
+      throw new DomainError('SALES_WITHHOLDING_MANUAL_POSTING', 'Invoices with withholding need explicit journal lines', 422);
+    }
+    const discount = money(locked.invoiceDiscount ?? '0');
+    const extra = money(locked.extraTax ?? '0');
+    const tax = money(locked.taxTotal);
+    const total = money(locked.total);
+    const gross = money(locked.subtotal).plus(discount);
+    const isReturn = locked.kind === 'sale_return' || locked.kind === 'credit_note';
+    const lines: { accountId: string; debit?: string; credit?: string; partyId?: string }[] = [];
+    const leg = (accountId: string, debit: Decimal, credit: Decimal, partyId: string | null = locked.partyId): void => {
+      if (debit.abs().lte(0) && credit.abs().lte(0)) return;
+      lines.push({ accountId, debit: debit.toFixed(4), credit: credit.toFixed(4), partyId: partyId ?? undefined });
+    };
+    // The till/bank leg carries no party subledger — cash has no customer account.
+    const settlementParty = settlement === 'credit' ? locked.partyId : null;
+
+    if (!isReturn) {
+      leg(settlementAccount, total, new Decimal(0), settlementParty);
+      leg(need('salesAccountId'), new Decimal(0), gross);
+      if (discount.gt(0)) leg(need('discountGivenAccountId'), discount, new Decimal(0));
+      if (tax.abs().gt(0)) leg(need('vatOutputAccountId'), new Decimal(0), tax);
+      if (extra.abs().gt(0)) leg(need('exciseTaxAccountId'), new Decimal(0), extra);
+    } else {
+      leg(settlementAccount, new Decimal(0), total, settlementParty);
+      leg(need('salesReturnAccountId'), gross, new Decimal(0));
+      if (discount.gt(0)) leg(need('discountGivenAccountId'), new Decimal(0), discount);
+      if (tax.abs().gt(0)) leg(need('vatOutputAccountId'), tax, new Decimal(0));
+      if (extra.abs().gt(0)) leg(need('exciseTaxAccountId'), extra, new Decimal(0));
+    }
+    if (cogsTotal.abs().gt(0)) {
+      if (!isReturn) {
+        leg(need('cogsAccountId'), cogsTotal, new Decimal(0));
+        leg(need('inventoryAccountId'), new Decimal(0), cogsTotal);
+      } else {
+        leg(need('inventoryAccountId'), cogsTotal, new Decimal(0));
+        leg(need('cogsAccountId'), new Decimal(0), cogsTotal);
+      }
+    }
+    return lines;
   }
 
   async void(tenantId: string, id: string, reason: string) {
     if (!reason.trim()) throw new DomainError('SALES_VOID_REASON_REQUIRED', 'A void reason is required', 422);
     const invoice = await this.get(tenantId, id);
     if (invoice.status !== 'posted') throw new DomainError('SALES_INVOICE_INVALID_STATUS', 'Only posted invoices can be voided', 409);
-    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesInvoices).set({ status: 'voided', voidedAt: new Date(), updatedAt: new Date(), zatcaStatus: `voided:${reason}` }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'posted'))));
+    if (invoice.zatcaStatus === 'cleared' || invoice.zatcaStatus === 'reported' || invoice.zatcaStatus === 'signed') {
+      throw new DomainError('SALES_VOID_ZATCA_SEALED', 'A ZATCA-sealed invoice cannot be voided — issue a credit note', 409);
+    }
+    if (money(invoice.paidTotal).abs().gt(0)) {
+      throw new DomainError('SALES_VOID_HAS_PAYMENTS', 'Refund or unallocate the payments before voiding', 409);
+    }
+    // The desktop only flags the invoice and its entry as deleted and leaves the
+    // stock relieved. The cloud reverses all three legs — journal, stock and status —
+    // in one transaction, so voiding can never silently unbalance the ledger.
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const [entry] = await tx
+        .select({ id: journalEntries.id })
+        .from(journalEntries)
+        .where(and(eq(journalEntries.tenantId, tenantId), eq(journalEntries.sourceType, 'sales_invoice'), eq(journalEntries.sourceId, id)));
+      if (entry) {
+        const [existing] = await tx.select({ id: journalEntries.id }).from(journalEntries).where(eq(journalEntries.reversalOf, entry.id));
+        if (!existing) {
+          const fiscalPeriodId = await this.accounting.openPeriodForDateInTx(tx, tenantId, today);
+          const entryLines = await tx.select().from(journalEntryLines).where(eq(journalEntryLines.entryId, entry.id));
+          const reversalId = newId();
+          await tx.insert(journalEntries).values({
+            id: reversalId,
+            tenantId,
+            branchId: invoice.branchId,
+            fiscalPeriodId,
+            date: today,
+            kind: 'reversal',
+            status: 'posted',
+            description: `Void ${invoice.number ?? id}: ${reason}`,
+            reversalOf: entry.id,
+            sourceType: 'sales_invoice',
+            sourceId: id,
+            postedAt: new Date(),
+          });
+          await tx.insert(journalEntryLines).values(
+            entryLines.map((line) => ({
+              entryId: reversalId,
+              lineNo: line.lineNo,
+              tenantId,
+              accountId: line.accountId,
+              debit: line.credit,
+              credit: line.debit,
+              partyId: line.partyId,
+              description: line.description,
+            })),
+          );
+          await tx.update(journalEntries).set({ status: 'void', updatedAt: new Date() }).where(eq(journalEntries.id, entry.id));
+        }
+      }
+
+      const movements = await tx
+        .select()
+        .from(inventoryTransactions)
+        .where(and(eq(inventoryTransactions.tenantId, tenantId), eq(inventoryTransactions.docId, id)));
+      const mirrors: InventoryLine[] = movements.map((movement) => ({
+        itemId: movement.itemId,
+        warehouseId: movement.warehouseId,
+        qty: movement.qty,
+        unitCost: movement.unitCost ?? '0',
+        direction: movement.direction === 'out' ? 'in' : 'out',
+        docType: 'sales_void',
+        docId: id,
+        lineId: movement.lineId ?? undefined,
+        serialId: movement.serialId ?? undefined,
+        costing: movement.direction === 'out' ? 'returnAtOriginalCost' : 'outAtAvg',
+      }));
+      if (mirrors.length) await this.inventory.recordInTx(tx, tenantId, mirrors);
+
+      await tx
+        .update(salesInvoices)
+        .set({ status: 'voided', voidedAt: new Date(), updatedAt: new Date(), zatcaStatus: `voided:${reason}` })
+        .where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id), eq(salesInvoices.status, 'posted')));
+    });
     return this.get(tenantId, id);
   }
 
