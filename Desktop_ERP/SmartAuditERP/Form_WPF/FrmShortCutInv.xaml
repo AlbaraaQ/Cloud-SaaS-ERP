@@ -1,0 +1,229 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.FrmShortCutInv"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="حاسبة الفاتورة"
+    Width="420" Height="330"
+    WindowStartupLocation="CenterOwner"
+    FlowDirection="LeftToRight"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="10" ShadowDepth="2"
+                          Direction="270" Opacity="0.12" Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow"  BlurRadius="5"  ShadowDepth="1"
+                          Direction="270" Opacity="0.18" Color="#000000"/>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsReadOnly" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F0F2F8"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Background" Value="#F0F2F8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- TextBox الخصم بلون أحمر -->
+        <Style x:Key="DiscountTextBox" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="Foreground" Value="#B92F2F"/>
+        </Style>
+
+        <Style x:Key="OkBtn" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="9">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Border Background="White" CornerRadius="12" Margin="8"
+            Effect="{StaticResource CardShadow}">
+        <Grid Margin="16,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="6"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="6"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="6"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="6"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="14"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="{StaticResource HeaderBrush}"
+                    CornerRadius="8" Padding="10,5">
+                <TextBlock Text="💰 حاسبة الفاتورة"
+                           Foreground="White" FontSize="13" FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           FontFamily="Cairo, Tahoma, Arial"/>
+            </Border>
+
+            <!-- المجموع -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="2" Text="📋 المجموع"
+                           Style="{StaticResource FieldLabel}"
+                           HorizontalAlignment="Right"/>
+                <TextBox Grid.Column="0" x:Name="txtSumVal"
+                         Style="{StaticResource ModernTextBox}"
+                         Text="0"
+                         TextChanged="txtSumVal_TextChanged"
+                         KeyDown="txtSumVal_KeyDown"/>
+            </Grid>
+
+            <!-- الخصم -->
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="2" Text="🏷️ الخصم"
+                           Style="{StaticResource FieldLabel}"
+                           Foreground="#B92F2F"
+                           HorizontalAlignment="Right"/>
+                <TextBox Grid.Column="0" x:Name="txtTotDiscount"
+                         Style="{StaticResource DiscountTextBox}"
+                         Text="0"
+                         TextChanged="txtTotDiscount_TextChanged"
+                         KeyDown="txtDiscount_KeyDown"/>
+            </Grid>
+
+            <!-- الإجمالي -->
+            <Grid Grid.Row="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="2" Text="📊 الإجمالي"
+                           Style="{StaticResource FieldLabel}"
+                           HorizontalAlignment="Right"/>
+                <TextBox Grid.Column="0" x:Name="txtTotal"
+                         Style="{StaticResource ModernTextBox}"
+                         Text="0" IsReadOnly="True"/>
+            </Grid>
+
+            <!-- الضريبة -->
+            <Grid Grid.Row="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="2" x:Name="lblVatTitle"
+                           Text="💹 الضريبة"
+                           Style="{StaticResource FieldLabel}"
+                           HorizontalAlignment="Right"/>
+                <TextBox Grid.Column="0" x:Name="txtVAT"
+                         Style="{StaticResource ModernTextBox}"
+                         Text="0" IsReadOnly="True" IsEnabled="False"/>
+            </Grid>
+
+            <!-- صافي الفاتورة -->
+            <Grid Grid.Row="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="120"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="2" Text="🧾 صافي الفاتورة"
+                           Style="{StaticResource FieldLabel}"
+                           HorizontalAlignment="Right"/>
+                <TextBox Grid.Column="0" x:Name="txtNet"
+                         Style="{StaticResource ModernTextBox}"
+                         Text="0" IsReadOnly="True" IsEnabled="False"/>
+            </Grid>
+
+            <!-- زر إدراج -->
+            <Button Grid.Row="12" x:Name="btnOk"
+                    Content="✅ إدراج"
+                    Style="{StaticResource OkBtn}"
+                    Click="btnOk_Click"/>
+        </Grid>
+    </Border>
+</dx:ThemedWindow>

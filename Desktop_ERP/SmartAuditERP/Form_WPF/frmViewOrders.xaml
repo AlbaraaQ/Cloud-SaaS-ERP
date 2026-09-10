@@ -1,0 +1,377 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmViewOrders"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="عرض الطلبات - ViewOrders"
+    WindowState="Maximized"
+    MinWidth="1100" MinHeight="700"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#232F34"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SearchBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F9AA33" Offset="0"/>
+            <GradientStop Color="#D4890A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.18"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.25"
+                          Color="#000000"/>
+
+        <!-- Search Button Style -->
+        <Style x:Key="SearchBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Background" Value="{StaticResource SearchBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Search TextBox Style -->
+        <Style x:Key="SearchTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#F9AA33"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DataGrid Styles -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#C8D8F8"/>
+                    <Setter Property="Foreground" Value="#0A1A4A"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- State Cell Template DataTriggers -->
+        <Style x:Key="StateCellStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding state}" Value="مستلم">
+                    <Setter Property="Foreground" Value="#2980B9"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding state}" Value="في الخياطة">
+                    <Setter Property="Foreground" Value="#E67E22"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding state}" Value="جاهز">
+                    <Setter Property="Foreground" Value="#27AE60"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding state}" Value="تم التسليم">
+                    <Setter Property="Foreground" Value="#7F8C8D"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Search Bar -->
+            <RowDefinition Height="Auto"/>
+            <!-- DataGrid -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Search Bar (Panel1) ═══ -->
+        <Border Grid.Row="0"
+                Background="#2C3E50"
+                Padding="14,10"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Placeholder-like: TextBox + TextBlock overlay -->
+                <Grid Grid.Column="0">
+                    <TextBox x:Name="txtPhoneNum"
+                             Style="{StaticResource SearchTextBox}"
+                             TextChanged="txtPhoneNum_TextChanged"/>
+                    <TextBlock x:Name="placeholderSearch"
+                               Text="🔍 الهاتف أو اسم العميل..."
+                               FontSize="13"
+                               FontFamily="Cairo, Tahoma, Arial"
+                               Foreground="#999999"
+                               VerticalAlignment="Center"
+                               Margin="14,0"
+                               IsHitTestVisible="False"
+                               Visibility="Visible"/>
+                </Grid>
+
+                <Button x:Name="Button1"
+                        Grid.Column="2"
+                        Content="🔍 عرض"
+                        Style="{StaticResource SearchBtn}"
+                        Width="100"
+                        Click="Button1_Click"/>
+
+                <!-- إحصاء النتائج -->
+                <TextBlock x:Name="lblResultCount"
+                           Grid.Column="4"
+                           Text="النتائج: 0"
+                           Foreground="White"
+                           FontSize="12"
+                           FontWeight="Bold"
+                           FontFamily="Cairo, Tahoma, Arial"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ═══ DataGrid (Panel2) ═══ -->
+        <Border Grid.Row="1"
+                Background="White"
+                Margin="0"
+                Effect="{StaticResource CardShadow}">
+            <DataGrid x:Name="dgvSrch"
+                      AutoGenerateColumns="False"
+                      ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                      RowStyle="{StaticResource DgvRow}"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      FlowDirection="RightToLeft"
+                      Background="White"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#E8EBF5"
+                      AlternatingRowBackground="#F8F9FD"
+                      BorderThickness="0"
+                      RowHeaderWidth="0">
+
+                <DataGrid.Columns>
+
+                    <DataGridTextColumn Header="📋 رقم الفاتورة"
+                                        Binding="{Binding code}"
+                                        Width="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="👤 الاسم"
+                                        Binding="{Binding name}"
+                                        Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Padding" Value="6,0"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="📱 الجوال"
+                                        Binding="{Binding phone}"
+                                        Width="130">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="📅 التاريخ"
+                                        Binding="{Binding Datee}"
+                                        Width="130">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="💰 الإجمالي"
+                                        Binding="{Binding Sale_price, StringFormat=N2}"
+                                        Width="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="✅ المدفوع"
+                                        Binding="{Binding paid, StringFormat=N2}"
+                                        Width="110">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#27AE60"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="⏳ الباقي"
+                                        Binding="{Binding rest, StringFormat=N2}"
+                                        Width="110">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#E74C3C"/>
+                                <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="📌 الحالة"
+                                        Binding="{Binding state}"
+                                        Width="120">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource StateCellStyle}"/>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <!-- زر العرض (بديل DataGridViewButtonColumn) -->
+                    <DataGridTemplateColumn Header="👁️ عرض" Width="90">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="👁️ عرض"
+                                        Tag="{Binding}"
+                                        Height="26"
+                                        Padding="8,0"
+                                        Cursor="Hand"
+                                        FontSize="11"
+                                        FontFamily="Cairo, Tahoma, Arial"
+                                        FontWeight="Bold"
+                                        Foreground="White"
+                                        Click="btnViewOrder_Click">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd"
+                                                    Background="#3A63C3"
+                                                    CornerRadius="6"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#2E4E9E"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#213A7A"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>
