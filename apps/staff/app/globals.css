@@ -839,7 +839,7 @@ th.num {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: end;
+  align-items: flex-end;
   padding: 12px;
   background: var(--surface);
   border: 1px solid var(--line);

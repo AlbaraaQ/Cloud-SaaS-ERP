@@ -7,9 +7,28 @@ loadEnvFiles(process.cwd());
 const apiTarget = (process.env.API_PROXY_TARGET ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(/\/+$/, '');
 
 /** @type {import('next').NextConfig} */
+/**
+ * Which hosts may talk to the dev server.
+ *
+ * The panel is opened through a tunnel host (`https://3001-<sandbox>.e2b.app`), and
+ * Next 15 treats any `/_next/*` request whose Host is not localhost as a cross-origin
+ * dev request: it logs a warning and, in a future major version, refuses to serve the
+ * chunks — which leaves the preview a blank page. Listing the sandbox domains keeps the
+ * tunneled preview working; the wildcard is a dev-only convenience and never widens the
+ * production surface, because `next start` ignores the option.
+ */
+const allowedDevOrigins = [
+  'localhost',
+  '127.0.0.1',
+  '*.e2b.app',
+  '*.e2b.dev',
+  '*.arena.ai',
+];
+
 const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  allowedDevOrigins,
   env: {
     // Exposed to the browser. Empty means "same origin" — requests go to /api/v1/* on
     // this server and the rewrite below forwards them to the API. That is what makes
