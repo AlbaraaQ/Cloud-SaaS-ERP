@@ -268,6 +268,44 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   the desktop files it under المحاسبة › تقارير محاسبية, but a safe's statement belongs
   with the safe now that الخزينة is a module of its own.
 
+* **المرحلة 06 — الخزينة، الجزء الرابع: إغلاقات اليومية** (`Form_WPF/frmCloseShift.xaml`
+  + `.xaml.cs` L214/L270/L330/L676/L735، `frmCloseShiftDetails.xaml`،
+  `frmCloseShiftInv.xaml`، والمحرك الحقيقي في `Form_WPF/ClosShiftAndroid.xaml.cs`
+  L592 وL780–L930). The grid's first column is `🔢 الرقم`, and in the desktop that is
+  `CasherClosed.ClosedID` — **a close is a document the cashier signs**, and
+  `BindCloseShiftToEntry1` builds a journal entry around it. The cloud created its
+  `shift_closes` row when the drawer was *opened* and gave it no number at all, so
+  "which close was Tuesday's?" had a uuid for an answer. Migration `0042` adds
+  `shift_closes.number` with a partial unique index, **nullable on purpose**: an open
+  shift is a draft, and the number is allocated at close from `document_sequences`
+  (`CS-`, padding 6) exactly as a voucher is numbered on posting. No renumbering, no
+  backfill: old rows keep their emptiness until a new shift is closed.
+  `GET /shift-closes/day-closes` (filters `from`/`to`/`branch_id`/`membership_id`/
+  `user_id`) is the list; `GET /shift-closes/:id` is one close with its two children —
+  🧾 الملاحظات المعدودة and the summary lines — and answers `404 SHIFT_NOT_FOUND` for an
+  unknown *or non-uuid* id. Three decisions carry the desktop's intent: **a draft is not
+  cash** (📤 المصاريف و💵 النقدي read *posted* vouchers, so an unposted expense never
+  shrinks a drawer on paper); **🏦 رصيد الصندوق is what was counted, 💵 النقدي is what
+  was expected**, and 📉 الفرق is between them — which is why an open row's safe balance
+  is empty rather than wrong; and **a close is a snapshot**, frozen into `summary` so a
+  voucher posted afterwards cannot rewrite a signed sheet. 🚗 توصيل · ☕ ضيافة · 🛒
+  المشتريات · 🛡️ تأمين come from the *name* of the expense type whose account the voucher
+  points at, because the desktop reads columns our invoices do not carry and a tenant that
+  names its types in Arabic gets the split for free. Filtering by 👤 الموظف resolves the
+  membership to its users, and an id that is nobody's returns an **empty list, not the
+  whole book** — a silently dropped filter is worse than a missing one. Screen
+  `/treasury/day-close`: six cards, a 🏦 الوردية الحالية card with nine denominations and
+  a live 📉 الفرق, a filter panel, and a grid whose eighteen headers are `frmCloseShift`'s
+  own labels with a totals footer and an expandable detail per row. Tests
+  `apps/api/test/treasury-dayclose.spec.ts` (8) and section 9 of
+  `scripts/verify-treasury.mjs` (23 checks, and it closes a drawer left open by an earlier
+  run so it stays re-runnable). 502 API tests, 36 staff tests, 71 contract tests.
+  **Deferred with a reason:** the close's journal entry (`BindCloseShiftToEntry1`) waits
+  for the accounting part of this phase, so entries come from one engine and not two, and
+  the printed reports (`Reports/rptCloseShift.repx`, `rptCloseday.repx`,
+  `rptClosedayCust.repx`) wait for the reporting phase — `printShiftData` only prepares
+  their data.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

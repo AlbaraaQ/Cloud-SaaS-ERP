@@ -1322,9 +1322,9 @@ const treasury: ModuleNode = {
           permission: 'treasury.view',
           endpoint: '/vouchers',
         }),
-        screen('day-close', '📊 إغلاق اليومية', 'Day close', '/sales/shifts', 'ready', {
+        screen('day-close', '📊 إغلاق اليومية', 'Day close', '/treasury/day-close', 'ready', {
           permission: 'treasury.view',
-          endpoint: '/shift-closes',
+          endpoint: '/shift-closes/day-closes',
         }),
       ],
     },

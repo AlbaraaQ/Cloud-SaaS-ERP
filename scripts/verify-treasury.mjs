@@ -65,16 +65,18 @@ async function call(method, path, token, body) {
 
 const login = async () => {
   const data = await call('post', '/auth/login', undefined, { tenantCode, email, password });
+  // 👤 الموظف is a *membership*; the day-close screen filters by it (section 9).
+  session = data;
   return data.accessToken ?? data.access_token ?? data.token;
 };
 
+let session;
 const token = await login();
 console.log(`✔ logged in to ${tenantCode} as ${email}\n`);
 
 // ---------------------------------------------------------------- reference data
 const stamp = Date.now().toString().slice(-6);
 const today = new Date().toISOString().slice(0, 10);
-const year = new Date().getUTCFullYear();
 
 const branches = await call('get', '/branches', token);
 const branchId = branches[0].id;
@@ -556,6 +558,177 @@ try {
     `${error.status} ${error.code}`,
   );
 }
+console.log('');
+
+// ── 9. إغلاقات اليومية ──────────────────────────────────────────────────────
+// `frmCloseShift.xaml` («عرض وإدارة إغلاقات وردية الموظفين») reads `CasherClosed`
+// joined with `CasherClosed_Sub` (`.xaml.cs:214` and `:270`), shows 👤 الموظف by
+// joining the party (L330) and presents 🏦 رصيد الصندوق (الدرج) beside 💰 مجموع
+// الشبكة والنقدي (الورق) with 📉 الفرق between them.
+console.log('9. إغلاقات اليومية');
+
+const shiftSafeAccountId = await account('1213', 'درج الوردية — تحقق', 'asset');
+const deliveryAccountId = await account('5210', 'توصيل — تحقق', 'expense');
+const hospitalityAccountId = await account('5220', 'ضيافة — تحقق', 'expense');
+const shiftSafe = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'safe',
+  name: `درج الوردية ${stamp}`,
+  accountId: shiftSafeAccountId,
+});
+const deliveryType = await call('post', '/expense-types', token, {
+  nameAr: `توصيل ${stamp}`,
+  accountId: deliveryAccountId,
+});
+const hospitalityType = await call('post', '/expense-types', token, {
+  nameAr: `ضيافة ${stamp}`,
+  accountId: hospitalityAccountId,
+});
+
+const dayCloses = (query = '') => call('get', `/shift-closes/day-closes${query ? `?${query}` : ''}`, token);
+
+// The script is re-runnable: a drawer left open by an earlier run is closed first,
+// because only one open shift per cashier and branch is allowed.
+for (const row of (await dayCloses()).filter((entry) => entry.status === 'open')) {
+  await call('post', `/shift-closes/${row.id}/close`, token, { counts: [] });
+}
+
+const beforeOpen = (await dayCloses()).length;
+
+// Opening the drawer is the precondition for a sale, so the API must refuse a second
+// one rather than fail on the open-shift uniqueness rule.
+const opened = await call('post', '/shift-closes/open', token, { branchId });
+check('الوردية تُفتح', Boolean(opened?.id) && opened.status === 'open', opened?.status);
+try {
+  await call('post', '/shift-closes/open', token, { branchId });
+  check('وردية ثانية مرفوضة', false, 'expected 409');
+} catch (error) {
+  check(
+    'وردية ثانية مرفوضة',
+    error.status === 409 && error.code === 'SHIFT_ALREADY_OPEN',
+    `${error.status} ${error.code}`,
+  );
+}
+
+// 💵 نقدي in the drawer, and 🚗 توصيل/☕ ضيافة leaving it. The close is a *physical*
+// count, so the numbers come from the ledger, not from a field on the shift.
+// A draft voucher is a promise, not money — `ClosShiftAndroid.xaml.cs` reads the
+// receipts of the window, so only a posted one moves the drawer.
+const postVoucher = async (payload) => {
+  const voucher = await call('post', '/vouchers', token, payload);
+  return call('post', `/vouchers/${voucher.id}/post`, token);
+};
+await postVoucher({
+  branchId,
+  kind: 'receipt',
+  subtype: 'customer',
+  date: today,
+  partyId: customer.id,
+  cashLocationId: shiftSafe.id,
+  method: 'cash',
+  amount: '400',
+  description: 'تحصيل في الوردية',
+});
+// The expense *type* is the bucket (🚗/☕); the voucher points at its account, which is
+// what the desktop keys the split on.
+for (const [typeId, typeAccountId, paid] of [
+  [deliveryType.id, deliveryAccountId, '20'],
+  [hospitalityType.id, hospitalityAccountId, '10'],
+]) {
+  await postVoucher({
+    branchId,
+    kind: 'payment',
+    subtype: 'expense',
+    date: today,
+    cashLocationId: shiftSafe.id,
+    counterAccountId: typeAccountId,
+    method: 'cash',
+    amount: paid,
+    expenseTypeId: typeId,
+    description: `مصروف ${paid}`,
+  });
+}
+
+const openRows = await dayCloses();
+const openRow = openRows.find((row) => row.id === opened.id);
+check('الوردية المفتوحة تظهر في القائمة', Boolean(openRow), `${openRows.length - beforeOpen} صف جديد`);
+check('💵 النقدي 400 − 30 مصروف', money(openRow.cash) === '370.00', money(openRow.cash));
+check('📤 المصاريف 30', money(openRow.expenses?.total) === '30.00', money(openRow.expenses?.total));
+check('🚗 توصيل 20', money(openRow.expenses?.delivery) === '20.00', money(openRow.expenses?.delivery));
+check('☕ ضيافة 10', money(openRow.expenses?.hospitality) === '10.00', money(openRow.expenses?.hospitality));
+// 🏦 رصيد الصندوق is what the cashier *counted*, so it stays empty until the count —
+// the paper figure lives in 💵 النقدي and is what الفرق will be measured against.
+check('🏦 رصيد الصندوق فارغ قبل العد', money(openRow.safeBalance) === '0.00', money(openRow.safeBalance));
+check('💵 النقدي هو الرقم المتوقع قبل العد', money(openRow.expected) === '370.00', money(openRow.expected));
+check('الرقم يتأخر حتى الإغلاق', !openRow.number, openRow.number ?? '—');
+check('👤 الموظف مسمّى من ملف الموظف', Boolean(openRow.employee), openRow.employee ?? '—');
+
+// 🧾 الملاحظات المعدودة: 3×100 + 1×50 + 1×20 = 370 — a cashier counts coins, not a total.
+const closed = await call('post', `/shift-closes/${opened.id}/close`, token, {
+  branchId,
+  counts: [
+    { currencyCode: 'SAR', denomination: '100', count: 3 },
+    { currencyCode: 'SAR', denomination: '50', count: 1 },
+    { currencyCode: 'SAR', denomination: '20', count: 1 },
+  ],
+});
+const shiftNumber = closed.number ?? closed.id;
+check('🔢 الرقم من تسلسل المستندات', /^CS-/.test(String(shiftNumber)), String(shiftNumber));
+
+const afterClose = (await dayCloses()).find((row) => row.id === opened.id);
+check('الإغلاق يظهر برقمه', afterClose?.number === shiftNumber, afterClose?.number ?? '—');
+check('📉 الفرق صفر عند تطابق العدد', money(afterClose?.diff) === '0.00', money(afterClose?.diff));
+check('🏦 رصيد الصندوق = ما عُدّ', money(afterClose?.safeBalance) === '370.00', money(afterClose?.safeBalance));
+
+// The close is a snapshot. A voucher written afterwards must not rewrite it.
+await postVoucher({
+  branchId,
+  kind: 'receipt',
+  subtype: 'customer',
+  date: today,
+  partyId: customer.id,
+  cashLocationId: shiftSafe.id,
+  method: 'cash',
+  amount: '999',
+  description: 'تحصيل بعد الإغلاق',
+});
+const frozen = (await dayCloses()).find((row) => row.id === opened.id);
+check(
+  'الإغلاق صورة ثابتة لا تتغير بعده',
+  money(frozen?.cash) === '370.00' && money(frozen?.safeBalance) === '370.00',
+  `${money(frozen?.cash)} / ${money(frozen?.safeBalance)}`,
+);
+
+const detail = await call('get', `/shift-closes/${opened.id}`, token);
+check('🧾 الملاحظات المعدودة تُحفظ', (detail.counts?.length ?? 0) === 3, `${detail.counts?.length ?? 0} فئة`);
+const countedValue = (detail.counts ?? []).reduce((running, line) => running + Number(line.total ?? 0), 0);
+check('مجموع الملاحظات 370', money(countedValue) === '370.00', money(countedValue));
+check('التفاصيل: سطور الملخّص', (detail.lines?.length ?? 0) > 0, `${detail.lines?.length ?? 0} سطر`);
+
+try {
+  await call('get', '/shift-closes/not-a-uuid', token);
+  check('معرّف غير مفهوم مرفوض', false, 'expected 404');
+} catch (error) {
+  check('معرّف غير مفهوم مرفوض', error.status === 404, `${error.status} ${error.code}`);
+}
+
+// 👤 الموظف — a real filter, not a decoration. The shift belongs to the signed-in
+// membership, so filtering by it must keep the row and a stranger's id must drop it.
+const membershipId = session?.memberships?.[0]?.id ?? '';
+const byEmployee = await dayCloses(`membership_id=${membershipId}`);
+check(
+  '👤 الموظف يفلتر القائمة فعلياً',
+  byEmployee.some((row) => row.id === opened.id) &&
+    byEmployee.every((row) => row.membershipId === membershipId),
+  `${byEmployee.length} صف`,
+);
+const byStranger = await dayCloses(`membership_id=00000000-0000-4000-8000-000000000000`);
+check(
+  'فلترة بموظف آخر لا تُرجع هذه الوردية',
+  !byStranger.some((row) => row.id === opened.id),
+  `${byStranger.length} صف`,
+);
+
 console.log('');
 
 console.log(failures === 0 ? '\n✔ Phase 06 treasury documents verified' : `\n✗ ${failures} check(s) failed`);

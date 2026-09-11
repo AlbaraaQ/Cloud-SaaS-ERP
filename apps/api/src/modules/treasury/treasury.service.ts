@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   cashLocationBalances,
@@ -11,6 +11,7 @@ import {
   expenseTypes,
   journalEntries,
   journalEntryLines,
+  memberships,
   parties,
   paymentAllocations,
   shiftCloseLines,
@@ -18,6 +19,7 @@ import {
   cashCountLines,
   invoicePayments,
   salesInvoices,
+  users,
   vouchers,
   withTenantTx,
   type DatabaseHandle,
@@ -828,10 +830,36 @@ export class TreasuryService {
   }
 
   async openShift(tenantId: string, branchId: string, userId: string) {
-    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
-      tx.insert(shiftCloses).values({ id: newId(), tenantId, branchId, userId, status: 'open' }).returning(),
-    );
-    return row;
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      /**
+       * One open drawer per cashier per branch — `shift_closes_one_open_key`. The desktop
+       * never lets a cashier open a second one (`ClosShiftAndroid` works on the open
+       * close), and a database constraint is a 500 to the cashier unless it is asked
+       * about first.
+       */
+      const [open] = await tx
+        .select({ id: shiftCloses.id })
+        .from(shiftCloses)
+        .where(
+          and(
+            eq(shiftCloses.tenantId, tenantId),
+            eq(shiftCloses.branchId, branchId),
+            eq(shiftCloses.userId, userId),
+            eq(shiftCloses.status, 'open'),
+          ),
+        );
+      if (open)
+        throw new DomainError(
+          'SHIFT_ALREADY_OPEN',
+          'هذا المستخدم لديه وردية مفتوحة على هذا الفرع — أغلقها قبل فتح وردية جديدة',
+          409,
+        );
+      const [row] = await tx
+        .insert(shiftCloses)
+        .values({ id: newId(), tenantId, branchId, userId, status: 'open' })
+        .returning();
+      return row;
+    });
   }
   /**
    * The caller's open shift, with its takings *so far* attached as `live` — the
@@ -915,10 +943,84 @@ export class TreasuryService {
       target[bucket(row.method)] = target[bucket(row.method)].plus(row.amount);
     }
 
+    // ══ what the drawer actually sold — the invoice side of `frmCloseShift` ══
+    // `ClosShiftAndroid.xaml.cs` L780–L930 walks the shift's own invoices and carries
+    // four totals the method buckets above cannot produce: the net (💹 الصافي), the VAT
+    // (🧾 الضريبة), the discount (🏷️ الخصم) and the postponed sales (📋 آجل — invoices
+    // the customer did not settle). Returns subtract from all four, so a refunded sale
+    // shrinks the VAT it once added.
+    const invoices = await tx
+      .select({
+        kind: salesInvoices.kind,
+        total: salesInvoices.total,
+        tax: salesInvoices.taxTotal,
+        discount: salesInvoices.invoiceDiscount,
+        paid: salesInvoices.paidTotal,
+      })
+      .from(salesInvoices)
+      .where(
+        and(
+          eq(salesInvoices.tenantId, tenantId),
+          eq(salesInvoices.branchId, shift.branchId),
+          ne(salesInvoices.status, 'voided'),
+          gte(salesInvoices.createdAt, shift.openedAt),
+          or(eq(salesInvoices.shiftId, shift.id), isNull(salesInvoices.shiftId)),
+        ),
+      );
+
+    let net = new Decimal(0);
+    let tax = new Decimal(0);
+    let discount = new Decimal(0);
+    let postponed = new Decimal(0);
+    for (const row of invoices) {
+      const sign = row.kind === 'sale_return' || row.kind === 'credit_note' ? -1 : 1;
+      const invoiceTotal = money(row.total ?? '0');
+      net = net.plus(invoiceTotal.mul(sign));
+      tax = tax.plus(money(row.tax ?? '0').mul(sign));
+      discount = discount.plus(money(row.discount ?? '0').mul(sign));
+      const unpaid = invoiceTotal.minus(money(row.paid ?? '0'));
+      if (unpaid.gt(0)) postponed = postponed.plus(unpaid.mul(sign));
+    }
+
+    // ══ 📤 المصاريف — `ClosShiftAndroid.xaml.cs` L592, `ReceiptType = 8` ══
+    // Money that left the drawer for expenses, split into the four named buckets the
+    // desktop keeps beside it (🚗 توصيل، ☕ الضيافة، 🛒 المشتريات، 🛡️ تأمين). The
+    // desktop takes those from columns our invoices do not carry; the voucher's counter
+    // account already points at an expense type, so the type's own name decides the
+    // bucket — no new column, and a tenant that names its types in Arabic gets the split
+    // for free.
+    const types = await tx
+      .select({ nameAr: expenseTypes.nameAr, accountId: expenseTypes.accountId })
+      .from(expenseTypes)
+      .where(and(eq(expenseTypes.tenantId, tenantId), isNull(expenseTypes.deletedAt)));
+    const bucketOfExpense = (accountId: string | null) => {
+      const name = types.find((type) => type.accountId === accountId)?.nameAr ?? '';
+      if (name.includes('توصيل')) return 'delivery';
+      if (name.includes('ضيافة')) return 'hospitality';
+      if (name.includes('مشتريات')) return 'purchases';
+      if (name.includes('تأمين')) return 'insurance';
+      return 'other';
+    };
+    const expenses = { total: new Decimal(0), delivery: new Decimal(0), hospitality: new Decimal(0), purchases: new Decimal(0), insurance: new Decimal(0), other: new Decimal(0) };
+    for (const row of posted) {
+      if (row.kind !== 'payment' || row.subtype !== 'expense') continue;
+      const amount = money(row.amount);
+      expenses.total = expenses.total.plus(amount);
+      const key = bucketOfExpense(row.counterAccountId ?? null);
+      expenses[key] = expenses[key].plus(amount);
+    }
+
+    // 🌐 الشبكة — the desktop's `NetworkSum`: card and bank together, returns subtracted.
+    const network = sales.card.plus(sales.bank).minus(returns.card).minus(returns.bank);
+    const expectedCash = voucherCash.plus(sales.cash).minus(returns.cash);
+
     return {
       vouchers: posted.length,
       vouchersCash: voucherCash.toFixed(4),
+      /** Kept as the number of settled payment rows — `pos-checkout` asserts on it. */
       invoices: settled.length,
+      /** The invoices themselves, which is what the totals below are summed over. */
+      invoiceRows: invoices.length,
       sales: {
         cash: sales.cash.toFixed(4),
         card: sales.card.toFixed(4),
@@ -931,9 +1033,201 @@ export class TreasuryService {
         bank: returns.bank.toFixed(4),
         credit: returns.credit.toFixed(4),
       },
-      expectedCash: voucherCash.plus(sales.cash).minus(returns.cash).toFixed(4),
+      expectedCash: expectedCash.toFixed(4),
+      /** 💵 النقدي — the desktop's `SAfeNetVal`. */
+      cash: expectedCash.toFixed(4),
+      network: network.toFixed(4),
+      /** 💰 مجموع الشبكة والنقدي — the desktop's `sumCashAndCredit`. */
+      sumCashAndNetwork: expectedCash.plus(network).toFixed(4),
+      /** 💹 الصافي — the desktop's `Net`. */
+      net: net.toFixed(4),
+      /** 🧾 الضريبة — the desktop's `AllVAT`. */
+      tax: tax.toFixed(4),
+      /** 🏷️ الخصم — the desktop's `Discount`. */
+      discount: discount.toFixed(4),
+      /** 📋 آجل — the desktop's `PostPoneSales`: what the customer did not settle. */
+      postponed: postponed.toFixed(4),
+      expenses: {
+        total: expenses.total.toFixed(4),
+        delivery: expenses.delivery.toFixed(4),
+        hospitality: expenses.hospitality.toFixed(4),
+        purchases: expenses.purchases.toFixed(4),
+        insurance: expenses.insurance.toFixed(4),
+        other: expenses.other.toFixed(4),
+      },
     };
   }
+  /**
+   * 📊 إغلاقات اليومية — `Form_WPF/frmCloseShift.xaml` («عرض وإدارة إغلاقات وردية
+   * الموظفين»).
+   *
+   * The desktop's grid is `CasherClosed` joined to `CasherClosed_Sub`
+   * (`frmCloseShift.xaml.cs:214` and `:270`): one row per close, with the money the
+   * cashier took — cash, network, postponed — beside the money that left the drawer —
+   * مصاريف، مشتريات، ضيافة، تأمين — and the two numbers an auditor reads first,
+   * `🏦 رصيد الصندوق` (what was counted) and `📉 الفرق` (counted − expected).
+   *
+   * A **closed** shift is read from its frozen `summary`: the takings were captured at
+   * the moment of counting and must not move afterwards. An **open** one still has no
+   * summary, so it is computed live — the cashier watching the screen sees the drawer
+   * fill up.
+   */
+  async dayCloses(
+    tenantId: string,
+    filters: { from?: string; to?: string; userId?: string; membershipId?: string; branchId?: string } = {},
+  ) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      /**
+       * 👤 الموظف — a shift is opened by a *user*, but the screen offers the employee
+       * list. Accepting the membership id and resolving it here keeps the screen from
+       * having to know how a person is joined to a login.
+       */
+      const wanted = new Set<string>();
+      if (filters.userId) wanted.add(filters.userId);
+      if (filters.membershipId) {
+        const [member] = await tx
+          .select({ userId: memberships.userId })
+          .from(memberships)
+          .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, filters.membershipId)));
+        if (member) wanted.add(member.userId);
+      }
+      /**
+       * A caller who names a cashier wants *that* cashier. When the id is not one of
+       * ours the answer is an empty list — never the whole book, which is what a
+       * silently-dropped filter would return.
+       */
+      const byCashier = wanted.size > 0 ? inArray(shiftCloses.userId, [...wanted]) : undefined;
+      const nobodyMatches =
+        wanted.size === 0 && Boolean(filters.membershipId || filters.userId)
+          ? isNull(shiftCloses.id)
+          : undefined;
+
+      const rows = await tx
+        .select()
+        .from(shiftCloses)
+        .where(
+          and(
+            eq(shiftCloses.tenantId, tenantId),
+            filters.branchId ? eq(shiftCloses.branchId, filters.branchId) : undefined,
+            byCashier,
+            nobodyMatches,
+            filters.from ? gte(shiftCloses.openedAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+            filters.to ? lte(shiftCloses.openedAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+          ),
+        )
+        .orderBy(desc(shiftCloses.openedAt))
+        .limit(200);
+
+      // 👤 الموظف — the desktop reads `Employees.name` (`frmCloseShift.xaml.cs:330`). A
+      // shift is opened by a *user*, so the name comes from the employee record behind
+      // that user's membership, falling back to the user's own name — a cashier with no
+      // HR record is still a cashier whose drawer this is.
+      const staff = await tx
+        .select({
+          userId: memberships.userId,
+          membershipId: memberships.id,
+          fullName: users.fullName,
+          employeeName: employees.name,
+        })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .leftJoin(
+          employees,
+          and(eq(employees.membershipId, memberships.id), isNull(employees.deletedAt)),
+        )
+        .where(eq(memberships.tenantId, tenantId));
+      const nameOf = (userId: string) => {
+        const found = staff.find((row) => row.userId === userId);
+        return found?.employeeName ?? found?.fullName ?? '';
+      };
+
+      return Promise.all(
+        rows.map(async (row) => {
+          const live = row.status === 'open' ? await this.shiftTakings(tx, tenantId, row) : undefined;
+          const summary = (row.summary ?? {}) as Record<string, unknown>;
+          const expenses = (live?.expenses ?? summary.expenses ?? {}) as Record<string, string | undefined>;
+          const pick = (key: string) => live?.[key as keyof typeof live] ?? (summary[key] as string | undefined) ?? '0';
+          return {
+            id: row.id,
+            /** 🔢 الرقم — allocated when the drawer was counted. */
+            number: row.number,
+            status: row.status,
+            employee: nameOf(row.userId),
+            employeeId: row.userId,
+            /** The membership behind the cashier, so a screen can filter by 👤 الموظف. */
+            membershipId: staff.find((person) => person.userId === row.userId)?.membershipId ?? null,
+            openedAt: row.openedAt,
+            closedAt: row.closedAt,
+            /** 💹 الصافي */
+            net: pick('net'),
+            /** 🏦 رصيد الصندوق — what the cashier counted, not what the till expected. */
+            safeBalance: row.status === 'closed' ? row.countedCash : '0',
+            expected: row.status === 'closed' ? row.expectedCash : (live?.expectedCash ?? '0'),
+            /** 📉 الفرق */
+            diff: row.status === 'closed' ? row.diff : '0',
+            /** 📋 آجل */
+            postponed: pick('postponed'),
+            /** 🌐 الشبكة */
+            network: pick('network'),
+            /** 💵 النقدي */
+            cash: pick('cash'),
+            /** 💰 مجموع الشبكة والنقدي */
+            sumCashAndNetwork: pick('sumCashAndNetwork'),
+            /** 🧾 الضريبة */
+            tax: pick('tax'),
+            /** 🏷️ الخصم */
+            discount: pick('discount'),
+            expenses: {
+              /** 📤 المصاريف */
+              total: expenses.total ?? '0',
+              /** 🚗 توصيل */
+              delivery: expenses.delivery ?? '0',
+              /** ☕ الضيافة */
+              hospitality: expenses.hospitality ?? '0',
+              /** 🛒 المشتريات */
+              purchases: expenses.purchases ?? '0',
+              /** 🛡️ تأمين */
+              insurance: expenses.insurance ?? '0',
+              other: expenses.other ?? '0',
+            },
+          };
+        }),
+      );
+    });
+  }
+
+  /**
+   * One close with its two children: `frmCloseShiftDetails.xaml` (the counted notes) and
+   * `frmCloseShiftInv.xaml` (the invoices the drawer took).
+   */
+  async shiftClose(tenantId: string, id: string) {
+    // A path parameter is whatever the caller typed; an invalid uuid is a missing close,
+    // not an invalid query.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+      throw new DomainError('SHIFT_NOT_FOUND', 'Shift close was not found', 404);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(shiftCloses)
+        .where(and(eq(shiftCloses.tenantId, tenantId), eq(shiftCloses.id, id)));
+      if (!row) throw new DomainError('SHIFT_NOT_FOUND', 'Shift close was not found', 404);
+      const [closes] = await this.dayCloses(tenantId, { userId: row.userId, branchId: row.branchId });
+      const detail = closes && closes.id === id ? closes : undefined;
+      return {
+        shift: row,
+        close: detail ?? null,
+        counts: await tx
+          .select()
+          .from(cashCountLines)
+          .where(and(eq(cashCountLines.tenantId, tenantId), eq(cashCountLines.shiftCloseId, id))),
+        lines: await tx
+          .select()
+          .from(shiftCloseLines)
+          .where(and(eq(shiftCloseLines.tenantId, tenantId), eq(shiftCloseLines.shiftCloseId, id))),
+      };
+    });
+  }
+
   history(tenantId: string, branchId?: string) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx
@@ -971,6 +1265,17 @@ export class TreasuryService {
 
       const takings = await this.shiftTakings(tx, tenantId, shift);
       const expected = money(takings.expectedCash);
+      /**
+       * 🔢 الرقم — `frmCloseShift.xaml`'s first column. A close is a document the cashier
+       * signs, so it is numbered from the tenant's sequence the moment it is counted,
+       * exactly the way a voucher is numbered when it is posted and not when it is
+       * drafted. An open drawer stays unnumbered.
+       */
+      const allocated = await this.sequences.next(
+        { tenantId, branchId: shift.branchId, docType: 'shift_close' },
+        tx,
+        { prefix: 'CS-', padding: 6 },
+      );
       const counted = counts.reduce(
         (sum, line) => sum.plus(money(line.denomination).mul(line.count)),
         new Decimal(0),
@@ -1035,6 +1340,7 @@ export class TreasuryService {
         .update(shiftCloses)
         .set({
           status: 'closed',
+          number: allocated.display,
           closedAt: new Date(),
           expectedCash: expected.toFixed(4),
           countedCash: counted.toFixed(4),
@@ -1045,7 +1351,7 @@ export class TreasuryService {
         .where(
           and(eq(shiftCloses.tenantId, tenantId), eq(shiftCloses.id, id), eq(shiftCloses.status, 'open')),
         );
-      return { id, status: 'closed', summary };
+      return { id, number: allocated.display, status: 'closed', summary };
     });
   }
   printShiftData(tenantId: string, id: string) {

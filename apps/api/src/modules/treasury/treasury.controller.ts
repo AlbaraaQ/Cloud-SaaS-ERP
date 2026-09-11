@@ -31,6 +31,33 @@ export class TreasuryController {
   @Get('shift-closes/current') @RequiresPermission('treasury.view') currentShift(@Query('branch_id') branchId: string, @Query('user_id') userId?: string) { const ctx = getTenantContext(); return this.treasury.currentShift(ctx.tenantId, branchId, userId ?? ctx.userId); }
   @Get('shift-closes') @RequiresPermission('treasury.view') history(@Query('branch_id') branchId?: string) { return this.treasury.history(getTenantContext().tenantId, branchId); }
   @Post('shift-closes/:id/close') @RequiresPermission('treasury.shift.close') closeShift(@Param('id') id: string, @Body() body: { counts: ShiftCount[] }) { return this.treasury.closeShift(getTenantContext().tenantId, id, body.counts); }
+  /**
+   * 📊 إغلاقات اليومية — `frmCloseShift`. One row per close with the money the drawer
+   * took (💵 النقدي · 🌐 الشبكة · 💰 مجموع الشبكة والنقدي · 📋 آجل · 🧾 الضريبة ·
+   * 🏷️ الخصم · 💹 الصافي), the money that left it (📤 المصاريف · 🛒 المشتريات ·
+   * 🚗 توصيل · ☕ الضيافة · 🛡️ تأمين), and the two an auditor reads first:
+   * 🏦 رصيد الصندوق and 📉 الفرق. A closed row is read from its frozen summary; an
+   * open one is computed live.
+   */
+  @Get('shift-closes/day-closes')
+  @RequiresPermission('treasury.view')
+  dayCloses(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('user_id') userId?: string,
+    @Query('membership_id') membershipId?: string,
+    @Query('branch_id') branchId?: string,
+  ) {
+    return this.treasury.dayCloses(getTenantContext().tenantId, { from, to, userId, membershipId, branchId });
+  }
+
+  /** One close with its counted notes and its summary lines — `frmCloseShiftDetails`. */
+  @Get('shift-closes/:id')
+  @RequiresPermission('treasury.view')
+  shiftClose(@Param('id') id: string) {
+    return this.treasury.shiftClose(getTenantContext().tenantId, id);
+  }
+
   @Get('shift-closes/:id/print-data') @RequiresPermission('treasury.view') printShift(@Param('id') id: string) { return this.treasury.printShiftData(getTenantContext().tenantId, id); }
   /**
    * 🏦 حركة الصندوق — `frmRptKhzna`. Reads the safe's **ledger** (not the voucher table),

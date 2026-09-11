@@ -122,6 +122,8 @@ export type Employee = {
   employeeNo?: string;
   employee_no?: string;
   name: string;
+  /** The membership this employee record belongs to — how a user links to a person. */
+  membershipId?: string | null;
   departmentId?: string | null;
   jobId?: string | null;
   status?: string;
