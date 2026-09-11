@@ -897,16 +897,124 @@ await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1', walkIn);
 await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1', walkIn);
 
 const byMobile = await call('get', `/sales/cash-customers?mobile=${walkIn.mobile}`, token);
-check('🔍 البحث بالجوال تطابق تام', byMobile.length === 1, `${byMobile.length} صف`);
-check('👤 الاسم محفوظ على الفاتورة', byMobile[0]?.name === walkIn.name, byMobile[0]?.name ?? '—');
-check('الفواتير تُجمَّع لا تُكرَّر', Number(byMobile[0]?.invoices) === 2, String(byMobile[0]?.invoices));
+// The grouping key is (name, mobile): one row per name that used this number. A re-run of
+// this script leaves the previous run's زياد العتيبي <stamp> behind, so the assertion is
+// «every row really carries this mobile, and this run's زياد is one of them» — not a
+// brittle row count.
+check(
+  '🔍 البحث بالجوال تطابق تام',
+  byMobile.length > 0 && byMobile.every((row) => row.mobile === walkIn.mobile),
+  `${byMobile.length} صف`,
+);
+const walkInRow = byMobile.find((row) => row.name === walkIn.name);
+check('👤 الاسم محفوظ على الفاتورة', Boolean(walkInRow?.name), walkInRow?.name ?? '—');
+check('الفواتير تُجمَّع لا تُكرَّر', Number(walkInRow?.invoices) === 2, String(walkInRow?.invoices));
 
 const byName = await call('get', `/sales/cash-customers?name=${encodeURIComponent('زياد العتيبي')}`, token);
 check('🔍 البحث بالاسم يبحث في وسطه', byName.some((row) => row.name === walkIn.name), `${byName.length} صف`);
+check('كل صف يحمل جواله', byName.every((row) => Boolean(row.mobile)), `${byName.length} صف`);
 
 const strangerName = await call('get', `/sales/cash-customers?mobile=0550009999`, token);
 check('جوال مجهول لا يردّ أحداً', strangerName.length === 0, `${strangerName.length} صف`);
 
+
+// ── 11. مناقلة الخزن — frmSafesTransfer: إرسال / استلام / إقفال ───────────────
+console.log('11. مناقلة الخزن');
+const transferSafeB = await call('post', '/cash-locations', token, {
+  name: `خزنة مناقلة ${stamp}`,
+  kind: 'safe',
+  branchId,
+  accountId: safeAccountId,
+  currencyCode: 'SAR',
+});
+
+const draftTransfer = await call('post', '/cash-transfers', token, {
+  branchId,
+  fromCashLocationId: safe.id,
+  toCashLocationId: transferSafeB.id,
+  amount: '1200',
+  currencyCode: 'SAR',
+});
+check('مسودة بلا رقم حتى تُرسل', !draftTransfer.number, String(draftTransfer.number ?? '—'));
+check('المسودة تُحفظ', draftTransfer.status === 'draft', draftTransfer.status);
+
+const beforeSend = await balanceOf(safe.id);
+const sentTransfer = await call('post', `/cash-transfers/${draftTransfer.id}/send`, token, {});
+check('📤 الإرسال يرقّم المناقلة', /^CT-/.test(String(sentTransfer.number)), String(sentTransfer.number));
+check('الحالة بعد الإرسال', sentTransfer.status === 'sent', sentTransfer.status);
+check(
+  '💰 الخزنة المصدر تنقص 1200',
+  near((await balanceOf(safe.id)) - beforeSend, -1200),
+  money((await balanceOf(safe.id)) - beforeSend),
+);
+
+const receivedTransfer = await call('post', `/cash-transfers/${sentTransfer.id}/receive`, token, {});
+check('📥 الاستلام يغلق الدورة', receivedTransfer.status === 'received', receivedTransfer.status);
+check(
+  '💰 الخزنة الهدف تزيد 1200',
+  near(await balanceOf(transferSafeB.id), 1200),
+  money(await balanceOf(transferSafeB.id)),
+);
+
+// 📤 تُرسل مرة واحدة فقط، ولا تُستلم مرتين.
+const expectFail = async (label, fn, status = 422) => {
+  try {
+    await fn();
+    check(label, false, `expected ${status}`);
+  } catch (error) {
+    check(label, error.status === status, `${error.status} ${error.code}`);
+  }
+};
+await expectFail('📤 إرسال المُرسَلة مرفوض', () =>
+  call('post', `/cash-transfers/${sentTransfer.id}/send`, token, {}),
+);
+await expectFail('📥 استلام المُستلَمة مرفوض', () =>
+  call('post', `/cash-transfers/${sentTransfer.id}/receive`, token, {}),
+);
+
+// 🗑️ حذف — المسودة وحدها تُمحى، وما أُرسل يُلغى ولا يُمحى.
+const doomedDraft = await call('post', '/cash-transfers', token, {
+  branchId,
+  fromCashLocationId: safe.id,
+  toCashLocationId: transferSafeB.id,
+  amount: '45',
+});
+const voided = await call('post', `/cash-transfers/${doomedDraft.id}/cancel`, token, {});
+check('🗑️ المسودة تُلغى', voided.status === 'voided', voided.status);
+const afterVoid = (await call('get', '/cash-transfers?status=voided', token)).filter(
+  (row) => row.id === doomedDraft.id,
+);
+check('المُلغاة تظهر في البحث', afterVoid.length === 1, `${afterVoid.length} صف`);
+
+// 🔍 البحث برقم التحويل وبالفترة.
+const byNumber = await call(
+  'get',
+  `/cash-transfers?number=${encodeURIComponent(sentTransfer.number)}`,
+  token,
+);
+check(
+  '🔢 البحث بالرقم يُعيدها وحدها',
+  byNumber.length === 1 && byNumber[0].id === sentTransfer.id,
+  `${byNumber.length} صف`,
+);
+
+const windowed = await call('get', `/cash-transfers?from=${today}&to=${today}`, token);
+check('📅 نافذة اليوم تحتويها', windowed.some((row) => row.id === sentTransfer.id), `${windowed.length} صف`);
+const farAway = await call('get', '/cash-transfers?from=2099-01-01&to=2099-12-31', token);
+check('📅 فترة أخرى لا تحتويها', farAway.length === 0, `${farAway.length} صف`);
+
+const namedRows = await call('get', `/cash-transfers?number=${encodeURIComponent(sentTransfer.number)}`, token);
+check(
+  '🏦 من خزنة / إلى خزنة مسمّاة لا مُجرّد مُعرّفات',
+  namedRows[0]?.fromName && namedRows[0]?.toName,
+  `${namedRows[0]?.fromName ?? '—'} → ${namedRows[0]?.toName ?? '—'}`,
+);
+
+// مناقلة الأصناف (`frmSafesTransfer` نفسه) تُبحث بالرقم والفترة على نفس الشكل.
+const itemRows = await call('get', '/inventory/transfers?number=TR-', token);
+check('🔍 مناقلة الأصناف تقبل الرقم', Array.isArray(itemRows), `${itemRows.length} صف`);
+const futureItemRows = await call('get', '/inventory/transfers?from=2099-01-01&to=2099-12-31', token);
+check('📅 مناقلة الأصناف تقبل الفترة', Array.isArray(futureItemRows), `${futureItemRows.length} صف`);
 console.log('');
 
 console.log(failures === 0 ? '\n✔ Phase 06 treasury documents verified' : `\n✗ ${failures} check(s) failed`);

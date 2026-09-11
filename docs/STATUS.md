@@ -338,6 +338,32 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   empty and fills only on a keystroke; a list screen that opens empty looks broken, so
   with no search term the API returns the most recently served names.
 
+* **المرحلة 06 — الخزينة، الجزء السادس: مناقلة الخزن**
+  (`Form_WPF/frmSafesTransfer.xaml` + `.xaml.cs` L690/L863/L872،
+  `Reports/rptSafeTransfer.repx`، والجدولان في `CrystalLiteDB.txt` L1620 `SafesTransfer`
+  وL1642 `SafesTransfer_Sub`). **The decisive finding came before the code**: the
+  desktop's `SafesTransfer` table has **no amount column** — its sub-table carries *items*
+  (`ItemId`, `value` = quantity, `AvrgCost`, `ReceivedValue`, `Diff`) and
+  `rptSafeTransfer.repx` prints الصنف / الفئة / المستودع / الباركود / الكمية. So
+  `frmSafesTransfer` is a **مناقلة أصناف بين المخازن**, and moving *money* between safes
+  is done in the desktop with a سند صرف and a سند قبض. The cloud therefore needed both
+  halves: a new money screen `/treasury/transfers` on `/cash-transfers` carrying the
+  window's own three tabs (📦 التحويل · 📥 استلام تحويل · 🔍 البحث) and its state machine
+  (draft → sent → received, with `🗑️ حذف` for drafts only), and the missing 🔍 tab on the
+  item screen `/inventory/transfers` (`🔢 رقم التحويل` · `📅 من تاريخ` · `📅 إلى تاريخ` ·
+  `📋 كل الفترة` · `🔍 بحث`). `transfers()` now returns `fromName`/`toName` resolved
+  server-side by joining `cash_locations` twice under aliases, so the grid never shows a
+  raw uuid where the desktop shows a name; `cancelTransfer` writes `voided`, the terminal
+  state migration `0011` already allows, rather than inventing `cancelled` and a migration
+  to go with it. **No migration — again deliberately.** Screens gated by
+  `treasury.view`, actions by `treasury.transfer.manage`; 📦 استلام الكل shows a live
+  count of what is on the road. Tests `apps/api/test/treasury-transfers.spec.ts` (9) and
+  section 11 of `scripts/verify-treasury.mjs` (19 checks, walking the whole lifecycle
+  against the live stack). **526** API tests, 36 staff tests, 71 contract tests.
+  **Two justified deviations:** `🏦 من خزنة` / `🏦 إلى خزنة` are the window's
+  `🏪 من مخزن` / `🏪 إلى مخزن` with the store replaced by the safe — this module moves
+  cash, not stock; and `📋 الحالة` names a column the desktop grid leaves unheaded.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

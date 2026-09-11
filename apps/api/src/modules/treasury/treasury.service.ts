@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
+import { alias } from 'drizzle-orm/pg-core';
 import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
@@ -714,14 +715,80 @@ export class TreasuryService {
     );
     return row;
   }
-  transfers(tenantId: string) {
+  /**
+   * 🔍 البحث — `frmSafesTransfer.xaml` «📊 نتائج البحث»: `🔢 رقم التحويل` ·
+   * `📅 من تاريخ` · `📅 إلى تاريخ` · `📋 كل الفترة` · `🔍 بحث`. The grid binds
+   * `SafeFromName`/`SafeToName`, so the two sides are resolved here rather than in the
+   * browser — a screen that resolves a name is a screen that can show the wrong one.
+   */
+  transfers(
+    tenantId: string,
+    filters: { status?: string; number?: string; from?: string; to?: string } = {},
+  ) {
+    const fromSide = alias(cashLocations, 'from_side');
+    const toSide = alias(cashLocations, 'to_side');
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx
+        .select({
+          id: cashTransfers.id,
+          branchId: cashTransfers.branchId,
+          fromCashLocationId: cashTransfers.fromCashLocationId,
+          toCashLocationId: cashTransfers.toCashLocationId,
+          /** 🏦 من خزنة */
+          fromName: fromSide.name,
+          /** 🏦 إلى خزنة */
+          toName: toSide.name,
+          number: cashTransfers.number,
+          amount: cashTransfers.amount,
+          currency: cashTransfers.currency,
+          status: cashTransfers.status,
+          sentAt: cashTransfers.sentAt,
+          receivedAt: cashTransfers.receivedAt,
+          createdAt: cashTransfers.createdAt,
+        })
+        .from(cashTransfers)
+        .leftJoin(fromSide, eq(fromSide.id, cashTransfers.fromCashLocationId))
+        .leftJoin(toSide, eq(toSide.id, cashTransfers.toCashLocationId))
+        .where(
+          and(
+            eq(cashTransfers.tenantId, tenantId),
+            filters.status ? eq(cashTransfers.status, filters.status) : undefined,
+            filters.number ? ilike(cashTransfers.number, `%${filters.number}%`) : undefined,
+            filters.from ? gte(cashTransfers.createdAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+            filters.to ? lte(cashTransfers.createdAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+          ),
+        )
+        .orderBy(desc(cashTransfers.createdAt))
+        .limit(200),
+    );
+  }
+
+  /**
+   * 🗑️ حذف / إلغاء — `frmSafesTransfer` keeps `IS_Deleted` on the row rather than
+   * erasing it, and only a transfer nobody has sent can be dropped: once the money has
+   * left the source safe, the only honest way back is a transfer in the other direction.
+   * The status written is `voided`, the word migration `0011` already allows for a
+   * document that was written and then abandoned — no new state was invented here.
+   */
+  async cancelTransfer(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [row] = await tx
         .select()
         .from(cashTransfers)
-        .where(eq(cashTransfers.tenantId, tenantId))
-        .orderBy(desc(cashTransfers.createdAt)),
-    );
+        .where(and(eq(cashTransfers.tenantId, tenantId), eq(cashTransfers.id, id)));
+      if (!row) throw new DomainError('CASH_TRANSFER_NOT_FOUND', 'Cash transfer was not found', 404);
+      if (row.status !== 'draft')
+        throw new DomainError(
+          'CASH_TRANSFER_INVALID_STATE',
+          'Only a draft transfer can be cancelled — send it back instead',
+          422,
+        );
+      await tx
+        .update(cashTransfers)
+        .set({ status: 'voided', updatedAt: new Date() })
+        .where(and(eq(cashTransfers.tenantId, tenantId), eq(cashTransfers.id, id)));
+      return { id, status: 'voided' };
+    });
   }
   async sendTransfer(tenantId: string, id: string) {
     return withTenantTx(this.database.db, tenantId, async (tx) => {

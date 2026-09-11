@@ -4,7 +4,17 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
-import { ActionBar, DocField, DocHead, StatTile, StatTiles, StatusTrack, Tabs, Totals } from '../../../components/ui';
+import {
+  ActionBar,
+  DocField,
+  DocHead,
+  FilterBar,
+  StatTile,
+  StatTiles,
+  StatusTrack,
+  Tabs,
+  Totals,
+} from '../../../components/ui';
 import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -81,7 +91,26 @@ const lineValue = (line: TransferLine) => Number(line.qty) * Number(line.unitCos
 
 export default function TransfersPage() {
   const { can } = useSession();
-  const transfers = useQuery<Transfer[]>(() => apiList<Transfer>('/inventory/transfers'), []);
+  /**
+   * 🔍 البحث — `frmSafesTransfer` narrows the grid by `🔢 رقم التحويل` and by a
+   * `📅 من تاريخ` / `📅 إلى تاريخ` window, and `📋 كل الفترة` puts the whole history
+   * back. The server does the narrowing so the clerk searches a year of transfers, not
+   * the one page the browser happened to have cached.
+   */
+  const [search, setSearch] = useState<{ number: string; from: string; to: string }>({
+    number: '',
+    from: '',
+    to: '',
+  });
+  const searchKey = `${search.number}|${search.from}|${search.to}`;
+  const transfers = useQuery<Transfer[]>(() => {
+    const params = new URLSearchParams();
+    if (search.number.trim()) params.set('number', search.number.trim());
+    if (search.from) params.set('from', search.from);
+    if (search.to) params.set('to', search.to);
+    const query = params.toString();
+    return apiList<Transfer>(`/inventory/transfers${query ? `?${query}` : ''}`);
+  }, [searchKey]);
   const branches = useQuery<Branch[]>(() => listBranches(), []);
   const warehouses = useQuery<Warehouse[]>(() => listWarehouses(), []);
   const items = useQuery<Item[]>(() => listItems(), []);
@@ -418,6 +447,49 @@ export default function TransfersPage() {
         <StatTile label="قيمة ما في الطريق" value={money(transitValue)} hint="في حساب بضاعة تحت التحويل" tone="brand" />
         <StatTile label="مسودات" value={rows.filter((row) => row.status === 'draft').length} hint="تنتظر الإرسال" />
       </StatTiles>
+
+      <FilterBar
+        actions={
+          <>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => setSearch({ number: '', from: '', to: '' })}
+            >
+              📋 كل الفترة
+            </button>
+            <button className="btn primary" type="button" onClick={() => transfers.reload()}>
+              🔍 بحث
+            </button>
+          </>
+        }
+      >
+        <label className="field">
+          <span>🔢 رقم التحويل</span>
+          <input
+            dir="ltr"
+            value={search.number}
+            onChange={(event) => setSearch((current) => ({ ...current, number: event.target.value }))}
+            placeholder="TR-0001"
+          />
+        </label>
+        <label className="field">
+          <span>📅 من تاريخ</span>
+          <input
+            type="date"
+            value={search.from}
+            onChange={(event) => setSearch((current) => ({ ...current, from: event.target.value }))}
+          />
+        </label>
+        <label className="field">
+          <span>📅 إلى تاريخ</span>
+          <input
+            type="date"
+            value={search.to}
+            onChange={(event) => setSearch((current) => ({ ...current, to: event.target.value }))}
+          />
+        </label>
+      </FilterBar>
 
       <Tabs items={BUCKETS} value={bucket} onChange={setBucket} />
 

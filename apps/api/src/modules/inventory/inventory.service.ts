@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   accounts,
@@ -118,13 +118,29 @@ export class InventoryService {
    * Transfer register. `createTransfer` and `receiveTransfer` existed without any way to
    * read the result back, which made the مناقلة screen impossible to build.
    */
-  async listTransfers(tenantId: string, status?: string) {
+  /**
+   * 🔍 البحث — `frmSafesTransfer.xaml` «🔍 معايير البحث»: `🔢 رقم التحويل` ·
+   * `📅 من تاريخ` · `📅 إلى تاريخ`, with `📋 كل الفترة` meaning "send no dates at all".
+   * A transfer is a numbered document the receiving store keeps waiting for, so finding
+   * one by its number is the ordinary case, not a special one.
+   */
+  async listTransfers(
+    tenantId: string,
+    status?: string,
+    filters: { number?: string; from?: string; to?: string } = {},
+  ) {
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const rows = await tx
         .select()
         .from(stockTransfers)
         .where(
-          and(eq(stockTransfers.tenantId, tenantId), status ? eq(stockTransfers.status, status) : undefined),
+          and(
+            eq(stockTransfers.tenantId, tenantId),
+            status ? eq(stockTransfers.status, status) : undefined,
+            filters.number ? ilike(stockTransfers.number, `%${filters.number}%`) : undefined,
+            filters.from ? gte(stockTransfers.createdAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+            filters.to ? lte(stockTransfers.createdAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+          ),
         )
         .orderBy(sql`${stockTransfers.createdAt} DESC`)
         .limit(200);

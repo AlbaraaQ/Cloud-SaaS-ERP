@@ -1,28 +1,23 @@
-# نص جاهز للمحادثة القادمة — بعد الجزء الخامس من المرحلة 06 (الخزينة)
+# نص جاهز للمحادثة القادمة — بعد الجزء السادس من المرحلة 06 (الخزينة)
 
 انسخ هذا الملف كاملاً وأرسله في المحادثة الجديدة. (ملف للنسخ فقط — ليس توثيقاً رسمياً.)
 
 ---
 
-المرحلة 05 (المخزون) **مغلقة** بأجزائها السبعة، والمرحلة 06 (الخزينة) أُنجز منها خمسة
-أجزاء: **سند القبض وسند الصرف بوثيقة كاملة + القيد** (§1–§8)، و**تعريف الخزن والبنوك**
-(§9)، و**حركة الصندوق** (§10)، و**إغلاقات اليومية** (§11)، و**التحويل البنكي والعميل
-النقدي** (§12). راجع `docs/desktop-parity/PHASE_06_TREASURY.md` قبل أي سطر كود.
+المرحلة 05 (المخزون) **مغلقة** بأجزائها السبعة، والمرحلة 06 (الخزينة) أُنجز منها **ستة
+أجزاء**: **سند القبض وسند الصرف بوثيقة كاملة + القيد** (§1–§8)، و**تعريف الخزن
+والبنوك** (§9)، و**حركة الصندوق** (§10)، و**إغلاقات اليومية** (§11)، و**التحويل البنكي
+والعميل النقدي** (§12)، و**مناقلة الخزن** (§13). راجع
+`docs/desktop-parity/PHASE_06_TREASURY.md` قبل أي سطر كود.
 
-## الخيار الأول (الموصى به): الجزء السادس والأخير — مناقلة الخزن
-
-`Form_WPF/frmSafesTransfer.xaml` والتقرير `Reports/rptSafeTransfer.repx`: إرسال /
-استلام / إقفال بين الخزن. الواجهة الخلفية موجودة (`/cash-transfers`،
-`/cash-transfers/:id/send`، `/:id/receive`)؛ **الشاشة لا وجود لها**.
-
-## الخيار الثاني: قيد الإغلاق والتحويل البنكي (مؤجَّل عن قصد من الجزأين 4 و5)
+## الخيار الأول (الموصى به): قيد الإغلاق والتحويل البنكي (مؤجَّل عن قصد من الجزأين 4 و5)
 
 `BindCloseShiftToEntry1` في `Form_WPF/ClosShiftAndroid.xaml.cs` يبني قيداً حول رقم
 الإغلاق، و`EntryOper.cs` L620 يبني سطر التحويل من حساب البنك نفسه. السطور والملخّصات
 مجهّزة؛ **القيد نفسه** ينتظر جزء المحاسبة في هذه المرحلة حتى تأتي القيود من محرّك واحد
 لا اثنين.
 
-## الخيار الثالث: تقارير الخزينة المطبوعة
+## الخيار الثاني: تقارير الخزينة المطبوعة
 
 `Reports/rptCloseShift.repx` و`rptCloseday.repx` و`rptClosedayCust.repx` و
 `RptKhzna.repx` و`rptSafeTransfer.repx` تنتظر مرحلة التقارير؛ `printShiftData` يهيّئ
@@ -35,15 +30,17 @@
 ## 1) أين نقف (حقائق مقيسة عند كتابة هذا النص)
 
 - الفرع الإلزامي: `arena/01a0889e-cloud-saas-erp`.
-- `apps/api`: **87 ملفاً / 517 اختباراً** خضراء (منها `treasury-bank-transfer.spec.ts`
-  بـ8 و`sales-cash-customer.spec.ts` بـ7). `apps/staff`: **36/36**.
-  `@erp/contracts`: 71/71.
-- `node scripts/verify-treasury.mjs`: **10 أقسام** كلها ✓ وينتهي بـ
+- `apps/api`: **88 ملفاً / 526 اختباراً** خضراء (منها `treasury-bank-transfer.spec.ts`
+  بـ8، و`sales-cash-customer.spec.ts` بـ7، و`treasury-transfers.spec.ts` بـ9).
+  `apps/staff`: **36/36**. `@erp/contracts`: 71/71.
+- `node scripts/verify-treasury.mjs`: **11 قسماً** كلها ✓ وينتهي بـ
   «✔ Phase 06 treasury documents verified».
 - `node scripts/verify-inventory.mjs`: **15 قسماً** كلها ✓.
-- **43 ترحيلاً** مطبقاً آخرها `0042_shift_close_number` (الجزء الخامس بلا ترحيل، قصداً).
+- **43 ترحيلاً** مطبقاً آخرها `0042_shift_close_number` (الجزءان الخامس والسادس بلا
+  ترحيل، قصداً: `voided` موجود في `0011_treasury.sql` بلفظه).
 - شاشات الخزينة الحيّة: `/treasury/vouchers` · `/treasury/cash-locations` ·
-  `/treasury/banks` · `/treasury/movements` · `/treasury/day-close`، ومعها
+  `/treasury/banks` · `/treasury/movements` · `/treasury/day-close` ·
+  `/treasury/transfers`، ومعها `/inventory/transfers` (مناقلة الأصناف) و
   `/sales/cash-customers` ونافذتا `🏦 اختر البنك` و`👤 عميل نقدي` في `/sales/pos`
   و`/treasury/vouchers`.
 

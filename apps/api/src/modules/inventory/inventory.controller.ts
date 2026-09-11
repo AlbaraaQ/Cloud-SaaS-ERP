@@ -70,8 +70,15 @@ export class InventoryController {
   ) {
     return this.inventory.recomputeBalances(getTenantContext().tenantId, warehouseId, itemId);
   }
-  @Get('transfers') @RequiresPermission('inventory.view') listTransfers(@Query('status') status?: string) {
-    return this.inventory.listTransfers(getTenantContext().tenantId, status);
+  @Get('transfers')
+  @RequiresPermission('inventory.view')
+  listTransfers(
+    @Query('status') status?: string,
+    @Query('number') number?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.inventory.listTransfers(getTenantContext().tenantId, status, { number, from, to });
   }
   @Post('transfers') @RequiresPermission('inventory.adjust') transfer(
     @Body()

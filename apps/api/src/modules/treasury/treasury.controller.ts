@@ -19,10 +19,20 @@ export class TreasuryController {
   @Post('vouchers/:id/post') @RequiresPermission('treasury.voucher.post') postVoucher(@Param('id') id: string, @Body() body: VoucherPostInput) { return this.treasury.postVoucher(getTenantContext().tenantId, id, body); }
   @Post('vouchers/:id/void') @RequiresPermission('treasury.voucher.void') voidVoucher(@Param('id') id: string, @Body() body: { reason: string }) { return this.treasury.voidVoucher(getTenantContext().tenantId, id, body.reason); }
   @Post('vouchers/:id/cheque') @RequiresPermission('treasury.cheque.clear') cheque(@Param('id') id: string, @Body() body: { action: 'clear' | 'bounce' | 'collect' }) { return this.treasury.transitionCheque(getTenantContext().tenantId, id, body.action); }
-  @Get('cash-transfers') @RequiresPermission('treasury.view') transfers() { return this.treasury.transfers(getTenantContext().tenantId); }
+  @Get('cash-transfers')
+  @RequiresPermission('treasury.view')
+  transfers(
+    @Query('status') status?: string,
+    @Query('number') number?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.treasury.transfers(getTenantContext().tenantId, { status, number, from, to });
+  }
   @Post('cash-transfers') @RequiresPermission('treasury.transfer.manage') createTransfer(@Body() body: TransferInput) { return this.treasury.createTransfer(getTenantContext().tenantId, body); }
   @Post('cash-transfers/:id/send') @RequiresPermission('treasury.transfer.manage') sendTransfer(@Param('id') id: string) { return this.treasury.sendTransfer(getTenantContext().tenantId, id); }
   @Post('cash-transfers/:id/receive') @RequiresPermission('treasury.transfer.manage') receiveTransfer(@Param('id') id: string) { return this.treasury.receiveTransfer(getTenantContext().tenantId, id); }
+  @Post('cash-transfers/:id/cancel') @RequiresPermission('treasury.transfer.manage') cancelTransfer(@Param('id') id: string) { return this.treasury.cancelTransfer(getTenantContext().tenantId, id); }
   @Get('expense-types') @RequiresPermission('treasury.view') expenseTypes() { return this.treasury.listExpenseTypes(getTenantContext().tenantId); }
   @Post('expense-types') @RequiresPermission('treasury.expensetype.manage') createExpenseType(@Body() body: { nameAr: string; nameEn?: string; accountId: string; costCenterId?: string }) { return this.treasury.createExpenseType(getTenantContext().tenantId, body); }
   @Patch('expense-types/:id') @RequiresPermission('treasury.expensetype.manage') updateExpenseType(@Param('id') id: string, @Body() body: { nameAr?: string; nameEn?: string | null; accountId?: string; costCenterId?: string | null }) { return this.treasury.updateExpenseType(getTenantContext().tenantId, id, body); }

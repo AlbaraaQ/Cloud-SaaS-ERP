@@ -1329,6 +1329,10 @@ const treasury: ModuleNode = {
           permission: 'treasury.view',
           endpoint: '/shift-closes/day-closes',
         }),
+        screen('cash-transfer', 'مناقلة', 'Cash transfer', '/treasury/transfers', 'ready', {
+          permission: 'treasury.view',
+          endpoint: '/cash-transfers',
+        }),
       ],
     },
     {
