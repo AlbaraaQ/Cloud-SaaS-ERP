@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { DocField, DocHead, StatTile, StatTiles, StatusTrack, Totals } from '../../../components/ui';
 import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -123,8 +124,12 @@ export default function ProductionOrdersPage() {
   }
 
   const open = (orders.data ?? []).find((row) => row.id === expanded) ?? null;
-  const completed = (orders.data ?? []).filter((row) => row.status === 'completed');
+  const orderRows = orders.data ?? [];
+  const completed = orderRows.filter((row) => row.status === 'completed');
+  const drafts = orderRows.filter((row) => row.status === 'draft');
   const producedCost = completed.reduce((sum, row) => sum + Number(row.componentCost), 0);
+  const producedQty = completed.reduce((sum, row) => sum + Number(row.outputQty), 0);
+  const componentsCost = orderRows.reduce((sum, row) => sum + Number(row.componentCost), 0);
 
   return (
     <Screen
@@ -138,6 +143,14 @@ export default function ProductionOrdersPage() {
       }
     >
       {notice && <Notice notice={notice} />}
+
+      <StatTiles>
+        <StatTile label="أوامر الإنتاج" value={orderRows.length} hint="مسودة ومكتملة" tone="brand" />
+        <StatTile label="مسودات" value={drafts.length} hint="تنتظر التنفيذ" tone={drafts.length > 0 ? 'warn' : 'ok'} />
+        <StatTile label="أوامر مكتملة" value={completed.length} hint="نُفّذت وحرّكت المخزون" tone="ok" />
+        <StatTile label="الكمية المنتجة" value={quantity(producedQty)} hint="من الأوامر المكتملة" />
+        <StatTile label="تكلفة المكونات" value={money(componentsCost)} hint="ما خرج من المستودع" />
+      </StatTiles>
 
       {can('inventory.production.manage') && (
         <div className="card">
@@ -272,26 +285,78 @@ export default function ProductionOrdersPage() {
 
       {open && (
         <div className="card">
-          <h3>
-            {open.number} — {itemName(open.outputItemId)}
-          </h3>
-          <div className="chips">
-            <span className="chip">{`الحالة: ${STATUS_LABELS[open.status] ?? statusLabel(open.status)}`}</span>
-            <span className="chip">{`الكمية المنتجة: ${quantity(open.outputQty)}`}</span>
-            <span className="chip">{`تكلفة الوحدة: ${money(open.unitCost)}`}</span>
-            {open.notes && <span className="chip">{open.notes}</span>}
+          <div className="section-title">
+            <h3 dir="ltr">{open.number}</h3>
+            <span className="badge">{STATUS_LABELS[open.status] ?? statusLabel(open.status)}</span>
           </div>
+
+          <StatusTrack
+            steps={['مسودة', 'مُنفَّذ', 'مُلغى']}
+            current={open.status === 'draft' ? 0 : open.status === 'completed' ? 1 : 2}
+            cancelled={open.status === 'cancelled'}
+          />
+
+          <DocHead>
+            <DocField label="الرقم">
+              <span dir="ltr">{open.number}</span>
+            </DocField>
+            <DocField label="التاريخ">{shortDate(open.orderDate)}</DocField>
+            <DocField label="المنتج">{itemName(open.outputItemId)}</DocField>
+            <DocField label="الكمية المنتجة">
+              <span dir="ltr">{quantity(open.outputQty)}</span>
+            </DocField>
+            <DocField label="المستودع">{warehouseName(open.warehouseId)}</DocField>
+            <DocField label="تكلفة الوحدة">
+              <span dir="ltr">{money(open.unitCost)}</span>
+            </DocField>
+            <DocField label="البيان">{open.notes ?? '—'}</DocField>
+          </DocHead>
+
           <DataTable
             rows={open.components}
             rowKey={(row) => String(row.lineNo)}
+            footer={[
+              <>المجموع</>,
+              '',
+              '',
+              quantity(open.components.reduce((sum, row) => sum + Number(row.qty), 0)),
+              '',
+              money(open.components.reduce((sum, row) => sum + Number(row.lineCost), 0)),
+            ]}
             columns={[
               { key: 'no', header: '#', align: 'num', cell: (row) => row.lineNo },
-              { key: 'item', header: 'المكوّن', cell: (row) => itemName(row.itemId) },
-              { key: 'qty', header: 'الكمية', align: 'num', cell: (row) => quantity(row.qty) },
-              { key: 'unit', header: 'تكلفة الوحدة', align: 'num', cell: (row) => money(row.unitCost) },
-              { key: 'cost', header: 'التكلفة', align: 'num', cell: (row) => money(row.lineCost) },
+              {
+                key: 'sku',
+                header: 'رمز الصنف',
+                align: 'ltr',
+                cell: (row) => (items.data ?? []).find((item) => item.id === row.itemId)?.sku ?? '—',
+              },
+              { key: 'item', header: 'الصنف', cell: (row) => itemName(row.itemId) },
+              {
+                key: 'qty',
+                header: 'الكمية',
+                align: 'num',
+                cell: (row) => quantity(row.qty),
+              },
+              { key: 'unit', header: 'سعر الوحدة', align: 'num', cell: (row) => money(row.unitCost) },
+              { key: 'cost', header: 'المجموع', align: 'num', cell: (row) => money(row.lineCost) },
             ]}
           />
+
+          <Totals
+            items={[
+              {
+                label: 'إجمالي كمية المكونات',
+                value: quantity(open.components.reduce((sum, row) => sum + Number(row.qty), 0)),
+              },
+              {
+                label: 'إجمالي تكلفة المكونات',
+                value: money(open.components.reduce((sum, row) => sum + Number(row.lineCost), 0)),
+              },
+              { label: 'تكلفة الوحدة المنتجة', value: money(open.unitCost) },
+            ]}
+          />
+
           {open.status === 'draft' && <p className="muted">التكاليف تظهر أصفاراً حتى يُنفَّذ الأمر.</p>}
         </div>
       )}

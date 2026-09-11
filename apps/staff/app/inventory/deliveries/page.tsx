@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { StatTile, StatTiles } from '../../../components/ui';
 import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -134,12 +135,36 @@ export default function StockDeliveriesPage() {
     }
   }
 
+  const deliveryRows = deliveries.data ?? [];
+  const pendingQty = outstandingRows.reduce(
+    (sum, row) => sum + row.lines.reduce((inner, line) => inner + Number(line.remainingQty), 0),
+    0,
+  );
+  const pendingValue = outstandingRows.reduce((sum, row) => sum + Number(row.total), 0);
+  const deliveredQty = deliveryRows.reduce(
+    (sum, row) => sum + (row.lines ?? []).reduce((inner, line) => inner + Number(line.qty ?? 0), 0),
+    0,
+  );
+
   return (
     <Screen
       title="توصيل مخزني"
       subtitle="سند تسليم بضاعة فاتورة مبيعات مرحَّلة: يوثّق ما خرج فعلياً ومن استلمه، ولا يحرّك المخزون لأن ترحيل الفاتورة هو ما يخصم الرصيد."
       crumbs={['المستودعات', 'العمليات']}
     >
+      <StatTiles>
+        <StatTile
+          label="فواتير معلقة التوصيل"
+          value={outstandingRows.length}
+          hint="مرحَّلة ولم تُسلَّم بالكامل"
+          tone={outstandingRows.length > 0 ? 'warn' : 'ok'}
+        />
+        <StatTile label="الكمية المتبقية" value={quantity(pendingQty)} hint="لم تُسلَّم بعد" tone="brand" />
+        <StatTile label="قيمة الفواتير المعلقة" value={money(pendingValue)} hint="إجمالي المستحق تسليمه" />
+        <StatTile label="سندات التوصيل" value={deliveryRows.length} hint="سند مسجّل" />
+        <StatTile label="الكمية المسلَّمة" value={quantity(deliveredQty)} hint="مجموع سندات التوصيل" tone="ok" />
+      </StatTiles>
+
       {can('inventory.delivery.manage') && (
         <form className="card" onSubmit={createDelivery}>
           <h2>سند توصيل جديد</h2>

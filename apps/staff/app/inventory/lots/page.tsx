@@ -13,6 +13,8 @@ export default function LotsPage() {
   const lots = useQuery<Lot[]>(() => apiList<Lot>('/inventory/lots'), []);
   const items = useQuery<Item[]>(() => listItems(), []);
   const itemRows = items.data ?? [];
+  const lotRows = lots.data ?? [];
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <Directory<Lot>
@@ -37,6 +39,31 @@ export default function LotsPage() {
       }
       successText={(values) => `تمت إضافة الدفعة ${String(values.lotNo)}.`}
       rowKey={(row) => row.id}
+      tiles={[
+        { label: 'عدد الدفعات', value: lotRows.length, hint: 'دفعة مسجّلة', tone: 'brand' },
+        {
+          label: 'منتهية',
+          value: lotRows.filter((row) => row.expiryDate && row.expiryDate < today).length,
+          hint: 'تجاوزت تاريخ الصلاحية',
+          tone: lotRows.some((row) => row.expiryDate && row.expiryDate < today) ? 'danger' : 'ok',
+        },
+        {
+          label: 'دفعات منتهية خلال شهر',
+          value: lotRows.filter((row) => {
+            if (!row.expiryDate || row.expiryDate < today) return false;
+            const days = Math.round((new Date(row.expiryDate).getTime() - Date.now()) / 86400000);
+            return days <= 30;
+          }).length,
+          hint: 'تحتاج متابعة',
+          tone: 'warn',
+        },
+        {
+          label: 'بدون تاريخ صلاحية',
+          value: lotRows.filter((row) => !row.expiryDate).length,
+          hint: 'لن تظهر في تقرير الصلاحية',
+        },
+        { label: 'مواد لها دفعات', value: new Set(lotRows.map((row) => row.itemId)).size, hint: 'مادة' },
+      ]}
       empty="لا توجد دفعات"
       columns={[
         {

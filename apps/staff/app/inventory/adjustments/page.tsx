@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { ActionBar, DocField, DocHead, StatTile, StatTiles, StatusTrack, Tabs, Totals } from '../../../components/ui';
 import { ApiError, apiData, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -49,6 +50,16 @@ type AdjustmentLine = {
   unitCost?: string | null;
 };
 
+type Bucket = 'all' | 'draft' | 'posted';
+
+const BUCKETS: Array<{ id: Bucket; label: string }> = [
+  { id: 'all', label: 'الكل' },
+  { id: 'draft', label: 'مسودة' },
+  { id: 'posted', label: 'مُرحَّل' },
+];
+
+const STEPS = ['مسودة', 'مُعتمد', 'مُرحَّل'];
+
 type Adjustment = {
   id: string;
   number: string;
@@ -81,6 +92,7 @@ export default function StockAdjustmentsPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
   const [selected, setSelected] = useState<Adjustment | undefined>();
+  const [bucket, setBucket] = useState<Bucket>('all');
 
   const effectiveBranch = branchId || defaultOf(branchRows)?.id || '';
   const effectiveWarehouse = warehouseId || defaultOf(warehouseRows)?.id || '';
@@ -195,6 +207,32 @@ export default function StockAdjustmentsPage() {
     const unitValue = Number(line.costText || levelOf(line.itemId)?.averageCost || 0);
     return sum + variance * unitValue;
   }, 0);
+
+  const rows = adjustments.data ?? [];
+  const shown = bucket === 'all' ? rows : rows.filter((row) => row.status === bucket);
+  const countedRows = rows.reduce((sum, row) => sum + row.lines.length, 0);
+  const netVarianceQty = rows.reduce(
+    (sum, row) => sum + row.lines.reduce((inner, line) => inner + Number(line.varianceQty ?? 0), 0),
+    0,
+  );
+  const shortageValue = rows.reduce(
+    (sum, row) =>
+      sum +
+      row.lines.reduce(
+        (inner, line) => (Number(line.varianceQty ?? 0) < 0 ? inner + Number(line.varianceValue ?? 0) : inner),
+        0,
+      ),
+    0,
+  );
+  const surplusValue = rows.reduce(
+    (sum, row) =>
+      sum +
+      row.lines.reduce(
+        (inner, line) => (Number(line.varianceQty ?? 0) > 0 ? inner + Number(line.varianceValue ?? 0) : inner),
+        0,
+      ),
+    0,
+  );
 
   return (
     <Screen
@@ -393,134 +431,207 @@ export default function StockAdjustmentsPage() {
 
       {!open && <Notice notice={notice} />}
 
-      <QueryView
-        query={adjustments}
-        empty="لا توجد عمليات جرد"
-        emptyDetail="أنشئ جرداً جديداً لتسوية المخزون على الأرفف."
-      >
-        {(rows) => (
-          <DataTable
-            rows={rows}
-            rowKey={(row) => row.id}
-            columns={[
-              { key: 'number', header: 'الرقم', align: 'ltr', cell: (row) => row.number },
-              { key: 'reason', header: 'السبب', cell: (row) => row.reason },
-              {
-                key: 'warehouse',
-                header: 'المستودع',
-                cell: (row) =>
-                  arabicName(warehouseRows.find((warehouse) => warehouse.id === row.warehouseId) ?? {}),
-              },
-              { key: 'lines', header: 'الأصناف', align: 'num', cell: (row) => row.lines.length },
-              {
-                key: 'variance',
-                header: 'صافي الفرق',
-                align: 'num',
-                cell: (row) =>
-                  quantity(row.lines.reduce((sum, line) => sum + Number(line.varianceQty ?? 0), 0)),
-              },
-              {
-                key: 'value',
-                header: 'قيمة الفرق',
-                align: 'num',
-                cell: (row) =>
+      <StatTiles>
+        <StatTile
+          label="جردات مسودة"
+          value={rows.filter((row) => row.status === 'draft').length}
+          hint="تنتظر الاعتماد والترحيل"
+          tone={rows.some((row) => row.status === 'draft') ? 'warn' : 'ok'}
+        />
+        <StatTile label="أصناف مجرودة" value={countedRows} hint="سطر جرد مسجّل" />
+        <StatTile
+          label="صافي الفرق"
+          value={quantity(netVarianceQty)}
+          hint={netVarianceQty < 0 ? 'عجز في المخزون' : netVarianceQty > 0 ? 'زيادة في المخزون' : 'مطابق'}
+          tone={netVarianceQty < 0 ? 'danger' : netVarianceQty > 0 ? 'ok' : 'default'}
+        />
+        <StatTile label="قيمة العجز" value={money(shortageValue)} hint="ما نقص عن الدفاتر" tone="danger" />
+        <StatTile label="قيمة الزيادة" value={money(surplusValue)} hint="ما زاد عن الدفاتر" tone="ok" />
+      </StatTiles>
+
+      <Tabs items={BUCKETS} value={bucket} onChange={setBucket} />
+
+      <div className="split">
+        <div className="card tight split-list">
+          <QueryView query={adjustments} empty="لا توجد عمليات جرد" emptyDetail="أنشئ جرداً لمطابقة الأرصدة مع الرفوف.">
+            {() => (
+              <>
+                {shown.length === 0 ? (
+                  <p className="muted" style={{ padding: 12 }}>لا جردات في هذا التبويب.</p>
+                ) : (
+                  shown.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className={`list-row${row.id === selected?.id ? ' active' : ''}`}
+                      onClick={() => setSelected(row)}
+                    >
+                      <span className="list-title" dir="ltr">{row.number}</span>
+                      <span className="list-sub">{row.reason}</span>
+                      <span className="row" style={{ justifyContent: 'space-between' }}>
+                        <span className={`badge ${row.status === 'posted' ? 'ok' : ''}`}>{statusLabel(row.status)}</span>
+                        <span className="list-sub" dir="ltr">{dateTime(row.createdAt)}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </>
+            )}
+          </QueryView>
+        </div>
+
+        <div className="card">
+          {!selected ? (
+            <p className="muted">اختر جرداً من القائمة لعرض أسطره وفروقه.</p>
+          ) : (
+            <>
+              <div className="section-title">
+                <h2 dir="ltr">{selected.number}</h2>
+                <span className={`badge ${selected.status === 'posted' ? 'ok' : ''}`}>
+                  {statusLabel(selected.status)}
+                </span>
+              </div>
+
+              <StatusTrack steps={STEPS} current={selected.status === 'posted' ? 2 : 0} />
+
+              <DocHead>
+                <DocField label="الرقم">
+                  <span dir="ltr">{selected.number}</span>
+                </DocField>
+                <DocField label="السبب">{selected.reason}</DocField>
+                <DocField label="المستودع">
+                  {arabicName(warehouseRows.find((warehouse) => warehouse.id === selected.warehouseId) ?? {})}
+                </DocField>
+                <DocField label="التاريخ">{dateTime(selected.createdAt)}</DocField>
+                <DocField label="القيد">{selected.journalEntryId ? 'له قيد تسوية' : 'لم يُرحَّل'}</DocField>
+              </DocHead>
+
+              <DataTable
+                rows={selected.lines}
+                rowKey={(line) => String(line.lineNo)}
+                footer={[
+                  <>المجموع</>,
+                  '',
+                  quantity(selected.lines.reduce((sum, line) => sum + Number(line.expectedQty), 0)),
+                  quantity(selected.lines.reduce((sum, line) => sum + Number(line.countedQty), 0)),
+                  quantity(selected.lines.reduce((sum, line) => sum + Number(line.varianceQty ?? 0), 0)),
                   money(
-                    String(
-                      Math.round(
-                        row.lines.reduce(
-                          (sum, line) =>
-                            sum +
-                            (Number(line.varianceQty ?? 0) >= 0 ? 1 : -1) * Number(line.varianceValue ?? 0),
-                          0,
-                        ) * 10000,
-                      ) / 10000,
+                    selected.lines.reduce(
+                      (sum, line) =>
+                        sum + (Number(line.varianceQty ?? 0) >= 0 ? 1 : -1) * Number(line.varianceValue ?? 0),
+                      0,
                     ),
                   ),
-              },
-              {
-                key: 'status',
-                header: 'الحالة',
-                cell: (row) => (
-                  <span className={`badge ${row.status === 'posted' ? 'ok' : ''}`}>
-                    {statusLabel(row.status)}
-                  </span>
-                ),
-              },
-              {
-                key: 'actions',
-                header: '',
-                cell: (row) => (
-                  <span className="row" style={{ gap: 6 }}>
-                    <button className="btn sm" type="button" onClick={() => setSelected(row)}>
-                      تفاصيل
-                    </button>
-                    {row.status === 'draft' && can('inventory.adjust') && (
-                      <button className="btn sm primary" type="button" onClick={() => void post(row)}>
-                        اعتماد وترحيل
-                      </button>
-                    )}
-                  </span>
-                ),
-              },
-            ]}
-          />
-        )}
-      </QueryView>
+                ]}
+                columns={[
+                  { key: 'no', header: '#', align: 'num', cell: (line) => line.lineNo },
+                  {
+                    key: 'item',
+                    header: 'المادة',
+                    cell: (line) =>
+                      itemLabel(
+                        itemRows.find((row) => row.id === line.itemId) ?? ({ id: line.itemId, sku: '—' } as Item),
+                      ),
+                  },
+                  {
+                    key: 'expected',
+                    header: 'الرصيد الدفتري',
+                    align: 'num',
+                    cell: (line) => quantity(line.expectedQty),
+                  },
+                  {
+                    key: 'counted',
+                    header: 'المجرود',
+                    align: 'num',
+                    cell: (line) => <strong dir="ltr">{quantity(line.countedQty)}</strong>,
+                  },
+                  {
+                    key: 'variance',
+                    header: 'الفرق',
+                    align: 'num',
+                    cell: (line) => {
+                      const variance = Number(line.varianceQty ?? 0);
+                      return (
+                        <span
+                          dir="ltr"
+                          style={{
+                            color: variance === 0 ? 'var(--muted)' : variance > 0 ? 'var(--ok)' : 'var(--danger)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {variance === 0 ? 'مطابق' : `${variance > 0 ? '+' : '−'}${quantity(Math.abs(variance))}`}
+                        </span>
+                      );
+                    },
+                  },
+                  { key: 'value', header: 'قيمة الفرق', align: 'num', cell: (line) => money(line.varianceValue) },
+                ]}
+              />
 
-      {selected && (
-        <section className="card">
-          <h2>
-            تفاصيل الجرد {selected.number} <span className="muted">({statusLabel(selected.status)})</span>
-          </h2>
-          <p className="muted">
-            {selected.reason} ·{' '}
-            {arabicName(warehouseRows.find((warehouse) => warehouse.id === selected.warehouseId) ?? {})} ·{' '}
-            {dateTime(selected.createdAt)}
-            {selected.journalEntryId ? ' · له قيد تسوية' : ''}
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>المادة</th>
-                  <th>الرصيد الدفتري</th>
-                  <th>المجرود</th>
-                  <th>الفرق</th>
-                  <th>قيمة الفرق</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selected.lines.map((line) => (
-                  <tr key={line.lineNo}>
-                    <td dir="ltr">{line.lineNo}</td>
-                    <td>
-                      {itemLabel(
-                        itemRows.find((row) => row.id === line.itemId) ??
-                          ({ id: line.itemId, sku: '—' } as Item),
-                      )}
-                    </td>
-                    <td dir="ltr">{quantity(line.expectedQty)}</td>
-                    <td dir="ltr">{quantity(line.countedQty)}</td>
-                    <td dir="ltr">
-                      {line.varianceQty === null || line.varianceQty === undefined
-                        ? '—'
-                        : quantity(line.varianceQty)}
-                    </td>
-                    <td dir="ltr">{money(line.varianceValue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button className="btn sm" type="button" onClick={() => setSelected(undefined)}>
-            إغلاق التفاصيل
-          </button>
-          <p className="muted" style={{ fontSize: 13 }}>
-            آخر تحديث: {shortDate(new Date())}
-          </p>
-        </section>
-      )}
+              <Totals
+                items={[
+                  {
+                    label: 'إجمالي العجز',
+                    value: money(
+                      selected.lines.reduce(
+                        (sum, line) => (Number(line.varianceQty ?? 0) < 0 ? sum + Number(line.varianceValue ?? 0) : sum),
+                        0,
+                      ),
+                    ),
+                  },
+                  {
+                    label: 'إجمالي الزيادة',
+                    value: money(
+                      selected.lines.reduce(
+                        (sum, line) => (Number(line.varianceQty ?? 0) > 0 ? sum + Number(line.varianceValue ?? 0) : sum),
+                        0,
+                      ),
+                    ),
+                  },
+                  {
+                    label: 'صافي قيمة الفرق',
+                    value: money(
+                      selected.lines.reduce(
+                        (sum, line) =>
+                          sum + (Number(line.varianceQty ?? 0) >= 0 ? 1 : -1) * Number(line.varianceValue ?? 0),
+                        0,
+                      ),
+                    ),
+                  },
+                  { label: 'الأصناف', value: selected.lines.length },
+                ]}
+              />
+
+              <ActionBar>
+                {selected.status === 'draft' && can('inventory.adjust') && (
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `اعتماد وترحيل الجرد ${selected.number}؟ سيُعدَّل المخزون إلى الكميات المجرودة ويُنشأ قيد تسوية واحد بصافي الفرق.`,
+                        )
+                      ) {
+                        void post(selected);
+                      }
+                    }}
+                  >
+                    اعتماد وترحيل
+                  </button>
+                )}
+                <button className="btn" type="button" onClick={() => setSelected(undefined)}>
+                  إغلاق التفاصيل
+                </button>
+                <button className="btn" type="button" onClick={() => window.print()}>
+                  طباعة
+                </button>
+              </ActionBar>
+              <p className="muted small">آخر تحديث للسجل: {shortDate(new Date())}</p>
+            </>
+          )}
+        </div>
+      </div>
     </Screen>
   );
 }

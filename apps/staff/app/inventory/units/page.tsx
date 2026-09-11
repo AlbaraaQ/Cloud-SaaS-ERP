@@ -9,6 +9,7 @@ import { useQuery } from '../../../lib/use-query';
 export default function UnitsPage() {
   const { can } = useSession();
   const units = useQuery<Unit[]>(() => listUnits(), []);
+  const unitRows = units.data ?? [];
 
   return (
     <Directory<Unit>
@@ -18,6 +19,16 @@ export default function UnitsPage() {
       query={units}
       canCreate={can('catalog.unit.manage')}
       createLabel="وحدة جديدة"
+      tiles={[
+        { label: 'وحدات القياس', value: unitRows.length, hint: 'وحدة معرّفة', tone: 'brand' },
+        {
+          label: 'بلا اسم إنجليزي',
+          value: unitRows.filter((row) => !row.nameEn).length,
+          hint: 'تظهر بالعربية فقط',
+          tone: unitRows.some((row) => !row.nameEn) ? 'warn' : 'ok',
+        },
+        { label: 'الرموز', value: new Set(unitRows.map((row) => row.code)).size, hint: 'رمز مختلف' },
+      ]}
       fields={[
         { name: 'code', label: 'الرمز', required: true, ltr: true, placeholder: 'PCS' },
         { name: 'nameAr', label: 'الاسم العربي', required: true },

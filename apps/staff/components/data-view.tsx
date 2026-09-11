@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 import type { QueryState } from '../lib/use-query';
 
@@ -47,10 +47,37 @@ export type Column<T> = {
 };
 
 /** Plain, dense table. No sorting or pagination magic — the API decides the order. */
-export function DataTable<T>({ columns, rows, rowKey }: { columns: Array<Column<T>>; rows: T[]; rowKey: (row: T, index: number) => string }) {
+/**
+ * Dense table with the extras a document screen needs: zebra rows, clickable rows,
+ * an expandable detail row and a totals footer. Every option is opt-in, so the
+ * thirteen screens already calling it keep working unchanged.
+ */
+export function DataTable<T>({
+  columns,
+  rows,
+  rowKey,
+  zebra = true,
+  compact,
+  onRowClick,
+  activeKey,
+  footer,
+  expanded,
+}: {
+  columns: Array<Column<T>>;
+  rows: T[];
+  rowKey: (row: T, index: number) => string;
+  zebra?: boolean;
+  compact?: boolean;
+  onRowClick?: (row: T) => void;
+  activeKey?: string;
+  /** Cells of the totals row, in column order. */
+  footer?: ReactNode[];
+  /** Detail rendered under the row — lot, serial, the source document. */
+  expanded?: (row: T) => ReactNode;
+}) {
   return (
     <div className="table-wrap">
-      <table>
+      <table className={[zebra ? 'zebra' : '', compact ? 'compact' : ''].filter(Boolean).join(' ') || undefined}>
         <thead>
           <tr>
             {columns.map((column) => (
@@ -61,16 +88,47 @@ export function DataTable<T>({ columns, rows, rowKey }: { columns: Array<Column<
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={rowKey(row, index)}>
-              {columns.map((column) => (
-                <td key={column.key} className={column.align === 'num' ? 'num' : undefined} dir={column.align === 'ltr' ? 'ltr' : undefined}>
-                  {column.cell(row, index)}
+          {rows.map((row, index) => {
+            const key = rowKey(row, index);
+            const active = activeKey !== undefined && activeKey === key;
+            return (
+              <Fragment key={key}>
+                <tr
+                  className={[onRowClick ? 'clickable' : '', active ? 'row-active' : ''].filter(Boolean).join(' ') || undefined}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={column.align === 'num' ? 'num' : undefined}
+                      dir={column.align === 'ltr' ? 'ltr' : undefined}
+                    >
+                      {column.cell(row, index)}
+                    </td>
+                  ))}
+                </tr>
+                {expanded ? (
+                  <tr>
+                    <td colSpan={columns.length} style={{ background: '#fbfbfd', padding: '8px 12px' }}>
+                      {expanded(row)}
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
+        </tbody>
+        {footer ? (
+          <tfoot>
+            <tr>
+              {footer.map((cell, index) => (
+                <td key={columns[index]?.key ?? index} className={columns[index]?.align === 'num' ? 'num' : undefined}>
+                  {cell}
                 </td>
               ))}
             </tr>
-          ))}
-        </tbody>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );

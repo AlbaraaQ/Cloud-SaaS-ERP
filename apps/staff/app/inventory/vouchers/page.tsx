@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { ActionBar, DocField, DocHead, StatTile, StatTiles, StatusTrack, Tabs, Totals } from '../../../components/ui';
 import { accountLabel, listAccounts, postableOf, type Account } from '../../../lib/accounts';
 import { ApiError, apiData, apiList, apiPost } from '../../../lib/api';
 import {
@@ -141,6 +142,29 @@ export default function VouchersPage() {
     return lists.flat();
   }, [itemIds]);
   const unitsOf = (id: string) => (unitRows.data ?? []).filter((row) => row.itemId === id);
+
+  /**
+   * وحدات سند محدد — the card above loads units for the lines being typed; a saved
+   * document needs its own, or the base quantity column would silently read ×1 for
+   * every line that was counted in a carton.
+   */
+  const selectedItemIds = (selected?.lines ?? []).map((line) => line.itemId).join(',');
+  const selectedUnits = useQuery<ItemUnit[]>(async () => {
+    const ids = Array.from(new Set(selectedItemIds.split(',').filter(Boolean)));
+    if (ids.length === 0) return [];
+    const lists = await Promise.all(ids.map((id) => listItemUnits(id)));
+    return lists.flat();
+  }, [selectedItemIds]);
+  const baseOf = (line: VoucherLine) => {
+    const ratio = line.unitId
+      ? Number(
+          (selectedUnits.data ?? []).find(
+            (row) => row.itemId === line.itemId && row.unitId === line.unitId,
+          )?.ratio ?? 1,
+        )
+      : 1;
+    return Number(line.qty) * (Number.isFinite(ratio) && ratio > 0 ? ratio : 1);
+  };
   const factorOf = (line: { itemId: string; unitId: string }) => {
     if (!line.unitId) return 1;
     return Number(unitsOf(line.itemId).find((row) => row.unitId === line.unitId)?.ratio ?? 1);
@@ -282,6 +306,8 @@ export default function VouchersPage() {
     }
   }
 
+  const rows = vouchers.data ?? [];
+
   return (
     <Screen
       title="سندات المخزون"
@@ -295,22 +321,15 @@ export default function VouchersPage() {
         ) : null
       }
     >
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        {KINDS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            className={option.id === kind ? 'btn primary' : 'btn'}
-            onClick={() => {
-              setKind(option.id);
-              setNotice(undefined);
-            }}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      <p className="muted" style={{ marginTop: 6 }}>
+      <Tabs
+        items={KINDS.map((option) => ({ id: option.id, label: option.label }))}
+        value={kind}
+        onChange={(next) => {
+          setKind(next);
+          setNotice(undefined);
+        }}
+      />
+      <p className="muted" style={{ marginTop: -4 }}>
         {KINDS.find((option) => option.id === kind)?.hint}
       </p>
 
@@ -582,93 +601,209 @@ export default function VouchersPage() {
 
       {!open && <Notice notice={notice} />}
 
-      <QueryView
-        query={vouchers}
-        empty="لا توجد سندات"
-        emptyDetail="أنشئ سند إدخال أو إخراج لتحريك المخزون بقيد متزن."
-      >
-        {(rows) => (
-          <DataTable
-            rows={rows}
-            rowKey={(row) => row.id}
-            columns={[
-              { key: 'number', header: 'الرقم', align: 'ltr', cell: (row) => row.number },
-              { key: 'date', header: 'التاريخ', align: 'ltr', cell: (row) => shortDate(row.voucherDate) },
-              {
-                key: 'warehouse',
-                header: 'المستودع',
-                cell: (row) =>
-                  arabicName(warehouseRows.find((warehouse) => warehouse.id === row.warehouseId) ?? {}),
-              },
-              { key: 'reason', header: 'السبب', cell: (row) => row.reason ?? '—' },
-              { key: 'lines', header: 'الأسطر', align: 'num', cell: (row) => row.lines.length },
-              {
-                key: 'qty',
-                header: 'الكمية',
-                align: 'num',
-                cell: (row) => quantity(row.lines.reduce((sum, line) => sum + Number(line.qty), 0)),
-              },
-              { key: 'value', header: 'القيمة', align: 'num', cell: (row) => money(row.totalCost) },
-              {
-                key: 'status',
-                header: 'الحالة',
-                cell: (row) => (
-                  <span
-                    className={`badge ${row.status === 'posted' ? 'ok' : row.status === 'voided' ? 'danger' : ''}`}
-                  >
-                    {statusLabel(row.status)}
-                  </span>
-                ),
-              },
-              {
-                key: 'actions',
-                header: '',
-                cell: (row) => (
-                  <span className="row" style={{ gap: 6 }}>
-                    <button className="btn sm" type="button" onClick={() => setSelected(row)}>
-                      تفاصيل
+      <StatTiles>
+        <StatTile
+          label={`سندات ${KIND_LABELS[kind]}`}
+          value={rows.length}
+          hint={PREFIXES[kind]}
+          tone="brand"
+        />
+        <StatTile label="إجمالي القيمة" value={money(rows.reduce((sum, row) => sum + Number(row.totalCost), 0))} hint="مجموع السندات المعروضة" />
+        <StatTile
+          label="مسودات تنتظر الترحيل"
+          value={rows.filter((row) => row.status === 'draft').length}
+          hint="لم تُحرّك المخزون بعد"
+          tone={rows.some((row) => row.status === 'draft') ? 'warn' : 'ok'}
+        />
+        <StatTile
+          label="مُرحَّلة"
+          value={rows.filter((row) => row.status === 'posted').length}
+          hint="لها قيد محاسبي"
+          tone="ok"
+        />
+        <StatTile
+          label="إجمالي الكمية"
+          value={quantity(rows.reduce((sum, row) => sum + row.lines.reduce((inner, line) => inner + Number(line.qty), 0), 0))}
+          hint="بوحدات السندات"
+        />
+      </StatTiles>
+
+      <div className="split">
+        <div className="card tight split-list">
+          <QueryView query={vouchers} empty="لا توجد سندات" emptyDetail="أنشئ سند إدخال أو إخراج لتحريك المخزون بقيد متزن.">
+            {() => (
+              <>
+                {rows.length === 0 ? (
+                  <p className="muted" style={{ padding: 12 }}>لا سندات من هذا النوع.</p>
+                ) : (
+                  rows.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className={`list-row${row.id === selected?.id ? ' active' : ''}`}
+                      onClick={() => setSelected(row)}
+                    >
+                      <span className="list-title" dir="ltr">{row.number}</span>
+                      <span className="list-sub">{`${shortDate(row.voucherDate)} · ${arabicName(
+                        warehouseRows.find((warehouse) => warehouse.id === row.warehouseId) ?? {},
+                      )}`}</span>
+                      <span className="row" style={{ justifyContent: 'space-between' }}>
+                        <span
+                          className={`badge ${
+                            row.status === 'posted' ? 'ok' : row.status === 'voided' ? 'danger' : ''
+                          }`}
+                        >
+                          {statusLabel(row.status)}
+                        </span>
+                        <span className="list-sub" dir="ltr">{money(row.totalCost)}</span>
+                      </span>
                     </button>
-                    {row.status === 'draft' && can('inventory.adjust') && (
-                      <button
-                        className="btn sm primary"
-                        type="button"
-                        onClick={() =>
-                          act(
-                            () => apiPost(`/inventory/vouchers/${row.id}/post`, { allowNegative }),
-                            `تم ترحيل ${row.number} وتحريك المخزون وإنشاء القيد.`,
-                          )
-                        }
-                      >
-                        ترحيل
-                      </button>
-                    )}
-                    {row.status === 'posted' && can('inventory.adjust') && (
-                      <button
-                        className="btn sm danger"
-                        type="button"
-                        onClick={() => {
-                          const why = window.prompt(`سبب إلغاء السند ${row.number}:`);
-                          if (why && why.trim()) {
-                            void act(
-                              () => apiPost(`/inventory/vouchers/${row.id}/void`, { reason: why.trim() }),
-                              `تم إلغاء ${row.number} وعكس قيده.`,
-                            );
-                          }
-                        }}
-                      >
-                        إلغاء
-                      </button>
-                    )}
-                  </span>
-                ),
-              },
-            ]}
-          />
-        )}
-      </QueryView>
+                  ))
+                )}
+              </>
+            )}
+          </QueryView>
+        </div>
+
+        <div className="card">
+          {!selected ? (
+            <p className="muted">اختر سنداً من القائمة لعرض بياناته وأسطره وأفعاله.</p>
+          ) : (
+            <>
+              <div className="section-title">
+                <h2 dir="ltr">{selected.number}</h2>
+                <span
+                  className={`badge ${
+                    selected.status === 'posted' ? 'ok' : selected.status === 'voided' ? 'danger' : ''
+                  }`}
+                >
+                  {statusLabel(selected.status)}
+                </span>
+              </div>
+
+              <StatusTrack
+                steps={['مسودة', 'مُرحَّل', 'مُلغى']}
+                current={selected.status === 'draft' ? 0 : selected.status === 'posted' ? 1 : 2}
+                cancelled={selected.status === 'voided'}
+              />
+
+              <DocHead>
+                <DocField label="الرقم">
+                  <span dir="ltr">{selected.number}</span>
+                </DocField>
+                <DocField label="النوع">{KIND_LABELS[selected.kind] ?? selected.kind}</DocField>
+                <DocField label="التاريخ">{shortDate(selected.voucherDate)}</DocField>
+                <DocField label="المستودع">
+                  {arabicName(warehouseRows.find((warehouse) => warehouse.id === selected.warehouseId) ?? {})}
+                </DocField>
+                <DocField label="السبب">{selected.reason ?? '—'}</DocField>
+                <DocField label="القيد">{selected.journalEntryId ? 'له قيد محاسبي' : 'لم يُرحَّل'}</DocField>
+                <DocField label="أُنشئ">{dateTime(selected.createdAt)}</DocField>
+              </DocHead>
+
+              <DataTable
+                rows={selected.lines}
+                rowKey={(line) => String(line.lineNo)}
+                footer={[
+                  <>المجموع</>,
+                  '',
+                  quantity(selected.lines.reduce((sum, line) => sum + Number(line.qty), 0)),
+                  '',
+                  quantity(selected.lines.reduce((sum, line) => sum + baseOf(line), 0)),
+                  '',
+                  money(selected.totalCost),
+                  '',
+                ]}
+                columns={[
+                  { key: 'no', header: '#', align: 'num', cell: (line) => line.lineNo },
+                  {
+                    key: 'item',
+                    header: 'المادة',
+                    cell: (line) => itemLabel(itemOf(line.itemId) ?? ({ id: line.itemId, sku: '—' } as Item)),
+                  },
+                  { key: 'qty', header: 'الكمية', align: 'num', cell: (line) => quantity(line.qty) },
+                  {
+                    key: 'unit',
+                    header: 'الوحدة',
+                    cell: (line) =>
+                      line.unitId
+                        ? (selectedUnits.data ?? []).find(
+                            (row) => row.itemId === line.itemId && row.unitId === line.unitId,
+                          )?.unitNameAr ?? '—'
+                        : 'الوحدة الأساسية',
+                  },
+                  {
+                    key: 'base',
+                    header: 'الكمية بالوحدة الأساسية',
+                    align: 'num',
+                    cell: (line) => <strong dir="ltr">{quantity(baseOf(line))}</strong>,
+                  },
+                  { key: 'cost', header: 'تكلفة الوحدة', align: 'num', cell: (line) => money(line.unitCost) },
+                  { key: 'value', header: 'القيمة', align: 'num', cell: (line) => money(line.lineCost) },
+                  { key: 'note', header: 'ملاحظة', cell: (line) => line.note ?? '—' },
+                ]}
+              />
+
+              <Totals
+                items={[
+                  { label: 'إجمالي الكمية', value: quantity(selected.lines.reduce((sum, line) => sum + Number(line.qty), 0)) },
+                  {
+                    label: 'بالوحدة الأساسية',
+                    value: quantity(selected.lines.reduce((sum, line) => sum + baseOf(line), 0)),
+                  },
+                  { label: 'الأسطر', value: selected.lines.length },
+                  { label: 'إجمالي السند', value: money(selected.totalCost) },
+                ]}
+              />
+
+              <ActionBar>
+                {selected.status === 'draft' && can('inventory.adjust') && (
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`ترحيل السند ${selected.number}؟ سيُحرَّك المخزون ويُنشأ القيد.`)) {
+                        void act(
+                          () => apiPost(`/inventory/vouchers/${selected.id}/post`, { allowNegative }),
+                          `تم ترحيل ${selected.number} وتحريك المخزون وإنشاء القيد.`,
+                        );
+                      }
+                    }}
+                  >
+                    ترحيل
+                  </button>
+                )}
+                {selected.status === 'posted' && can('inventory.adjust') && (
+                  <button
+                    className="btn danger"
+                    type="button"
+                    onClick={() => {
+                      const why = window.prompt(`سبب إلغاء السند ${selected.number}:`);
+                      if (why && why.trim()) {
+                        void act(
+                          () => apiPost(`/inventory/vouchers/${selected.id}/void`, { reason: why.trim() }),
+                          `تم إلغاء ${selected.number} وعكس قيده.`,
+                        );
+                      }
+                    }}
+                  >
+                    إلغاء
+                  </button>
+                )}
+                <button className="btn" type="button" onClick={() => setSelected(undefined)}>
+                  إغلاق التفاصيل
+                </button>
+                <button className="btn" type="button" onClick={() => window.print()}>
+                  طباعة
+                </button>
+              </ActionBar>
+            </>
+          )}
+        </div>
+      </div>
 
       {can('inventory.negative.override') && (
-        <label className="field" style={{ maxWidth: 420 }}>
+        <label className="field no-print" style={{ maxWidth: 420 }}>
           <span>
             <input
               type="checkbox"
@@ -680,60 +815,6 @@ export default function VouchersPage() {
           <span className="muted">صالح فقط للجلسات التي تملك صلاحية تجاوز الرصيد السالب.</span>
         </label>
       )}
-
-      {selected && (
-        <section className="card">
-          <h2>
-            تفاصيل السند {selected.number}{' '}
-            <span className="muted">({KIND_LABELS[selected.kind] ?? selected.kind})</span>
-          </h2>
-          <p className="muted">
-            {shortDate(selected.voucherDate)} ·{' '}
-            {arabicName(warehouseRows.find((warehouse) => warehouse.id === selected.warehouseId) ?? {})} ·{' '}
-            {statusLabel(selected.status)}
-            {selected.journalEntryId ? ' · له قيد محاسبي' : ''}
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>المادة</th>
-                  <th>الكمية</th>
-                  <th>الوحدة</th>
-                  <th>تكلفة الوحدة</th>
-                  <th>القيمة</th>
-                  <th>ملاحظة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selected.lines.map((line) => (
-                  <tr key={line.lineNo}>
-                    <td dir="ltr">{line.lineNo}</td>
-                    <td>{itemLabel(itemOf(line.itemId) ?? ({ id: line.itemId, sku: '—' } as Item))}</td>
-                    <td dir="ltr">{quantity(line.qty)}</td>
-                    <td>
-                      {line.unitId
-                        ? (unitsOf(line.itemId).find((row) => row.unitId === line.unitId)?.unitNameAr ?? '—')
-                        : 'الوحدة الأساسية'}
-                    </td>
-                    <td dir="ltr">{money(line.unitCost)}</td>
-                    <td dir="ltr">{money(line.lineCost)}</td>
-                    <td>{line.note ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button className="btn sm" type="button" onClick={() => setSelected(undefined)}>
-            إغلاق التفاصيل
-          </button>
-        </section>
-      )}
-
-      <p className="muted" style={{ fontSize: 13 }}>
-        آخر تحديث للسجل: {dateTime(new Date())}
-      </p>
     </Screen>
   );
 }

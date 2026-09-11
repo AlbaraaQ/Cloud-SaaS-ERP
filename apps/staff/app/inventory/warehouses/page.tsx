@@ -11,6 +11,8 @@ export default function WarehousesPage() {
   const warehouses = useQuery<Warehouse[]>(() => listWarehouses(), []);
   const branches = useQuery<Branch[]>(() => listBranches(), []);
   const branchRows = branches.data ?? [];
+  const warehouseRows = warehouses.data ?? [];
+  const defaults = warehouseRows.filter((row) => row.isDefault).length;
 
   return (
     <Directory<Warehouse>
@@ -64,6 +66,17 @@ export default function WarehousesPage() {
       rowLabel={(row) => `المستودع ${row.code ?? ''}`}
       successText={(values) => `تمت إضافة المستودع ${String(values.code)}.`}
       rowKey={(row) => row.id}
+      tiles={[
+        { label: 'المستودعات', value: warehouseRows.length, hint: 'مستودع معرّف', tone: 'brand' },
+        { label: 'الفروع', value: branchRows.length, hint: 'فرع مسجّل' },
+        { label: 'مستودع افتراضي', value: defaults, hint: 'يُستخدم تلقائياً في الفواتير' },
+        {
+          label: 'مستودعات بلا فرع',
+          value: warehouseRows.filter((row) => !row.branchId).length,
+          hint: 'لن تجد ملف ترحيل',
+          tone: warehouseRows.some((row) => !row.branchId) ? 'danger' : 'ok',
+        },
+      ]}
       empty="لا توجد مستودعات"
       columns={[
         { key: 'code', header: 'الرمز', align: 'ltr', cell: (row) => row.code ?? '—' },

@@ -295,53 +295,70 @@ Additive: the transfer status check is widened with `'closed'`, `stock_transfers
 
 ---
 
-## 8. Part four — إعادة تصميم شاشات المخزون (مخطَّط: لم يُنفَّذ بعد)
+## 8. Part four — إعادة تصميم شاشات المخزون (منفَّذ)
 
-> حالة هذا القسم: **خطة عمل لجلسة قادمة**. نُفِّذت الأجزاء 1–3 (الكومِتات `0b4578c` و`a6d99e1` و`55d407c`)؛ الجزء الرابع تغيير في **طبقة العرض فقط** ولا يمس أي نقطة نهاية.
+Presentation layer only: not one endpoint changed, not one permission widened.
 
-### 8.1 Why — measured, not impression
+### 8.1 Why — قياسات ما قبل التغيير
 
-الخلفية سليمة ومُختبَرة، لكن التصميم لم يتطور:
+الخلفية كانت سليمة ومُختبَرة، لكن الشكل لم يتطور:
 
 - كل شاشة ترث نفس القالب `components/screen.tsx` (مسار + عنوان + وصف + أزرار) ثم بطاقات وجداول `DataTable`؛ لا لوحة مؤشرات ولا خطوات ولا تخطيط مقسوم ولا تبويبات.
-- أصناف معرّفة في `globals.css` ولا تُستخدم في `app/inventory/`: `.kpi` **0**، `.state` **0**، `.skeleton` **0**، `.section-title` **0**، `.grid.cols` **1**.
-- **8 شاشات** ما زالت تكتب `<table>` يدوياً بدل `DataTable`.
-- النتيجة: شاشات صحيحة وظيفياً بشكل «نموذج موحّد بسيط» لا يختلف عن بقية النظام.
+- أصناف معرّفة في `globals.css` ولا استخدام لها في `app/inventory/`: `.kpi` **0**، `.state` **0**، `.skeleton` **0**، `.section-title` **0**، `.grid.cols` **1**.
+- **8 شاشات** تكتب `<table>` يدوياً بدل `DataTable`.
 
-### 8.2 The shared component layer to build in `apps/staff/components/`
+### 8.2 طبقة المكوّنات المشتركة — `apps/staff/components/ui.tsx`
 
-`PageHeader` · `FilterBar` (لاصق) · `StatTiles` (القيمة + الكمية) · `DataTable` (رأس لاصق، صفوف مخططة، ترتيب، توسّع، تذييل مجاميع) · `StatusTrack` (خطوات حالة المستند) · `EmptyState` / `LoadingState` / `ErrorState` · `ActionBar` (تأكيد قبل الإجراء المدمّر) · `Tabs`.
+`StatTiles` و`StatTile` (قيمة + كمية + تلميح + نغمة + شريط تقدّم) · `StatusTrack` (خطوات دورة المستند، مع حالة الإلغاء) · `Tabs` · `FilterBar` (فلاتر + أفعال) · `ActionBar` (يُخفى عند الطباعة) · `DocHead` و`DocField` (ترويسة المستند على شكل واجهات الديسكتوب) · `StateBox` (حالة فراغ/توضيح مفسِّرة) · `Totals` (شريط المجاميع).
 
-### 8.3 `Desktop_ERP` references — التصميم يُستخرج منها، لا يُخترع
+### 8.3 نظام التصميم في `globals.css`
 
-| الشاشة السحابية | الواجهة `Form_WPF/` | المستخلص |
+قسم جديد (≈320 سطراً) يضيف: `.tiles` و`.tile` بخمس نغمات، `.bar` لشرائط التقدّم والتغطية، `.stepper` و`.step`، `.tabs` و`.tab`، `.filters`، `.split` و`.split-list` و`.list-row` (تخطيط مقسوم: قائمة + تفاصيل)، `.doc-head` و`.doc-field`، `table.zebra` و`table.compact` و`tfoot` و`tr.row-active`، `.totals`، `.state-box`، و`@media print` يخفي الفلاتر والأفعال والقوائم الجانبية ويفتح الجداول للطباعة.
+
+### 8.4 `DataTable` مُطوَّر
+
+خصائص اختيارية جديدة: `zebra`، `compact`، `onRowClick` + `activeKey`، `footer` (صف مجاميع)، `expanded` (صف تفاصيل قابل للتوسّع). الشاشات الثلاث عشرة التي كانت تستدعيه استفادت منه دون تغيير سطر واحد.
+
+### 8.5 `Directory` مُطوَّر
+
+`tiles` (مؤشرات) و`footer` (مجاميع) — فاستفادت منه قوائم الدفعات والأرقام التسلسلية والمستودعات والوحدات والمجموعات دفعة واحدة.
+
+### 8.6 الشاشات المُعاد بناؤها — كل شاشة ومرجعها من `Desktop_ERP`
+
+| الشاشة | ما تغيّر | المرجع |
 |---|---|---|
-| بطاقة الصنف `items` | `frmItems.xaml` | التبويبات الأربعة: **عام / وحدات / بضاعة أول المدة / المكونات** |
-| `vouchers` | `frmInvInOutput.xaml` | الرقم، التاريخ، رقم المرجع، تاريخ المرجع، البيان، المستودع، اسم المورد، الرصيد + أفعال الأسطر (الباركود، بحث مادة، إضافة مادة، الوحدات، حذف السجل) |
-| `transfers` | `frmInventoryTransfer.xaml` | الرقم، التاريخ، الوقت، المرجع، **من مستودع / إلى مستودع**، البيان |
-| `production` | `frmProductionOrder.xaml` | المنتج، الوحدة، البيان + أعمدة المكوّنات (رمز الصنف، الصنف، الوحدة، الكمية الأساسية، الكمية، السعر، المجموع) |
-| `expiry` | `frmItemsExpire.xaml` | صلاحية الصنف، رمز الصنف، الصنف، الكمية |
-| `item-units` / الباركود | `frmMultiBarcode.xaml` | رقم الصنف، الصنف، الباركود، حذف |
-| `below-minimum` | `frmItemsLimit.xaml` | الرقم، المجموعة، الصنف، سعر الشراء، سعر البيع، الرصيد، **حد الطلب** |
-| مكوّنات الصنف | تبويب «المكونات» + `Class/ItemComponent.cs` | المكوّن، المستودع، الكمية، الوحدة، السعر، المجموع، مضاف/مطروح |
+| `vouchers` | تبويبات الأنواع (إدخال/إخراج/بضاعة أول المدة) + تخطيط مقسوم (قائمة السندات ← بطاقة السند) + خطوات الحالة + ترويسة المستند + **الكمية بالوحدة الأساسية** + مجاميع + تأكيد قبل الترحيل/الإلغاء | `frmInvInOutput.xaml`، `RptInvInOutput.repx`، `InvoiceOper.cs` س 5031 |
+| `transfers` | مؤشرات (في الطريق / مستلم جزئياً / الكمية والقيمة المعلّقة) + تبويبات الحالة + خطوات (مسودة→في الطريق→مُستلمة→مُغلقة) + ترويسة «من/إلى مستودع» + شريط تقدّم الاستلام لكل سطر + مجاميع | `frmInventoryTransfer.xaml`، `rptInventoryTransfer.repx` |
+| `adjustments` | مؤشرات (مسودات/عجز/زيادة/صافي) + تبويبات + تخطيط مقسوم + **جدول فروق ملوّن** (مطابق/زيادة/عجز) + مجاميع + تأكيد الاعتماد قبل الترحيل | `frmItemInvertory`/`frmInvInOutput`، `Inventory.cs` |
+| `item-card` | بطاقات (افتتاحي/وارد/صادر/ختامي) بالكمية **والقيمة** + ترويسة المستند + فلاتر + جدول موحّد بمجاميع + صف تفاصيل + **إجمالي الكميات وإجمالي المجموع** + طباعة | `rptItemDetails.repx`، `Inventorybalance()` |
+| `in-transit` | بطاقات (معلّقة/قيمة/متأخرة/أقدم مدة) + **دلاء العمر** (٠–٢ / ٣–٧ / +٧) + أعمدة «من/إلى مستودع» + مجاميع + صف تفاصيل | `frmInventoryTransfer.xaml` |
+| `items` | **تبويبات بطاقة الصنف الأربعة**: عام / وحدات / بضاعة أول المدة / المكونات + مؤشرات + تخطيط مقسوم + معاينة «1 علبة = 12 حبة» | `frmItems.xaml`، `ListItemunit.cs` |
+| `item-units` | بطاقات الوحدات بمعاينة التحويل + مؤشرات (أساسية/تعبئة/باركودات/بلا باركود) + شريط فلاتر | `ItemOper.cs` س 744-760، `frmMultiBarcode.xaml` |
+| `expiry` | بطاقات (منتهية/أسبوع/شهر/إجمالي) + **دلاء** (منتهية/أسبوع/شهر/أبعد) + مجاميع | `rptItemsExpire.repx`، `frmItemsExpire.xaml` |
+| `below-minimum` | بطاقات (أصناف/عجز/حرجة/أكبر عجز) + **شريط تغطية** لكل صنف + مجاميع + مسار إلى سند التغطية | `frmItemsLimit.xaml` |
+| `production` | بطاقات + خطوات + ترويسة (المنتج/الوحدة/البيان) + أعمدة المكوّنات (رمز الصنف، الصنف، الكمية، السعر، المجموع) + مجاميع | `frmProductionOrder.xaml`، `rptProductionOrder.repx` |
+| `movements` | بطاقات (وارد/صادر/صافي/قيمة) + شريط فلاتر + اتجاه ملوّن + مجاميع | `Inventory.cs` |
+| `levels` | بطاقات (قيمة المخزون/الكمية/متوسط التكلفة/أرصدة صفرية) + فلاتر + مجاميع | `InventoryCost(branch,date)` |
+| `requests` | بطاقات لكل حالة + تبويبات الحالة بدل الشرائح | — |
+| `deliveries` | بطاقات (فواتير معلقة/كمية متبقية/قيمة/مسلَّم) | — |
+| `lots`, `serials`, `warehouses`, `units`, `categories` | مؤشرات مشتقة من الصفوف (منتهية/قاربت، متاح/محجوز/مُباع، مستودعات بلا فرع…) عبر `Directory` | — |
 
-التقارير `Reports/` تحدّد محتوى العرض والطباعة: `rptItemDetails.repx` (بطاقة الصنف + إجمالي الكميات/المجموع)، `RptInvInOutput.repx` و`rptInventoryTransfer.repx` (أعمدة السند والمناقلة)، `rptItemsExpire.repx` (الصلاحية + سعر التكلفة)، `rptItemsDirectory.repx` (دليل الأصناف)، `rptProductionOrder.repx`، `Barcode.repx`، `rptInventoryReport.repx`.
+### 8.7 لوحة المخزون — `/inventory/overview` (جديدة)
 
-الفئات `Class/` تحدّد السلوك: `Inventory.cs` (`UpdateItemStock`, `ItemsExpirationStock`, `TotalItemStock`, `Inventorybalance`, `InventoryCost`, `InventoryCostByType`)، `ItemOper.cs` س 744-760 (`purch, sale, barcode, perc` → `UnitEquality`)، `InvoiceOper.cs` س 5031 (`ItemPrimaryQnty = ItemQuantity * UnitEquality`)، `ListItemunit.cs`، `ItemComponent.cs`.
+بطاقات: قيمة المخزون، أصناف الأرصدة، تحت حد الطلب، دفعات قاربت الانتهاء، بضاعة في الطريق، مسودات تنتظر الترحيل — كل واحدة منها رابط إلى الشاشة التي تسوّيها، مع إجراءات سريعة وقائمتي «أكبر الأرصدة قيمةً» و«أكبر العجز». أُضيفت إلى `lib/navigation.ts` كمجموعة «نظرة عامة».
 
-**قاعدة:** كل تسمية عمود أو تبويب أو زر تُؤخذ من هذه الملفات بنصها العربي؛ أي تسمية مخترعة تُذكر مع سببها.
+### 8.8 ما لم يُبنَ بعد (مرجعه جاهز)
 
-### 8.4 Screens, in order
+- **تبويب «المكونات»** في بطاقة الصنف: `StateBox` يشرح أن التسجيل ينتظر ربط `item_components` بأوامر الإنتاج بدل عرض بيانات وهمية.
+- طباعة ملصق الباركود (`Barcode.repx`) مؤجَّلة للمرحلة 10.
 
-`vouchers` (تخطيط مقسوم + تبويبات + مسح باركود + عمود الوحدة الأساسية) ← `transfers` (`StatusTrack` + تقدّم الاستلام) ← `adjustments` (نموذج جرد بألوان + اعتماد) ← `item-card` (مؤشرات كمية وقيمة + إجماليات) ← `in-transit` (مؤشرات + دلاء عمر + إقفال) ← `items` (تبويباتها الأربعة) ← `item-units` ← `expiry` (دلاء) ← `below-minimum` ← `production` ← باقي الشاشات ← **جديد `/inventory/overview`** (لوحة المخزون).
+### 8.9 التحقق
 
-### 8.5 Definition of done
-
-لا `<table>` يدوية · ≥ 12 شاشة على `PageHeader` + `FilterBar` · `LoadingState` و`EmptyState` في كل قائمة · عنصر تصميمي جديد واحد على الأقل في كل شاشة · بطاقة الصنف بتبويباتها الأربعة · المؤشرات تعرض الكمية والقيمة معاً · **مطابقة تسميات `Desktop_ERP` ≥ 90٪** · خطوط الأساس في §9 تبقى خضراء.
-
-### 8.6 Handoff
-
-النص الجاهز للجلسة القادمة: `docs/desktop-parity/NEXT_SESSION_PROMPT_PHASE_05_UI.md`.
+- `apps/api`: **78 ملفاً / 454 اختباراً** خضراء (لا تغيير في الخلفية).
+- `apps/staff`: **36/36** — وأصلح الاختبار مفتاحاً مكرراً كان قائماً (`expiry` لشاشتين)، فصار مفتاح الدفعات `lots`.
+- `pnpm --filter @erp/staff run build`: **100/100** صفحة ثابتة (99 + لوحة المخزون).
+- `scripts/verify-inventory.mjs`: 11 قسماً كلها ✓.
+- كل مسارات `/inventory/*` (21 مساراً) ترجع 200، وأصناف التصميم الجديدة موجودة في CSS المبني.
 
 ## 9. Verification
 

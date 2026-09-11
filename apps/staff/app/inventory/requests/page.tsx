@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { StatTile, StatTiles, Tabs } from '../../../components/ui';
 import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -167,6 +168,13 @@ export default function GoodsRequestsPage() {
     await act(() => apiPost(`/inventory/requests/${decision.id}/reject`, { reason: rejectReason }), 'تم رفض الطلب.');
     setDecision(null);
   }
+
+  const requestRows = requests.data ?? [];
+  const count = (value: string) => requestRows.filter((row) => row.status === value).length;
+  const requestedQty = requestRows.reduce(
+    (sum, row) => sum + row.lines.reduce((inner, line) => inner + Number(line.qty), 0),
+    0,
+  );
 
   return (
     <Screen
@@ -342,13 +350,25 @@ export default function GoodsRequestsPage() {
         </div>
       )}
 
-      <div className="chips">
-        {FILTERS.map((filter) => (
-          <button key={filter.value || 'all'} className={`chip${status === filter.value ? ' on' : ''}`} type="button" onClick={() => setStatus(filter.value)}>
-            {filter.label}
-          </button>
-        ))}
-      </div>
+      <StatTiles>
+        <StatTile label="طلبات البضاعة" value={requestRows.length} hint="طلب مسجّل" tone="brand" />
+        <StatTile
+          label="بانتظار الاعتماد"
+          value={count('submitted')}
+          hint="تحتاج قرار المستودع المورِّد"
+          tone={count('submitted') > 0 ? 'warn' : 'ok'}
+        />
+        <StatTile label="معتمد" value={count('approved')} hint="جاهز للتنفيذ بمناقلة" tone="ok" />
+        <StatTile label="نُفّذ" value={count('fulfilled')} hint="تحوّل إلى مناقلة" />
+        <StatTile label="مرفوض" value={count('rejected')} hint="مرفوض من المورِّد" tone="danger" />
+        <StatTile label="الكمية المطلوبة" value={quantity(requestedQty)} hint="مجموع كل الطلبات" />
+      </StatTiles>
+
+      <Tabs
+        items={FILTERS.map((filter) => ({ id: filter.value, label: filter.label }))}
+        value={status}
+        onChange={setStatus}
+      />
 
       {!open && !decision && <Notice notice={notice} />}
 

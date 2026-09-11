@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { ActionBar, DocField, DocHead, StatTile, StatTiles, StatusTrack, Tabs, Totals } from '../../../components/ui';
 import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -41,8 +42,34 @@ const TRANSFER_STATUS: Record<string, string> = {
   in_transit: 'في الطريق',
   partially_received: 'مستلم جزئياً',
   received: 'مستلم',
+  closed: 'مُغلقة',
   cancelled: 'ملغاة',
 };
+
+/** Where each status sits on the lifecycle track below. */
+const STATUS_STEP: Record<string, number> = {
+  draft: 0,
+  in_transit: 1,
+  partially_received: 1,
+  received: 2,
+  closed: 3,
+  cancelled: 1,
+};
+
+const STEPS = ['مسودة', 'في الطريق', 'مُستلمة', 'مُغلقة'];
+
+type Bucket = 'open' | 'draft' | 'in_transit' | 'partially_received' | 'received' | 'cancelled';
+
+const BUCKETS: Array<{ id: Bucket; label: string }> = [
+  { id: 'open', label: 'قيد التنفيذ' },
+  { id: 'draft', label: 'مسودة' },
+  { id: 'in_transit', label: 'في الطريق' },
+  { id: 'partially_received', label: 'مستلم جزئياً' },
+  { id: 'received', label: 'مستلم' },
+  { id: 'cancelled', label: 'ملغاة' },
+];
+
+const lineValue = (line: TransferLine) => Number(line.qty) * Number(line.unitCost ?? 0);
 
 export default function TransfersPage() {
   const { can } = useSession();
@@ -70,6 +97,8 @@ export default function TransfersPage() {
   >([{ itemId: '', qtyText: '', unitId: '', unitCostText: '' }]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
+  const [selectedId, setSelectedId] = useState('');
+  const [bucket, setBucket] = useState<Bucket>('open');
 
   const nameOfWarehouse = (id: string) => {
     const warehouse = warehouseRows.find((row) => row.id === id);
@@ -139,6 +168,20 @@ export default function TransfersPage() {
       setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
     }
   }
+
+  const rows = transfers.data ?? [];
+  const inFlight = rows.filter((row) => ['in_transit', 'partially_received'].includes(row.status));
+  const shown =
+    bucket === 'open'
+      ? rows.filter((row) => ['draft', 'in_transit', 'partially_received'].includes(row.status))
+      : rows.filter((row) => row.status === bucket);
+  const selected = rows.find((row) => row.id === selectedId);
+  const transitQty = inFlight
+    .flatMap((row) => row.lines)
+    .reduce((sum, line) => sum + (Number(line.qty) - Number(line.receivedQty)), 0);
+  const transitValue = inFlight
+    .flatMap((row) => row.lines)
+    .reduce((sum, line) => sum + (Number(line.qty) - Number(line.receivedQty)) * Number(line.unitCost ?? 0), 0);
 
   return (
     <Screen
@@ -313,124 +356,239 @@ export default function TransfersPage() {
 
       {!open && <Notice notice={notice} />}
 
-      <QueryView query={transfers} empty="لا توجد مناقلات" emptyDetail="أنشئ مناقلة لنقل بضاعة بين مستودعين.">
-        {(rows) => (
-          <DataTable
-            rows={rows}
-            rowKey={(row) => row.id}
-            columns={[
-              { key: 'number', header: 'الرقم', align: 'ltr', cell: (row) => row.number },
-              { key: 'from', header: 'من', cell: (row) => nameOfWarehouse(row.fromWarehouseId) },
-              { key: 'to', header: 'إلى', cell: (row) => nameOfWarehouse(row.toWarehouseId) },
-              { key: 'lines', header: 'الأسطر', align: 'num', cell: (row) => row.lines.length },
-              {
-                key: 'qty',
-                header: 'إجمالي الكمية',
-                align: 'num',
-                cell: (row) => quantity(row.lines.reduce((sum, line) => sum + Number(line.qty), 0)),
-              },
-              {
-                key: 'value',
-                header: 'القيمة',
-                align: 'num',
-                cell: (row) =>
-                  money(
-                    String(
-                      Math.round(
-                        row.lines.reduce(
-                          (sum, line) => sum + Number(line.qty) * Number(line.unitCost ?? 0),
-                          0,
-                        ) * 10000,
-                      ) / 10000,
+      <StatTiles>
+        <StatTile
+          label="مناقلات في الطريق"
+          value={rows.filter((row) => row.status === 'in_transit').length}
+          hint="خرجت من المصدر ولم تصل"
+          tone="warn"
+        />
+        <StatTile
+          label="مستلمة جزئياً"
+          value={rows.filter((row) => row.status === 'partially_received').length}
+          hint="وصل بعضها وبقي بعضها"
+          tone="warn"
+        />
+        <StatTile
+          label="الكمية المعلّقة"
+          value={quantity(transitQty)}
+          hint="لم تُستلم بعد"
+        />
+        <StatTile label="قيمة ما في الطريق" value={money(transitValue)} hint="في حساب بضاعة تحت التحويل" tone="brand" />
+        <StatTile label="مسودات" value={rows.filter((row) => row.status === 'draft').length} hint="تنتظر الإرسال" />
+      </StatTiles>
+
+      <Tabs items={BUCKETS} value={bucket} onChange={setBucket} />
+
+      <div className="split">
+        <div className="card tight split-list">
+          <QueryView query={transfers} empty="لا توجد مناقلات" emptyDetail="أنشئ مناقلة لنقل بضاعة بين مستودعين.">
+            {() => (
+              <>
+                {shown.length === 0 ? (
+                  <p className="muted" style={{ padding: 12 }}>لا مناقلات في هذا التبويب.</p>
+                ) : (
+                  shown.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className={`list-row${row.id === selectedId ? ' active' : ''}`}
+                      onClick={() => setSelectedId(row.id)}
+                    >
+                      <span className="list-title" dir="ltr">{row.number}</span>
+                      <span className="list-sub">
+                        {`${nameOfWarehouse(row.fromWarehouseId)} ← ${nameOfWarehouse(row.toWarehouseId)}`}
+                      </span>
+                      <span className="row" style={{ justifyContent: 'space-between' }}>
+                        <span className={`badge ${row.status === 'received' ? 'ok' : row.status === 'cancelled' ? 'danger' : ''}`}>
+                          {TRANSFER_STATUS[row.status] ?? statusLabel(row.status)}
+                        </span>
+                        <span className="list-sub" dir="ltr">{dateTime(row.createdAt)}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </>
+            )}
+          </QueryView>
+        </div>
+
+        <div className="card">
+          {!selected ? (
+            <p className="muted">اختر مناقلة من القائمة لعرض خطواتها وأسطرها وأفعالها.</p>
+          ) : (
+            <>
+              <div className="section-title">
+                <h2 dir="ltr">{selected.number}</h2>
+                <span className={`badge ${selected.status === 'received' ? 'ok' : selected.status === 'cancelled' ? 'danger' : ''}`}>
+                  {TRANSFER_STATUS[selected.status] ?? statusLabel(selected.status)}
+                </span>
+              </div>
+
+              <StatusTrack
+                steps={STEPS}
+                current={STATUS_STEP[selected.status] ?? 0}
+                cancelled={selected.status === 'cancelled'}
+              />
+
+              <DocHead>
+                <DocField label="الرقم">
+                  <span dir="ltr">{selected.number}</span>
+                </DocField>
+                <DocField label="من مستودع">{nameOfWarehouse(selected.fromWarehouseId)}</DocField>
+                <DocField label="إلى مستودع">{nameOfWarehouse(selected.toWarehouseId)}</DocField>
+                <DocField label="أُنشئت">{dateTime(selected.createdAt)}</DocField>
+                <DocField label="الأسطر">{selected.lines.length}</DocField>
+              </DocHead>
+
+              <DataTable
+                rows={selected.lines}
+                rowKey={(line) => String(line.lineNo)}
+                footer={[
+                  <>المجموع</>,
+                  '',
+                  quantity(selected.lines.reduce((sum, line) => sum + Number(line.qty), 0)),
+                  quantity(selected.lines.reduce((sum, line) => sum + Number(line.receivedQty), 0)),
+                  quantity(
+                    selected.lines.reduce(
+                      (sum, line) => sum + (Number(line.qty) - Number(line.receivedQty)),
+                      0,
                     ),
                   ),
-              },
-              {
-                key: 'status',
-                header: 'الحالة',
-                cell: (row) => (
-                  <span
-                    className={`badge ${row.status === 'received' ? 'ok' : row.status === 'cancelled' ? 'danger' : ''}`}
+                  '',
+                  money(selected.lines.reduce((sum, line) => sum + lineValue(line), 0)),
+                ]}
+                columns={[
+                  {
+                    key: 'item',
+                    header: 'الصنف',
+                    cell: (line) => {
+                      const item = itemOf(line.itemId);
+                      return item ? (
+                        itemLabel(item)
+                      ) : (
+                        <span className="muted" dir="ltr">{line.itemId.slice(0, 8)}</span>
+                      );
+                    },
+                  },
+                  { key: 'cost', header: 'تكلفة الوحدة', align: 'num', cell: (line) => money(line.unitCost) },
+                  { key: 'qty', header: 'الكمية', align: 'num', cell: (line) => quantity(line.qty) },
+                  { key: 'received', header: 'المُستلَم', align: 'num', cell: (line) => quantity(line.receivedQty) },
+                  {
+                    key: 'left',
+                    header: 'المتبقي',
+                    align: 'num',
+                    cell: (line) => {
+                      const left = Number(line.qty) - Number(line.receivedQty);
+                      return <strong dir="ltr" style={{ color: left > 0 ? 'var(--warn)' : 'var(--ok)' }}>{quantity(left)}</strong>;
+                    },
+                  },
+                  {
+                    key: 'progress',
+                    header: 'نسبة الاستلام',
+                    cell: (line) => {
+                      const sent = Number(line.qty);
+                      const got = Number(line.receivedQty);
+                      const pct = sent > 0 ? Math.round((got / sent) * 100) : 0;
+                      return (
+                        <span style={{ display: 'grid', gap: 2 }}>
+                          <span className="small muted" dir="ltr">{`${pct}٪`}</span>
+                          <span className={`bar ${pct >= 100 ? 'ok' : pct > 0 ? 'warn' : 'danger'}`}>
+                            <span style={{ width: `${Math.min(100, pct)}%` }} />
+                          </span>
+                        </span>
+                      );
+                    },
+                  },
+                  { key: 'value', header: 'القيمة', align: 'num', cell: (line) => money(String(lineValue(line))) },
+                ]}
+              />
+
+              <Totals
+                items={[
+                  { label: 'إجمالي الكمية', value: quantity(selected.lines.reduce((sum, line) => sum + Number(line.qty), 0)) },
+                  { label: 'المُستلَم', value: quantity(selected.lines.reduce((sum, line) => sum + Number(line.receivedQty), 0)) },
+                  {
+                    label: 'المتبقي في الطريق',
+                    value: quantity(
+                      selected.lines.reduce((sum, line) => sum + (Number(line.qty) - Number(line.receivedQty)), 0),
+                    ),
+                  },
+                  { label: 'القيمة', value: money(selected.lines.reduce((sum, line) => sum + lineValue(line), 0)) },
+                ]}
+              />
+
+              <ActionBar>
+                {selected.status === 'draft' && can('inventory.adjust') && (
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={() =>
+                      act(
+                        () => apiPost(`/inventory/transfers/${selected.id}/send`, {}),
+                        'تم إرسال المناقلة وخُصمت الكمية من المصدر.',
+                      )
+                    }
                   >
-                    {TRANSFER_STATUS[row.status] ?? statusLabel(row.status)}
-                  </span>
-                ),
-              },
-              { key: 'created', header: 'أُنشئت', align: 'ltr', cell: (row) => dateTime(row.createdAt) },
-              {
-                key: 'actions',
-                header: '',
-                cell: (row) => (
-                  <span className="row">
-                    {row.status === 'draft' && can('inventory.adjust') && (
-                      <button
-                        className="btn sm"
-                        type="button"
-                        onClick={() =>
-                          act(
-                            () => apiPost(`/inventory/transfers/${row.id}/send`, {}),
-                            'تم إرسال المناقلة وخُصمت الكمية من المصدر.',
-                          )
-                        }
-                      >
-                        إرسال
-                      </button>
-                    )}
-                    {['in_transit', 'partially_received'].includes(row.status) && can('inventory.adjust') && (
-                      <button
-                        className="btn sm primary"
-                        type="button"
-                        onClick={() =>
-                          act(
-                            () =>
-                              apiPost(`/inventory/transfers/${row.id}/receive`, {
-                                received: row.lines
-                                  .map((line) => ({
-                                    lineNo: line.lineNo,
-                                    qty: String(Number(line.qty) - Number(line.receivedQty)),
-                                  }))
-                                  .filter((line) => Number(line.qty) > 0),
-                              }),
-                            'تم استلام المناقلة: دخلت البضاعة المخزون الهدف وخلا حساب بضاعة تحت التحويل.',
-                          )
-                        }
-                      >
-                        استلام كامل
-                      </button>
-                    )}
-                    {['draft', 'in_transit'].includes(row.status) && can('inventory.adjust') && (
-                      <button
-                        className="btn sm danger"
-                        type="button"
-                        onClick={() => {
-                          const why =
-                            row.status === 'in_transit'
-                              ? window.prompt(`إلغاء مناقلة في الطريق ${row.number} — يرجى ذكر السبب:`)
-                              : '';
-                          if (row.status !== 'in_transit' || (why && why.trim())) {
-                            void act(
-                              () =>
-                                apiPost(
-                                  `/inventory/transfers/${row.id}/cancel`,
-                                  why && why.trim() ? { reason: why.trim() } : {},
-                                ),
-                              row.status === 'in_transit'
-                                ? 'أُلغيت المناقلة وعادت البضاعة إلى المستودع المصدر.'
-                                : 'تم إلغاء المناقلة.',
-                            );
-                          }
-                        }}
-                      >
-                        إلغاء
-                      </button>
-                    )}
-                  </span>
-                ),
-              },
-            ]}
-          />
-        )}
-      </QueryView>
+                    إرسال
+                  </button>
+                )}
+                {['in_transit', 'partially_received'].includes(selected.status) && can('inventory.adjust') && (
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={() =>
+                      act(
+                        () =>
+                          apiPost(`/inventory/transfers/${selected.id}/receive`, {
+                            received: selected.lines
+                              .map((line) => ({
+                                lineNo: line.lineNo,
+                                qty: String(Number(line.qty) - Number(line.receivedQty)),
+                              }))
+                              .filter((line) => Number(line.qty) > 0),
+                          }),
+                        'تم استلام المناقلة: دخلت البضاعة المخزون الهدف وخلا حساب بضاعة تحت التحويل.',
+                      )
+                    }
+                  >
+                    استلام كامل
+                  </button>
+                )}
+                {['draft', 'in_transit'].includes(selected.status) && can('inventory.adjust') && (
+                  <button
+                    className="btn danger"
+                    type="button"
+                    onClick={() => {
+                      const why =
+                        selected.status === 'in_transit'
+                          ? window.prompt(`إلغاء مناقلة في الطريق ${selected.number} — يرجى ذكر السبب:`)
+                          : '';
+                      if (selected.status !== 'in_transit' || (why && why.trim())) {
+                        void act(
+                          () =>
+                            apiPost(
+                              `/inventory/transfers/${selected.id}/cancel`,
+                              why && why.trim() ? { reason: why.trim() } : {},
+                            ),
+                          selected.status === 'in_transit'
+                            ? 'أُلغيت المناقلة وعادت البضاعة إلى المستودع المصدر.'
+                            : 'تم إلغاء المناقلة.',
+                        );
+                      }
+                    }}
+                  >
+                    إلغاء
+                  </button>
+                )}
+                <button className="btn" type="button" onClick={() => window.print()}>
+                  طباعة
+                </button>
+              </ActionBar>
+            </>
+          )}
+        </div>
+      </div>
     </Screen>
   );
 }

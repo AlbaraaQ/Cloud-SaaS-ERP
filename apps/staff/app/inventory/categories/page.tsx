@@ -9,6 +9,8 @@ import { useQuery } from '../../../lib/use-query';
 export default function CategoriesPage() {
   const { can } = useSession();
   const categories = useQuery<Category[]>(() => listCategories(), []);
+  const categoryRows = categories.data ?? [];
+  const roots = categoryRows.filter((row) => !row.parentId);
 
   return (
     <Directory<Category>
@@ -18,6 +20,15 @@ export default function CategoriesPage() {
       query={categories}
       canCreate={can('catalog.category.manage')}
       createLabel="مجموعة جديدة"
+      tiles={[
+        { label: 'المجموعات', value: categoryRows.length, hint: 'مجموعة أصناف', tone: 'brand' },
+        { label: 'مجموعات رئيسية', value: roots.length, hint: 'بلا أب' },
+        {
+          label: 'مجموعات فرعية',
+          value: categoryRows.length - roots.length,
+          hint: 'تندرج تحت مجموعة أخرى',
+        },
+      ]}
       fields={[
         { name: 'code', label: 'الرمز', required: true, ltr: true },
         { name: 'nameAr', label: 'الاسم العربي', required: true },

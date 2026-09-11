@@ -4,21 +4,37 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
-import { ApiError, apiDelete, apiPatch, apiPost } from '../../../lib/api';
+import { DocField, DocHead, FilterBar, StatTile, StatTiles, StateBox, Tabs, Totals } from '../../../components/ui';
+import { ApiError, apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import {
   arabicName,
   listCategories,
+  listItemUnits,
   listItems,
   listTaxGroups,
   listUnits,
   money,
+  quantity,
   type Category,
   type Item,
+  type ItemUnit,
   type TaxGroup,
   type Unit,
 } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
+
+/** The four tabs of the item card, exactly as `frmItems.xaml` lays them out. */
+type CardTab = 'general' | 'units' | 'opening' | 'components';
+
+const CARD_TABS: Array<{ id: CardTab; label: string }> = [
+  { id: 'general', label: 'عام' },
+  { id: 'units', label: 'وحدات' },
+  { id: 'opening', label: 'بضاعة أول المدة' },
+  { id: 'components', label: 'المكونات' },
+];
+
+type Level = { itemId: string; warehouseId: string; quantity: string; value: string; averageCost: string };
 
 export default function ItemsPage() {
   const { can } = useSession();
@@ -53,6 +69,8 @@ export default function ItemsPage() {
   };
   const [form, setForm] = useState(blank);
   const [editing, setEditing] = useState<Item | undefined>();
+  const [selectedId, setSelectedId] = useState('');
+  const [tab, setTab] = useState<CardTab>('general');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -169,6 +187,19 @@ export default function ItemsPage() {
   const categoryRows = categories.data ?? [];
   const unitRows = units.data ?? [];
   const missingRefs = categoryRows.length === 0 || unitRows.length === 0;
+
+  const rows = items.data ?? [];
+  const selected = rows.find((row) => row.id === selectedId);
+  const cardUnits = useQuery<ItemUnit[]>(
+    () => (selected ? listItemUnits(selected.id) : Promise.resolve([])),
+    [selectedId],
+  );
+  const cardLevels = useQuery<Level[]>(
+    () => (selected ? apiList<Level>(`/inventory/levels?item_id=${selected.id}`) : Promise.resolve([])),
+    [selectedId],
+  );
+  const stockQty = (cardLevels.data ?? []).reduce((sum, row) => sum + Number(row.quantity), 0);
+  const stockValue = (cardLevels.data ?? []).reduce((sum, row) => sum + Number(row.value), 0);
 
   return (
     <Screen
@@ -348,16 +379,47 @@ export default function ItemsPage() {
         </form>
       )}
 
-      <div className="card toolbar">
-        <input
-          className="input"
-          placeholder="بحث بالاسم العربي…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') setApplied(search.trim());
-          }}
+      <StatTiles>
+        <StatTile label="عدد المواد" value={rows.length} hint="بطاقة صنف مسجّلة" tone="brand" />
+        <StatTile
+          label="مواد مخزنية"
+          value={rows.filter((row) => (row.kind ?? 'stock') === 'stock').length}
+          hint="تُدار أرصدتها"
         />
+        <StatTile
+          label="خدمات"
+          value={rows.filter((row) => row.kind === 'service').length}
+          hint="بلا مخزون"
+        />
+        <StatTile
+          label="أصناف مركبة"
+          value={rows.filter((row) => row.kind === 'composite').length}
+          hint="لها مكونات"
+          tone={rows.some((row) => row.kind === 'composite') ? 'warn' : 'default'}
+        />
+        <StatTile
+          label="بدون باركود"
+          value={rows.filter((row) => !row.barcode).length}
+          hint="لن تُقرأ بالقارئ"
+          tone={rows.filter((row) => !row.barcode).length > 0 ? 'warn' : 'ok'}
+        />
+      </StatTiles>
+
+      <FilterBar
+        actions={<span className="small muted">{applied ? `نتيجة البحث عن «${applied}»` : `${rows.length} مادة`}</span>}
+      >
+        <label className="field">
+          <span>بحث</span>
+          <input
+            className="input"
+            placeholder="بحث بالاسم العربي…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') setApplied(search.trim());
+            }}
+          />
+        </label>
         <button className="btn" type="button" onClick={() => setApplied(search.trim())}>
           بحث
         </button>
@@ -373,69 +435,193 @@ export default function ItemsPage() {
             إلغاء الفلتر
           </button>
         )}
-      </div>
+      </FilterBar>
 
       {!open && notice && <Notice notice={notice} />}
 
-      <QueryView query={items} empty="لا توجد مواد" emptyDetail="ابدأ بإضافة بطاقة مادة جديدة.">
-        {(rows) => (
-          <DataTable
-            rows={rows}
-            rowKey={(row) => row.id}
-            columns={[
-              { key: 'sku', header: 'الرمز', align: 'ltr', cell: (row) => row.sku },
-              { key: 'barcode', header: 'الباركود', align: 'ltr', cell: (row) => row.barcode ?? '—' },
-              { key: 'name', header: 'الاسم', cell: (row) => arabicName(row) },
-              {
-                key: 'kind',
-                header: 'النوع',
-                cell: (row) =>
-                  row.kind === 'service' ? 'خدمة' : row.kind === 'composite' ? 'مركبة' : 'مخزنية',
-              },
-              {
-                key: 'sale',
-                header: 'سعر البيع',
-                align: 'num',
-                cell: (row) => money(row.salePrice ?? row.sale_price),
-              },
-              {
-                key: 'purchase',
-                header: 'سعر الشراء',
-                align: 'num',
-                cell: (row) => money(row.purchasePrice ?? row.purchase_price),
-              },
-              ...(can('catalog.item.manage')
-                ? [
-                    {
-                      key: 'actions',
-                      header: '',
-                      cell: (row: Item) => (
-                        <span className="row">
-                          <button
-                            className="btn sm"
-                            type="button"
-                            onClick={() => startEdit(row)}
-                            disabled={busy}
-                          >
-                            تعديل
-                          </button>
-                          <button
-                            className="btn sm danger"
-                            type="button"
-                            onClick={() => void remove(row)}
-                            disabled={busy}
-                          >
-                            حذف
-                          </button>
+      <div className="split">
+        <div className="card tight split-list">
+          <QueryView query={items} empty="لا توجد مواد" emptyDetail="ابدأ بإضافة بطاقة مادة جديدة.">
+            {() => (
+              <>
+                {rows.length === 0 ? (
+                  <p className="muted" style={{ padding: 12 }}>لا مواد مطابقة.</p>
+                ) : (
+                  rows.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className={`list-row${row.id === selectedId ? ' active' : ''}`}
+                      onClick={() => setSelectedId(row.id)}
+                    >
+                      <span className="list-title">{arabicName(row)}</span>
+                      <span className="list-sub" dir="ltr">{`${row.sku}${row.barcode ? ` · ${row.barcode}` : ''}`}</span>
+                      <span className="row" style={{ justifyContent: 'space-between' }}>
+                        <span className="badge">
+                          {row.kind === 'service' ? 'خدمة' : row.kind === 'composite' ? 'مركبة' : 'مخزنية'}
                         </span>
-                      ),
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        )}
-      </QueryView>
+                        <span className="list-sub" dir="ltr">{money(row.salePrice ?? row.sale_price)}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </>
+            )}
+          </QueryView>
+        </div>
+
+        <div className="card">
+          {!selected ? (
+            <p className="muted">اختر مادة من القائمة لعرض بطاقتها بتبويباتها.</p>
+          ) : (
+            <>
+              <div className="section-title">
+                <h2>{arabicName(selected)}</h2>
+                <span className="badge">
+                  {selected.kind === 'service' ? 'خدمة' : selected.kind === 'composite' ? 'مركبة' : 'مخزنية'}
+                </span>
+              </div>
+
+              <Tabs items={CARD_TABS} value={tab} onChange={setTab} />
+
+              {tab === 'general' && (
+                <>
+                  <DocHead>
+                    <DocField label="الرمز">
+                      <span dir="ltr">{selected.sku}</span>
+                    </DocField>
+                    <DocField label="الباركود">
+                      <span dir="ltr">{selected.barcode ?? '—'}</span>
+                    </DocField>
+                    <DocField label="الاسم">{arabicName(selected)}</DocField>
+                    <DocField label="الاسم الإنجليزي">{selected.nameEn ?? '—'}</DocField>
+                    <DocField label="المجموعة">
+                      {arabicName(
+                        categories.data?.find((row) => row.id === (selected.categoryId ?? selected.category_id)) ?? {},
+                      )}
+                    </DocField>
+                    <DocField label="الوحدة الأساسية">
+                      {arabicName(units.data?.find((row) => row.id === (selected.baseUnitId ?? selected.base_unit_id)) ?? {})}
+                    </DocField>
+                    <DocField label="سعر البيع">
+                      <span dir="ltr">{money(selected.salePrice ?? selected.sale_price)}</span>
+                    </DocField>
+                    <DocField label="سعر الشراء">
+                      <span dir="ltr">{money(selected.purchasePrice ?? selected.purchase_price)}</span>
+                    </DocField>
+                    <DocField label="حد الطلب">
+                      <span dir="ltr">{quantity(selected.minQty ?? selected.min_qty)}</span>
+                    </DocField>
+                    <DocField label="الحد الأعلى">
+                      <span dir="ltr">{quantity(selected.maxQty ?? selected.max_qty)}</span>
+                    </DocField>
+                    <DocField label="تتبع الدفعات">{selected.trackLot ?? selected.track_lot ? 'نعم' : 'لا'}</DocField>
+                    <DocField label="تتبع الأرقام التسلسلية">
+                      {selected.trackSerial ?? selected.track_serial ? 'نعم' : 'لا'}
+                    </DocField>
+                  </DocHead>
+
+                  <Totals
+                    items={[
+                      { label: 'الرصيد الحالي', value: quantity(stockQty) },
+                      { label: 'قيمة الرصيد', value: money(stockValue) },
+                      { label: 'المستودعات', value: (cardLevels.data ?? []).length },
+                    ]}
+                  />
+
+                  <div className="toolbar no-print">
+                    {can('catalog.item.manage') && (
+                      <>
+                        <button className="btn" type="button" onClick={() => startEdit(selected)} disabled={busy}>
+                          تعديل البطاقة
+                        </button>
+                        <button className="btn danger" type="button" onClick={() => void remove(selected)} disabled={busy}>
+                          حذف
+                        </button>
+                      </>
+                    )}
+                    <button className="btn" type="button" onClick={() => window.print()}>
+                      طباعة
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {tab === 'units' && (
+                <QueryView query={cardUnits} empty="لا وحدات لهذه المادة" emptyDetail="أضف وحداتها من شاشة وحدات الصنف.">
+                  {(unitRows) => (
+                    <DataTable
+                      rows={unitRows}
+                      rowKey={(row) => `${row.itemId}:${row.unitId}`}
+                      footer={[<>{`المجموع (${unitRows.length})`}</>, '', '', '', '']}
+                      columns={[
+                        { key: 'unit', header: 'الوحدة', cell: (row) => row.unitNameAr ?? row.unitCode ?? '—' },
+                        {
+                          key: 'ratio',
+                          header: 'معامل التحويل',
+                          align: 'num',
+                          cell: (row) => (
+                            <span dir="ltr">{`×${Number(row.ratio).toLocaleString('ar-EG')}`}</span>
+                          ),
+                        },
+                        {
+                          key: 'example',
+                          header: 'مثال',
+                          cell: (row) => (
+                            <span dir="ltr">
+                              {`1 ${row.unitNameAr ?? row.unitCode ?? ''} = ${Number(row.ratio).toLocaleString('ar-EG')} ${
+                                arabicName(units.data?.find((unit) => unit.id === (selected.baseUnitId ?? selected.base_unit_id)) ?? {}) ||
+                                'وحدة أساسية'
+                              }`}
+                            </span>
+                          ),
+                        },
+                        { key: 'sale', header: 'سعر البيع', align: 'num', cell: (row) => money(row.salePrice) },
+                        { key: 'barcode', header: 'الباركود', align: 'ltr', cell: (row) => row.barcode ?? '—' },
+                      ]}
+                    />
+                  )}
+                </QueryView>
+              )}
+
+              {tab === 'opening' && (
+                <>
+                  <p className="muted">
+                    بضاعة أول المدة هي رصيد الافتتاح الذي يُقيَّد في حساب بضاعة أول المدة عند الترحيل. الرصيد الحالي
+                    لهذه المادة مبيّن أدناه؛ سجّل الافتتاح بسند من نوع «بضاعة أول المدة».
+                  </p>
+                  <Totals
+                    items={[
+                      { label: 'الرصيد الحالي', value: quantity(stockQty) },
+                      { label: 'قيمة الرصيد', value: money(stockValue) },
+                      {
+                        label: 'متوسط التكلفة',
+                        value: stockQty > 0 ? money(stockValue / stockQty) : '—',
+                      },
+                    ]}
+                  />
+                  <div className="toolbar no-print">
+                    <a className="btn primary" href="/inventory/vouchers?kind=opening">
+                      سند بضاعة أول المدة
+                    </a>
+                    <a className="btn" href={`/inventory/item-card`}>
+                      بطاقة الصنف (الحركات)
+                    </a>
+                  </div>
+                </>
+              )}
+
+              {tab === 'components' && (
+                <StateBox
+                  icon="🧩"
+                  title="مكوّنات الصنف لم تُربط بعد"
+                  detail="جدول item_components موجود في قاعدة البيانات ويُقرأ في أوامر الإنتاج، لكن تسجيل المكوّنات من بطاقة الصنف يأتي مع الجزء الوظيفي التالي — لن نعرض بيانات وهمية إلى أن يصبح لها مسار حقيقي."
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </Screen>
   );
 }

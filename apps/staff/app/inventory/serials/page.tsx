@@ -21,6 +21,8 @@ export default function SerialsPage() {
   const items = useQuery<Item[]>(() => listItems(), []);
   const warehouses = useQuery<Warehouse[]>(() => listWarehouses(), []);
   const itemRows = items.data ?? [];
+  const serialRows = serials.data ?? [];
+  const count = (status: string) => serialRows.filter((row) => row.status === status).length;
 
   return (
     <Directory<Serial>
@@ -50,6 +52,13 @@ export default function SerialsPage() {
       }
       successText={(values) => `تمت إضافة الرقم ${String(values.serialNo)}.`}
       rowKey={(row) => row.id}
+      tiles={[
+        { label: 'إجمالي الأرقام', value: serialRows.length, hint: 'رقم تسلسلي مسجّل', tone: 'brand' },
+        { label: 'متاح', value: count('available'), hint: 'جاهز للبيع', tone: 'ok' },
+        { label: 'محجوز', value: count('reserved'), hint: 'مرتبط بمستند', tone: 'warn' },
+        { label: 'مُباع', value: count('consumed'), hint: 'خرج من المخزون' },
+        { label: 'مُرتجع', value: count('returned'), hint: 'أُعيد إلى المخزون' },
+      ]}
       empty="لا توجد أرقام تسلسلية"
       columns={[
         {

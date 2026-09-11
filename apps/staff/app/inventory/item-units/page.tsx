@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { FilterBar, StatTile, StatTiles } from '../../../components/ui';
 import { ApiError } from '../../../lib/api';
 import {
   addItemBarcode,
@@ -149,7 +150,15 @@ export default function ItemUnitsPage() {
       subtitle="لكل صنف وحدة أساسية واحدة، وأي عدد من وحدات التعبئة بباركود خاص لكل منها."
       crumbs={['المستودعات', 'التعاريف']}
     >
-      <div className="card toolbar">
+      <FilterBar
+        actions={
+          selected ? (
+            <span className="small muted">
+              الوحدة الأساسية: <strong>{unitName(selected.baseUnitId ?? selected.base_unit_id)}</strong>
+            </span>
+          ) : undefined
+        }
+      >
         <label className="field">
           <span>الصنف</span>
           <select
@@ -168,13 +177,50 @@ export default function ItemUnitsPage() {
             ))}
           </select>
         </label>
-        {selected && (
-          <p className="muted small">
-            الوحدة الأساسية: <strong>{unitName(selected.baseUnitId ?? selected.base_unit_id)}</strong> — كل
-            كمية في المخزون محفوظة بها.
-          </p>
-        )}
-      </div>
+      </FilterBar>
+
+      {itemId && (
+        <StatTiles>
+          <StatTile
+            label="الوحدة الأساسية"
+            value={unitName(selected?.baseUnitId ?? selected?.base_unit_id)}
+            hint="كل كمية في المخزون محفوظة بها"
+            tone="brand"
+          />
+          <StatTile
+            label="وحدات التعبئة"
+            value={(itemUnits.data ?? []).length}
+            hint="علبة · كرتون · عبوة"
+          />
+          <StatTile
+            label="باركودات إضافية"
+            value={(barcodes.data ?? []).length}
+            hint="ملصق آخر لنفس الصنف"
+          />
+          <StatTile
+            label="وحدات بلا باركود"
+            value={(itemUnits.data ?? []).filter((row) => !row.barcode).length}
+            hint="لن تُقرأ بالقارئ"
+            tone={(itemUnits.data ?? []).some((row) => !row.barcode) ? 'warn' : 'ok'}
+          />
+        </StatTiles>
+      )}
+
+      {itemId && (itemUnits.data ?? []).length > 0 && (
+        <div className="tiles">
+          {(itemUnits.data ?? []).map((row) => (
+            <div className="tile" key={row.unitId}>
+              <span className="tile-label">{row.unitNameAr ?? unitName(row.unitId)}</span>
+              <span className="tile-value" dir="ltr">
+                {`1 = ${Number(row.ratio).toLocaleString('ar-EG')}`}
+              </span>
+              <span className="tile-hint">
+                {`من ${unitName(selected?.baseUnitId ?? selected?.base_unit_id)} · الباركود: ${row.barcode ?? '—'}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!itemId ? (
         <div className="card">

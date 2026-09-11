@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import { FilterBar, StatTile, StatTiles } from '../../../components/ui';
 import { apiList } from '../../../lib/api';
 import { downloadCsv } from '../../../lib/accounts';
 import { arabicName, itemLabel, listItems, listWarehouses, money, quantity, type Item, type Warehouse } from '../../../lib/lookups';
@@ -35,6 +36,11 @@ export default function StockLevelsPage() {
     return warehouse ? arabicName(warehouse) : id;
   };
 
+  const levelRows = levels.data ?? [];
+  const totalQty = levelRows.reduce((sum, row) => sum + Number(row.quantity), 0);
+  const totalValue = levelRows.reduce((sum, row) => sum + Number(row.value), 0);
+  const zeroRows = levelRows.filter((row) => Number(row.quantity) === 0).length;
+
   return (
     <Screen
       title="جرد المواد"
@@ -57,7 +63,26 @@ export default function StockLevelsPage() {
         </button>
       }
     >
-      <div className="card toolbar">
+      <StatTiles>
+        <StatTile label="قيمة المخزون" value={money(totalValue)} hint="إجمالي القيمة الدفترية" tone="brand" />
+        <StatTile label="إجمالي الكمية" value={quantity(totalQty)} hint="وحدة أساسية" />
+        <StatTile
+          label="متوسط تكلفة الوحدة"
+          value={totalQty > 0 ? money(totalValue / totalQty) : '—'}
+          hint="القيمة ÷ الكمية"
+        />
+        <StatTile label="صفوف الأرصدة" value={levelRows.length} hint="مادة × مستودع" />
+        <StatTile
+          label="أرصدة صفرية"
+          value={zeroRows}
+          hint="نفد رصيدها"
+          tone={zeroRows > 0 ? 'warn' : 'ok'}
+        />
+      </StatTiles>
+
+      <FilterBar
+        actions={<span className="small muted">{levelRows.length === 0 ? 'لا أرصدة' : `${levelRows.length} صف رصيد`}</span>}
+      >
         <label className="field">
           <span>المستودع</span>
           <select className="input" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
@@ -80,7 +105,7 @@ export default function StockLevelsPage() {
             ))}
           </select>
         </label>
-      </div>
+      </FilterBar>
 
       <QueryView query={levels} empty="لا توجد أرصدة" emptyDetail="لم تُسجَّل أي حركة مخزنية بعد.">
         {(rows) => (

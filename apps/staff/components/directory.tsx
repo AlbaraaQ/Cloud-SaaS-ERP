@@ -7,6 +7,10 @@ import type { QueryState } from '../lib/use-query';
 
 import { DataTable, Notice, QueryView, type Column } from './data-view';
 import { Screen } from './screen';
+import { StatTiles, type Tone } from './ui';
+
+/** One KPI tile above the table. */
+export type Tile = { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: Tone };
 
 
 /**
@@ -66,6 +70,8 @@ export function Directory<T>({
   successText,
   blocked,
   toolbar,
+  tiles,
+  footer,
   children,
 }: {
   title: string;
@@ -95,6 +101,10 @@ export function Directory<T>({
   /** Rendered instead of the submit button when a prerequisite is missing. */
   blocked?: string;
   toolbar?: ReactNode;
+  /** KPI tiles rendered above the table — counts the screen can derive from its rows. */
+  tiles?: Tile[];
+  /** Totals row for the table, computed from the rows on screen. */
+  footer?: (rows: T[]) => ReactNode[];
   /** Extra content rendered between the form and the table. */
   children?: ReactNode;
 }) {
@@ -228,11 +238,29 @@ export function Directory<T>({
 
       {toolbar && <div className="card toolbar">{toolbar}</div>}
       {children}
+      {tiles && tiles.length > 0 && (
+        <StatTiles>
+          {tiles.map((tile) => (
+            <div className={`tile${tile.tone && tile.tone !== 'default' ? ` ${tile.tone}` : ''}`} key={tile.label}>
+              <span className="tile-label">{tile.label}</span>
+              <span className="tile-value">{tile.value}</span>
+              {tile.hint ? <span className="tile-hint">{tile.hint}</span> : null}
+            </div>
+          ))}
+        </StatTiles>
+      )}
 
       {!open && notice && <Notice notice={notice} />}
 
       <QueryView query={query} empty={empty} emptyDetail={emptyDetail}>
-        {(rows) => <DataTable rows={rows} rowKey={rowKey} columns={rowColumns} />}
+        {(rows) => (
+          <DataTable
+            rows={rows}
+            rowKey={rowKey}
+            columns={rowColumns}
+            footer={footer ? footer(rows) : undefined}
+          />
+        )}
       </QueryView>
     </Screen>
   );

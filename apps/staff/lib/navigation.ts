@@ -233,6 +233,17 @@ const inventory: ModuleNode = {
   permission: 'inventory.view',
   groups: [
     {
+      key: 'inventory-overview',
+      labelAr: 'نظرة عامة',
+      labelEn: 'Overview',
+      items: [
+        screen('inventory-overview', 'لوحة المخزون', 'Inventory overview', '/inventory/overview', 'ready', {
+          permission: 'inventory.view',
+          endpoint: '/inventory/levels',
+        }),
+      ],
+    },
+    {
       key: 'inventory-defs',
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
@@ -354,7 +365,7 @@ const inventory: ModuleNode = {
           'ready',
           { permission: 'reporting.view', endpoint: '/reports/inventory-movement' },
         ),
-        screen('expiry', 'صلاحية المواد', 'Item expiry', '/inventory/lots', 'ready', {
+        screen('lots', 'صلاحية المواد (الدفعات)', 'Item expiry (lots)', '/inventory/lots', 'ready', {
           permission: 'inventory.view',
           endpoint: '/inventory/lots',
         }),
