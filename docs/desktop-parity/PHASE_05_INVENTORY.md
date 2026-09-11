@@ -349,7 +349,7 @@ Presentation layer only: not one endpoint changed, not one permission widened.
 
 ### 8.8 ما لم يُبنَ بعد (مرجعه جاهز)
 
-- **تبويب «المكونات»** في بطاقة الصنف: `StateBox` يشرح أن التسجيل ينتظر ربط `item_components` بأوامر الإنتاج بدل عرض بيانات وهمية.
+- (الجزء الخامس بنى تبويب «المكونات» — انظر §11.)
 - طباعة ملصق الباركود (`Barcode.repx`) مؤجَّلة للمرحلة 10.
 
 ### 8.9 التحقق
@@ -376,18 +376,146 @@ Presentation layer only: not one endpoint changed, not one permission widened.
   opening + in − out agrees with the balance table, and the movement list honours a
   period.
 * `node scripts/verify-inventory.mjs` — the same journey against a live stack, now
-  eleven sections: opening → issue → count → transfer → negative → reorder → وحدات
-  القياس → الباركود → تواريخ الصلاحية → **بضاعة في الطريق → بطاقة الصنف**, asserting the
-  ledger at every step.
-* Suite: API **78 files / 454 tests** green, `@erp/database` **17/17** green, staff build
-  **99/99** static pages.
+  twelve sections: opening → issue → count → transfer → negative → reorder → وحدات
+  القياس → الباركود → تواريخ الصلاحية → **بضاعة في الطريق → بطاقة الصنف → مكوّنات الصنف**,
+  asserting the ledger at every step.
+* Suite: API **79 files / 462 tests** green (was 78/454 — the eight BOM tests of §11.8),
+  `@erp/database` **17/17** green, staff build **100/100** static pages.
 
 ---
 
-## 10. Deliberately deferred
+## 10. Part five — مكوّنات الصنف (BOM)
 
-* Production orders / item assembly (`frmProductionOrder*`) already have their own
-  service; they are not re-modelled here.
+### 10.1 What the desktop did, file by file
+
+| Behaviour | `Desktop_ERP` source | What it did | What we built |
+|---|---|---|---|
+| تبويب المكونات في بطاقة الصنف | `Form_WPF/frmItems.xaml` — `TabItem x:Name="TabPage1" Header="  المكونات  "` (L1149), group header `🔧 مكونات الصنف` (L1167), `pnlComponent` / `dgvComponent` (L1220-1346) | a grid of the item's components, edited in place | the fourth tab of `/inventory/items`, same header and same grid |
+| أعمدة الشبكة | `frmItems.xaml` L1225-1346 | `#`, `رمز الصنف`, `رقم الصنف`, `الصنف`, `الوحدة`, `الكمية`, `السعر`, `المجموع`, `المستودع`, `مادة مضافة` (`Binding IsAdded`), `حذف` | `رمز الصنف`, `الصنف`, `الكمية`, `الوحدة`, `المستودع`, `مادة مضافة`, `حذف` (see §10.7 for the three columns we deliberately left out) |
+| إعدادات الإنتاج على البطاقة | `frmItems.xaml` L1180-1225 — `Panel3` | `مستودع المنتج التام`, `تكلفة المادة`, `كمية المنتج` | `مستودع الإنتاج` and `الكمية المنتجة` live on the order (`frmProductionOrder.xaml`), which is where the desktop asks for them too; `تكلفة المادة` is *computed*, never typed |
+| قراءة التركيبة | `frmItems.xaml.cs` `LoadItemComponents()` L697-733 — `SELECT … FROM ItemComponents LEFT JOIN items ON ItemComponents.ComponentId = items.id` | loaded the recipe for the open item | `GET /organization/catalog/items/:id/components`, joined to items, units and warehouses so the screen prints names instead of uuids |
+| حفظ التركيبة | `frmItems.xaml.cs` L1085-1118 | `delete from ItemComponents where itemId=…` then re-insert every row; refuses an empty recipe with **«ادخل مكونات المادة»** (L1092) | `POST …/components` is an upsert on `(item_id, component_item_id)` — no delete-and-rewrite, so concurrent edits to other rows of the same recipe survive |
+| أمر الإنتاج يملأ مكوّناته من البطاقة | `frmProductionOrder.xaml.cs` `LoadComponent()` L299-380 | for the chosen product, read `ItemComponents` and fill the grid (`ItemCode`, `Item_name`, `unit_id`, `store`, `quantity`, `type`) | `POST /inventory/production-orders` with **no** `components` reads `catalog.componentsFor()` inside the same transaction |
+| معامل الوحدة | `frmProductionOrder.xaml.cs` L345-355 — `SELECT perc FROM ItemUnits WHERE ItemId=… AND unit=…` | `UnitEquality` per row | `componentUnitRatio()` — the same `item_units.perc`, defaulting to 1 for the base unit |
+| ضرب الكمية في الكمية المنتجة | `frmProductionOrder.xaml.cs` L567-570 — `row.Qty = Math.Round(qty * row.BaseQty * row.UnitEquality, 2)` | the consumed quantity is the recipe **per unit** × the produced quantity × the unit ratio | `componentsFor(tx, tenantId, itemId, outputQty)` returns `qty × outputQty`, and `InventoryService.recordInTx` applies the unit's factor — identical arithmetic, done where the ledger is written |
+| شاشة أمر الإنتاج | `frmProductionOrder.xaml` L246-546 | `🏭 أمر الإنتاج`, `📦 المنتج`, `📐 الوحدة`, `🏭 مستودع الإنتاج`, `🔢 الكمية المنتجة`, `📊 الكمية المتوفرة`, `📝 البيان`, `🧾 مكونات الإنتاج`, grid columns `#`, `رمز الصنف`, `الصنف`, `الوحدة`, `الكمية الأساسية`, `الكمية`, `السعر`, `المجموع`, `المستودع`, `المتوفرة`, `حذف` | `/inventory/production`: the same field labels, and a live preview of `الكمية الأساسية` → `الكمية` for every component of the chosen product |
+
+### 10.2 Migration `0037_item_components.sql`
+
+Additive, like every migration before it — nothing is dropped, nothing is rewritten:
+
+1. `item_components.warehouse_id → warehouses(id)`, nullable, `ON DELETE SET NULL`, plus the
+   partial index `item_components_warehouse_idx (tenant_id, warehouse_id) WHERE warehouse_id IS
+   NOT NULL` — the desktop's `store` column, which decides where a component is drawn from;
+2. `production_order_components.unit_id → units_of_measure(id)`, nullable — the unit a line was
+   planned in, so an order can be re-read and costed without guessing;
+3. the down migration (`migrations/down/0037_item_components.down.sql`) drops the index, then the
+   two columns.
+
+`item_components` itself was unusable before 0035 repaired its RLS and tenant column (§6.1);
+0037 is the first migration that gives it a *consumer*.
+
+### 10.3 The rule the service enforces
+
+`CatalogService.componentsFor(tx, tenantId, itemId, outputQty)` is the single reader of the recipe:
+
+* only `kind = 'component'` lines are consumed — `additive` is the desktop's `IsAdded` bit, a
+  by-product that comes *out* of the build, not an ingredient, and is recorded but never drawn
+  from stock;
+* every quantity is scaled by the produced quantity and returns the component's own `unitId`, so
+  `0.5 × 2` cartons is stored as `1 CTN` and consumed as 12 pieces;
+* a component's unit must be its base unit or a unit defined on its own card
+  (`CATALOG_COMPONENT_UNIT_INVALID`) — otherwise the ratio has no source;
+* an item cannot be its own component (`CATALOG_COMPONENT_SELF`), and a recipe may not form a
+  loop: `assertNoCycle` walks the graph depth-first to a bound of 10 and answers
+  `CATALOG_COMPONENT_CYCLE` (409), because a cycle in a BOM is not a bad row, it is a bad
+  *structure* that would hang an explosion;
+* the quantity must be positive — the zod schema rejects it at the boundary
+  (`VALIDATION_FAILED`) and the service repeats the check for direct callers such as the
+  defaulting path (`CATALOG_COMPONENT_QTY_INVALID`).
+
+### 10.4 Endpoints
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| `GET` | `/organization/catalog/items/:id/components` | `catalog.item.view` | the recipe, joined to item/unit/warehouse names, ordered by the component's SKU |
+| `POST` | `/organization/catalog/items/:id/components` | `catalog.item.manage` | upsert on `(item_id, component_item_id)` |
+| `DELETE` | `/organization/catalog/items/:id/components/:componentItemId` | `catalog.item.manage` | one row |
+
+Tenant isolation is the existing `tenant_isolation` policy on `item_components` (0035) — no new
+policy was needed, and none of the three endpoints filters by tenant in application code.
+
+### 10.5 Production orders
+
+`components` in `POST /inventory/production-orders` is now **optional**:
+
+* **typed** → validated exactly as before (quantity > 0, not the output item, no duplicates), and
+  each line keeps its `unitId`;
+* **omitted** → filled from the item card inside the same `withTenantTx`, scaled by `outputQty`;
+* **empty in both places** → `422 PRODUCTION_COMPONENTS_REQUIRED` — the desktop's
+  «ادخل مكونات المادة», raised by the API instead of a message box.
+
+`complete()` passes each line's `unitId` to `recordInTx`, so the movement carries both what the
+planner typed and what the ledger stored (`base_qty = qty × factor`). `InventoryModule` now
+imports `CatalogModule`; that is not a cycle — the catalog module imports only the database.
+
+### 10.6 Screens
+
+* `/inventory/items` — تبويب **المكونات**: the recipe as a table with a totals row, an add row
+  beneath it (الصنف · الكمية · الوحدة · المستودع · مادة مضافة), unit options coming from the
+  selected component's own card, and **حذف** per row. The old `StateBox` that explained the tab
+  was unimplemented is gone.
+* `/inventory/production` — **مكونات الإنتاج** shows the card's recipe the moment a product is
+  chosen: `رمز الصنف · الصنف · الكمية الأساسية · الوحدة · الكمية · المستودع`, where `الكمية` is
+  `الكمية الأساسية × الكمية المنتجة`. «تعبئة تلقائية من بطاقة الصنف» is on by default — unchecking
+  it brings back the manual grid, which is the desktop's own escape hatch for a one-off build
+  that does not match the card. An item with no recipe says so where the components would be,
+  instead of failing on save.
+
+### 10.7 Label match against `Desktop_ERP`
+
+Every visible label is taken from the files in §10.1:
+
+| Desktop | Ours | |
+|---|---|---|
+| `المكونات` | `المكونات` | verbatim |
+| `🔧 مكونات الصنف` | `🔧 مكونات الصنف` | verbatim |
+| `رمز الصنف` · `الصنف` · `الوحدة` · `الكمية` · `المستودع` · `مادة مضافة` · `حذف` | the same | verbatim |
+| `مستودع الإنتاج` · `الكمية المنتجة` · `المنتج` · `البيان` · `مكونات الإنتاج` | the same | verbatim |
+| `الكمية الأساسية` · `الكمية` (order grid) | the same | verbatim |
+| `رقم الصنف` | — | not shown: the desktop's internal `items.id`; `رمز الصنف` is the key a user types, and printing a uuid in an RTL grid buys nothing |
+| `السعر` · `المجموع` | — | not stored on the recipe: the desktop keeps a *price snapshot* that goes stale, while the order is costed at completion from the warehouse's moving average — which is what `ItemOper.Cost` returns there anyway |
+| `تكلفة المادة` | computed, not typed | the order shows the cost after completion; typing it would let a user disagree with the ledger |
+
+Three invented labels, all of them switches the desktop does not need because it has only one
+behaviour: **«تعبئة تلقائية من بطاقة الصنف»** (the desktop always auto-loads; the web form also
+allows typed components, so it needs the choice), **«مكوّنات البطاقة: n»** (a chip counting the
+recipe rows), and the empty-state sentence «بطاقة هذا الصنف لا تحمل مكوّنات بعد».
+
+### 10.8 Verification
+
+* `apps/api/test/inventory-bom.spec.ts` — 8 tests: add/read/update/delete a component, a
+  non-positive quantity and a foreign unit are refused, a cycle is refused, a reader with only
+  `catalog.item.view` cannot write, a production order fills itself from the card, an item with
+  neither a recipe nor typed components is refused `PRODUCTION_COMPONENTS_REQUIRED`, completing
+  the order moves both halves of the stock, and a component planned in cartons is consumed in
+  pieces (0.5 × 2 cartons = 12 pieces).
+* Suite: API **79 files / 462 tests** green, `apps/staff` **36/36** green, staff build
+  **100/100** static pages.
+* `node scripts/verify-inventory.mjs` — now **twelve** sections; the new one walks the whole
+  journey against the live stack: store a recipe → read it back → refuse a self-reference and a
+  cycle → create an order with no components → watch it fill with `3 × 4 = 12` → complete it and
+  assert the part fell from 40 to 28, the assembly came in at 4, and its unit cost is exactly
+  `60 / 4 = 15` → refuse an order for an item with no recipe.
+* `/inventory/items` and `/inventory/production` both render (200) through the tunneled host.
+
+---
+
+## 11. Deliberately deferred
+
+* Production orders / item assembly (`frmProductionOrder*`) already have their own service;
+  §10 wired the item card's recipe into it, and the order itself is deliberately still
+  one-level — a component that is itself an assembly is exploded per order, not recursively.
 * Unit-aware *pricing lists* — a unit carries its own sale/purchase price, but price lists
   (phase 08) do not yet choose a unit.
 * Printing barcode labels and the stock documents themselves (phase 10).

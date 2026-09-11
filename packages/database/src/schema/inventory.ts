@@ -547,6 +547,8 @@ export const productionOrderComponents = pgTable(
     qty: numeric('qty', qty).notNull(),
     unitCost: numeric('unit_cost', money).notNull().default('0'),
     lineCost: numeric('line_cost', money).notNull().default('0'),
+    /** Unit the quantity was counted in; the movement is posted in base units. */
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.orderId, t.lineNo] }),

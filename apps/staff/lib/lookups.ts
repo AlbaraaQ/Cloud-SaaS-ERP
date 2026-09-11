@@ -197,6 +197,28 @@ export const setItemUnit = (itemId: string, body: unknown) =>
   apiPost<ItemUnit>(`/organization/catalog/items/${itemId}/units`, body);
 export const removeItemUnit = (itemId: string, unitId: string) =>
   apiDelete(`/organization/catalog/items/${itemId}/units/${unitId}`);
+/** مكوّنات الصنف — the bill of materials on the item card. */
+export type ItemComponent = {
+  itemId: string;
+  componentItemId: string;
+  sku: string;
+  nameAr: string | null;
+  qty: string;
+  unitId: string;
+  unitCode: string;
+  unitNameAr: string | null;
+  kind: string;
+  warehouseId: string | null;
+  warehouseName: string | null;
+  baseUnitId: string;
+};
+export const listItemComponents = (itemId: string) =>
+  apiList<ItemComponent>(`/organization/catalog/items/${itemId}/components`);
+export const setItemComponent = (itemId: string, body: unknown) =>
+  apiData<ItemComponent>(`/organization/catalog/items/${itemId}/components`, { method: 'POST', body: JSON.stringify(body) });
+export const removeItemComponent = (itemId: string, componentItemId: string) =>
+  apiData<{ deleted: boolean }>(`/organization/catalog/items/${itemId}/components/${componentItemId}`, { method: 'DELETE' });
+
 export const listItemBarcodes = (itemId: string) =>
   apiList<ItemBarcode>(`/organization/catalog/items/${itemId}/barcodes`);
 export const addItemBarcode = (itemId: string, body: unknown) =>

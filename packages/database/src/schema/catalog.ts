@@ -15,7 +15,7 @@ import {
 
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
-import { branches } from './organization.js';
+import { branches, warehouses } from './organization.js';
 import { tenants } from './platform.js';
 
 export const itemCategories = pgTable(
@@ -209,8 +209,13 @@ export const itemComponents = pgTable(
       .notNull()
       .references(() => unitsOfMeasure.id),
     kind: text('kind').notNull().default('component'),
+    /** The desktop `store`: which warehouse this component is drawn from. Optional. */
+    warehouseId: uuid('warehouse_id').references(() => warehouses.id),
   },
-  (t) => ({ pk: primaryKey({ columns: [t.itemId, t.componentItemId] }) }),
+  (t) => ({
+    pk: primaryKey({ columns: [t.itemId, t.componentItemId] }),
+    warehouse: index('item_components_warehouse_idx').on(t.tenantId, t.warehouseId),
+  }),
 );
 export const itemPriceHistory = pgTable('item_price_history', {
   id: uuid('id').primaryKey(),

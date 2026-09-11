@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
 import { DocField, DocHead, StatTile, StatTiles, StatusTrack, Totals } from '../../../components/ui';
+import { listItemComponents, type ItemComponent } from '../../../lib/lookups';
 import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
@@ -61,8 +62,16 @@ export default function ProductionOrdersPage() {
   const [notes, setNotes] = useState('');
   const [components, setComponents] = useState<ComponentDraft[]>([emptyComponent(), emptyComponent(), emptyComponent()]);
   const [expanded, setExpanded] = useState('');
+  const [fromCard, setFromCard] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
+
+  const cardComponents = useQuery<ItemComponent[]>(
+    () => (outputItemId ? listItemComponents(outputItemId) : Promise.resolve([])),
+    [outputItemId],
+  );
+  const cardRows = (cardComponents.data ?? []).filter((row) => row.kind === 'component');
+  const builtQty = Number(outputQty) > 0 ? Number(outputQty) : 0;
 
   const itemName = (id: string) => {
     const item = (items.data ?? []).find((row) => row.id === id);
@@ -84,14 +93,21 @@ export default function ProductionOrdersPage() {
     try {
       if (!warehouseId) throw new ApiError(422, 'VALIDATION_FAILED', 'اختر المستودع.');
       if (!outputItemId) throw new ApiError(422, 'VALIDATION_FAILED', 'اختر المنتج الناتج.');
-      if (filled.length === 0) throw new ApiError(422, 'VALIDATION_FAILED', 'أضف مكوناً واحداً على الأقل.');
+      if (!fromCard && filled.length === 0)
+        throw new ApiError(
+          422,
+          'VALIDATION_FAILED',
+          'إما أن تُدخل مكوّناً واحداً على الأقل، أو تترك التعبئة لبطاقة الصنف.',
+        );
       const created = await apiPost<ProductionOrder>('/inventory/production-orders', {
         warehouseId,
         orderDate,
         outputItemId,
         outputQty,
         notes: notes.trim() || undefined,
-        components: filled.map((component) => ({ itemId: component.itemId, qty: component.qty })),
+        // Nothing typed means "read the bill of materials off the card", scaled to the
+        // quantity being built.
+        components: fromCard ? undefined : filled.map((component) => ({ itemId: component.itemId, qty: component.qty })),
       });
       setNotice({ kind: 'ok', text: `تم إنشاء أمر الإنتاج ${created.number} كمسودة — لم يتحرك المخزون بعد.` });
       setComponents([emptyComponent(), emptyComponent(), emptyComponent()]);
@@ -157,7 +173,7 @@ export default function ProductionOrdersPage() {
           <h3>أمر إنتاج جديد</h3>
           <div className="form-grid">
             <label className="field">
-              <span>المستودع</span>
+              <span>مستودع الإنتاج</span>
               <select className="input" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
                 <option value="">— اختر —</option>
                 {(warehouses.data ?? []).map((row) => (
@@ -170,7 +186,7 @@ export default function ProductionOrdersPage() {
               <input className="input" type="date" value={orderDate} onChange={(event) => setOrderDate(event.target.value)} />
             </label>
             <label className="field wide">
-              <span>المنتج الناتج</span>
+              <span>المنتج</span>
               <select className="input" value={outputItemId} onChange={(event) => setOutputItemId(event.target.value)}>
                 <option value="">— اختر —</option>
                 {(items.data ?? []).map((row) => (
@@ -183,44 +199,98 @@ export default function ProductionOrdersPage() {
               <input className="input" value={outputQty} onChange={(event) => setOutputQty(event.target.value)} inputMode="decimal" />
             </label>
             <label className="field wide">
-              <span>ملاحظات</span>
+              <span>البيان</span>
               <input className="input" value={notes} onChange={(event) => setNotes(event.target.value)} />
             </label>
           </div>
 
-          <h4>المكونات</h4>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>الصنف</th>
-                  <th>الكمية المستهلكة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {components.map((component, index) => (
-                  <tr key={index}>
-                    <td>
-                      <select className="input" value={component.itemId} onChange={(event) => setComponent(index, { itemId: event.target.value })}>
-                        <option value="">— اختر —</option>
-                        {(items.data ?? []).map((row) => (
-                          <option key={row.id} value={row.id}>{itemLabel(row)}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input className="input" value={component.qty} onChange={(event) => setComponent(index, { qty: event.target.value })} inputMode="decimal" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="section-title">
+            <h4>مكونات الإنتاج</h4>
+            <label className="row" style={{ gap: 6 }}>
+              <input type="checkbox" checked={fromCard} onChange={(event) => setFromCard(event.target.checked)} />
+              <span className="small">تعبئة تلقائية من بطاقة الصنف</span>
+            </label>
           </div>
+
+          {fromCard ? (
+            cardRows.length === 0 ? (
+              <p className="alert warn">
+                بطاقة هذا الصنف لا تحمل مكوّنات بعد. أضفها من تبويب «المكونات» في دليل المواد، أو ألغِ التعبئة
+                التلقائية وأدخل المكوّنات يدوياً.
+              </p>
+            ) : (
+              <>
+                <p className="muted small">
+                  {`المكوّنات تُقرأ من بطاقة الصنف وتُضرب في الكمية المنتجة (${builtQty}) عند الحفظ.`}
+                </p>
+                <div className="table-wrap">
+                  <table className="zebra">
+                    <thead>
+                      <tr>
+                        <th>رمز الصنف</th>
+                        <th>الصنف</th>
+                        <th>الكمية الأساسية</th>
+                        <th>الوحدة</th>
+                        <th>الكمية</th>
+                        <th>المستودع</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cardRows.map((row) => (
+                        <tr key={row.componentItemId}>
+                          <td dir="ltr">{row.sku}</td>
+                          <td>{row.nameAr ?? '—'}</td>
+                          <td dir="ltr" className="num">{quantity(row.qty)}</td>
+                          <td>{row.unitNameAr ?? row.unitCode}</td>
+                          <td dir="ltr" className="num">
+                            <strong>{quantity(Number(row.qty) * builtQty)}</strong>
+                          </td>
+                          <td>{row.warehouseName ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الصنف</th>
+                    <th>الكمية المستهلكة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {components.map((component, index) => (
+                    <tr key={index}>
+                      <td>
+                        <select className="input" value={component.itemId} onChange={(event) => setComponent(index, { itemId: event.target.value })}>
+                          <option value="">— اختر —</option>
+                          {(items.data ?? []).map((row) => (
+                            <option key={row.id} value={row.id}>{itemLabel(row)}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input className="input" value={component.qty} onChange={(event) => setComponent(index, { qty: event.target.value })} inputMode="decimal" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="toolbar">
-            <button className="btn sm" type="button" onClick={() => setComponents((current) => [...current, emptyComponent()])}>
-              إضافة مكوّن
-            </button>
-            <span className="chip">{`عدد المكونات: ${filled.length}`}</span>
+            {!fromCard && (
+              <button className="btn sm" type="button" onClick={() => setComponents((current) => [...current, emptyComponent()])}>
+                إضافة مكوّن
+              </button>
+            )}
+            <span className="chip">
+              {fromCard ? `مكوّنات البطاقة: ${cardRows.length}` : `عدد المكونات: ${filled.length}`}
+            </span>
             <button className="btn primary" type="button" onClick={create} disabled={busy}>
               {busy ? 'جارٍ الحفظ…' : 'حفظ الأمر'}
             </button>

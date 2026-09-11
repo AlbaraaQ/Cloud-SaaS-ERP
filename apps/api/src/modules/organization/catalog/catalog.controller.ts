@@ -34,6 +34,17 @@ const itemUnitSchema = z.object({
   isDefaultSale: z.boolean().optional(),
   isDefaultPurchase: z.boolean().optional(),
 });
+/** A component line of zero or less is not a recipe, it is a mistake. */
+const positiveQty = decimal4.refine((value) => Number(value) > 0, {
+  message: 'must be greater than zero',
+});
+const itemComponentSchema = z.object({
+  componentItemId: z.string().uuid(),
+  qty: positiveQty,
+  unitId: z.string().uuid().optional(),
+  kind: z.enum(['component', 'additive']).optional(),
+  warehouseId: z.string().uuid().nullish(),
+});
 const itemBarcodeSchema = z.object({
   barcode: z.string().trim().min(1).max(64),
   unitId: z.string().uuid().nullish(),
@@ -159,6 +170,38 @@ export class CatalogController {
     @Param('barcode') barcode: string,
   ) {
     return this.catalog.removeItemBarcode(getTenantContext().tenantId, decodeURIComponent(barcode));
+  }
+
+  // ------------------------------------------------------------ مكوّنات الصنف (BOM)
+
+  /**
+   * `GET /organization/catalog/items/:id/components` — the bill of materials, with the
+   * names and units the item card and the production screen both need.
+   */
+  @Get('items/:id/components') @RequiresPermission('catalog.item.view') itemComponents(
+    @Param('id') itemId: string,
+  ) {
+    return this.catalog.listItemComponents(getTenantContext().tenantId, itemId);
+  }
+
+  @Post('items/:id/components') @RequiresPermission('catalog.item.manage') setItemComponent(
+    @Param('id') itemId: string,
+    @Body() body: unknown,
+  ) {
+    return this.catalog.setItemComponent(
+      getTenantContext().tenantId,
+      itemId,
+      itemComponentSchema.parse(body),
+    );
+  }
+
+  @Delete('items/:id/components/:componentItemId')
+  @RequiresPermission('catalog.item.manage')
+  removeItemComponent(
+    @Param('id') itemId: string,
+    @Param('componentItemId') componentItemId: string,
+  ) {
+    return this.catalog.removeItemComponent(getTenantContext().tenantId, itemId, componentItemId);
   }
 
   @Get('categories') @RequiresPermission('catalog.category.view') categories() {

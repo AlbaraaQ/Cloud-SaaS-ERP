@@ -647,5 +647,127 @@ check(
   running.join(' → '),
 );
 
+// ── 12. مكوّنات الصنف (BOM) ──────────────────────────────────────────────────
+// The desktop kept this in `ItemComponents`, filled `frmProductionOrder`'s grid from
+// it in `LoadComponent()`, and scaled every line by `Qty = qty × BaseQty × UnitEquality`
+// (frmProductionOrder.xaml.cs:567-570). Nothing is typed on the order here: the card's
+// recipe is the only input, and the warehouse has to end up short by exactly that.
+console.log('');
+console.log('12. مكوّنات الصنف');
+const bomPart = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-PRT-${stamp}`,
+  nameAr: 'مكوّن تجميع',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+  purchasePrice: '5',
+});
+const bomAssembly = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-ASM-${stamp}`,
+  nameAr: 'صنف مجمَّع',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+  kind: 'stock',
+});
+const partStock = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'تغذية المكوّنات',
+  lines: [{ itemId: bomPart.id, qty: '40', unitCost: '5' }],
+});
+await call('post', `/inventory/vouchers/${partStock.id}/post`, token, {});
+
+const savedComponent = await call('post', `/organization/catalog/items/${bomAssembly.id}/components`, token, {
+  componentItemId: bomPart.id,
+  qty: '3',
+  warehouseId,
+});
+check(
+  'the component is stored on the card',
+  savedComponent.componentItemId === bomPart.id && Number(savedComponent.qty) === 3,
+  `${savedComponent.sku} × ${savedComponent.qty} ${savedComponent.unitCode}`,
+);
+const listed = await call('get', `/organization/catalog/items/${bomAssembly.id}/components`, token);
+check('the card lists its recipe', listed.length === 1 && listed[0].sku === bomPart.sku, listed.length);
+try {
+  await call('post', `/organization/catalog/items/${bomAssembly.id}/components`, token, {
+    componentItemId: bomAssembly.id,
+    qty: '1',
+  });
+  check('an item cannot be its own component', false, 'expected 422');
+} catch (error) {
+  check(
+    'an item cannot be its own component',
+    error.status === 422 && error.code === 'CATALOG_COMPONENT_SELF',
+    `${error.status} ${error.code}`,
+  );
+}
+try {
+  await call('post', `/organization/catalog/items/${bomPart.id}/components`, token, {
+    componentItemId: bomAssembly.id,
+    qty: '1',
+  });
+  check('a cycle is refused', false, 'expected 409');
+} catch (error) {
+  check('a cycle is refused', error.status === 409 && error.code === 'CATALOG_COMPONENT_CYCLE', `${error.status} ${error.code}`);
+}
+
+const partLevel = async () => {
+  const rows = await call('get', `/inventory/levels?warehouse_id=${warehouseId}&item_id=${bomPart.id}`, token);
+  return Number(rows[0]?.quantity ?? 0);
+};
+const assemblyLevel = async () => {
+  const rows = await call('get', `/inventory/levels?warehouse_id=${warehouseId}&item_id=${bomAssembly.id}`, token);
+  return Number(rows[0]?.quantity ?? 0);
+};
+
+// No components on the order: the recipe has to fill it, 3 per unit × 4 built = 12.
+const bomOrder = await call('post', '/inventory/production-orders', token, {
+  warehouseId,
+  outputItemId: bomAssembly.id,
+  outputQty: '4',
+});
+const bomLines = bomOrder.components ?? [];
+check(
+  'the recipe filled the order',
+  bomLines.length === 1 && Number(bomLines[0].qty) === 12,
+  `${bomLines[0]?.qty ?? 0} of ${bomLines.length} line(s)`,
+);
+const partBefore = await partLevel();
+const bomDone = await call('post', `/inventory/production-orders/${bomOrder.id}/complete`, token, {});
+check('the order is completed', bomDone.status === 'completed', bomDone.number);
+check(
+  'the component left the warehouse by the scaled quantity',
+  partBefore - (await partLevel()) === 12,
+  `${partBefore} → ${await partLevel()}`,
+);
+check('the assembly came in by the built quantity', (await assemblyLevel()) === 4, String(await assemblyLevel()));
+check(
+  'the assembly is valued at exactly what left it',
+  money(bomDone.componentCost) === money(60) && money(bomDone.unitCost) === money(15),
+  `${money(bomDone.componentCost)} / 4 = ${money(bomDone.unitCost)}`,
+);
+
+const noRecipe = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-NOR-${stamp}`,
+  nameAr: 'صنف بلا تركيبة',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+try {
+  await call('post', '/inventory/production-orders', token, {
+    warehouseId,
+    outputItemId: noRecipe.id,
+    outputQty: '1',
+  });
+  check('an order with neither a recipe nor typed components is refused', false, 'expected 422');
+} catch (error) {
+  check(
+    'an order with neither a recipe nor typed components is refused',
+    error.status === 422 && error.code === 'PRODUCTION_COMPONENTS_REQUIRED',
+    `${error.status} ${error.code}`,
+  );
+}
+
 console.log(failures === 0 ? '\n✔ Phase 05 inventory documents verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

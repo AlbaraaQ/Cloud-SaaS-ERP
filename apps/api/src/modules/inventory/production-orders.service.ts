@@ -16,6 +16,7 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
+import { CatalogService } from '../organization/catalog/catalog.service.js';
 
 import { InventoryService } from './inventory.service.js';
 
@@ -26,7 +27,11 @@ export type ProductionOrderInput = {
   outputItemId: string;
   outputQty: string;
   notes?: string;
-  components: Array<{ itemId: string; qty: string }>;
+  /**
+   * Leave it out and the bill of materials on the item card fills it in, scaled to the
+   * quantity being built — that is what makes the المكونات tab worth keeping.
+   */
+  components?: Array<{ itemId: string; qty: string; unitId?: string }>;
 };
 
 const dec = (input: string | number | null | undefined) => new Decimal(input ?? 0);
@@ -49,6 +54,7 @@ export class ProductionOrdersService {
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly sequences: SequencesService,
     private readonly inventory: InventoryService,
+    private readonly catalog: CatalogService,
   ) {}
 
   async list(tenantId: string, filters: { status?: string; warehouseId?: string } = {}) {
@@ -78,22 +84,38 @@ export class ProductionOrdersService {
     if (!input.outputItemId) throw new DomainError('PRODUCTION_OUTPUT_REQUIRED', 'A production order needs an output item', 422);
     const outputQty = dec(input.outputQty);
     if (!outputQty.isFinite() || outputQty.lte(0)) throw new DomainError('PRODUCTION_OUTPUT_QTY_INVALID', 'The produced quantity must be greater than zero', 422);
-    if (!input.components?.length) throw new DomainError('PRODUCTION_COMPONENTS_REQUIRED', 'A production order needs at least one component', 422);
-
-    const seen = new Set<string>();
-    const components = input.components.map((component, index) => {
-      const qty = dec(component.qty);
-      if (!qty.isFinite() || qty.lte(0)) throw new DomainError('PRODUCTION_COMPONENT_QTY_INVALID', 'Every component needs a quantity greater than zero', 422);
-      if (component.itemId === input.outputItemId) throw new DomainError('PRODUCTION_COMPONENT_IS_OUTPUT', 'An item cannot be both a component and the output', 422);
-      if (seen.has(component.itemId)) throw new DomainError('PRODUCTION_COMPONENT_DUPLICATE', 'Each component may appear only once; combine the quantities', 422);
-      seen.add(component.itemId);
-      return { lineNo: index + 1, itemId: component.itemId, qty: qty.toFixed(4) };
-    });
+    const drafted = (input.components ?? []).map((component) => ({
+      itemId: component.itemId,
+      qty: component.qty,
+      unitId: component.unitId,
+    }));
 
     const id = newId();
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const [warehouse] = await tx.select().from(warehouses).where(and(eq(warehouses.tenantId, tenantId), eq(warehouses.id, input.warehouseId)));
       if (!warehouse) throw new DomainError('WAREHOUSE_NOT_FOUND', 'Warehouse was not found', 404);
+
+      // Nothing typed on the screen: read the bill of materials off the item card.
+      const lines =
+        drafted.length > 0
+          ? drafted
+          : await this.catalog.componentsFor(tx, tenantId, input.outputItemId, outputQty);
+      const seen = new Set<string>();
+      const components = lines.map((component, index) => {
+        const qty = dec(component.qty);
+        if (!qty.isFinite() || qty.lte(0)) throw new DomainError('PRODUCTION_COMPONENT_QTY_INVALID', 'Every component needs a quantity greater than zero', 422);
+        if (component.itemId === input.outputItemId) throw new DomainError('PRODUCTION_COMPONENT_IS_OUTPUT', 'An item cannot be both a component and the output', 422);
+        if (seen.has(component.itemId)) throw new DomainError('PRODUCTION_COMPONENT_DUPLICATE', 'Each component may appear only once; combine the quantities', 422);
+        seen.add(component.itemId);
+        return { lineNo: index + 1, itemId: component.itemId, qty: qty.toFixed(4), unitId: component.unitId ?? null };
+      });
+      if (components.length === 0)
+        throw new DomainError(
+          'PRODUCTION_COMPONENTS_REQUIRED',
+          'A production order needs at least one component — either pass them or define them on the item card',
+          422,
+        );
+
       const referenced = [input.outputItemId, ...components.map((component) => component.itemId)];
       const known = await tx.select({ id: items.id }).from(items).where(and(eq(items.tenantId, tenantId), inArray(items.id, referenced)));
       if (known.length !== new Set(referenced).size) throw new DomainError('ITEM_NOT_FOUND', 'One of the items on this order was not found', 404);
@@ -127,6 +149,7 @@ export class ProductionOrdersService {
         itemId: component.itemId,
         warehouseId: order.warehouseId,
         qty: component.qty,
+        unitId: component.unitId ?? undefined,
         direction: 'out' as const,
         docType: 'production_order',
         docId: id,

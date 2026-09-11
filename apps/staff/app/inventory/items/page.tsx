@@ -4,22 +4,28 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
-import { DocField, DocHead, FilterBar, StatTile, StatTiles, StateBox, Tabs, Totals } from '../../../components/ui';
+import { DocField, DocHead, FilterBar, StatTile, StatTiles, Tabs, Totals } from '../../../components/ui';
 import { ApiError, apiDelete, apiList, apiPatch, apiPost } from '../../../lib/api';
 import {
   arabicName,
   listCategories,
+  listItemComponents,
   listItemUnits,
   listItems,
   listTaxGroups,
   listUnits,
+  listWarehouses,
   money,
   quantity,
+  removeItemComponent,
+  setItemComponent,
   type Category,
   type Item,
+  type ItemComponent,
   type ItemUnit,
   type TaxGroup,
   type Unit,
+  type Warehouse,
 } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
@@ -71,6 +77,14 @@ export default function ItemsPage() {
   const [editing, setEditing] = useState<Item | undefined>();
   const [selectedId, setSelectedId] = useState('');
   const [tab, setTab] = useState<CardTab>('general');
+  const [componentDraft, setComponentDraft] = useState({
+    componentItemId: '',
+    qty: '1',
+    unitId: '',
+    warehouseId: '',
+    kind: 'component',
+  });
+  const [componentBusy, setComponentBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -200,6 +214,58 @@ export default function ItemsPage() {
   );
   const stockQty = (cardLevels.data ?? []).reduce((sum, row) => sum + Number(row.quantity), 0);
   const stockValue = (cardLevels.data ?? []).reduce((sum, row) => sum + Number(row.value), 0);
+
+  // مكوّنات الصنف — the bill of materials, and the units of the component being added.
+  const warehouseRows = useQuery<Warehouse[]>(() => listWarehouses(), []);
+  const components = useQuery<ItemComponent[]>(
+    () => (selected ? listItemComponents(selected.id) : Promise.resolve([])),
+    [selectedId],
+  );
+  const componentUnits = useQuery<ItemUnit[]>(
+    () => (componentDraft.componentItemId ? listItemUnits(componentDraft.componentItemId) : Promise.resolve([])),
+    [componentDraft.componentItemId],
+  );
+  const componentRows = components.data ?? [];
+  const manage = can('catalog.item.manage');
+
+  async function saveComponent(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    setComponentBusy(true);
+    setNotice(undefined);
+    try {
+      await setItemComponent(selected.id, {
+        componentItemId: componentDraft.componentItemId,
+        qty: componentDraft.qty,
+        unitId: componentDraft.unitId || undefined,
+        warehouseId: componentDraft.warehouseId || undefined,
+        kind: componentDraft.kind,
+      });
+      setNotice({ kind: 'ok', text: 'حُفظ المكوّن في بطاقة الصنف.' });
+      setComponentDraft({ ...componentDraft, componentItemId: '', qty: '1', unitId: '' });
+      components.reload();
+    } catch (error) {
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setComponentBusy(false);
+    }
+  }
+
+  async function dropComponent(row: ItemComponent) {
+    if (!selected) return;
+    if (!window.confirm(`إزالة المكوّن ${row.sku} — ${row.nameAr ?? ''} من بطاقة الصنف؟`)) return;
+    setComponentBusy(true);
+    setNotice(undefined);
+    try {
+      await removeItemComponent(selected.id, row.componentItemId);
+      setNotice({ kind: 'ok', text: 'أُزيل المكوّن من البطاقة.' });
+      components.reload();
+    } catch (error) {
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setComponentBusy(false);
+    }
+  }
 
   return (
     <Screen
@@ -612,11 +678,188 @@ export default function ItemsPage() {
               )}
 
               {tab === 'components' && (
-                <StateBox
-                  icon="🧩"
-                  title="مكوّنات الصنف لم تُربط بعد"
-                  detail="جدول item_components موجود في قاعدة البيانات ويُقرأ في أوامر الإنتاج، لكن تسجيل المكوّنات من بطاقة الصنف يأتي مع الجزء الوظيفي التالي — لن نعرض بيانات وهمية إلى أن يصبح لها مسار حقيقي."
-                />
+                <>
+                  <p className="muted">
+                    🔧 مكونات الصنف — ما يُصنع منه هذا الصنف، بالوحدة التي تُقاس بها كل كمية، والمستودع الذي
+                    يُصرف منه. أمر إنتاج بلا مكوّنات يُملأ تلقائياً من هذا الجدول، مضروباً في الكمية المنتجة.
+                  </p>
+
+                  <QueryView
+                    query={components}
+                    empty="لا مكوّنات لهذا الصنف"
+                    emptyDetail={
+                      manage
+                        ? 'أضف مكوّناً واحداً على الأقل ليتمكن أمر الإنتاج من تعبئة نفسه تلقائياً.'
+                        : undefined
+                    }
+                  >
+                    {() => (
+                      <DataTable
+                        rows={componentRows}
+                        rowKey={(row) => row.componentItemId}
+                        footer={[
+                          <>المجموع ({componentRows.length})</>,
+                          '',
+                          quantity(componentRows.reduce((sum, row) => sum + Number(row.qty), 0)),
+                          '',
+                          '',
+                          '',
+                          ...(manage ? [''] : []),
+                        ]}
+                        columns={[
+                          {
+                            key: 'sku',
+                            header: 'رمز الصنف',
+                            cell: (row) => row.sku,
+                          },
+                          {
+                            key: 'component',
+                            header: 'الصنف',
+                            cell: (row) => row.nameAr ?? '—',
+                          },
+                          {
+                            key: 'qty',
+                            header: 'الكمية',
+                            align: 'num',
+                            cell: (row) => quantity(row.qty),
+                          },
+                          {
+                            key: 'unit',
+                            header: 'الوحدة',
+                            cell: (row) => (
+                              <>
+                                {row.unitNameAr ?? row.unitCode}
+                                {row.unitId !== row.baseUnitId && (
+                                  <span className="muted small"> (بوحدة تعبئة)</span>
+                                )}
+                              </>
+                            ),
+                          },
+                          {
+                            key: 'warehouse',
+                            header: 'المستودع',
+                            cell: (row) => row.warehouseName ?? '—',
+                          },
+                          {
+                            key: 'added',
+                            header: 'مادة مضافة',
+                            cell: (row) => (row.kind === 'additive' ? 'نعم' : 'لا'),
+                          },
+                          ...(manage
+                            ? [
+                                {
+                                  key: 'actions',
+                                  header: '',
+                                  cell: (row: ItemComponent) => (
+                                    <button
+                                      className="btn sm danger"
+                                      type="button"
+                                      disabled={componentBusy}
+                                      onClick={() => void dropComponent(row)}
+                                    >
+                                      حذف
+                                    </button>
+                                  ),
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
+                    )}
+                  </QueryView>
+
+                  {manage && (
+                    <form className="form-grid" onSubmit={saveComponent}>
+                      <label className="field">
+                        <span>الصنف *</span>
+                        <select
+                          className="input"
+                          value={componentDraft.componentItemId}
+                          onChange={(event) =>
+                            setComponentDraft({
+                              ...componentDraft,
+                              componentItemId: event.target.value,
+                              unitId: '',
+                            })
+                          }
+                          required
+                        >
+                          <option value="">— اختر —</option>
+                          {rows
+                            .filter((row) => row.id !== selected?.id)
+                            .map((row) => (
+                              <option key={row.id} value={row.id}>
+                                {`${row.sku} — ${arabicName(row)}`}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>الكمية *</span>
+                        <input
+                          className="input"
+                          inputMode="decimal"
+                          dir="ltr"
+                          value={componentDraft.qty}
+                          onChange={(event) => setComponentDraft({ ...componentDraft, qty: event.target.value })}
+                          required
+                        />
+                      </label>
+                      <label className="field">
+                        <span>الوحدة</span>
+                        <select
+                          className="input"
+                          value={componentDraft.unitId}
+                          onChange={(event) => setComponentDraft({ ...componentDraft, unitId: event.target.value })}
+                        >
+                          <option value="">الوحدة الأساسية</option>
+                          {(componentUnits.data ?? []).map((row) => (
+                            <option key={row.unitId} value={row.unitId}>
+                              {`${row.unitNameAr ?? row.unitCode} (×${Number(row.ratio).toLocaleString('ar-EG')})`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>المستودع</span>
+                        <select
+                          className="input"
+                          value={componentDraft.warehouseId}
+                          onChange={(event) =>
+                            setComponentDraft({ ...componentDraft, warehouseId: event.target.value })
+                          }
+                        >
+                          <option value="">— غير محدد —</option>
+                          {(warehouseRows.data ?? []).map((row) => (
+                            <option key={row.id} value={row.id}>
+                              {arabicName(row)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>مادة مضافة</span>
+                        <select
+                          className="input"
+                          value={componentDraft.kind}
+                          onChange={(event) => setComponentDraft({ ...componentDraft, kind: event.target.value })}
+                        >
+                          <option value="component">لا</option>
+                          <option value="additive">نعم</option>
+                        </select>
+                      </label>
+                      <div className="row">
+                        <button
+                          className="btn primary"
+                          type="submit"
+                          disabled={componentBusy || !componentDraft.componentItemId}
+                        >
+                          {componentBusy ? 'جارٍ الحفظ…' : 'حفظ المكوّن'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </>
               )}
             </>
           )}

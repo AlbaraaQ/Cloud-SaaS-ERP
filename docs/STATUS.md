@@ -167,6 +167,13 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   because inventory value is conserved, so it raises no journal entry. The output item may
   not be one of its own components, a component may not repeat (combine the quantities),
   and completion fails on `STOCK_INSUFFICIENT` rather than driving stock negative. The
+  components are **optional**: when none are typed they are read from the item card's bill of
+  materials (`item_components`, `GET/POST/DELETE /organization/catalog/items/:id/components`)
+  and scaled by the produced quantity, each in the unit the card named — the desktop's
+  `Qty = qty × BaseQty × UnitEquality`. An item with no recipe and an order with no typed
+  components is refused `PRODUCTION_COMPONENTS_REQUIRED`. A component's unit must be its own
+  base unit or one defined on its card, and a recipe may not form a loop
+  (`CATALOG_COMPONENT_CYCLE`). The
   `line_id` of each stock movement is the item id, so the existing
   `(tenant, doc_type, doc_id, line_id)` unique index enforces one movement per item per
   order. Screen `/inventory/production`, report key `production-orders`.

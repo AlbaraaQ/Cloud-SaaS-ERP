@@ -5,17 +5,43 @@ import { Decimal } from 'decimal.js';
 import {
   itemBarcodes,
   itemCategories,
+  itemComponents,
   itemUnits,
   items,
   newId,
   taxGroups,
   unitsOfMeasure,
+  warehouses,
   withTenantTx,
   type DatabaseHandle,
   type DrizzleTx,
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+
+/** One line of a bill of materials. `ratio` is base units per one of `unitId`. */
+export type ItemComponentRow = {
+  itemId: string;
+  componentItemId: string;
+  sku: string;
+  nameAr: string | null;
+  qty: string;
+  unitId: string;
+  unitCode: string;
+  unitNameAr: string | null;
+  kind: string;
+  warehouseId: string | null;
+  warehouseName: string | null;
+  baseUnitId: string;
+};
+
+export type ItemComponentInput = {
+  componentItemId: string;
+  qty: string;
+  unitId?: string;
+  kind?: 'component' | 'additive';
+  warehouseId?: string | null;
+};
 
 export type CatalogItemInput = {
   sku: string;
@@ -327,6 +353,199 @@ export class CatalogService {
         );
       return { itemId, unitId, deleted: true };
     });
+  }
+
+  // ------------------------------------------------------------ مكوّنات الصنف (BOM)
+
+  /**
+   * مكوّنات الصنف — the bill of materials, as the desktop keeps it on the item card
+   * (`frmItems` → تبويب «المكونات», `Class/ItemComponent.cs`).
+   *
+   * `kind` carries the desktop's `IsAdded` bit in words: `component` is consumed when the
+   * assembly is built, `additive` is *produced* by it — a by-product or the packaging the
+   * finished item gains. Production orders currently consume `component` lines only.
+   */
+  async listItemComponents(tenantId: string, itemId: string): Promise<ItemComponentRow[]> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.requireItem(tx, tenantId, itemId);
+      return this.componentRows(tx, tenantId, itemId);
+    });
+  }
+
+  async setItemComponent(
+    tenantId: string,
+    itemId: string,
+    input: ItemComponentInput,
+  ): Promise<ItemComponentRow> {
+    const qty = new Decimal(input.qty);
+    if (!qty.isFinite() || qty.lte(0))
+      throw new DomainError(
+        'CATALOG_COMPONENT_QTY_INVALID',
+        'The component quantity must be greater than zero',
+        422,
+        { field: 'qty' },
+      );
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.requireItem(tx, tenantId, itemId);
+      if (input.componentItemId === itemId)
+        throw new DomainError(
+          'CATALOG_COMPONENT_SELF',
+          'An item cannot be a component of itself',
+          422,
+        );
+      const component = await this.requireItem(tx, tenantId, input.componentItemId);
+      // Counting a component in a unit the item does not define is how a quantity stops
+      // being convertible: the ledger stores base units, and there would be no ratio to
+      // convert with.
+      const ratio = await this.componentUnitRatio(
+        tx,
+        tenantId,
+        component,
+        input.unitId ?? component.baseUnitId,
+      );
+      if (input.warehouseId) {
+        const [warehouse] = await tx
+          .select({ id: warehouses.id })
+          .from(warehouses)
+          .where(and(eq(warehouses.tenantId, tenantId), eq(warehouses.id, input.warehouseId), isNull(warehouses.deletedAt)));
+        if (!warehouse)
+          throw new DomainError('WAREHOUSE_NOT_FOUND', 'Warehouse was not found', 404);
+      }
+      await this.assertNoCycle(tx, tenantId, itemId, input.componentItemId);
+
+      await tx
+        .insert(itemComponents)
+        .values({
+          tenantId,
+          itemId,
+          componentItemId: input.componentItemId,
+          qty: qty.toFixed(4),
+          unitId: input.unitId ?? component.baseUnitId,
+          kind: input.kind ?? 'component',
+          warehouseId: input.warehouseId ?? null,
+        })
+        .onConflictDoUpdate({
+          target: [itemComponents.itemId, itemComponents.componentItemId],
+          set: {
+            tenantId,
+            qty: qty.toFixed(4),
+            unitId: input.unitId ?? component.baseUnitId,
+            kind: input.kind ?? 'component',
+            warehouseId: input.warehouseId ?? null,
+          },
+        });
+      const ratioRow = ratio;
+      const rows = await this.componentRows(tx, tenantId, itemId);
+      const saved = rows.find((row) => row.componentItemId === input.componentItemId);
+      return saved ?? { ...rows[0]!, ratio: ratioRow.toFixed(6) };
+    });
+  }
+
+  async removeItemComponent(tenantId: string, itemId: string, componentItemId: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.requireItem(tx, tenantId, itemId);
+      const deleted = await tx
+        .delete(itemComponents)
+        .where(
+          and(
+            eq(itemComponents.tenantId, tenantId),
+            eq(itemComponents.itemId, itemId),
+            eq(itemComponents.componentItemId, componentItemId),
+          ),
+        )
+        .returning({ componentItemId: itemComponents.componentItemId });
+      return { itemId, componentItemId, deleted: deleted.length > 0 };
+    });
+  }
+
+  /**
+   * `GET /inventory/items/:id/components` is not the only reader: the production screen
+   * asks for the bill of materials of the item it is about to build, scaled to the
+   * quantity it plans to build.
+   */
+  async componentsFor(
+    tx: DrizzleTx,
+    tenantId: string,
+    itemId: string,
+    outputQty: Decimal,
+  ): Promise<Array<{ itemId: string; qty: string; unitId: string }>> {
+    const rows = await tx
+      .select()
+      .from(itemComponents)
+      .where(and(eq(itemComponents.tenantId, tenantId), eq(itemComponents.itemId, itemId), eq(itemComponents.kind, 'component')));
+    return rows.map((row) => ({
+      itemId: row.componentItemId,
+      qty: new Decimal(row.qty).times(outputQty).toFixed(4),
+      unitId: row.unitId,
+    }));
+  }
+
+  private async componentRows(tx: DrizzleTx, tenantId: string, itemId: string): Promise<ItemComponentRow[]> {
+    return tx
+      .select({
+        itemId: itemComponents.itemId,
+        componentItemId: itemComponents.componentItemId,
+        sku: items.sku,
+        nameAr: items.nameAr,
+        qty: itemComponents.qty,
+        unitId: itemComponents.unitId,
+        unitCode: unitsOfMeasure.code,
+        unitNameAr: unitsOfMeasure.nameAr,
+        kind: itemComponents.kind,
+        warehouseId: itemComponents.warehouseId,
+        warehouseName: warehouses.name,
+        baseUnitId: items.baseUnitId,
+      })
+      .from(itemComponents)
+      .innerJoin(items, eq(items.id, itemComponents.componentItemId))
+      .innerJoin(unitsOfMeasure, eq(unitsOfMeasure.id, itemComponents.unitId))
+      .leftJoin(warehouses, eq(warehouses.id, itemComponents.warehouseId))
+      .where(and(eq(itemComponents.tenantId, tenantId), eq(itemComponents.itemId, itemId)))
+      .orderBy(asc(items.sku));
+  }
+
+  /** Base units per one of `unitId` for this item — 1 when it is the base unit. */
+  private async componentUnitRatio(
+    tx: DrizzleTx,
+    tenantId: string,
+    item: { id: string; baseUnitId: string },
+    unitId: string,
+  ): Promise<Decimal> {
+    if (unitId === item.baseUnitId) return new Decimal(1);
+    const [row] = await tx
+      .select({ ratio: itemUnits.ratio })
+      .from(itemUnits)
+      .where(and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.itemId, item.id), eq(itemUnits.unitId, unitId)));
+    if (!row)
+      throw new DomainError(
+        'CATALOG_COMPONENT_UNIT_INVALID',
+        'The component unit must be the item’s base unit or one of the units defined on its card',
+        422,
+        { field: 'unitId' },
+      );
+    return new Decimal(row.ratio);
+  }
+
+  /**
+   * A bill of materials that contains itself cannot be costed: building one unit would
+   * need one unit of itself first. The walk is bounded, because a cycle in the data
+   * would otherwise spin forever.
+   */
+  private async assertNoCycle(tx: DrizzleTx, tenantId: string, itemId: string, componentItemId: string, depth = 0) {
+    if (depth > 10) return;
+    const children = await tx
+      .select({ componentItemId: itemComponents.componentItemId })
+      .from(itemComponents)
+      .where(and(eq(itemComponents.tenantId, tenantId), eq(itemComponents.itemId, componentItemId)));
+    if (children.some((child) => child.componentItemId === itemId))
+      throw new DomainError(
+        'CATALOG_COMPONENT_CYCLE',
+        'This component already contains the item you are adding it to',
+        409,
+      );
+    for (const child of children) {
+      await this.assertNoCycle(tx, tenantId, itemId, child.componentItemId, depth + 1);
+    }
   }
 
   private async requireUnit(tx: DrizzleTx, tenantId: string, unitId: string) {
