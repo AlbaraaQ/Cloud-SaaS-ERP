@@ -236,6 +236,98 @@ export type ScanResult = {
 };
 export const scanBarcode = (code: string) =>
   apiData<ScanResult>(`/inventory/barcode/${encodeURIComponent(code.trim())}`);
+/** بضاعة في الطريق — a transfer that left and never fully arrived. */
+export type InTransitRow = {
+  transferId: string;
+  number: string;
+  branchId?: string | null;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  status: string;
+  sentAt?: string | null;
+  daysInTransit?: number | null;
+  lineNo: number;
+  itemId: string;
+  sku?: string | null;
+  nameAr?: string | null;
+  unitId?: string | null;
+  qty: string;
+  baseQty: string;
+  value: string;
+};
+export const inTransitReport = (warehouseId?: string) =>
+  apiList<InTransitRow>(`/inventory/in-transit${warehouseId ? `?warehouse_id=${warehouseId}` : ''}`);
+export const closeTransfer = (transferId: string, body: { mode: 'return' | 'shortage'; reason?: string }) =>
+  apiPost<{
+    transferId: string;
+    number: string;
+    status: string;
+    mode: string;
+    value: string;
+    journalEntryId: string | null;
+  }>(`/inventory/transfers/${transferId}/close`, body);
+
+/** بطاقة الصنف — the item's ledger with a running balance. */
+export type ItemCardRow = {
+  id: string;
+  itemId: string;
+  sku?: string | null;
+  itemNameAr?: string | null;
+  warehouseId?: string | null;
+  warehouseNameAr?: string | null;
+  direction: 'in' | 'out';
+  qty: string;
+  baseQty: string;
+  unitId?: string | null;
+  unitNameAr?: string | null;
+  factor: string;
+  unitCost?: string | null;
+  totalCost?: string | null;
+  docType: string;
+  docId: string;
+  occurredAt: string;
+  balanceQty: string;
+  balanceValue: string;
+  averageCost: string;
+};
+export type ItemCard = {
+  itemId: string;
+  sku?: string | null;
+  nameAr?: string | null;
+  warehouseId?: string | null;
+  from?: string | null;
+  to?: string | null;
+  opening: { quantity: string; value: string };
+  totals: { inQty: string; inValue: string; outQty: string; outValue: string };
+  closing: { quantity: string; value: string };
+  rows: ItemCardRow[];
+};
+export const itemCard = (params: { item_id: string; warehouse_id?: string; from?: string; to?: string }) => {
+  const query = new URLSearchParams({ item_id: params.item_id });
+  if (params.warehouse_id) query.set('warehouse_id', params.warehouse_id);
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  return apiData<ItemCard>(`/inventory/item-card?${query.toString()}`);
+};
+
+/** حركة المخزون — the same rows, narrowed to a period. */
+export type MovementRow = Omit<ItemCardRow, 'balanceQty' | 'balanceValue' | 'averageCost'>;
+export const movements = (params: {
+  item_id?: string;
+  warehouse_id?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}) => {
+  const query = new URLSearchParams();
+  if (params.item_id) query.set('item_id', params.item_id);
+  if (params.warehouse_id) query.set('warehouse_id', params.warehouse_id);
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  if (params.limit) query.set('limit', String(params.limit));
+  const qs = query.toString();
+  return apiList<MovementRow>(`/inventory/movements${qs ? `?${qs}` : ''}`);
+};
 export const listParties = (kind?: string) => apiList<Party>(`/parties${kind ? `?kind=${kind}` : ''}`);
 export const listCashLocations = () => apiList<CashLocation>('/cash-locations');
 export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');

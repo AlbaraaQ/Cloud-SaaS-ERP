@@ -334,6 +334,10 @@ const inventory: ModuleNode = {
           permission: 'inventory.view',
           endpoint: '/inventory/expiry',
         }),
+        screen('item-card', 'بطاقة الصنف', 'Item card (stock ledger)', '/inventory/item-card', 'ready', {
+          permission: 'inventory.view',
+          endpoint: '/inventory/item-card',
+        }),
         screen(
           'item-movement',
           'حركة مادة تفصيلي',

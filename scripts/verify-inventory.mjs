@@ -14,6 +14,8 @@
  *   7. وحدات القياس — a document written in boxes moves pieces
  *   8. الباركود — a label resolves to an item, a unit and a factor
  *   9. تواريخ الصلاحية — a lot inside the horizon is reported, one outside is not
+ *   10. بضاعة في الطريق — a half-received transfer is listed, then closed
+ *   11. بطاقة الصنف — the item card's running balance agrees with the balance table
  *
  * Every step asserts the *ledger*, not just the stock level: a stock document that
  * moves quantity without a journal is the desktop bug this phase exists to remove.
@@ -467,6 +469,182 @@ check(
   'a lot beyond the horizon is not',
   !expiring.some((row) => row.lotNo === `LOT-LATER-${stamp}`),
   `${expiring.length} row(s)`,
+);
+
+// ── 10. بضاعة في الطريق وإقفال المناقلة ─────────────────────────────────────
+// A transfer that is sent but never fully received used to stay open for ever: the
+// source warehouse had already lost the goods and بضاعة تحت التحويل kept a balance
+// nobody could explain. Closure settles the remainder — home, or written off.
+console.log('');
+console.log('10. بضاعة في الطريق');
+const shipItem = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-SHIP-${stamp}`,
+  nameAr: 'صنف مناقلة',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+const restock = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'تمويل للمناقلة',
+  lines: [{ itemId: shipItem.id, qty: '100', unitCost: '10' }],
+});
+await call('post', `/inventory/vouchers/${restock.id}/post`, token, {});
+const shipDraft = await call('post', '/inventory/transfers/draft', token, {
+  branchId,
+  fromWarehouseId: warehouseId,
+  toWarehouseId: secondWarehouseId,
+  lines: [{ itemId: shipItem.id, qty: '30', unitCost: '10' }],
+});
+await call('post', `/inventory/transfers/${shipDraft.id}/send`, token, {});
+await call('post', `/inventory/transfers/${shipDraft.id}/receive`, token, {
+  received: [{ lineNo: 1, qty: '12' }],
+});
+const transit = await call('get', `/inventory/in-transit?warehouse_id=${warehouseId}`, token);
+const transitRow = transit.find((row) => row.transferId === shipDraft.id);
+check(
+  'the outstanding 18 are listed as in transit',
+  Boolean(transitRow) && Number(transitRow.qty) === 18,
+  transitRow ? `${transitRow.number} — ${transitRow.qty} in transit` : `${transit.length} row(s)`,
+);
+check('the transit value is carried too', Number(transitRow?.value) === 180, transitRow?.value ?? '');
+
+const closed = await call('post', `/inventory/transfers/${shipDraft.id}/close`, token, {
+  mode: 'return',
+  reason: 'رفض الاستلام',
+});
+check(
+  'the transfer closes as a return',
+  closed.status === 'closed' && closed.mode === 'return',
+  `${closed.status}/${closed.mode}`,
+);
+check('the closure posts a journal entry', Boolean(closed.journalEntryId), String(closed.journalEntryId));
+const closedDetail = await call('get', `/inventory/transfers/${shipDraft.id}`, token);
+check(
+  'the return is not counted as a receipt',
+  Number(closedDetail.lines[0].receivedQty) === 12 && Number(closedDetail.lines[0].closedQty) === 18,
+  `received ${closedDetail.lines[0].receivedQty}, closed ${closedDetail.lines[0].closedQty}`,
+);
+const afterClosure = await call('get', `/inventory/in-transit?warehouse_id=${warehouseId}`, token);
+check(
+  'nothing of it is in transit any more',
+  !afterClosure.some((row) => row.transferId === shipDraft.id),
+  `${afterClosure.length} row(s)`,
+);
+
+// A second transfer ends the other way: the goods are gone, so the transit asset is
+// written off and no stock moves anywhere.
+const lostDraft = await call('post', '/inventory/transfers/draft', token, {
+  branchId,
+  fromWarehouseId: warehouseId,
+  toWarehouseId: secondWarehouseId,
+  lines: [{ itemId: shipItem.id, qty: '5', unitCost: '10' }],
+});
+await call('post', `/inventory/transfers/${lostDraft.id}/send`, token, {});
+const levelsBefore = await call(
+  'get',
+  `/inventory/levels?warehouse_id=${secondWarehouseId}&item_id=${shipItem.id}`,
+  token,
+);
+const lost = await call('post', `/inventory/transfers/${lostDraft.id}/close`, token, {
+  mode: 'shortage',
+  reason: 'تلف أثناء النقل',
+});
+check(
+  'a shortage closes without returning stock',
+  lost.mode === 'shortage' && Number(lost.returnedQty) === 0,
+  lost.mode,
+);
+const levelsAfter = await call(
+  'get',
+  `/inventory/levels?warehouse_id=${secondWarehouseId}&item_id=${shipItem.id}`,
+  token,
+);
+check(
+  'the destination is untouched by a write-off',
+  Number(levelsAfter[0]?.quantity ?? 0) === Number(levelsBefore[0]?.quantity ?? 0),
+  `${levelsBefore[0]?.quantity ?? 0} → ${levelsAfter[0]?.quantity ?? 0}`,
+);
+try {
+  await call('post', `/inventory/transfers/${lostDraft.id}/close`, token, { mode: 'shortage' });
+  check('closing twice is refused', false, 'expected 409');
+} catch (error) {
+  check(
+    'closing twice is refused',
+    error.status === 409 && error.code === 'TRANSFER_ALREADY_CLOSED',
+    `${error.status} ${error.code}`,
+  );
+}
+
+// ── 11. بطاقة الصنف ─────────────────────────────────────────────────────────
+// The desktop read this from `Inventorybalance()` and `TotalItemStock(branch, date)`:
+// opening, every movement with its running balance, and a closing that has to agree
+// with the balance table.
+console.log('');
+console.log('11. بطاقة الصنف');
+const cardItem = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-CARD-${stamp}`,
+  nameAr: 'صنف بطاقة',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+const first = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'وارد أول',
+  lines: [{ itemId: cardItem.id, qty: '10', unitCost: '20' }],
+});
+await call('post', `/inventory/vouchers/${first.id}/post`, token, {});
+const second = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'وارد ثانٍ',
+  lines: [{ itemId: cardItem.id, qty: '4', unitCost: '25' }],
+});
+await call('post', `/inventory/vouchers/${second.id}/post`, token, {});
+const cardIssue = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_out',
+  reason: 'صرف',
+  lines: [{ itemId: cardItem.id, qty: '5' }],
+});
+await call('post', `/inventory/vouchers/${cardIssue.id}/post`, token, {});
+
+const card = await call(
+  'get',
+  `/inventory/item-card?item_id=${cardItem.id}&warehouse_id=${warehouseId}`,
+  token,
+);
+check(
+  'opening + in − out = closing',
+  Number(card.opening.quantity) + Number(card.totals.inQty) - Number(card.totals.outQty) ===
+    Number(card.closing.quantity),
+  `${card.opening.quantity} + ${card.totals.inQty} − ${card.totals.outQty} = ${card.closing.quantity}`,
+);
+const cardLevels = await call(
+  'get',
+  `/inventory/levels?warehouse_id=${warehouseId}&item_id=${cardItem.id}`,
+  token,
+);
+check(
+  'the closing agrees with the balance table',
+  Number(card.closing.quantity) === Number(cardLevels[0]?.quantity ?? 0),
+  `card ${card.closing.quantity} vs balance ${cardLevels[0]?.quantity ?? 0}`,
+);
+check(
+  'the card is valued, not only counted',
+  Number(card.totals.inValue) === 300 && Number(card.closing.value) > 0,
+  `in ${card.totals.inValue}, closing ${card.closing.value}`,
+);
+const running = card.rows.map((row) => Number(row.balanceQty));
+check(
+  'every row carries its own running balance',
+  running.length === 3 && running[running.length - 1] === Number(card.closing.quantity),
+  running.join(' → '),
 );
 
 console.log(failures === 0 ? '\n✔ Phase 05 inventory documents verified' : `\n✗ ${failures} check(s) failed`);

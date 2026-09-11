@@ -1,4 +1,4 @@
-# Phase 05 — المخزون (stock documents, transfers, counts, multi-unit, barcodes, expiry)
+# Phase 05 — المخزون (stock documents, transfers, counts, multi-unit, barcodes, expiry, in-transit, item card)
 
 Date: 2026-09 · Status: ✅ done
 Sources: `Desktop_ERP/SmartAuditERP/Form_WPF/frmInvInOutput.xaml.cs` (3,120 lines),
@@ -22,6 +22,8 @@ Sources: `Desktop_ERP/SmartAuditERP/Form_WPF/frmInvInOutput.xaml.cs` (3,120 line
 | `ItemPrimaryQnty = ItemQuantity * UnitEquality` — the ledger always stores base units | `InvoiceOper.cs` L5031, stock update L4275-4295 | every quantity was assumed to be base units | `base_qty = qty × factor`; the entered `unit_id` and its `factor` are snapshotted on `inventory_transactions` |
 | باركود متعدد (`ItemBarcodes`) + a barcode per unit | `ItemOper.cs` barcode lookup | `item_barcodes` existed with no endpoint; nothing resolved a scan | `GET /inventory/barcode/:code` answers item + unit + factor, searching `items.barcode`, `item_barcodes` and `item_units.barcode` |
 | تنبيه انتهاء الصلاحية | `frmItems*` expiry column | lots carried `expiry_date` but nothing ever read it | `GET /inventory/expiry?days=…` + the `/inventory/expiry` screen |
+| مناقلة مرسلة ولم تُستلم كاملة | `frmInventoryTransfer` | no ending at all: the remainder stayed in بضاعة تحت التحويل for ever | `GET /inventory/in-transit` + `POST /inventory/transfers/:id/close` with `return` or `shortage` |
+| رصيد الصنف حتى تاريخ (`TotalItemStock(branch, date)`, `Inventorybalance()`) | `Class/Inventory.cs` | a flat movement list with no period and no running balance | `GET /inventory/item-card` with opening, running balance, totals and closing |
 
 **The rule this phase adds:** a stock document that moves quantity *must* move value in
 the same transaction. Sales and purchases already post to `inventoryAccountId`; a
@@ -237,7 +239,63 @@ the variance that is posted.
 
 ---
 
-## 7. Verification
+## 7. Part three — بضاعة في الطريق، إقفال المناقلة، وبطاقة الصنف
+
+### 7.1 بضاعة في الطريق
+
+A مناقلة that is sent but never fully received had no ending at all — on the desktop
+either. The source warehouse loses the goods at send time, the destination only books
+what arrives, and the difference sits in بضاعة تحت التحويل with nothing to clear it.
+
+`GET /inventory/in-transit` lists exactly that: every transfer line still outstanding,
+with the item, the quantity, its value, and `daysInTransit` — because an old one is the
+one nobody has looked at.
+
+`POST /inventory/transfers/:id/close` settles it, and there are only two honest endings:
+
+| Mode | Stock | Journal |
+|---|---|---|
+| `return` | the remainder moves back into the **source** warehouse at the cost it left at, so value is conserved | Dr المخزون / Cr بضاعة تحت التحويل |
+| `shortage` | nothing moves — the source already lost the goods when it sent them | Dr عجز (the count-variance account) / Cr بضاعة تحت التحويل |
+
+Either way the transit account ends at zero for that transfer. The settled quantity is
+recorded in a new `closed_qty` column, never in `received_qty`: a document must not be
+made to look fully received when the goods went home or went missing. Closing twice is
+`409 TRANSFER_ALREADY_CLOSED`, and a transfer that is not on the road cannot be closed.
+
+### 7.2 بطاقة الصنف
+
+`GET /inventory/item-card?item_id=&warehouse_id=&from=&to=` — the desktop's
+`Inventorybalance()` and `TotalItemStock(branch, date)`, read the way a storekeeper
+reads them:
+
+* an opening balance at `from` (zero when no period is asked for — otherwise everything
+  would be counted twice);
+* every movement inside the period with a **running** quantity and value beside it;
+* in/out totals, and a closing balance that is asserted against `stock_balances`.
+
+The value column matters as much as the quantity: a card that only counts units cannot
+answer what the stock is worth. `GET /inventory/movements` gained the same `from`/`to`
+filters, the joined names (SKU, item, warehouse, unit) and a sane limit, so a screen can
+print a name instead of a uuid.
+
+### 7.3 Migration `0036_transfer_closure.sql`
+
+Additive: the transfer status check is widened with `'closed'`, `stock_transfers` gains
+`closed_at` / `closed_journal_entry_id` / `closure_mode` / `closure_reason`, and
+`stock_transfer_lines` gains `closed_qty`. No row is rewritten.
+
+### 7.4 Screens
+
+| Screen | Notes |
+|---|---|
+| `/inventory/in-transit` (new) | what is still on the road, its value, how many days it has been there, and the two closures — إعادة للمصدر / إقفال كعجز — with a reason |
+| `/inventory/item-card` (new) | item + warehouse + period, four tiles (افتتاحي · وارد · صادر · ختامي) each with quantity **and** value, then the ledger with a running balance and the unit the line was counted in |
+| `/inventory/movements` (updated) | the same period filters, and document types named in Arabic |
+
+---
+
+## 8. Verification
 
 * `apps/api/test/inventory-documents.spec.ts` — 14 tests (part one).
 * `apps/api/test/inventory-units-barcode.spec.ts` — 11 tests (part two): the base unit is
@@ -246,15 +304,22 @@ the variance that is posted.
   posting, a scan answers item + unit + factor, one label cannot belong to two items,
   lots inside the horizon are reported and those beyond it are not, and a barcode from
   another tenant is invisible.
-* `node scripts/verify-inventory.mjs` — the same journey against a live stack, now nine
-  sections: opening → issue → count → transfer → negative → reorder → **وحدات القياس →
-  الباركود → تواريخ الصلاحية**, asserting the ledger at every step.
-* Suite: API **77 files / 447 tests** green, `@erp/database` **17/17** green, staff build
-  **97/97** static pages.
+* `apps/api/test/inventory-closure.spec.ts` — 7 tests (part three): a partly received
+  transfer still lists its outstanding 18, closing as a return brings them home and does
+  **not** count as a receipt, a shortage writes the transit asset off without moving
+  stock, closing twice is refused, a draft cannot be closed, the item card's
+  opening + in − out agrees with the balance table, and the movement list honours a
+  period.
+* `node scripts/verify-inventory.mjs` — the same journey against a live stack, now
+  eleven sections: opening → issue → count → transfer → negative → reorder → وحدات
+  القياس → الباركود → تواريخ الصلاحية → **بضاعة في الطريق → بطاقة الصنف**, asserting the
+  ledger at every step.
+* Suite: API **78 files / 454 tests** green, `@erp/database` **17/17** green, staff build
+  **99/99** static pages.
 
 ---
 
-## 8. Deliberately deferred
+## 9. Deliberately deferred
 
 * Production orders / item assembly (`frmProductionOrder*`) already have their own
   service; they are not re-modelled here.

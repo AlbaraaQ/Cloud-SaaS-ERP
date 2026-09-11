@@ -58,6 +58,14 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   `items.barcode` → `item_barcodes` → `item_units.barcode`; expiry report
   `GET /inventory/expiry?days=…` and the `/inventory/expiry` screen; staff
   `/inventory/item-units` and unit columns on vouchers, counts and transfers.
+- [x] Behaviours (part three): بضاعة في الطريق — a transfer sent but not fully received
+  is listed with its value and age, and closed either as `return` (the remainder goes
+  home, value conserved) or `shortage` (written off, no stock moves); the settled
+  quantity lives in a new `closed_qty`, never in `received_qty`. بطاقة الصنف —
+  `GET /inventory/item-card` with opening, running balance, totals and a closing that is
+  asserted against `stock_balances`; `GET /inventory/movements` gained a period and
+  joined names. Screens `/inventory/in-transit`, `/inventory/item-card`, and the
+  updated `/inventory/movements`.
 - [ ] Still open: unit-aware price lists (phase 08), printing the stock documents and
   barcode labels (phase 10). Production/assembly keeps its own service.
 

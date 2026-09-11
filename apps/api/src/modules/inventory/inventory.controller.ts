@@ -19,11 +19,38 @@ export class InventoryController {
   ) {
     return this.inventory.levels(getTenantContext().tenantId, warehouseId, itemId);
   }
+  /** حركة المخزون — now with a period, which is the only way a movement list is usable. */
   @Get('movements') @RequiresPermission('inventory.view') movements(
     @Query('item_id') itemId?: string,
     @Query('warehouse_id') warehouseId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.inventory.movements(getTenantContext().tenantId, itemId, warehouseId);
+    return this.inventory.movements(getTenantContext().tenantId, {
+      itemId,
+      warehouseId,
+      from,
+      to,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  /** بطاقة الصنف — the item's ledger with a running balance, quantity and value. */
+  @Get('item-card') @RequiresPermission('inventory.view') itemCard(
+    @Query('item_id') itemId: string,
+    @Query('warehouse_id') warehouseId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.inventory.itemCard(getTenantContext().tenantId, { itemId, warehouseId, from, to });
+  }
+
+  /** بضاعة في الطريق — transfers sent but not fully received, oldest first. */
+  @Get('in-transit') @RequiresPermission('inventory.view') inTransit(
+    @Query('warehouse_id') warehouseId?: string,
+  ) {
+    return this.inventory.inTransit(getTenantContext().tenantId, warehouseId);
   }
   @Post('ledger/record') @RequiresPermission('inventory.adjust') record(
     @Body() body: { lines: InventoryLine[] },
@@ -79,6 +106,18 @@ export class InventoryController {
   ) {
     return this.inventory.receiveTransfer(getTenantContext().tenantId, transferId, body.received, {
       fiscalPeriodId: body.fiscalPeriodId,
+    });
+  }
+  @Post('transfers/:id/close')
+  @RequiresPermission('inventory.adjust')
+  closeTransfer(
+    @Param('id') transferId: string,
+    @Body() body: { mode?: string; reason?: string; fiscalPeriodId?: string },
+  ) {
+    return this.inventory.closeTransfer(getTenantContext().tenantId, transferId, {
+      mode: (body?.mode === 'shortage' ? 'shortage' : 'return') as 'return' | 'shortage',
+      reason: body?.reason,
+      fiscalPeriodId: body?.fiscalPeriodId,
     });
   }
   @Post('transfers/:id/cancel') @RequiresPermission('inventory.adjust') cancelTransferById(

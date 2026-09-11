@@ -4,41 +4,42 @@ import { useState } from 'react';
 
 import { DataTable, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
-import { apiList } from '../../../lib/api';
-import { arabicName, dateTime, itemLabel, listItems, listWarehouses, money, quantity, type Item, type Warehouse } from '../../../lib/lookups';
+import {
+  ItemPicker,
+  PeriodPicker,
+  WarehousePicker,
+  docTypeLabel,
+} from '../../../components/inventory-filters';
+import {
+  dateTime,
+  itemLabel,
+  listItems,
+  money,
+  movements as movementsReport,
+  quantity,
+  type Item,
+  type MovementRow,
+} from '../../../lib/lookups';
 import { useQuery } from '../../../lib/use-query';
-
-type Movement = {
-  id: string;
-  itemId: string;
-  warehouseId: string;
-  occurredAt: string;
-  docType: string;
-  direction: 'in' | 'out';
-  qty: string;
-  unitCost: string;
-  totalCost: string;
-};
-
-const DOC_LABELS: Record<string, string> = {
-  sales_invoice: 'فاتورة مبيعات',
-  purchase_invoice: 'فاتورة مشتريات',
-  stock_transfer: 'مناقلة (صرف)',
-  stock_transfer_receipt: 'مناقلة (استلام)',
-  stock_adjustment: 'تسوية مخزنية',
-  opening_stock: 'بضاعة أول مدة',
-};
 
 export default function MovementsPage() {
   const [itemId, setItemId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const items = useQuery<Item[]>(() => listItems(), []);
-  const warehouses = useQuery<Warehouse[]>(() => listWarehouses(), []);
-  const query = new URLSearchParams({ ...(itemId ? { item_id: itemId } : {}), ...(warehouseId ? { warehouse_id: warehouseId } : {}) }).toString();
-  const movements = useQuery<Movement[]>(() => apiList<Movement>(`/inventory/movements${query ? `?${query}` : ''}`), [itemId, warehouseId]);
+  const movements = useQuery<MovementRow[]>(
+    () =>
+      movementsReport({
+        item_id: itemId || undefined,
+        warehouse_id: warehouseId || undefined,
+        from: from || undefined,
+        to: to || undefined,
+      }),
+    [itemId, warehouseId, from, to],
+  );
 
   const itemRows = items.data ?? [];
-  const warehouseRows = warehouses.data ?? [];
 
   return (
     <Screen
@@ -46,32 +47,17 @@ export default function MovementsPage() {
       subtitle="كل حركة دخول وخروج بترتيب زمني، بالتكلفة التي رُحّلت بها."
       crumbs={['المستودعات', 'تقارير مستودعية']}
     >
-      <div className="card toolbar">
-        <label className="field">
-          <span>المادة</span>
-          <select className="input" value={itemId} onChange={(event) => setItemId(event.target.value)}>
-            <option value="">كل المواد</option>
-            {itemRows.map((row) => (
-              <option key={row.id} value={row.id}>
-                {itemLabel(row)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>المستودع</span>
-          <select className="input" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
-            <option value="">كل المستودعات</option>
-            {warehouseRows.map((row) => (
-              <option key={row.id} value={row.id}>
-                {arabicName(row)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="card form-grid">
+        <ItemPicker value={itemId} onChange={setItemId} />
+        <WarehousePicker value={warehouseId} onChange={setWarehouseId} includeAll />
+        <PeriodPicker from={from} to={to} onFrom={setFrom} onTo={setTo} />
       </div>
 
-      <QueryView query={movements} empty="لا توجد حركات" emptyDetail="تظهر الحركات بعد ترحيل فاتورة أو مناقلة أو تسوية.">
+      <QueryView
+        query={movements}
+        empty="لا توجد حركات"
+        emptyDetail="تظهر الحركات بعد ترحيل فاتورة أو مناقلة أو تسوية."
+      >
         {(rows) => (
           <DataTable
             rows={rows}
@@ -86,7 +72,7 @@ export default function MovementsPage() {
                   return item ? itemLabel(item) : row.itemId;
                 },
               },
-              { key: 'doc', header: 'المستند', cell: (row) => DOC_LABELS[row.docType] ?? row.docType },
+              { key: 'doc', header: 'المستند', cell: (row) => docTypeLabel(row.docType) },
               { key: 'dir', header: 'الاتجاه', cell: (row) => (row.direction === 'in' ? 'وارد' : 'صادر') },
               { key: 'qty', header: 'الكمية', align: 'num', cell: (row) => quantity(row.qty) },
               { key: 'unit', header: 'تكلفة الوحدة', align: 'num', cell: (row) => money(row.unitCost) },

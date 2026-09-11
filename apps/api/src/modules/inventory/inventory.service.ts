@@ -265,20 +265,165 @@ export class InventoryService {
         .orderBy(asc(stockBalances.itemId)),
     );
   }
-  movements(tenantId: string, itemId?: string, warehouseId?: string) {
+  /**
+   * The movement list. It now takes a period as well as an item and a warehouse, because
+   * "everything that ever happened to this item" is only useful once it can be narrowed
+   * to the month somebody is asking about — that is what `Inventorybalance()` and
+   * `TotalItemStock(branch, date)` answered on the desktop.
+   */
+  async movements(
+    tenantId: string,
+    filters: { itemId?: string; warehouseId?: string; from?: string; to?: string; limit?: number } = {},
+  ) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx
-        .select()
+        .select({
+          id: inventoryTransactions.id,
+          itemId: inventoryTransactions.itemId,
+          sku: items.sku,
+          itemNameAr: items.nameAr,
+          warehouseId: inventoryTransactions.warehouseId,
+          warehouseNameAr: warehouses.name,
+          direction: inventoryTransactions.direction,
+          qty: inventoryTransactions.qty,
+          baseQty: inventoryTransactions.baseQty,
+          unitId: inventoryTransactions.unitId,
+          unitNameAr: unitsOfMeasure.nameAr,
+          factor: inventoryTransactions.factor,
+          unitCost: inventoryTransactions.unitCost,
+          totalCost: inventoryTransactions.totalCost,
+          docType: inventoryTransactions.docType,
+          docId: inventoryTransactions.docId,
+          lotId: inventoryTransactions.lotId,
+          serialId: inventoryTransactions.serialId,
+          occurredAt: inventoryTransactions.occurredAt,
+        })
         .from(inventoryTransactions)
+        .innerJoin(items, eq(items.id, inventoryTransactions.itemId))
+        .leftJoin(warehouses, eq(warehouses.id, inventoryTransactions.warehouseId))
+        .leftJoin(unitsOfMeasure, eq(unitsOfMeasure.id, inventoryTransactions.unitId))
         .where(
           and(
             eq(inventoryTransactions.tenantId, tenantId),
-            itemId ? eq(inventoryTransactions.itemId, itemId) : undefined,
-            warehouseId ? eq(inventoryTransactions.warehouseId, warehouseId) : undefined,
+            filters.itemId ? eq(inventoryTransactions.itemId, filters.itemId) : undefined,
+            filters.warehouseId ? eq(inventoryTransactions.warehouseId, filters.warehouseId) : undefined,
+            filters.from
+              ? sql`${inventoryTransactions.occurredAt}::date >= ${filters.from}::date`
+              : undefined,
+            filters.to ? sql`${inventoryTransactions.occurredAt}::date <= ${filters.to}::date` : undefined,
           ),
         )
-        .orderBy(asc(inventoryTransactions.occurredAt)),
+        .orderBy(asc(inventoryTransactions.occurredAt))
+        .limit(Math.min(Math.max(filters.limit ?? 500, 1), 2000)),
     );
+  }
+
+  /**
+   * بطاقة الصنف — the item card, which is the stock ledger read the way a storekeeper
+   * reads it: opening balance at `from`, every movement inside the period with a running
+   * balance beside it, and the closing balance that must agree with `stock_balances`.
+   *
+   * Quantity and value are both carried, because a card that only counts units cannot
+   * answer the question it exists for — what is this stock *worth* right now.
+   */
+  async itemCard(
+    tenantId: string,
+    filters: { itemId: string; warehouseId?: string; from?: string; to?: string } = { itemId: '' },
+  ) {
+    if (!filters.itemId)
+      throw new DomainError('INVENTORY_ITEM_REQUIRED', 'An item is required for its card', 422, {
+        field: 'item_id',
+      });
+    const [item] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: items.id, sku: items.sku, nameAr: items.nameAr, baseUnitId: items.baseUnitId })
+        .from(items)
+        .where(and(eq(items.tenantId, tenantId), eq(items.id, filters.itemId), isNull(items.deletedAt))),
+    );
+    if (!item) throw new DomainError('NOT_FOUND', 'Item was not found', 404);
+
+    // Without a `from` there is no opening: the card starts at the first movement ever,
+    // and counting everything twice is exactly the kind of subtly wrong total a store-
+    // keeper would trust once and never again.
+    const before = filters.from
+      ? await withTenantTx(this.database.db, tenantId, (tx) =>
+          tx
+            .select()
+            .from(inventoryTransactions)
+            .where(
+              and(
+                eq(inventoryTransactions.tenantId, tenantId),
+                eq(inventoryTransactions.itemId, filters.itemId),
+                filters.warehouseId ? eq(inventoryTransactions.warehouseId, filters.warehouseId) : undefined,
+                sql`${inventoryTransactions.occurredAt}::date < ${filters.from}::date`,
+              ),
+            )
+            .orderBy(asc(inventoryTransactions.occurredAt)),
+        )
+      : [];
+
+    const opening = before.reduce(
+      (acc, row) => {
+        const quantity = new Decimal(row.baseQty);
+        const value = new Decimal(row.totalCost);
+        return row.direction === 'in'
+          ? { quantity: acc.quantity.plus(quantity), value: acc.value.plus(value) }
+          : { quantity: acc.quantity.minus(quantity), value: acc.value.minus(value) };
+      },
+      { quantity: new Decimal(0), value: new Decimal(0) },
+    );
+
+    const rows = await this.movements(tenantId, {
+      itemId: filters.itemId,
+      warehouseId: filters.warehouseId,
+      from: filters.from,
+      to: filters.to,
+      limit: 2000,
+    });
+
+    let quantity = opening.quantity;
+    let value = opening.value;
+    const ledger = rows.map((row) => {
+      const moved = new Decimal(row.baseQty);
+      const cost = new Decimal(row.totalCost);
+      quantity = row.direction === 'in' ? quantity.plus(moved) : quantity.minus(moved);
+      value = row.direction === 'in' ? value.plus(cost) : value.minus(cost);
+      return {
+        ...row,
+        balanceQty: quantity.toFixed(4),
+        balanceValue: value.toFixed(4),
+        averageCost: quantity.abs().gt(0) ? value.div(quantity).toFixed(4) : '0.0000',
+      };
+    });
+
+    const totals = rows.reduce(
+      (acc, row) => {
+        const moved = new Decimal(row.baseQty);
+        const cost = new Decimal(row.totalCost);
+        return row.direction === 'in'
+          ? { ...acc, inQty: acc.inQty.plus(moved), inValue: acc.inValue.plus(cost) }
+          : { ...acc, outQty: acc.outQty.plus(moved), outValue: acc.outValue.plus(cost) };
+      },
+      { inQty: new Decimal(0), inValue: new Decimal(0), outQty: new Decimal(0), outValue: new Decimal(0) },
+    );
+
+    return {
+      itemId: filters.itemId,
+      sku: item.sku,
+      nameAr: item.nameAr,
+      warehouseId: filters.warehouseId ?? null,
+      from: filters.from ?? null,
+      to: filters.to ?? null,
+      opening: { quantity: opening.quantity.toFixed(4), value: opening.value.toFixed(4) },
+      totals: {
+        inQty: totals.inQty.toFixed(4),
+        inValue: totals.inValue.toFixed(4),
+        outQty: totals.outQty.toFixed(4),
+        outValue: totals.outValue.toFixed(4),
+      },
+      closing: { quantity: quantity.toFixed(4), value: value.toFixed(4) },
+      rows: ledger,
+    };
   }
 
   async valuationAsOf(tenantId: string, asOf: Date, warehouseId?: string, itemId?: string) {
@@ -970,6 +1115,303 @@ export class InventoryService {
         value: value.toFixed(4),
         journalEntryId: receivedJournalEntryId ?? null,
         lines: updated.lines,
+      };
+    });
+  }
+
+  // ── بضاعة في الطريق — what is still on the road, and what happened to it ────
+
+  /**
+   * Everything still outstanding: sent, not (fully) received, not closed.
+   *
+   * A transfer that sits here is not a statistic — it is stock the source warehouse has
+   * already lost and the destination has never gained. `daysInTransit` is what makes an
+   * old one visible before somebody closes it.
+   */
+  async inTransit(tenantId: string, warehouseId?: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const open = await tx
+        .select()
+        .from(stockTransfers)
+        .where(
+          and(
+            eq(stockTransfers.tenantId, tenantId),
+            inArray(stockTransfers.status, ['in_transit', 'partially_received']),
+            warehouseId ? eq(stockTransfers.fromWarehouseId, warehouseId) : undefined,
+          ),
+        )
+        .orderBy(asc(stockTransfers.sentAt));
+      const rows = [];
+      for (const transfer of open) {
+        const lines = await tx
+          .select()
+          .from(stockTransferLines)
+          .where(
+            and(eq(stockTransferLines.tenantId, tenantId), eq(stockTransferLines.transferId, transfer.id)),
+          );
+        for (const line of lines) {
+          const outstanding = new Decimal(line.qty).minus(line.receivedQty).minus(line.closedQty);
+          if (outstanding.lte(0)) continue;
+          const [item] = await tx
+            .select({ sku: items.sku, nameAr: items.nameAr, baseUnitId: items.baseUnitId })
+            .from(items)
+            .where(eq(items.id, line.itemId));
+          const factor = line.unitId
+            ? new Decimal(
+                (
+                  await tx
+                    .select({ ratio: itemUnits.ratio })
+                    .from(itemUnits)
+                    .where(
+                      and(
+                        eq(itemUnits.tenantId, tenantId),
+                        eq(itemUnits.itemId, line.itemId),
+                        eq(itemUnits.unitId, line.unitId),
+                      ),
+                    )
+                )[0]?.ratio ?? '1',
+              )
+            : new Decimal(1);
+          rows.push({
+            transferId: transfer.id,
+            number: transfer.number,
+            branchId: transfer.branchId,
+            fromWarehouseId: transfer.fromWarehouseId,
+            toWarehouseId: transfer.toWarehouseId,
+            status: transfer.status,
+            sentAt: transfer.sentAt,
+            daysInTransit: transfer.sentAt
+              ? Math.floor((Date.now() - new Date(transfer.sentAt).getTime()) / 86_400_000)
+              : null,
+            lineNo: line.lineNo,
+            itemId: line.itemId,
+            sku: item?.sku ?? null,
+            nameAr: item?.nameAr ?? null,
+            unitId: line.unitId,
+            qty: outstanding.toFixed(4),
+            baseQty: outstanding.mul(factor).toFixed(4),
+            value: outstanding
+              .mul(factor)
+              .mul(new Decimal(line.unitCost ?? '0'))
+              .toFixed(4),
+          });
+        }
+      }
+      return rows;
+    });
+  }
+
+  /**
+   * Closing a transfer settles whatever the destination never received.
+   *
+   * Two honest endings, and no third one:
+   *
+   * • `return` — the goods came home. Stock moves back into the **source** warehouse at
+   *   the cost it left at (so value is conserved), and the transit asset is cleared:
+   *   Dr المخزون / Cr بضاعة تحت التحويل.
+   * • `shortage` — the goods are gone. Nothing moves in the stock ledger (the source
+   *   already lost them when it sent them); the transit asset is written off instead:
+   *   Dr عجز / Cr بضاعة تحت التحويل.
+   *
+   * Either way بضاعة تحت التحويل ends at zero for this transfer, and `closed_qty`
+   * records the part that was settled without a receipt — `received_qty` is never
+   * inflated to make a document look complete.
+   */
+  async closeTransfer(
+    tenantId: string,
+    transferId: string,
+    input: { mode: 'return' | 'shortage'; reason?: string; fiscalPeriodId?: string } = { mode: 'return' },
+  ) {
+    if (!['return', 'shortage'].includes(input.mode))
+      throw new DomainError(
+        'TRANSFER_CLOSURE_MODE_INVALID',
+        'Closing a transfer needs a mode: return or shortage',
+        422,
+        {
+          field: 'mode',
+        },
+      );
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const transfer = await this.loadTransfer(tx, tenantId, transferId);
+      if (transfer.status === 'closed')
+        throw new DomainError('TRANSFER_ALREADY_CLOSED', 'This transfer is already closed', 409);
+      if (!['in_transit', 'partially_received'].includes(transfer.status))
+        throw new DomainError('TRANSFER_INVALID_STATE', 'Only a transfer on the road can be closed', 409);
+
+      const remainder = transfer.lines
+        .map((line) => ({
+          line,
+          outstanding: new Decimal(line.qty).minus(line.receivedQty).minus(line.closedQty),
+        }))
+        .filter((row) => row.outstanding.gt(0));
+      if (!remainder.length)
+        throw new DomainError('TRANSFER_NOTHING_OUTSTANDING', 'This transfer has nothing left to close', 409);
+
+      const branchId =
+        transfer.branchId ??
+        (
+          await tx
+            .select({ branchId: warehouses.branchId })
+            .from(warehouses)
+            .where(and(eq(warehouses.tenantId, tenantId), eq(warehouses.id, transfer.toWarehouseId)))
+        )[0]?.branchId;
+      if (!branchId)
+        throw new DomainError(
+          'TRANSFER_BRANCH_REQUIRED',
+          'A transfer needs a branch before it can be closed',
+          422,
+          {
+            field: 'branchId',
+          },
+        );
+
+      // The cost each line left at — a return has to put the same value back, or the
+      // inventory account drifts by the difference.
+      const sent = await tx
+        .select()
+        .from(inventoryTransactions)
+        .where(
+          and(
+            eq(inventoryTransactions.tenantId, tenantId),
+            eq(inventoryTransactions.docId, transferId),
+            eq(inventoryTransactions.docType, 'stock_transfer'),
+          ),
+        );
+      const costOf = new Map<string, string>();
+      for (const movement of sent)
+        costOf.set(movement.lineId ?? `${movement.itemId}`, movement.unitCost ?? '0');
+
+      const movements: InventoryLine[] = [];
+      const serialIds: string[] = [];
+      let value = new Decimal(0);
+      for (const { line, outstanding } of remainder) {
+        const factor = line.unitId
+          ? new Decimal(
+              (
+                await tx
+                  .select({ ratio: itemUnits.ratio })
+                  .from(itemUnits)
+                  .where(
+                    and(
+                      eq(itemUnits.tenantId, tenantId),
+                      eq(itemUnits.itemId, line.itemId),
+                      eq(itemUnits.unitId, line.unitId),
+                    ),
+                  )
+              )[0]?.ratio ?? '1',
+            )
+          : new Decimal(1);
+        value = value.plus(outstanding.mul(factor).mul(new Decimal(line.unitCost ?? '0')));
+        if (input.mode === 'return') {
+          movements.push({
+            itemId: line.itemId,
+            warehouseId: transfer.fromWarehouseId,
+            qty: outstanding.toFixed(4),
+            unitId: line.unitId ?? undefined,
+            unitCost: line.unitCost ?? '0',
+            direction: 'in',
+            docType: 'stock_transfer_return',
+            docId: transferId,
+            lineId: newId(),
+            lotId: line.lotId ?? undefined,
+            costing: 'returnAtOriginalCost',
+          });
+          serialIds.push(...(line.serialIds ?? []));
+        }
+      }
+
+      if (movements.length) await this.recordInTx(tx, tenantId, movements, { allowNegative: true });
+      if (input.mode === 'return' && serialIds.length) {
+        await this.transitionSerialsInTx(
+          tx,
+          tenantId,
+          serialIds,
+          ['reserved'],
+          'available',
+          transfer.fromWarehouseId,
+        );
+      }
+
+      let closedJournalEntryId: string | undefined;
+      if (value.gt(0)) {
+        const transitAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          branchId,
+          'stock_transfer',
+          'stockInTransitAccountId',
+        );
+        const otherAccount = await this.profileAccount(
+          tx,
+          tenantId,
+          branchId,
+          'stock_transfer',
+          input.mode === 'return' ? 'inventoryAccountId' : 'inventoryAdjustmentAccountId',
+        );
+        const fiscalPeriodId =
+          input.fiscalPeriodId ??
+          (await this.accounting.openPeriodForDateInTx(tx, tenantId, new Date().toISOString().slice(0, 10)));
+        const title = input.mode === 'return' ? 'عودة بضاعة إلى مصدرها' : 'عجز بضاعة تحت التحويل';
+        const entry = await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId,
+          fiscalPeriodId,
+          date: new Date().toISOString().slice(0, 10),
+          description: `إقفال مناقلة ${transfer.number} — ${title}${input.reason ? `: ${input.reason}` : ''}`,
+          lines: [
+            {
+              accountId: otherAccount,
+              debit: value.toFixed(4),
+              description: input.mode === 'return' ? 'عودة إلى المخزون' : 'عجز البضاعة',
+            },
+            { accountId: transitAccount, credit: value.toFixed(4), description: 'إقفال بضاعة تحت التحويل' },
+          ],
+          sourceType: input.mode === 'return' ? 'stock_transfer_return' : 'stock_transfer_shortage',
+          sourceId: transferId,
+          idempotencyKey: `stock-transfer-close:${transferId}:${input.mode}`,
+        });
+        closedJournalEntryId = entry?.id;
+      }
+
+      for (const { line, outstanding } of remainder) {
+        await tx
+          .update(stockTransferLines)
+          .set({ closedQty: sql`${stockTransferLines.closedQty} + ${outstanding.toFixed(4)}` })
+          .where(
+            and(
+              eq(stockTransferLines.tenantId, tenantId),
+              eq(stockTransferLines.transferId, transferId),
+              eq(stockTransferLines.lineNo, line.lineNo),
+            ),
+          );
+      }
+      await tx
+        .update(stockTransfers)
+        .set({
+          status: 'closed',
+          closedAt: new Date(),
+          closedJournalEntryId,
+          closureMode: input.mode,
+          closureReason: input.reason ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(stockTransfers.tenantId, tenantId), eq(stockTransfers.id, transferId)));
+
+      return {
+        transferId,
+        number: transfer.number,
+        status: 'closed' as const,
+        mode: input.mode,
+        value: value.toFixed(4),
+        returnedQty:
+          input.mode === 'return'
+            ? remainder.reduce((sum, row) => sum.plus(row.outstanding), new Decimal(0)).toFixed(4)
+            : '0.0000',
+        journalEntryId: closedJournalEntryId ?? null,
+        lines: remainder.map(({ line, outstanding }) => ({
+          lineNo: line.lineNo,
+          itemId: line.itemId,
+          qty: outstanding.toFixed(4),
+        })),
       };
     });
   }
