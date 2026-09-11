@@ -66,6 +66,20 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   asserted against `stock_balances`; `GET /inventory/movements` gained a period and
   joined names. Screens `/inventory/in-transit`, `/inventory/item-card`, and the
   updated `/inventory/movements`.
+- [ ] Screens (part four): a shared component layer (`PageHeader`, `FilterBar`,
+  `StatTiles`, an advanced `DataTable`, `StatusTrack`, `Empty/Loading/ErrorState`,
+  `ActionBar`, `Tabs`) applied to the 20 `/inventory/*` screens, **designed from
+  `Desktop_ERP`** — tabs of `frmItems.xaml` (عام / وحدات / بضاعة أول المدة /
+  المكونات), document headers of `frmInvInOutput.xaml` and
+  `frmInventoryTransfer.xaml`, grids of `frmProductionOrder.xaml`,
+  `frmItemsExpire.xaml`, `frmItemsLimit.xaml` and `frmMultiBarcode.xaml`, the layouts
+  of `Reports/*.repx` (`rptItemDetails`, `RptInvInOutput`, `rptInventoryTransfer`,
+  `rptItemsExpire`, `rptItemsDirectory`, `rptProductionOrder`, `Barcode`), and the
+  behaviour of `Class/Inventory.cs`, `Class/ItemOper.cs` (س 744-760),
+  `Class/InvoiceOper.cs` (س 5031) and `Class/ItemComponent.cs`. Measured starting
+  point: `.kpi`/`.state`/`.skeleton` have **0** uses in `app/inventory/`, 8 screens
+  still hand-write `<table>`. Presentation layer only — no endpoint changes. A new
+  `/inventory/overview` dashboard closes the module. Spec: `PHASE_05_INVENTORY.md` §8.
 - [ ] Still open: unit-aware price lists (phase 08), printing the stock documents and
   barcode labels (phase 10). Production/assembly keeps its own service.
 

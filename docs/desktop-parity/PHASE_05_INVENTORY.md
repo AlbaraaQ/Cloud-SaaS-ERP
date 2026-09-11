@@ -295,7 +295,55 @@ Additive: the transfer status check is widened with `'closed'`, `stock_transfers
 
 ---
 
-## 8. Verification
+## 8. Part four — إعادة تصميم شاشات المخزون (مخطَّط: لم يُنفَّذ بعد)
+
+> حالة هذا القسم: **خطة عمل لجلسة قادمة**. نُفِّذت الأجزاء 1–3 (الكومِتات `0b4578c` و`a6d99e1` و`55d407c`)؛ الجزء الرابع تغيير في **طبقة العرض فقط** ولا يمس أي نقطة نهاية.
+
+### 8.1 Why — measured, not impression
+
+الخلفية سليمة ومُختبَرة، لكن التصميم لم يتطور:
+
+- كل شاشة ترث نفس القالب `components/screen.tsx` (مسار + عنوان + وصف + أزرار) ثم بطاقات وجداول `DataTable`؛ لا لوحة مؤشرات ولا خطوات ولا تخطيط مقسوم ولا تبويبات.
+- أصناف معرّفة في `globals.css` ولا تُستخدم في `app/inventory/`: `.kpi` **0**، `.state` **0**، `.skeleton` **0**، `.section-title` **0**، `.grid.cols` **1**.
+- **8 شاشات** ما زالت تكتب `<table>` يدوياً بدل `DataTable`.
+- النتيجة: شاشات صحيحة وظيفياً بشكل «نموذج موحّد بسيط» لا يختلف عن بقية النظام.
+
+### 8.2 The shared component layer to build in `apps/staff/components/`
+
+`PageHeader` · `FilterBar` (لاصق) · `StatTiles` (القيمة + الكمية) · `DataTable` (رأس لاصق، صفوف مخططة، ترتيب، توسّع، تذييل مجاميع) · `StatusTrack` (خطوات حالة المستند) · `EmptyState` / `LoadingState` / `ErrorState` · `ActionBar` (تأكيد قبل الإجراء المدمّر) · `Tabs`.
+
+### 8.3 `Desktop_ERP` references — التصميم يُستخرج منها، لا يُخترع
+
+| الشاشة السحابية | الواجهة `Form_WPF/` | المستخلص |
+|---|---|---|
+| بطاقة الصنف `items` | `frmItems.xaml` | التبويبات الأربعة: **عام / وحدات / بضاعة أول المدة / المكونات** |
+| `vouchers` | `frmInvInOutput.xaml` | الرقم، التاريخ، رقم المرجع، تاريخ المرجع، البيان، المستودع، اسم المورد، الرصيد + أفعال الأسطر (الباركود، بحث مادة، إضافة مادة، الوحدات، حذف السجل) |
+| `transfers` | `frmInventoryTransfer.xaml` | الرقم، التاريخ، الوقت، المرجع، **من مستودع / إلى مستودع**، البيان |
+| `production` | `frmProductionOrder.xaml` | المنتج، الوحدة، البيان + أعمدة المكوّنات (رمز الصنف، الصنف، الوحدة، الكمية الأساسية، الكمية، السعر، المجموع) |
+| `expiry` | `frmItemsExpire.xaml` | صلاحية الصنف، رمز الصنف، الصنف، الكمية |
+| `item-units` / الباركود | `frmMultiBarcode.xaml` | رقم الصنف، الصنف، الباركود، حذف |
+| `below-minimum` | `frmItemsLimit.xaml` | الرقم، المجموعة، الصنف، سعر الشراء، سعر البيع، الرصيد، **حد الطلب** |
+| مكوّنات الصنف | تبويب «المكونات» + `Class/ItemComponent.cs` | المكوّن، المستودع، الكمية، الوحدة، السعر، المجموع، مضاف/مطروح |
+
+التقارير `Reports/` تحدّد محتوى العرض والطباعة: `rptItemDetails.repx` (بطاقة الصنف + إجمالي الكميات/المجموع)، `RptInvInOutput.repx` و`rptInventoryTransfer.repx` (أعمدة السند والمناقلة)، `rptItemsExpire.repx` (الصلاحية + سعر التكلفة)، `rptItemsDirectory.repx` (دليل الأصناف)، `rptProductionOrder.repx`، `Barcode.repx`، `rptInventoryReport.repx`.
+
+الفئات `Class/` تحدّد السلوك: `Inventory.cs` (`UpdateItemStock`, `ItemsExpirationStock`, `TotalItemStock`, `Inventorybalance`, `InventoryCost`, `InventoryCostByType`)، `ItemOper.cs` س 744-760 (`purch, sale, barcode, perc` → `UnitEquality`)، `InvoiceOper.cs` س 5031 (`ItemPrimaryQnty = ItemQuantity * UnitEquality`)، `ListItemunit.cs`، `ItemComponent.cs`.
+
+**قاعدة:** كل تسمية عمود أو تبويب أو زر تُؤخذ من هذه الملفات بنصها العربي؛ أي تسمية مخترعة تُذكر مع سببها.
+
+### 8.4 Screens, in order
+
+`vouchers` (تخطيط مقسوم + تبويبات + مسح باركود + عمود الوحدة الأساسية) ← `transfers` (`StatusTrack` + تقدّم الاستلام) ← `adjustments` (نموذج جرد بألوان + اعتماد) ← `item-card` (مؤشرات كمية وقيمة + إجماليات) ← `in-transit` (مؤشرات + دلاء عمر + إقفال) ← `items` (تبويباتها الأربعة) ← `item-units` ← `expiry` (دلاء) ← `below-minimum` ← `production` ← باقي الشاشات ← **جديد `/inventory/overview`** (لوحة المخزون).
+
+### 8.5 Definition of done
+
+لا `<table>` يدوية · ≥ 12 شاشة على `PageHeader` + `FilterBar` · `LoadingState` و`EmptyState` في كل قائمة · عنصر تصميمي جديد واحد على الأقل في كل شاشة · بطاقة الصنف بتبويباتها الأربعة · المؤشرات تعرض الكمية والقيمة معاً · **مطابقة تسميات `Desktop_ERP` ≥ 90٪** · خطوط الأساس في §9 تبقى خضراء.
+
+### 8.6 Handoff
+
+النص الجاهز للجلسة القادمة: `docs/desktop-parity/NEXT_SESSION_PROMPT_PHASE_05_UI.md`.
+
+## 9. Verification
 
 * `apps/api/test/inventory-documents.spec.ts` — 14 tests (part one).
 * `apps/api/test/inventory-units-barcode.spec.ts` — 11 tests (part two): the base unit is
@@ -319,7 +367,7 @@ Additive: the transfer status check is widened with `'closed'`, `stock_transfers
 
 ---
 
-## 9. Deliberately deferred
+## 10. Deliberately deferred
 
 * Production orders / item assembly (`frmProductionOrder*`) already have their own
   service; they are not re-modelled here.
