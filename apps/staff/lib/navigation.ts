@@ -253,6 +253,17 @@ const inventory: ModuleNode = {
           permission: 'catalog.unit.view',
           endpoint: '/organization/catalog/units',
         }),
+        screen(
+          'item-units',
+          'وحدات الصنف والباركود',
+          'Item units and barcodes',
+          '/inventory/item-units',
+          'ready',
+          {
+            permission: 'catalog.item.view',
+            endpoint: '/organization/catalog/items/:id/units',
+          },
+        ),
       ],
     },
     {
@@ -319,6 +330,10 @@ const inventory: ModuleNode = {
           'ready',
           { permission: 'inventory.view', endpoint: '/inventory/below-minimum' },
         ),
+        screen('expiry', 'تواريخ الصلاحية', 'Expiry dates', '/inventory/expiry', 'ready', {
+          permission: 'inventory.view',
+          endpoint: '/inventory/expiry',
+        }),
         screen(
           'item-movement',
           'حركة مادة تفصيلي',

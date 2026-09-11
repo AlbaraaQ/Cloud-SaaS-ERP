@@ -1,9 +1,10 @@
-# Phase 05 — المخزون (stock documents, transfers, counts, traceability)
+# Phase 05 — المخزون (stock documents, transfers, counts, multi-unit, barcodes, expiry)
 
 Date: 2026-09 · Status: ✅ done
 Sources: `Desktop_ERP/SmartAuditERP/Form_WPF/frmInvInOutput.xaml.cs` (3,120 lines),
 `frmInventoryTransfer*`, `frmReGenerateEntries.xaml.cs`, `Class/Inventory.cs`
-(`UpdateItemStock`), `Class/ItemOper.cs`.
+(`UpdateItemStock`), `Class/ItemOper.cs`, `Class/ListItemunit.cs`,
+`Class/InvoiceOper.cs` (L5031 `ItemPrimaryQnty = ItemQuantity * UnitEquality`).
 
 ---
 
@@ -17,6 +18,10 @@ Sources: `Desktop_ERP/SmartAuditERP/Form_WPF/frmInvInOutput.xaml.cs` (3,120 line
 | مناقلة between branches/warehouses (invType 8) | `frmInventoryTransfer` | `stock_transfers` moved quantity only; **no journal, and the send leg crashed** (`in_transit` violated a 0006 CHECK) | send → Dr بضاعة تحت التحويل / Cr المخزون; receive → the mirror |
 | جرد وتسوية — one item at a time, approval in the same dialog | `frmInvInOutput` | multi-line rows existed but had to be posted with a journal the browser built first | `POST /inventory/adjustments/:id/post` builds the entry server-side |
 | أرقام تسلسلية / دفعات / تواريخ صلاحية | `ItemOper`, `frmItems*` | lists only; the master-data flags were not even settable | item card carries `minQty`/`maxQty`/`trackLot`/`trackSerial`; documents enforce them |
+| وحدات القياس المتعددة — `ItemUnits.perc` per item/unit, with its own barcode and prices | `ListItemunit.cs`, `ItemOper.cs` L744/L2523/L2713 → `ProductUnit.UnitEquality` | the table existed but was **unusable**: `FORCE ROW LEVEL SECURITY` with no policy and no `tenant_id` | `item_units` repaired by migration 0035; every document line can be written in any unit the card defines |
+| `ItemPrimaryQnty = ItemQuantity * UnitEquality` — the ledger always stores base units | `InvoiceOper.cs` L5031, stock update L4275-4295 | every quantity was assumed to be base units | `base_qty = qty × factor`; the entered `unit_id` and its `factor` are snapshotted on `inventory_transactions` |
+| باركود متعدد (`ItemBarcodes`) + a barcode per unit | `ItemOper.cs` barcode lookup | `item_barcodes` existed with no endpoint; nothing resolved a scan | `GET /inventory/barcode/:code` answers item + unit + factor, searching `items.barcode`, `item_barcodes` and `item_units.barcode` |
+| تنبيه انتهاء الصلاحية | `frmItems*` expiry column | lots carried `expiry_date` but nothing ever read it | `GET /inventory/expiry?days=…` + the `/inventory/expiry` screen |
 
 **The rule this phase adds:** a stock document that moves quantity *must* move value in
 the same transaction. Sales and purchases already post to `inventoryAccountId`; a
@@ -158,26 +163,101 @@ while its endpoint is missing.
 
 ---
 
-## 5. Verification
+## 5. Verification (part one)
 
 * `apps/api/test/inventory-documents.spec.ts` — 14 tests: numbering per kind, the
   journal legs of each kind, double-post 409, service/lot-tracked refusals, void
   rollback, count approval + net variance, transfer send→receive legs,
   cancel-in-transit, below-minimum, negative override, tenant isolation.
-* `node scripts/verify-inventory.mjs` — the same journey against a live stack
-  (opening → issue → count → transfer → negative → reorder), asserting the **ledger**
-  at every step, not only the stock level.
-* Suite: API **76 files / 436 tests** green (14 new), `@erp/database` **17/17** green.
 * `pnpm db:seed` re-run on an existing tenant: 2 chart leaves added, posting profile
   extended, everything else untouched.
+* (Part two and the full suite numbers are in §7.)
 
 ---
 
-## 6. Deliberately deferred
+## 6. Part two — وحدات القياس، الباركود، تواريخ الصلاحية
+
+### 6.1 Migration `0035_item_units_barcodes.sql`
+
+`item_units` and `item_components` were created in 0003 and could never be used: they
+were created with `ENABLE` **and `FORCE ROW LEVEL SECURITY`**, with no policy and no
+`tenant_id` column — under `FORCE`, a table with no policy denies every command, and
+without a tenant column no policy could have been written. 0035 repairs them in place,
+without destroying anything:
+
+1. `tenant_id` is added, orphan rows (an item that no longer exists) are deleted, the
+   column is back-filled from `items`, and only then made `NOT NULL`;
+2. a real `tenant_isolation` policy is created on both tables, plus the tenant-scoped
+   unique indexes `(tenant_id, item_id, unit_id)` and
+   `(tenant_id, item_id, component_item_id)` that RLS scans actually use;
+3. `inventory_transactions` gains `unit_id` and `factor numeric(20,6) NOT NULL DEFAULT 1`,
+   commented on the column: *the balance moves by `base_qty = qty × factor`, never by
+   `qty`*;
+4. the three stock-document line tables (`stock_voucher_lines`,
+   `stock_adjustment_lines`, `stock_transfer_lines`) gain the same `unit_id`, so a
+   document records what the clerk counted as well as what the ledger stored.
+
+Nothing is dropped, and every statement is idempotent.
+
+### 6.2 The conversion rule
+
+| Rule | Where |
+|---|---|
+| `baseQty = qty × factor`, and the balance/value move by `baseQty` only | `InventoryService.recordInTx` |
+| `factor` is read from `item_units.ratio` and **snapshotted** onto the movement, so a ratio edited later cannot rewrite history | `resolveUnit()` + `inventory_transactions.factor` |
+| `unitCost` is converted the other way: the entered cost is per *entered* unit, the average is per *base* unit (`entered ÷ factor`) | `recordInTx` |
+| A unit the item card does not define is refused at posting time | `422 INVENTORY_UNIT_NOT_ALLOWED` |
+| The base unit always converts 1:1 — it is the unit every ratio is expressed against | `422 CATALOG_UNIT_RATIO_INVALID` |
+
+Two boxes of twelve at 120 each therefore land as **24 base units worth 240**, and the
+moving average becomes 10 per piece, not 120.
+
+Counts are compared in the unit they were taken in: the book quantity (base units) is
+divided by the factor before the variance is computed, so the variance on the screen is
+the variance that is posted.
+
+### 6.3 Endpoints
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET/POST/DELETE /organization/catalog/items/:id/units` | `catalog.item.view` / `.manage` | base unit first, then every packing unit; ratio, unit barcode, unit prices, default-for-sale |
+| `GET/POST /organization/catalog/items/:id/barcodes`, `DELETE …/:barcode` | `catalog.item.view` / `.manage` | extra labels; a label owned by another item is `409 CATALOG_BARCODE_TAKEN` |
+| `GET /inventory/barcode/:code` | `inventory.view` | resolves `items.barcode` → `item_barcodes` → `item_units.barcode`; answers item, unit, factor and which table matched |
+| `GET /inventory/expiry?days=30&warehouse_id=…` | `inventory.view` | lots at or inside the horizon, `daysLeft` and `expired` per row, soonest first |
+
+### 6.4 Screens
+
+| Screen | Notes |
+|---|---|
+| `/inventory/item-units` (new) | pick an item → its units with the base-unit equivalent, add/remove a unit (ratio, unit barcode, unit prices, default for sale), and manage extra barcodes per unit |
+| `/inventory/expiry` (new) | horizon selector (أسبوع / شهر / ثلاثة أشهر / سنة), منتهية vs قاربت counters, days left per lot |
+| `/inventory/vouchers` (updated) | a unit column per line with the base-unit equivalent beside the quantity, and a barcode box: one scan appends the item with its unit and factor |
+| `/inventory/adjustments` (updated) | the count can be taken in any unit; the book column and the variance follow the chosen unit |
+| `/inventory/transfers` (updated) | the same unit column when the transfer line is written in cartons |
+
+---
+
+## 7. Verification
+
+* `apps/api/test/inventory-documents.spec.ts` — 14 tests (part one).
+* `apps/api/test/inventory-units-barcode.spec.ts` — 11 tests (part two): the base unit is
+  always answerable, a box of 12 is refused a ratio of zero and the base unit cannot be
+  re-scaled, 2 boxes move 24 pieces and are worth 240, an undefined unit is refused at
+  posting, a scan answers item + unit + factor, one label cannot belong to two items,
+  lots inside the horizon are reported and those beyond it are not, and a barcode from
+  another tenant is invisible.
+* `node scripts/verify-inventory.mjs` — the same journey against a live stack, now nine
+  sections: opening → issue → count → transfer → negative → reorder → **وحدات القياس →
+  الباركود → تواريخ الصلاحية**, asserting the ledger at every step.
+* Suite: API **77 files / 447 tests** green, `@erp/database` **17/17** green, staff build
+  **97/97** static pages.
+
+---
+
+## 8. Deliberately deferred
 
 * Production orders / item assembly (`frmProductionOrder*`) already have their own
   service; they are not re-modelled here.
-* Multi-barcode and multi-unit conversion on the item card.
-* Expiry alerts (lots and `expiry_date` are captured and shown; a dated alert report is
-  a reporting-phase item).
-* Printing the stock documents (phase 10).
+* Unit-aware *pricing lists* — a unit carries its own sale/purchase price, but price lists
+  (phase 08) do not yet choose a unit.
+* Printing barcode labels and the stock documents themselves (phase 10).

@@ -164,6 +164,15 @@ export class InventoryController {
   ) {
     return this.inventory.voidVoucher(getTenantContext().tenantId, voucherId, body.reason);
   }
+  @Get('barcode/:code') @RequiresPermission('inventory.view') scan(@Param('code') code: string) {
+    return this.inventory.scan(getTenantContext().tenantId, decodeURIComponent(code));
+  }
+  @Get('expiry') @RequiresPermission('inventory.view') expiry(
+    @Query('days') days?: string,
+    @Query('warehouse_id') warehouseId?: string,
+  ) {
+    return this.inventory.expiry(getTenantContext().tenantId, days ? Number(days) : 30, warehouseId);
+  }
   @Get('below-minimum') @RequiresPermission('inventory.view') belowMinimum(
     @Query('warehouse_id') warehouseId?: string,
   ) {

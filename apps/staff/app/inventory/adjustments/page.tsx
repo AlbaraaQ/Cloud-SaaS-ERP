@@ -11,6 +11,7 @@ import {
   defaultOf,
   itemLabel,
   listBranches,
+  listItemUnits,
   listItems,
   listWarehouses,
   money,
@@ -19,6 +20,7 @@ import {
   statusLabel,
   type Branch,
   type Item,
+  type ItemUnit,
   type Warehouse,
 } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
@@ -73,9 +75,9 @@ export default function StockAdjustmentsPage() {
   const [branchId, setBranchId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [reason, setReason] = useState('جرد دوري');
-  const [lines, setLines] = useState<Array<{ itemId: string; countedText: string; costText: string }>>([
-    { itemId: '', countedText: '', costText: '' },
-  ]);
+  const [lines, setLines] = useState<
+    Array<{ itemId: string; countedText: string; unitId: string; costText: string }>
+  >([{ itemId: '', countedText: '', unitId: '', costText: '' }]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
   const [selected, setSelected] = useState<Adjustment | undefined>();
@@ -97,9 +99,29 @@ export default function StockAdjustmentsPage() {
   );
   const levelOf = (itemId: string) => (levels.data ?? []).find((row) => row.itemId === itemId);
 
+  /**
+   * وحدات القياس — a count is usually taken in the unit the goods are packed in, so the
+   * line needs the same unit choices the item card defines. The book quantity shown
+   * beside it is divided by the same factor before the two are compared.
+   */
+  const itemIds = lines
+    .map((line) => line.itemId)
+    .filter(Boolean)
+    .join(',');
+  const unitRows = useQuery<ItemUnit[]>(async () => {
+    const ids = Array.from(new Set(itemIds.split(',').filter(Boolean)));
+    const lists = await Promise.all(ids.map((id) => listItemUnits(id)));
+    return lists.flat();
+  }, [itemIds]);
+  const unitsOf = (id: string) => (unitRows.data ?? []).filter((row) => row.itemId === id);
+  const factorOf = (line: { itemId: string; unitId?: string }) =>
+    line.unitId ? Number(unitsOf(line.itemId).find((row) => row.unitId === line.unitId)?.ratio ?? 1) : 1;
+
+  const itemOf = (id: string) => itemRows.find((row) => row.id === id);
+
   function updateLine(
     index: number,
-    patch: Partial<{ itemId: string; countedText: string; costText: string }>,
+    patch: Partial<{ itemId: string; countedText: string; unitId: string; costText: string }>,
   ) {
     setLines((current) =>
       current.map((line, position) => (position === index ? { ...line, ...patch } : line)),
@@ -127,11 +149,12 @@ export default function StockAdjustmentsPage() {
         lines: filled.map((line) => ({
           itemId: line.itemId,
           countedQty: line.countedText,
+          unitId: line.unitId || undefined,
           unitCost: line.costText || undefined,
         })),
       });
       setNotice({ kind: 'ok', text: `حُفظ الجرد ${created.number} كمسودة. راجع الفروقات ثم اعتمده.` });
-      setLines([{ itemId: '', countedText: '', costText: '' }]);
+      setLines([{ itemId: '', countedText: '', unitId: '', costText: '' }]);
       setOpen(false);
       await reload();
     } catch (error) {
@@ -156,8 +179,14 @@ export default function StockAdjustmentsPage() {
     }
   }
 
-  const varianceOf = (line: { itemId: string; countedText: string; costText: string }) => {
-    const current = Number(levelOf(line.itemId)?.quantity ?? 0);
+  /**
+   * The book quantity is held in base units; a count is taken in whatever unit the clerk
+   * is holding. The book side is divided by the same factor the engine will use, so the
+   * variance on screen is the variance that will be posted.
+   */
+  const varianceOf = (line: { itemId: string; countedText: string; unitId?: string; costText: string }) => {
+    const factor = factorOf(line);
+    const current = Number(levelOf(line.itemId)?.quantity ?? 0) / (factor || 1);
     const counted = Number(line.countedText || 0);
     return Number.isFinite(counted) ? counted - current : 0;
   };
@@ -237,6 +266,7 @@ export default function StockAdjustmentsPage() {
                   <th>المادة</th>
                   <th>الرصيد الدفتري</th>
                   <th>الكمية المجرودة</th>
+                  <th>الوحدة</th>
                   <th>الفرق</th>
                   <th>تكلفة الوحدة</th>
                   <th />
@@ -261,7 +291,9 @@ export default function StockAdjustmentsPage() {
                           ))}
                         </select>
                       </td>
-                      <td dir="ltr">{quantity(levelOf(line.itemId)?.quantity ?? '0')}</td>
+                      <td dir="ltr">
+                        {quantity(Number(levelOf(line.itemId)?.quantity ?? 0) / (factorOf(line) || 1))}
+                      </td>
                       <td>
                         <input
                           className="input"
@@ -270,6 +302,27 @@ export default function StockAdjustmentsPage() {
                           value={line.countedText}
                           onChange={(event) => updateLine(index, { countedText: event.target.value })}
                         />
+                      </td>
+                      <td>
+                        <select
+                          className="input"
+                          value={line.unitId ?? ''}
+                          onChange={(event) => updateLine(index, { unitId: event.target.value })}
+                          disabled={!line.itemId}
+                        >
+                          <option value="">الوحدة الأساسية</option>
+                          {unitsOf(line.itemId)
+                            .filter(
+                              (unit) =>
+                                unit.unitId !==
+                                (itemOf(line.itemId)?.baseUnitId ?? itemOf(line.itemId)?.base_unit_id),
+                            )
+                            .map((unit) => (
+                              <option key={unit.unitId} value={unit.unitId}>
+                                {`${unit.unitNameAr ?? ''} (×${Number(unit.ratio).toLocaleString('ar-EG')})`}
+                              </option>
+                            ))}
+                        </select>
                       </td>
                       <td
                         dir="ltr"
@@ -320,7 +373,7 @@ export default function StockAdjustmentsPage() {
               className="btn sm"
               type="button"
               onClick={() =>
-                setLines((current) => [...current, { itemId: '', countedText: '', costText: '' }])
+                setLines((current) => [...current, { itemId: '', countedText: '', unitId: '', costText: '' }])
               }
             >
               + سطر

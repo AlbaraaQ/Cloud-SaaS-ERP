@@ -11,6 +11,7 @@ import {
   defaultOf,
   itemLabel,
   listBranches,
+  listItemUnits,
   listItems,
   listWarehouses,
   money,
@@ -18,6 +19,7 @@ import {
   statusLabel,
   type Branch,
   type Item,
+  type ItemUnit,
   type Warehouse,
 } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
@@ -63,9 +65,9 @@ export default function TransfersPage() {
   const [open, setOpen] = useState(false);
   const [fromWarehouseId, setFrom] = useState('');
   const [toWarehouseId, setTo] = useState('');
-  const [lines, setLines] = useState<Array<{ itemId: string; qtyText: string; unitCostText: string }>>([
-    { itemId: '', qtyText: '', unitCostText: '' },
-  ]);
+  const [lines, setLines] = useState<
+    Array<{ itemId: string; qtyText: string; unitId: string; unitCostText: string }>
+  >([{ itemId: '', qtyText: '', unitId: '', unitCostText: '' }]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -74,9 +76,22 @@ export default function TransfersPage() {
     return warehouse ? arabicName(warehouse) : id;
   };
 
+  /** وحدات القياس المتعددة للصنف — a transfer counted in cartons moves pieces. */
+  const itemIds = lines
+    .map((line) => line.itemId)
+    .filter(Boolean)
+    .join(',');
+  const unitRows = useQuery<ItemUnit[]>(async () => {
+    const ids = Array.from(new Set(itemIds.split(',').filter(Boolean)));
+    const lists = await Promise.all(ids.map((id) => listItemUnits(id)));
+    return lists.flat();
+  }, [itemIds]);
+  const unitsOf = (id: string) => (unitRows.data ?? []).filter((row) => row.itemId === id);
+  const itemOf = (id: string) => itemRows.find((row) => row.id === id);
+
   function updateLine(
     index: number,
-    patch: Partial<{ itemId: string; qtyText: string; unitCostText: string }>,
+    patch: Partial<{ itemId: string; qtyText: string; unitId: string; unitCostText: string }>,
   ) {
     setLines((current) =>
       current.map((line, position) => (position === index ? { ...line, ...patch } : line)),
@@ -100,11 +115,12 @@ export default function TransfersPage() {
         lines: filled.map((line) => ({
           itemId: line.itemId,
           qty: line.qtyText,
+          unitId: line.unitId || undefined,
           unitCost: line.unitCostText || undefined,
         })),
       });
       setNotice({ kind: 'ok', text: 'تم إنشاء المناقلة كمسودة. أرسِلها لخصم الكمية من المستودع المصدر.' });
-      setLines([{ itemId: '', qtyText: '', unitCostText: '' }]);
+      setLines([{ itemId: '', qtyText: '', unitId: '', unitCostText: '' }]);
       transfers.reload();
     } catch (error) {
       setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
@@ -201,6 +217,7 @@ export default function TransfersPage() {
                 <tr>
                   <th>المادة</th>
                   <th>الكمية</th>
+                  <th>الوحدة</th>
                   <th>تكلفة الوحدة</th>
                   <th />
                 </tr>
@@ -232,6 +249,27 @@ export default function TransfersPage() {
                       />
                     </td>
                     <td>
+                      <select
+                        className="input"
+                        value={line.unitId}
+                        onChange={(event) => updateLine(index, { unitId: event.target.value })}
+                        disabled={!line.itemId}
+                      >
+                        <option value="">الوحدة الأساسية</option>
+                        {unitsOf(line.itemId)
+                          .filter(
+                            (unit) =>
+                              unit.unitId !==
+                              (itemOf(line.itemId)?.baseUnitId ?? itemOf(line.itemId)?.base_unit_id),
+                          )
+                          .map((unit) => (
+                            <option key={unit.unitId} value={unit.unitId}>
+                              {`${unit.unitNameAr ?? ''} (×${Number(unit.ratio).toLocaleString('ar-EG')})`}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                    <td>
                       <input
                         className="input"
                         dir="ltr"
@@ -259,7 +297,9 @@ export default function TransfersPage() {
           <button
             className="btn sm"
             type="button"
-            onClick={() => setLines((current) => [...current, { itemId: '', qtyText: '', unitCostText: '' }])}
+            onClick={() =>
+              setLines((current) => [...current, { itemId: '', qtyText: '', unitId: '', unitCostText: '' }])
+            }
           >
             + سطر
           </button>

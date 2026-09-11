@@ -10,6 +10,8 @@ import {
   journalEntryLines,
   itemLots,
   itemSerials,
+  itemBarcodes,
+  itemUnits,
   items,
   stockAdjustmentLines,
   stockAdjustments,
@@ -18,6 +20,7 @@ import {
   stockTransferLines,
   stockVoucherLines,
   stockVouchers,
+  unitsOfMeasure,
   warehouses,
   withTenantTx,
   type DatabaseHandle,
@@ -35,6 +38,8 @@ export type InventoryLine = {
   itemId: string;
   warehouseId: string;
   qty: string;
+  /** Unit the quantity was entered in (default: the item's base unit). */
+  unitId?: string;
   unitCost?: string;
   direction: 'in' | 'out';
   docType: string;
@@ -49,6 +54,8 @@ export type InventoryLine = {
 export type StockVoucherLineInput = {
   itemId: string;
   qty: string;
+  /** Unit the quantity was counted in (default: the item's base unit). */
+  unitId?: string;
   unitCost?: string;
   lotId?: string;
   serialId?: string;
@@ -69,7 +76,14 @@ export type StockAdjustmentInput = {
   branchId: string;
   warehouseId: string;
   reason: string;
-  lines: Array<{ itemId: string; countedQty: string; unitCost?: string; lotId?: string; note?: string }>;
+  lines: Array<{
+    itemId: string;
+    countedQty: string;
+    unitId?: string;
+    unitCost?: string;
+    lotId?: string;
+    note?: string;
+  }>;
 };
 
 export const VOUCHER_KIND_LABELS: Record<string, string> = {
@@ -142,6 +156,9 @@ export class InventoryService {
       if (!quantity.isFinite() || quantity.lte(0))
         throw new DomainError('INVALID_STOCK_QUANTITY', 'Quantity must be positive', 422);
 
+      const { factor, unitId } = await this.resolveUnit(tx, tenantId, line);
+      const baseQuantity = quantity.mul(factor);
+
       await tx.execute(sql`
         INSERT INTO stock_balances (tenant_id, item_id, warehouse_id, quantity, value, average_cost, version, updated_at)
         VALUES (${tenantId}, ${line.itemId}, ${line.warehouseId}, 0, 0, 0, 1, now())
@@ -161,9 +178,14 @@ export class InventoryService {
 
       const currentQty = new Decimal(balance.quantity);
       const currentValue = new Decimal(balance.value);
-      const average = currentQty.gt(0) ? currentValue.div(currentQty) : new Decimal(line.unitCost ?? '0');
-      const unitCost = line.direction === 'in' ? new Decimal(line.unitCost ?? '0') : average;
-      const nextQty = line.direction === 'in' ? currentQty.plus(quantity) : currentQty.minus(quantity);
+      // `average` is always per BASE unit — that is what the balance row stores.
+      const average = currentQty.gt(0)
+        ? currentValue.div(currentQty)
+        : new Decimal(line.unitCost ?? '0').div(factor);
+      const enteredCost = line.direction === 'in' ? new Decimal(line.unitCost ?? '0') : average.mul(factor);
+      const unitCost = enteredCost.div(factor);
+      const nextQty =
+        line.direction === 'in' ? currentQty.plus(baseQuantity) : currentQty.minus(baseQuantity);
       if (nextQty.lt(0) && !options.allowNegative) {
         throw new DomainError('STOCK_INSUFFICIENT', 'Stock is insufficient for this movement', 422, {
           field: 'lines',
@@ -171,8 +193,8 @@ export class InventoryService {
       }
       const nextValue =
         line.direction === 'in'
-          ? currentValue.plus(quantity.mul(unitCost))
-          : currentValue.minus(quantity.mul(average));
+          ? currentValue.plus(baseQuantity.mul(unitCost))
+          : currentValue.minus(baseQuantity.mul(average));
       const averageCost = nextQty.isZero() ? '0.0000' : nextValue.div(nextQty).toFixed(4);
       const id = newId();
 
@@ -187,9 +209,11 @@ export class InventoryService {
         lineId: line.lineId,
         direction: line.direction,
         qty: line.qty,
-        baseQty: line.qty,
+        baseQty: baseQuantity.toFixed(4),
+        unitId,
+        factor: factor.toFixed(6),
         unitCost: unitCost.toFixed(4),
-        totalCost: quantity.mul(unitCost).toFixed(4),
+        totalCost: baseQuantity.mul(unitCost).toFixed(4),
         costing: line.costing ?? (line.direction === 'in' ? 'inWithCost' : 'outAtAvg'),
         lotId: line.lotId,
         serialId: line.serialId,
@@ -621,31 +645,27 @@ export class InventoryService {
             padding: 6,
           })
         ).display;
-      await tx
-        .insert(stockTransfers)
-        .values({
-          id,
+      await tx.insert(stockTransfers).values({
+        id,
+        tenantId,
+        number,
+        branchId,
+        fromWarehouseId: input.fromWarehouseId,
+        toWarehouseId: input.toWarehouseId,
+        status: 'draft',
+      });
+      await tx.insert(stockTransferLines).values(
+        input.lines.map((line, index) => ({
+          transferId: id,
           tenantId,
-          number,
-          branchId,
-          fromWarehouseId: input.fromWarehouseId,
-          toWarehouseId: input.toWarehouseId,
-          status: 'draft',
-        });
-      await tx
-        .insert(stockTransferLines)
-        .values(
-          input.lines.map((line, index) => ({
-            transferId: id,
-            tenantId,
-            lineNo: index + 1,
-            itemId: line.itemId,
-            qty: line.qty,
-            unitCost: line.unitCost ?? '0',
-            lotId: line.lotId,
-            serialIds: line.serialIds ?? [],
-          })),
-        );
+          lineNo: index + 1,
+          itemId: line.itemId,
+          qty: line.qty,
+          unitCost: line.unitCost ?? '0',
+          lotId: line.lotId,
+          serialIds: line.serialIds ?? [],
+        })),
+      );
       return { id, number, branchId, status: 'draft' };
     });
   }
@@ -1240,6 +1260,7 @@ export class InventoryService {
           tenantId,
           itemId: line.itemId,
           qty: line.qty,
+          unitId: line.unitId ?? null,
           unitCost: line.unitCost ?? null,
           lotId: line.lotId,
           serialId: line.serialId,
@@ -1340,6 +1361,7 @@ export class InventoryService {
           itemId: line.itemId,
           warehouseId: voucher.warehouseId,
           qty: line.qty,
+          unitId: line.unitId ?? undefined,
           unitCost,
           direction: direction as 'in' | 'out',
           docType: voucher.kind === 'opening' ? 'opening' : 'stock_voucher',
@@ -1515,6 +1537,7 @@ export class InventoryService {
           itemId: line.itemId,
           expectedQty: '0',
           countedQty: line.countedQty,
+          unitId: line.unitId ?? null,
           unitCost: line.unitCost ?? null,
           lotId: line.lotId,
           note: line.note,
@@ -1623,7 +1646,21 @@ export class InventoryService {
 
       const movements: InventoryLine[] = [];
       for (const line of adjustment.lines) {
-        const current = new Decimal(balanceOf.get(line.itemId)?.quantity ?? '0');
+        /**
+         * The book quantity is kept in base units; the clerk counts in whatever unit
+         * they are holding. The comparison — and the variance that is stored — has to
+         * happen in the *counted* unit, so the two sides of the sum mean the same thing.
+         */
+        const { factor } = await this.resolveUnit(tx, tenantId, {
+          itemId: line.itemId,
+          warehouseId: adjustment.warehouseId,
+          qty: '1',
+          direction: 'in',
+          docType: 'stock_adjustment',
+          docId: id,
+          unitId: line.unitId ?? undefined,
+        });
+        const current = new Decimal(balanceOf.get(line.itemId)?.quantity ?? '0').div(factor);
         const counted = new Decimal(line.countedQty);
         const variance = counted.minus(current);
         if (variance.isZero()) {
@@ -1646,6 +1683,7 @@ export class InventoryService {
           itemId: line.itemId,
           warehouseId: adjustment.warehouseId,
           qty: variance.abs().toFixed(4),
+          unitId: line.unitId ?? undefined,
           unitCost: variance.gt(0) ? unitCost : undefined,
           direction: variance.gt(0) ? 'in' : 'out',
           docType: 'stock_adjustment',
@@ -1773,6 +1811,181 @@ export class InventoryService {
         maxQty: row.item.maxQty,
         shortage: new Decimal(row.item.minQty).minus(row.balance.quantity).toFixed(4),
       }));
+    });
+  }
+  /**
+   * Resolves the conversion factor of a movement's unit.
+   *
+   * A unit is only accepted when the item card defines it (`item_units`): an
+   * unconfigured unit would silently move the wrong quantity, and there is no honest
+   * way to guess a ratio. The item's own base unit always converts 1:1.
+   */
+  private async resolveUnit(
+    tx: DrizzleTx,
+    tenantId: string,
+    line: InventoryLine,
+  ): Promise<{ factor: Decimal; unitId: string | undefined }> {
+    if (!line.unitId) return { factor: new Decimal(1), unitId: undefined };
+    const [item] = await tx
+      .select({ baseUnitId: items.baseUnitId })
+      .from(items)
+      .where(and(eq(items.tenantId, tenantId), eq(items.id, line.itemId)));
+    if (item?.baseUnitId === line.unitId) return { factor: new Decimal(1), unitId: line.unitId };
+    const [row] = await tx
+      .select({ ratio: itemUnits.ratio })
+      .from(itemUnits)
+      .where(
+        and(
+          eq(itemUnits.tenantId, tenantId),
+          eq(itemUnits.itemId, line.itemId),
+          eq(itemUnits.unitId, line.unitId),
+        ),
+      );
+    if (!row)
+      throw new DomainError(
+        'INVENTORY_UNIT_NOT_ALLOWED',
+        'This unit is not defined for the item — add it on the item card first',
+        422,
+        { field: 'unitId' },
+      );
+    return { factor: new Decimal(row.ratio), unitId: line.unitId };
+  }
+
+  // ── الباركود — resolve a scanned label to an item and a unit ───────────────
+
+  /**
+   * One scan, one answer: which item, and (when the label belongs to a unit) in which
+   * unit and with what factor. The desktop read three tables for this
+   * (`items.barcode`, `ItemBarcodes`, `ItemUnits.barcode`); the cloud asks the same
+   * three, in the order a shop would label them.
+   */
+  async scan(tenantId: string, code: string) {
+    const barcode = code.trim();
+    if (!barcode) throw new DomainError('BARCODE_REQUIRED', 'Scan or type a barcode', 422, { field: 'code' });
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [extra] = await tx
+        .select({ itemId: itemBarcodes.itemId, unitId: itemBarcodes.unitId })
+        .from(itemBarcodes)
+        .where(and(eq(itemBarcodes.tenantId, tenantId), eq(itemBarcodes.barcode, barcode)));
+      const [own] = await tx
+        .select({ id: items.id })
+        .from(items)
+        .where(and(eq(items.tenantId, tenantId), eq(items.barcode, barcode), isNull(items.deletedAt)));
+      const [unitOwned] = await tx
+        .select({ itemId: itemUnits.itemId, unitId: itemUnits.unitId, ratio: itemUnits.ratio })
+        .from(itemUnits)
+        .where(and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.barcode, barcode)));
+
+      const itemId = extra?.itemId ?? own?.id ?? unitOwned?.itemId;
+      const unitId = extra?.unitId ?? unitOwned?.unitId ?? undefined;
+      if (!itemId) throw new DomainError('BARCODE_NOT_FOUND', 'No item carries this barcode', 404);
+
+      const [item] = await tx
+        .select({
+          id: items.id,
+          sku: items.sku,
+          nameAr: items.nameAr,
+          salePrice: items.salePrice,
+          purchasePrice: items.purchasePrice,
+          baseUnitId: items.baseUnitId,
+          trackLot: items.trackLot,
+          trackSerial: items.trackSerial,
+        })
+        .from(items)
+        .where(and(eq(items.tenantId, tenantId), eq(items.id, itemId), isNull(items.deletedAt)));
+      if (!item) throw new DomainError('BARCODE_NOT_FOUND', 'No item carries this barcode', 404);
+
+      const factor =
+        unitId && unitId !== item.baseUnitId
+          ? new Decimal(
+              (
+                await tx
+                  .select({ ratio: itemUnits.ratio })
+                  .from(itemUnits)
+                  .where(
+                    and(
+                      eq(itemUnits.tenantId, tenantId),
+                      eq(itemUnits.itemId, itemId),
+                      eq(itemUnits.unitId, unitId),
+                    ),
+                  )
+              )[0]?.ratio ?? '1',
+            )
+          : new Decimal(1);
+      const [unit] = unitId
+        ? await tx
+            .select({ code: unitsOfMeasure.code, nameAr: unitsOfMeasure.nameAr })
+            .from(unitsOfMeasure)
+            .where(and(eq(unitsOfMeasure.tenantId, tenantId), eq(unitsOfMeasure.id, unitId)))
+        : [];
+      return {
+        barcode,
+        itemId,
+        sku: item.sku,
+        nameAr: item.nameAr,
+        salePrice: item.salePrice,
+        purchasePrice: item.purchasePrice,
+        trackLot: item.trackLot,
+        trackSerial: item.trackSerial,
+        unitId: unitId ?? item.baseUnitId,
+        unitNameAr: unit?.nameAr ?? null,
+        factor: factor.toFixed(6),
+        /** `box` · `piece` … whatever the label was attached to. */
+        matchedBy: extra ? 'item_barcodes' : own ? 'items.barcode' : 'item_units.barcode',
+      };
+    });
+  }
+
+  // ── تواريخ الصلاحية ────────────────────────────────────────────────────────
+
+  /**
+   * Lots that expire within `days` (or that already have), with what is still on the
+   * shelf. A lot you cannot find is a lot that quietly becomes waste: this is the
+   * report the desktop kept in `frmItems` under expiry, and it is why lots carry an
+   * expiry date at all.
+   */
+  async expiry(tenantId: string, days = 30, warehouseId?: string) {
+    const horizon = Number.isFinite(days) ? Math.max(0, Math.trunc(days)) : 30;
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select({ lot: itemLots, item: items, balance: stockBalances })
+        .from(itemLots)
+        .innerJoin(items, eq(items.id, itemLots.itemId))
+        .leftJoin(
+          stockBalances,
+          and(
+            eq(stockBalances.tenantId, tenantId),
+            eq(stockBalances.itemId, itemLots.itemId),
+            warehouseId ? eq(stockBalances.warehouseId, warehouseId) : sql`true`,
+          ),
+        )
+        .where(
+          and(
+            eq(itemLots.tenantId, tenantId),
+            isNull(itemLots.deletedAt),
+            sql`${itemLots.expiryDate} IS NOT NULL`,
+            sql`${itemLots.expiryDate} <= (CURRENT_DATE + ${horizon}::int)`,
+          ),
+        )
+        .orderBy(asc(itemLots.expiryDate))
+        .limit(300);
+      return rows.map((row) => {
+        const daysLeft = Math.round(
+          (new Date(`${row.lot.expiryDate}T00:00:00Z`).getTime() - Date.now()) / 86_400_000,
+        );
+        return {
+          lotId: row.lot.id,
+          lotNo: row.lot.lotNo,
+          expiryDate: row.lot.expiryDate,
+          daysLeft,
+          expired: daysLeft < 0,
+          itemId: row.item.id,
+          sku: row.item.sku,
+          nameAr: row.item.nameAr,
+          warehouseId: row.balance?.warehouseId ?? null,
+          quantity: row.balance?.quantity ?? '0',
+        };
+      });
     });
   }
 }

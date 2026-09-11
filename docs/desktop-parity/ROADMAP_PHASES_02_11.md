@@ -51,8 +51,15 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [x] Behaviours: stock in/out + opening as numbered postable documents with balanced
   journals; transfer both legs through بضاعة تحت التحويل (value-neutral); multi-line
   count with approval; serial/lot enforcement; reorder limits; negative-stock override.
-- [ ] Still open: multi-barcode + multi-unit conversion, expiry alert report, printing
-  the stock documents (phase 10). Production/assembly keeps its own service.
+- [x] Behaviours (part two): multi-unit conversion — `item_units` repaired by migration
+  0035 (it was created unusable: `FORCE RLS`, no policy, no `tenant_id`), every document
+  line can be counted in any unit the card defines and the ledger moves
+  `base_qty = qty × factor`; multi-barcode with `GET /inventory/barcode/:code` resolving
+  `items.barcode` → `item_barcodes` → `item_units.barcode`; expiry report
+  `GET /inventory/expiry?days=…` and the `/inventory/expiry` screen; staff
+  `/inventory/item-units` and unit columns on vouchers, counts and transfers.
+- [ ] Still open: unit-aware price lists (phase 08), printing the stock documents and
+  barcode labels (phase 10). Production/assembly keeps its own service.
 
 ## Phase 06 — Treasury
 

@@ -7,6 +7,7 @@ import { RequiresPermission } from '../../platform/decorators/requires-permissio
 import { CatalogService } from './catalog.service.js';
 
 const decimal4 = z.string().regex(/^\d+(\.\d{1,4})?$/);
+const decimal6 = z.string().regex(/^\d+(\.\d{1,6})?$/);
 const itemSchema = z.object({
   sku: z.string().min(1).max(80),
   barcode: z.string().trim().min(1).max(64).optional(),
@@ -23,6 +24,21 @@ const itemSchema = z.object({
   trackLot: z.boolean().optional(),
   trackSerial: z.boolean().optional(),
 });
+const itemUnitSchema = z.object({
+  unitId: z.string().uuid(),
+  /** Base units per one of this unit — 12 for a carton of a 12-piece item. */
+  ratio: decimal6,
+  barcode: z.string().trim().max(64).nullish(),
+  salePrice: decimal4.optional(),
+  purchasePrice: decimal4.optional(),
+  isDefaultSale: z.boolean().optional(),
+  isDefaultPurchase: z.boolean().optional(),
+});
+const itemBarcodeSchema = z.object({
+  barcode: z.string().trim().min(1).max(64),
+  unitId: z.string().uuid().nullish(),
+});
+
 const categorySchema = z.object({
   code: z.string().min(1).max(40),
   nameAr: z.string().min(1).max(200),
@@ -99,6 +115,52 @@ export class CatalogController {
   @Delete('items/:id') @RequiresPermission('catalog.item.manage') remove(@Param('id') id: string) {
     return this.catalog.removeItem(getTenantContext().tenantId, id);
   }
+  // ------------------------------------------------- وحدات القياس المتعددة
+
+  /**
+   * `GET /organization/catalog/items/:id/units` — the base unit first, then every other
+   * unit this item can be counted in. The screen and the scanner both read it.
+   */
+  @Get('items/:id/units') @RequiresPermission('catalog.item.view') itemUnits(@Param('id') itemId: string) {
+    return this.catalog.listItemUnits(getTenantContext().tenantId, itemId);
+  }
+
+  @Post('items/:id/units') @RequiresPermission('catalog.item.manage') setItemUnit(
+    @Param('id') itemId: string,
+    @Body() body: unknown,
+  ) {
+    return this.catalog.setItemUnit(getTenantContext().tenantId, itemId, itemUnitSchema.parse(body));
+  }
+
+  @Delete('items/:id/units/:unitId') @RequiresPermission('catalog.item.manage') removeItemUnit(
+    @Param('id') itemId: string,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.catalog.removeItemUnit(getTenantContext().tenantId, itemId, unitId);
+  }
+
+  // ------------------------------------------------------- الباركود المتعدد
+
+  @Get('items/:id/barcodes') @RequiresPermission('catalog.item.view') itemBarcodes(
+    @Param('id') itemId: string,
+  ) {
+    return this.catalog.listItemBarcodes(getTenantContext().tenantId, itemId);
+  }
+
+  @Post('items/:id/barcodes') @RequiresPermission('catalog.item.manage') addItemBarcode(
+    @Param('id') itemId: string,
+    @Body() body: unknown,
+  ) {
+    return this.catalog.addItemBarcode(getTenantContext().tenantId, itemId, itemBarcodeSchema.parse(body));
+  }
+
+  @Delete('items/:id/barcodes/:barcode') @RequiresPermission('catalog.item.manage') removeItemBarcode(
+    @Param('id') itemId: string,
+    @Param('barcode') barcode: string,
+  ) {
+    return this.catalog.removeItemBarcode(getTenantContext().tenantId, decodeURIComponent(barcode));
+  }
+
   @Get('categories') @RequiresPermission('catalog.category.view') categories() {
     return this.catalog.listCategories(getTenantContext().tenantId);
   }

@@ -6,7 +6,7 @@
  * and the display formatting in one module means a screen states *what* it needs, not
  * how the endpoint happens to be shaped.
  */
-import { apiList } from './api';
+import { apiData, apiDelete, apiList, apiPost } from './api';
 
 export type Option = { id: string; label: string };
 
@@ -168,6 +168,74 @@ export const listItems = (q?: string) =>
 export const listCategories = () => apiList<Category>('/organization/catalog/categories');
 export const listUnits = () => apiList<Unit>('/organization/catalog/units');
 export const listTaxGroups = () => apiList<TaxGroup>('/organization/catalog/tax-groups');
+
+/**
+ * وحدات الصنف المتعددة — `ratio` is **base units per one of this unit**: a carton of 12
+ * makes `12`, and the stock engine moves `qty × ratio` base units.
+ */
+export type ItemUnit = {
+  itemId: string;
+  unitId: string;
+  unitCode?: string;
+  unitNameAr?: string;
+  ratio: string;
+  barcode?: string | null;
+  salePrice?: string | null;
+  purchasePrice?: string | null;
+  isDefaultSale?: boolean;
+  isDefaultPurchase?: boolean;
+};
+export type ItemBarcode = {
+  barcode: string;
+  itemId: string;
+  unitId?: string | null;
+  unitNameAr?: string | null;
+};
+export const listItemUnits = (itemId: string) =>
+  apiList<ItemUnit>(`/organization/catalog/items/${itemId}/units`);
+export const setItemUnit = (itemId: string, body: unknown) =>
+  apiPost<ItemUnit>(`/organization/catalog/items/${itemId}/units`, body);
+export const removeItemUnit = (itemId: string, unitId: string) =>
+  apiDelete(`/organization/catalog/items/${itemId}/units/${unitId}`);
+export const listItemBarcodes = (itemId: string) =>
+  apiList<ItemBarcode>(`/organization/catalog/items/${itemId}/barcodes`);
+export const addItemBarcode = (itemId: string, body: unknown) =>
+  apiPost<ItemBarcode>(`/organization/catalog/items/${itemId}/barcodes`, body);
+export const removeItemBarcode = (itemId: string, barcode: string) =>
+  apiDelete(`/organization/catalog/items/${itemId}/barcodes/${encodeURIComponent(barcode)}`);
+
+/** تواريخ الصلاحية — what is on the shelf and when it stops being sellable. */
+export type ExpiryRow = {
+  lotId: string;
+  lotNo: string;
+  expiryDate: string;
+  daysLeft: number;
+  expired: boolean;
+  itemId: string;
+  sku: string;
+  nameAr: string;
+  warehouseId?: string | null;
+  quantity: string;
+};
+export const expiryReport = (days = 30) => apiList<ExpiryRow>(`/inventory/expiry?days=${days}`);
+
+/** One scan: which item, in which unit, and by what factor. */
+export type ScanResult = {
+  barcode: string;
+  itemId: string;
+  sku: string;
+  nameAr: string;
+  salePrice?: string | null;
+  purchasePrice?: string | null;
+  trackLot?: boolean;
+  trackSerial?: boolean;
+  unitId: string;
+  unitNameAr?: string | null;
+  factor: string;
+  matchedBy: string;
+};
+export const scanBarcode = (code: string) =>
+  apiData<ScanResult>(`/inventory/barcode/${encodeURIComponent(code.trim())}`);
 export const listParties = (kind?: string) => apiList<Party>(`/parties${kind ? `?kind=${kind}` : ''}`);
 export const listCashLocations = () => apiList<CashLocation>('/cash-locations');
 export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');

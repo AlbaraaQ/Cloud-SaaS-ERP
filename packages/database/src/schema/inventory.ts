@@ -17,7 +17,7 @@ import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../c
 
 import { accounts, journalEntries } from './accounting.js';
 import { branches, warehouses } from './organization.js';
-import { items } from './catalog.js';
+import { items, unitsOfMeasure } from './catalog.js';
 import { tenants } from './platform.js';
 
 const qty = { precision: 20, scale: 4, mode: 'string' as const };
@@ -42,7 +42,12 @@ export const inventoryTransactions = pgTable(
     lineId: uuid('line_id'),
     direction: text('direction').notNull(),
     qty: numeric('qty', qty).notNull(),
+    /** qty × factor — the only quantity the stock balance is ever moved by. */
     baseQty: numeric('base_qty', qty).notNull(),
+    /** The unit the clerk counted in (NULL = the item's base unit). */
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
+    /** ItemUnits.ratio snapshot: base units per the entered unit. */
+    factor: numeric('factor', { precision: 20, scale: 6 }).notNull().default('1'),
     unitCost: numeric('unit_cost', money).notNull(),
     totalCost: numeric('total_cost', money).notNull(),
     costing: text('costing').notNull(),
@@ -130,6 +135,7 @@ export const stockAdjustmentLines = pgTable(
       .references(() => items.id),
     expectedQty: numeric('expected_qty', qty).notNull(),
     countedQty: numeric('counted_qty', qty).notNull(),
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
     unitCost: numeric('unit_cost', money),
     varianceQty: numeric('variance_qty', qty),
     varianceValue: numeric('variance_value', money).notNull().default('0'),
@@ -199,6 +205,7 @@ export const stockVoucherLines = pgTable(
       .notNull()
       .references(() => items.id),
     qty: numeric('qty', qty).notNull(),
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
     unitCost: numeric('unit_cost', money),
     lineCost: numeric('line_cost', money).notNull().default('0'),
     lotId: uuid('lot_id').references(() => itemLots.id),
@@ -254,6 +261,7 @@ export const stockTransferLines = pgTable(
       .notNull()
       .references(() => items.id),
     qty: numeric('qty', qty).notNull(),
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
     sentQty: numeric('sent_qty', qty).notNull().default('0'),
     receivedQty: numeric('received_qty', qty).notNull().default('0'),
     unitCost: numeric('unit_cost', money).notNull().default('0'),

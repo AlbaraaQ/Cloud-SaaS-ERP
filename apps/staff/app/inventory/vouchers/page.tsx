@@ -14,17 +14,20 @@ import {
   defaultOf,
   itemLabel,
   listBranches,
+  listItemUnits,
   listItems,
   listLots,
   listSerials,
   listWarehouses,
   money,
   quantity,
+  scanBarcode,
   shortDate,
   statusLabel,
   today,
   type Branch,
   type Item,
+  type ItemUnit,
   type Lot,
   type Serial,
   type Warehouse,
@@ -46,6 +49,8 @@ type VoucherLine = {
   lineNo: number;
   itemId: string;
   qty: string;
+  /** Unit the quantity was counted in; the ledger holds `qty × factor` base units. */
+  unitId?: string | null;
   unitCost?: string | null;
   lineCost?: string | null;
   lotId?: string | null;
@@ -99,12 +104,15 @@ export default function VouchersPage() {
     Array<{
       itemId: string;
       qtyText: string;
+      unitId: string;
       costText: string;
       lotId: string;
       serialId: string;
       note: string;
     }>
-  >([{ itemId: '', qtyText: '', costText: '', lotId: '', serialId: '', note: '' }]);
+  >([{ itemId: '', qtyText: '', unitId: '', costText: '', lotId: '', serialId: '', note: '' }]);
+  const [scan, setScan] = useState('');
+  const blankLine = { itemId: '', qtyText: '', unitId: '', costText: '', lotId: '', serialId: '', note: '' };
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -121,6 +129,22 @@ export default function VouchersPage() {
   const accountRows = (accounts.data ?? []).filter((row) => postableOf(row));
   const lotRows = lots.data ?? [];
   const serialRows = serials.data ?? [];
+
+  /** وحدات كل سطر — the box/carton choices of the item that line is writing about. */
+  const itemIds = lines
+    .map((line) => line.itemId)
+    .filter(Boolean)
+    .join(',');
+  const unitRows = useQuery<ItemUnit[]>(async () => {
+    const ids = Array.from(new Set(itemIds.split(',').filter(Boolean)));
+    const lists = await Promise.all(ids.map((id) => listItemUnits(id)));
+    return lists.flat();
+  }, [itemIds]);
+  const unitsOf = (id: string) => (unitRows.data ?? []).filter((row) => row.itemId === id);
+  const factorOf = (line: { itemId: string; unitId: string }) => {
+    if (!line.unitId) return 1;
+    return Number(unitsOf(line.itemId).find((row) => row.unitId === line.unitId)?.ratio ?? 1);
+  };
 
   const effectiveBranch = branchId || defaultOf(branchRows)?.id || '';
   const effectiveWarehouse = warehouseId || defaultOf(warehouseRows)?.id || '';
@@ -140,11 +164,48 @@ export default function VouchersPage() {
     return itemRows.find((row) => row.id === id);
   }
 
+  /**
+   * قارئ الباركود — one label answers the item, the unit and the factor, so a whole
+   * carton can be scanned in without anyone converting anything by hand.
+   */
+  async function applyScan() {
+    const code = scan.trim();
+    if (!code) return;
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      const found = await scanBarcode(code);
+      setLines((current) => {
+        const blank = current.findIndex((line) => !line.itemId);
+        const next = {
+          ...blankLine,
+          itemId: found.itemId,
+          qtyText: '1',
+          unitId: found.unitId,
+          costText: found.purchasePrice ?? '',
+        };
+        return blank >= 0
+          ? current.map((line, position) => (position === blank ? next : line))
+          : [...current, next];
+      });
+      setScan('');
+      setNotice({
+        kind: 'ok',
+        text: `${found.nameAr}${found.unitNameAr ? ` — ${found.unitNameAr}` : ''} (×${Number(found.factor).toLocaleString('ar-EG')})`,
+      });
+    } catch (error) {
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function updateLine(
     index: number,
     patch: Partial<{
       itemId: string;
       qtyText: string;
+      unitId: string;
       costText: string;
       lotId: string;
       serialId: string;
@@ -188,6 +249,7 @@ export default function VouchersPage() {
         lines: filled.map((line) => ({
           itemId: line.itemId,
           qty: line.qtyText,
+          unitId: line.unitId || undefined,
           unitCost: isIssue ? undefined : line.costText || undefined,
           lotId: line.lotId || undefined,
           serialId: line.serialId || undefined,
@@ -198,7 +260,7 @@ export default function VouchersPage() {
         kind: 'ok',
         text: `حُفظ السند ${created.number} كمسودة. رحّله ليحرّك المخزون ويُنشئ القيد.`,
       });
-      setLines([{ itemId: '', qtyText: '', costText: '', lotId: '', serialId: '', note: '' }]);
+      setLines([blankLine]);
       setReason('');
       setOpen(false);
       await reload();
@@ -328,6 +390,30 @@ export default function VouchersPage() {
           </div>
 
           <h3>الأصناف</h3>
+          <div className="row" style={{ gap: 8 }}>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder="امسح باركود الصنف…"
+              value={scan}
+              onChange={(event) => setScan(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void applyScan();
+                }
+              }}
+            />
+            <button
+              className="btn sm"
+              type="button"
+              onClick={() => void applyScan()}
+              disabled={busy || !scan.trim()}
+            >
+              إضافة بالباركود
+            </button>
+          </div>
+
           <div className="table-wrap">
             <table>
               <thead>
@@ -337,6 +423,7 @@ export default function VouchersPage() {
                   {!isIssue && <th>تكلفة الوحدة</th>}
                   <th>دفعة</th>
                   <th>رقم تسلسلي</th>
+                  <th>الوحدة</th>
                   <th>ملاحظة</th>
                   <th />
                 </tr>
@@ -370,6 +457,33 @@ export default function VouchersPage() {
                           value={line.qtyText}
                           onChange={(event) => updateLine(index, { qtyText: event.target.value })}
                         />
+                      </td>
+                      <td>
+                        <select
+                          className="input"
+                          value={line.unitId}
+                          onChange={(event) => updateLine(index, { unitId: event.target.value })}
+                          disabled={!line.itemId}
+                        >
+                          <option value="">الوحدة الأساسية</option>
+                          {unitsOf(line.itemId)
+                            .filter(
+                              (unit) =>
+                                unit.unitId !==
+                                (itemOf(line.itemId)?.baseUnitId ?? itemOf(line.itemId)?.base_unit_id),
+                            )
+                            .map((unit) => (
+                              <option key={unit.unitId} value={unit.unitId}>
+                                {`${unit.unitNameAr ?? ''} (×${Number(unit.ratio).toLocaleString('ar-EG')})`}
+                              </option>
+                            ))}
+                        </select>
+                        {line.unitId && Number(line.qtyText) > 0 && (
+                          <span className="muted small" dir="ltr">
+                            {`= ${(Number(line.qtyText) * factorOf(line)).toLocaleString('ar-EG')} `}
+                            {arabicName(itemOf(line.itemId) ?? {}) ? '' : ''}
+                          </span>
+                        )}
                       </td>
                       {!isIssue && (
                         <td>
@@ -445,12 +559,7 @@ export default function VouchersPage() {
             <button
               className="btn sm"
               type="button"
-              onClick={() =>
-                setLines((current) => [
-                  ...current,
-                  { itemId: '', qtyText: '', costText: '', lotId: '', serialId: '', note: '' },
-                ])
-              }
+              onClick={() => setLines((current) => [...current, blankLine])}
             >
               + سطر
             </button>
@@ -591,6 +700,7 @@ export default function VouchersPage() {
                   <th>#</th>
                   <th>المادة</th>
                   <th>الكمية</th>
+                  <th>الوحدة</th>
                   <th>تكلفة الوحدة</th>
                   <th>القيمة</th>
                   <th>ملاحظة</th>
@@ -602,6 +712,11 @@ export default function VouchersPage() {
                     <td dir="ltr">{line.lineNo}</td>
                     <td>{itemLabel(itemOf(line.itemId) ?? ({ id: line.itemId, sku: '—' } as Item))}</td>
                     <td dir="ltr">{quantity(line.qty)}</td>
+                    <td>
+                      {line.unitId
+                        ? (unitsOf(line.itemId).find((row) => row.unitId === line.unitId)?.unitNameAr ?? '—')
+                        : 'الوحدة الأساسية'}
+                    </td>
                     <td dir="ltr">{money(line.unitCost)}</td>
                     <td dir="ltr">{money(line.lineCost)}</td>
                     <td>{line.note ?? '—'}</td>

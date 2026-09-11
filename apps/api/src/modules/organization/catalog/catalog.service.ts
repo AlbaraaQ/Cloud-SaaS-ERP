@@ -1,8 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { and, asc, eq, ilike, isNull, sql } from 'drizzle-orm';
 import { DomainError, errorCodes } from '@erp/contracts';
+import { Decimal } from 'decimal.js';
 import {
+  itemBarcodes,
   itemCategories,
+  itemUnits,
   items,
   newId,
   taxGroups,
@@ -30,6 +33,42 @@ export type CatalogItemInput = {
   trackLot?: boolean;
   trackSerial?: boolean;
 };
+
+/**
+ * وحدات القياس المتعددة — the desktop `ItemUnits` table. `ratio` is **base units per one
+ * of this unit** (desktop `perc`): a carton of 12 makes `ratio = 12`, and
+ * `InventoryOper` moves `qty × ratio` base units, never the entered quantity.
+ */
+export type ItemUnitInput = {
+  unitId: string;
+  ratio: string;
+  barcode?: string | null;
+  salePrice?: string;
+  purchasePrice?: string;
+  isDefaultSale?: boolean;
+  isDefaultPurchase?: boolean;
+};
+export type ItemUnitRow = {
+  itemId: string;
+  unitId: string;
+  unitCode: string;
+  unitNameAr: string;
+  ratio: string;
+  barcode: string | null;
+  salePrice: string | null;
+  purchasePrice: string | null;
+  isDefaultSale: boolean;
+  isDefaultPurchase: boolean;
+};
+export type ItemBarcodeInput = { barcode: string; unitId?: string | null };
+export type ItemBarcodeRow = {
+  barcode: string;
+  itemId: string;
+  unitId: string | null;
+  unitNameAr: string | null;
+  createdAt?: Date | string;
+};
+
 export type CategoryInput = { code: string; nameAr: string; nameEn?: string; parentId?: string };
 export type UnitInput = { code: string; nameAr: string; nameEn?: string };
 export type TaxGroupInput = {
@@ -105,26 +144,24 @@ export class CatalogService {
   async createItem(tenantId: string, input: CatalogItemInput) {
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
-      await tx
-        .insert(items)
-        .values({
-          id,
-          tenantId,
-          sku: input.sku,
-          barcode: input.barcode,
-          nameAr: input.nameAr,
-          nameEn: input.nameEn,
-          categoryId: input.categoryId,
-          baseUnitId: input.baseUnitId,
-          kind: input.kind ?? 'stock',
-          salePrice: input.salePrice,
-          purchasePrice: input.purchasePrice,
-          taxGroupId: input.taxGroupId,
-          minQty: input.minQty,
-          maxQty: input.maxQty,
-          trackLot: input.trackLot ?? false,
-          trackSerial: input.trackSerial ?? false,
-        });
+      await tx.insert(items).values({
+        id,
+        tenantId,
+        sku: input.sku,
+        barcode: input.barcode,
+        nameAr: input.nameAr,
+        nameEn: input.nameEn,
+        categoryId: input.categoryId,
+        baseUnitId: input.baseUnitId,
+        kind: input.kind ?? 'stock',
+        salePrice: input.salePrice,
+        purchasePrice: input.purchasePrice,
+        taxGroupId: input.taxGroupId,
+        minQty: input.minQty,
+        maxQty: input.maxQty,
+        trackLot: input.trackLot ?? false,
+        trackSerial: input.trackSerial ?? false,
+      });
     });
     return this.getItem(tenantId, id);
   }
@@ -166,6 +203,213 @@ export class CatalogService {
         .where(and(eq(items.tenantId, tenantId), eq(items.id, id)));
     });
     return this.getItem(tenantId, id);
+  }
+
+  // --------------------------------------------------- وحدات القياس المتعددة
+
+  /** The item's own unit, plus every unit it can be counted, sold or bought in. */
+  async listItemUnits(tenantId: string, itemId: string): Promise<ItemUnitRow[]> {
+    return withTenantTx(this.database.db, tenantId, (tx) => this.itemUnitRows(tx, tenantId, itemId));
+  }
+
+  /**
+   * Reads the rows inside the caller's transaction. It has to: `withTenantTx` takes its
+   * own connection, so a write made moments earlier in another call is invisible to a
+   * fresh one — `setItemUnit` would answer with the row it had not yet committed.
+   */
+  private async itemUnitRows(tx: DrizzleTx, tenantId: string, itemId: string): Promise<ItemUnitRow[]> {
+    const item = await this.requireItem(tx, tenantId, itemId);
+    const rows = await tx
+      .select({
+        itemId: itemUnits.itemId,
+        unitId: itemUnits.unitId,
+        unitCode: unitsOfMeasure.code,
+        unitNameAr: unitsOfMeasure.nameAr,
+        ratio: itemUnits.ratio,
+        barcode: itemUnits.barcode,
+        salePrice: itemUnits.salePrice,
+        purchasePrice: itemUnits.purchasePrice,
+        isDefaultSale: itemUnits.isDefaultSale,
+        isDefaultPurchase: itemUnits.isDefaultPurchase,
+      })
+      .from(itemUnits)
+      .innerJoin(unitsOfMeasure, eq(unitsOfMeasure.id, itemUnits.unitId))
+      .where(and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.itemId, itemId)))
+      .orderBy(asc(unitsOfMeasure.nameAr));
+    // The base unit is always answerable, even when nobody configured it explicitly.
+    const base = rows.find((row) => row.unitId === item.baseUnitId);
+    const baseRow: ItemUnitRow = base ?? {
+      itemId,
+      unitId: item.baseUnitId,
+      unitCode: '',
+      unitNameAr: 'الوحدة الأساسية',
+      ratio: '1',
+      barcode: null,
+      salePrice: item.salePrice ?? null,
+      purchasePrice: item.purchasePrice ?? null,
+      isDefaultSale: false,
+      isDefaultPurchase: false,
+    };
+    return [baseRow, ...rows.filter((row) => row.unitId !== item.baseUnitId)];
+  }
+
+  /**
+   * Define (or redefine) one unit of an item. The base unit cannot be given a ratio other
+   * than 1 — it *is* the unit every other ratio is expressed against.
+   */
+  async setItemUnit(tenantId: string, itemId: string, input: ItemUnitInput): Promise<ItemUnitRow> {
+    const ratio = new Decimal(input.ratio);
+    if (!ratio.isFinite() || ratio.lte(0))
+      throw new DomainError(
+        'CATALOG_UNIT_RATIO_INVALID',
+        'The conversion factor must be greater than zero',
+        422,
+        { field: 'ratio' },
+      );
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const item = await this.requireItem(tx, tenantId, itemId);
+      await this.requireUnit(tx, tenantId, input.unitId);
+      if (input.unitId === item.baseUnitId && !ratio.eq(1)) {
+        throw new DomainError(
+          'CATALOG_UNIT_RATIO_INVALID',
+          'The base unit always converts 1:1 — change the item’s base unit instead',
+          422,
+          { field: 'ratio' },
+        );
+      }
+      if (input.isDefaultSale || input.isDefaultPurchase) {
+        // Only one default per role, or the picker has no choice to make.
+        await tx
+          .update(itemUnits)
+          .set(input.isDefaultSale ? { isDefaultSale: false } : { isDefaultPurchase: false })
+          .where(and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.itemId, itemId)));
+      }
+      await tx
+        .insert(itemUnits)
+        .values({
+          tenantId,
+          itemId,
+          unitId: input.unitId,
+          ratio: ratio.toFixed(6),
+          barcode: input.barcode ?? null,
+          salePrice: input.salePrice,
+          purchasePrice: input.purchasePrice,
+          isDefaultSale: input.isDefaultSale ?? false,
+          isDefaultPurchase: input.isDefaultPurchase ?? false,
+        })
+        .onConflictDoUpdate({
+          target: [itemUnits.itemId, itemUnits.unitId],
+          set: {
+            tenantId,
+            ratio: ratio.toFixed(6),
+            barcode: input.barcode === undefined ? sql`${itemUnits.barcode}` : input.barcode,
+            salePrice: input.salePrice ?? null,
+            purchasePrice: input.purchasePrice ?? null,
+            isDefaultSale: input.isDefaultSale ?? false,
+            isDefaultPurchase: input.isDefaultPurchase ?? false,
+          },
+        });
+      const rows = await this.itemUnitRows(tx, tenantId, itemId);
+      return rows.find((row) => row.unitId === input.unitId) ?? rows[0]!;
+    });
+  }
+
+  async removeItemUnit(tenantId: string, itemId: string, unitId: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const item = await this.requireItem(tx, tenantId, itemId);
+      if (unitId === item.baseUnitId) {
+        throw new DomainError('CATALOG_UNIT_IMMUTABLE', 'The base unit cannot be removed from an item', 409);
+      }
+      await tx
+        .delete(itemUnits)
+        .where(
+          and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.itemId, itemId), eq(itemUnits.unitId, unitId)),
+        );
+      return { itemId, unitId, deleted: true };
+    });
+  }
+
+  private async requireUnit(tx: DrizzleTx, tenantId: string, unitId: string) {
+    const [row] = await tx
+      .select({ id: unitsOfMeasure.id })
+      .from(unitsOfMeasure)
+      .where(
+        and(
+          eq(unitsOfMeasure.tenantId, tenantId),
+          eq(unitsOfMeasure.id, unitId),
+          isNull(unitsOfMeasure.deletedAt),
+        ),
+      );
+    if (!row) throw new DomainError(errorCodes.NOT_FOUND, 'Unit of measure was not found', 404);
+    return row;
+  }
+
+  // ------------------------------------------------------- الباركود المتعدد
+
+  /** Every barcode that must resolve to this item: its own, its units', and extra labels. */
+  async listItemBarcodes(tenantId: string, itemId: string): Promise<ItemBarcodeRow[]> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const item = await this.requireItem(tx, tenantId, itemId);
+      const extra = await tx
+        .select({
+          barcode: itemBarcodes.barcode,
+          unitId: itemBarcodes.unitId,
+          unitNameAr: unitsOfMeasure.nameAr,
+          createdAt: itemBarcodes.createdAt,
+        })
+        .from(itemBarcodes)
+        .leftJoin(unitsOfMeasure, eq(unitsOfMeasure.id, itemBarcodes.unitId))
+        .where(and(eq(itemBarcodes.tenantId, tenantId), eq(itemBarcodes.itemId, itemId)))
+        .orderBy(asc(itemBarcodes.barcode));
+      const rows: ItemBarcodeRow[] = [];
+      if (item.barcode?.trim())
+        rows.push({ barcode: item.barcode.trim(), itemId, unitId: null, unitNameAr: 'الوحدة الأساسية' });
+      for (const row of extra) rows.push({ ...row, itemId });
+      return rows;
+    });
+  }
+
+  async addItemBarcode(tenantId: string, itemId: string, input: ItemBarcodeInput): Promise<ItemBarcodeRow> {
+    const barcode = input.barcode.trim();
+    if (!barcode)
+      throw new DomainError('CATALOG_BARCODE_REQUIRED', 'A barcode is required', 422, { field: 'barcode' });
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.requireItem(tx, tenantId, itemId);
+      if (input.unitId) await this.requireUnit(tx, tenantId, input.unitId);
+      // A barcode that already belongs to another item would make the scanner lie.
+      const [owner] = await tx
+        .select({ itemId: itemBarcodes.itemId })
+        .from(itemBarcodes)
+        .where(and(eq(itemBarcodes.tenantId, tenantId), eq(itemBarcodes.barcode, barcode)));
+      if (owner && owner.itemId !== itemId) {
+        throw new DomainError('CATALOG_BARCODE_TAKEN', 'This barcode already belongs to another item', 409, {
+          field: 'barcode',
+        });
+      }
+      await tx
+        .insert(itemBarcodes)
+        .values({ tenantId, barcode, itemId, unitId: input.unitId ?? null })
+        .onConflictDoUpdate({
+          target: [itemBarcodes.tenantId, itemBarcodes.barcode],
+          set: { itemId, unitId: input.unitId ?? null },
+        });
+      return { barcode, itemId, unitId: input.unitId ?? null, unitNameAr: null };
+    });
+  }
+
+  async removeItemBarcode(tenantId: string, barcode: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await tx
+        .delete(itemBarcodes)
+        .where(and(eq(itemBarcodes.tenantId, tenantId), eq(itemBarcodes.barcode, barcode)));
+      // The item's own barcode lives on the item card; clear it there too so one DELETE
+      // really does remove the label from the scanner.
+      await tx
+        .update(items)
+        .set({ barcode: null, updatedAt: new Date() })
+        .where(and(eq(items.tenantId, tenantId), eq(items.barcode, barcode)));
+      return { barcode, deleted: true };
+    });
   }
 
   /**
@@ -231,16 +475,14 @@ export class CatalogService {
   async createCategory(tenantId: string, input: CategoryInput) {
     const id = newId();
     await withTenantTx(this.database.db, tenantId, (tx) =>
-      tx
-        .insert(itemCategories)
-        .values({
-          id,
-          tenantId,
-          code: input.code,
-          nameAr: input.nameAr,
-          nameEn: input.nameEn,
-          parentId: input.parentId,
-        }),
+      tx.insert(itemCategories).values({
+        id,
+        tenantId,
+        code: input.code,
+        nameAr: input.nameAr,
+        nameEn: input.nameEn,
+        parentId: input.parentId,
+      }),
     );
     const rows = await this.listCategories(tenantId);
     return rows.find((row) => row.id === id);
@@ -389,17 +631,15 @@ export class CatalogService {
   async createTaxGroup(tenantId: string, input: TaxGroupInput) {
     const id = newId();
     await withTenantTx(this.database.db, tenantId, (tx) =>
-      tx
-        .insert(taxGroups)
-        .values({
-          id,
-          tenantId,
-          nameAr: input.nameAr,
-          nameEn: input.nameEn,
-          rate: input.rate,
-          vatAccountId: input.vatAccountId,
-          isInclusiveDefault: input.isInclusiveDefault ?? false,
-        }),
+      tx.insert(taxGroups).values({
+        id,
+        tenantId,
+        nameAr: input.nameAr,
+        nameEn: input.nameEn,
+        rate: input.rate,
+        vatAccountId: input.vatAccountId,
+        isInclusiveDefault: input.isInclusiveDefault ?? false,
+      }),
     );
     const rows = await this.listTaxGroups(tenantId);
     return rows.find((row) => row.id === id);

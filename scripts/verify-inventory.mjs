@@ -10,6 +10,10 @@
  *   3. جرد وتسوية — a counted variance approved and posted as one balanced entry
  *   4. مناقلة — send (بضاعة تحت التحويل) → receive (عودة للمخزون)
  *   5. الرصيد السالب — an issue beyond the balance is refused, then forced
+ *   6. حد الطلب — an item drained below its minimum is listed with its shortage
+ *   7. وحدات القياس — a document written in boxes moves pieces
+ *   8. الباركود — a label resolves to an item, a unit and a factor
+ *   9. تواريخ الصلاحية — a lot inside the horizon is reported, one outside is not
  *
  * Every step asserts the *ledger*, not just the stock level: a stock document that
  * moves quantity without a journal is the desktop bug this phase exists to remove.
@@ -82,8 +86,10 @@ const secondWarehouseId = warehouseRows.find((row) => row.id !== warehouseId).id
 
 const categories = await call('get', '/organization/catalog/categories', token);
 const units = await call('get', '/organization/catalog/units', token);
+const stamp = Date.now().toString().slice(-6);
+const categoryId = categories[0].id;
 const item = await call('post', '/organization/catalog/items', token, {
-  sku: `SKU-INV-${Date.now().toString().slice(-6)}`,
+  sku: `SKU-INV-${stamp}`,
   nameAr: 'صنف اختبار المخزون',
   categoryId: categories[0].id,
   baseUnitId: units[0].id,
@@ -320,6 +326,147 @@ check(
   'shortage equals min − on hand',
   shortRow ? Number(shortRow.shortage) === 5 : false,
   shortRow?.shortage ?? '',
+);
+
+// ── 7. وحدات القياس المتعددة ────────────────────────────────────────────────
+// The desktop stored `ItemUnits.perc` and multiplied every quantity by it
+// (`ItemPrimaryQnty = ItemQuantity * UnitEquality`). The cloud does the same: a
+// document counts cartons, the ledger stores pieces.
+console.log('');
+console.log('7. وحدات القياس المتعددة');
+const boxUnit = await call('post', '/organization/catalog/units', token, {
+  code: `BOX${stamp}`,
+  nameAr: 'علبة',
+});
+await call('post', `/organization/catalog/items/${itemId}/units`, token, {
+  unitId: boxUnit.id,
+  ratio: '12',
+  isDefaultSale: true,
+});
+const unitRows = await call('get', `/organization/catalog/items/${itemId}/units`, token);
+check(
+  'the box is listed with its factor',
+  unitRows.some((row) => row.unitId === boxUnit.id && Number(row.ratio) === 12),
+  `${unitRows.length} unit(s)`,
+);
+check('the base unit is still 1:1', Number(unitRows[0].ratio) === 1, unitRows[0]?.ratio ?? '');
+try {
+  await call('post', `/organization/catalog/items/${itemId}/units`, token, {
+    unitId: item.baseUnitId,
+    ratio: '6',
+  });
+  check('the base unit cannot be re-scaled', false, 'expected 422');
+} catch (error) {
+  check(
+    'the base unit cannot be re-scaled',
+    error.status === 422 && error.code === 'CATALOG_UNIT_RATIO_INVALID',
+    `${error.status} ${error.code}`,
+  );
+}
+
+const levelBeforeBoxes = Number(await levelOf());
+const boxReceipt = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'استلام بالعلب',
+  lines: [{ itemId, qty: '2', unitId: boxUnit.id, unitCost: '120' }],
+});
+await call('post', `/inventory/vouchers/${boxReceipt.id}/post`, token, {});
+check(
+  '2 boxes × 12 move 24 base units',
+  Number(await levelOf()) === levelBeforeBoxes + 24,
+  `${levelBeforeBoxes} → ${await levelOf()}`,
+);
+const boxValue = await call('get', `/inventory/vouchers/${boxReceipt.id}`, token);
+check('the line is worth 2 × 120, not 24 × 120', Number(boxValue.totalCost) === 240, boxValue.totalCost);
+const boxMovements = await call('get', `/inventory/movements?item_id=${itemId}`, token);
+const boxMovement = boxMovements.find((row) => row.docId === boxReceipt.id);
+check(
+  'the movement keeps the unit it was counted in',
+  Number(boxMovement?.qty) === 2 &&
+    Number(boxMovement?.baseQty) === 24 &&
+    Number(boxMovement?.factor) === 12 &&
+    boxMovement?.unitId === boxUnit.id,
+  `${boxMovement?.qty} ${boxMovement?.unitId ?? ''} → ${boxMovement?.baseQty} base`,
+);
+
+// ── 8. الباركود ────────────────────────────────────────────────────────────
+console.log('');
+console.log('8. الباركود المتعدد');
+const label = `BOX-${stamp}`;
+await call('post', `/organization/catalog/items/${itemId}/barcodes`, token, {
+  barcode: label,
+  unitId: boxUnit.id,
+});
+const scanned = await call('get', `/inventory/barcode/${label}`, token);
+check(
+  'a scan answers the item, the unit and the factor',
+  scanned.itemId === itemId && scanned.unitId === boxUnit.id && Number(scanned.factor) === 12,
+  `${scanned.matchedBy} ×${scanned.factor}`,
+);
+try {
+  await call('get', `/inventory/barcode/NOPE-${stamp}`, token);
+  check('an unknown label is a 404', false, 'expected 404');
+} catch (error) {
+  check(
+    'an unknown label is a 404',
+    error.status === 404 && error.code === 'BARCODE_NOT_FOUND',
+    `${error.status} ${error.code}`,
+  );
+}
+const secondItem = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU2-${stamp}`,
+  nameAr: 'صنف ثانٍ',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+try {
+  await call('post', `/organization/catalog/items/${secondItem.id}/barcodes`, token, { barcode: label });
+  check('one label cannot belong to two items', false, 'expected 409');
+} catch (error) {
+  check(
+    'one label cannot belong to two items',
+    error.status === 409 && error.code === 'CATALOG_BARCODE_TAKEN',
+    `${error.status} ${error.code}`,
+  );
+}
+const strayUnit = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_out',
+  reason: 'وحدة غير معرّفة على الصنف',
+  lines: [{ itemId: secondItem.id, qty: '1', unitId: boxUnit.id }],
+});
+try {
+  await call('post', `/inventory/vouchers/${strayUnit.id}/post`, token, {});
+  check('an undefined unit cannot be posted', false, 'expected 422');
+} catch (error) {
+  check(
+    'an undefined unit cannot be posted',
+    error.status === 422 && error.code === 'INVENTORY_UNIT_NOT_ALLOWED',
+    `${error.status} ${error.code}`,
+  );
+}
+
+// ── 9. تواريخ الصلاحية ─────────────────────────────────────────────────────
+console.log('');
+console.log('9. تواريخ الصلاحية');
+const soon = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+const later = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10);
+await call('post', '/inventory/lots', token, { itemId, lotNo: `LOT-SOON-${stamp}`, expiryDate: soon });
+await call('post', '/inventory/lots', token, { itemId, lotNo: `LOT-LATER-${stamp}`, expiryDate: later });
+const expiring = await call('get', '/inventory/expiry?days=30', token);
+const soonRow = expiring.find((row) => row.lotNo === `LOT-SOON-${stamp}`);
+check(
+  'a lot inside the horizon is reported',
+  Boolean(soonRow) && soonRow.daysLeft > 0 && soonRow.daysLeft <= 10,
+  soonRow ? `${soonRow.lotNo} in ${soonRow.daysLeft} day(s)` : `${expiring.length} row(s)`,
+);
+check(
+  'a lot beyond the horizon is not',
+  !expiring.some((row) => row.lotNo === `LOT-LATER-${stamp}`),
+  `${expiring.length} row(s)`,
 );
 
 console.log(failures === 0 ? '\n✔ Phase 05 inventory documents verified' : `\n✗ ${failures} check(s) failed`);
