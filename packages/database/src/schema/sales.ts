@@ -16,9 +16,9 @@ import {
 import { baseAuditColumns, baseLegacyColumns } from '../columns.js';
 
 import { branches, warehouses } from './organization.js';
-import { items, taxGroups } from './catalog.js';
+import { items, taxGroups, unitsOfMeasure } from './catalog.js';
 import { parties } from './parties.js';
-import { tenants } from './platform.js';
+import { tenants, users } from './platform.js';
 import { shiftCloses } from './treasury.js';
 
 const money = { precision: 20, scale: 4, mode: 'string' as const };
@@ -70,6 +70,10 @@ export const salesInvoices = pgTable(
      * closing report falls back to the branch + time window for those.
      */
     shiftId: uuid('shift_id').references(() => shiftCloses.id, { onDelete: 'set null' }),
+    /** User who physically captured a POS sale; NULL for back-office invoices. */
+    cashierId: uuid('cashier_id').references(() => users.id, { onDelete: 'set null' }),
+    /** simplified (B2C) or standard (B2B / TaxType-2 desktop equivalent). */
+    taxType: text('tax_type').notNull().default('simplified'),
     postedAt: timestamp('posted_at', { withTimezone: true }),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     ...baseAuditColumns(),
@@ -82,6 +86,7 @@ export const salesInvoices = pgTable(
     scope: index('sales_invoices_scope_idx').on(t.tenantId, t.branchId, t.status),
     party: index('sales_invoices_party_idx').on(t.tenantId, t.partyId),
     shift: index('sales_invoices_shift_idx').on(t.tenantId, t.shiftId),
+    cashier: index('sales_invoices_cashier_idx').on(t.tenantId, t.cashierId, t.postedAt),
   }),
 );
 
@@ -97,6 +102,9 @@ export const salesInvoiceLines = pgTable(
       .references(() => salesInvoices.id, { onDelete: 'cascade' }),
     lineNo: integer('line_no').notNull(),
     itemId: uuid('item_id').references(() => items.id),
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id'),
+    serialIds: jsonb('serial_ids').$type<string[]>().notNull().default([]),
     taxGroupId: uuid('tax_group_id').references(() => taxGroups.id),
     description: text('description'),
     modifiers: jsonb('modifiers').$type<Array<Record<string, unknown>>>().notNull().default([]),

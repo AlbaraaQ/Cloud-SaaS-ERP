@@ -23,7 +23,15 @@ export const items = pgTable('items', {
 }, (t) => ({ sku: uniqueIndex('items_tenant_sku_key').on(t.tenantId, t.sku).where(sql`deleted_at IS NULL`), barcode: index('items_tenant_barcode_idx').on(t.tenantId, t.barcode), category: index('items_tenant_category_idx').on(t.tenantId, t.categoryId) }));
 
 export const itemUnits = pgTable('item_units', { itemId: uuid('item_id').notNull().references(() => items.id), unitId: uuid('unit_id').notNull().references(() => unitsOfMeasure.id), ratio: numeric('ratio', { precision: 20, scale: 6 }).notNull(), barcode: text('barcode'), salePrice: numeric('sale_price', { precision: 20, scale: 4 }), purchasePrice: numeric('purchase_price', { precision: 20, scale: 4 }), isDefaultPurchase: boolean('is_default_purchase').notNull().default(false), isDefaultSale: boolean('is_default_sale').notNull().default(false) }, (t) => ({ pk: primaryKey({ columns: [t.itemId, t.unitId] }) }));
-export const itemBarcodes = pgTable('item_barcodes', { tenantId: uuid('tenant_id').notNull().references(() => tenants.id), barcode: text('barcode').notNull(), itemId: uuid('item_id').notNull().references(() => items.id), unitId: uuid('unit_id').references(() => unitsOfMeasure.id), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow() }, (t) => ({ pk: primaryKey({ columns: [t.tenantId, t.barcode] }) }));
+export const itemBarcodes = pgTable('item_barcodes', {
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  barcode: text('barcode').notNull(),
+  itemId: uuid('item_id').notNull().references(() => items.id),
+  unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
+  /** Keeps the legacy item/unit barcode fields synchronised with the canonical scanner-code register. */
+  source: text('source').notNull().default('alternate'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ pk: primaryKey({ columns: [t.tenantId, t.barcode] }) }));
 export const itemAlternativeCodes = pgTable('item_alternative_codes', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id), itemId: uuid('item_id').notNull().references(() => items.id), code: text('code').notNull(), notes: text('notes'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ code: uniqueIndex('item_alt_codes_tenant_code_key').on(t.tenantId, t.code).where(sql`deleted_at IS NULL`) }));
 export const itemComponents = pgTable('item_components', { itemId: uuid('item_id').notNull().references(() => items.id), componentItemId: uuid('component_item_id').notNull().references(() => items.id), qty: numeric('qty', { precision: 20, scale: 4 }).notNull(), unitId: uuid('unit_id').notNull().references(() => unitsOfMeasure.id), kind: text('kind').notNull().default('component') }, (t) => ({ pk: primaryKey({ columns: [t.itemId, t.componentItemId] }) }));
 export const itemPriceHistory = pgTable('item_price_history', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id), itemId: uuid('item_id').notNull().references(() => items.id), unitId: uuid('unit_id'), prices: jsonb('prices').$type<Record<string, string>>().notNull(), recordedBy: uuid('recorded_by'), recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow() });

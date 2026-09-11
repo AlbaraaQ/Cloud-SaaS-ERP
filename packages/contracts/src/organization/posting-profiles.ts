@@ -65,6 +65,8 @@ export const POST_PROFILE_ACCOUNT_KEYS = [
   'bankAccountId',
   'receivableAccountId',
   'payableAccountId',
+  /** Debit on drawer shortage / credit on drawer surplus at shift close. */
+  'cashOverShortAccountId',
 ] as const;
 
 export type PostProfileAccountKey = (typeof POST_PROFILE_ACCOUNT_KEYS)[number];

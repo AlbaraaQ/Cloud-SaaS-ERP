@@ -27,7 +27,20 @@ import { InventoryService, type InventoryLine } from '../inventory/inventory.ser
 import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
 import { SequencesService } from '../platform-services/index.js';
 
-export type PurchaseLineInput = { itemId: string; description?: string; quantity: string; unitPrice: string; discountRate?: string; discountAmount?: string; taxRate?: string; taxGroupId?: string };
+export type PurchaseLineInput = {
+  itemId: string;
+  /** Entered unit; omitted means the item's base unit. */
+  unitId?: string;
+  lotId?: string;
+  serialIds?: string[];
+  description?: string;
+  quantity: string;
+  unitPrice: string;
+  discountRate?: string;
+  discountAmount?: string;
+  taxRate?: string;
+  taxGroupId?: string;
+};
 export type PurchaseInvoiceInput = { branchId: string; warehouseId?: string; partyId: string; referenceInvoiceId?: string; kind?: 'purchase' | 'purchase_return'; supplierReferenceNo?: string; supplierReferenceDate?: string; currency?: string; priceIncludesVat?: boolean; invoiceDiscount?: string; extraTax?: string; withholding?: string; landedCostAlloc?: 'qty' | 'value'; lines: PurchaseLineInput[] };
 export type PurchaseCostInput = { costName: string; amount: string; allocationTarget?: 'inventory' | 'expense'; costCenterId?: string; accountId?: string };
 export type PurchasePostingInput = { fiscalPeriodId?: string; journalLines?: JournalLineInput[]; settlement?: 'credit' | 'cash' | 'bank'; settlementAccountId?: string; settlementCashLocationId?: string };
@@ -53,7 +66,22 @@ export class PurchasesService {
     if (!invoice) throw new DomainError('PURCHASE_INVOICE_NOT_FOUND', 'Purchase invoice was not found', 404);
     const lines = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(purchaseInvoiceLines).where(and(eq(purchaseInvoiceLines.tenantId, tenantId), eq(purchaseInvoiceLines.invoiceId, id))));
     const costs = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(purchaseInvoiceCosts).where(and(eq(purchaseInvoiceCosts.tenantId, tenantId), eq(purchaseInvoiceCosts.invoiceId, id))));
-    return { ...invoice, lines, costs };
+    // Payment allocations are part of the invoice's settlement history, not an
+    // implementation detail hidden behind paidTotal. The supplier statement and
+    // desktop invoice drill-down need both.
+    const payments = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(paymentAllocations)
+        .where(
+          and(
+            eq(paymentAllocations.tenantId, tenantId),
+            eq(paymentAllocations.invoiceId, id),
+            eq(paymentAllocations.invoiceKind, invoice.kind),
+          ),
+        ),
+    );
+    return { ...invoice, lines, costs, payments };
   }
 
   async create(tenantId: string, input: PurchaseInvoiceInput) {
@@ -64,7 +92,7 @@ export class PurchasesService {
       const [supplier] = await tx.select().from(parties).where(and(eq(parties.tenantId, tenantId), eq(parties.id, input.partyId)));
       if (!supplier || !['supplier', 'both'].includes(supplier.kind)) throw new DomainError('PURCHASE_SUPPLIER_REQUIRED', 'Purchase invoices require a supplier party', 422);
       await tx.insert(purchaseInvoices).values({ id, tenantId, createdBy: tryGetAuthContext()?.userId, branchId: input.branchId, warehouseId: input.warehouseId, partyId: input.partyId, referenceInvoiceId: input.referenceInvoiceId, kind: input.kind ?? 'purchase', supplierReferenceNo: input.supplierReferenceNo, supplierReferenceDate: input.supplierReferenceDate, currency: input.currency ?? 'SAR', priceIncludesVat: input.priceIncludesVat ?? false, landedCostAlloc: input.landedCostAlloc ?? 'value', invoiceDiscount: totals.discount, extraTax: totals.extraTax, withholding: totals.withholding, subtotal: totals.subtotal, taxTotal: totals.tax, total: totals.total, status: 'draft' });
-      await tx.insert(purchaseInvoiceLines).values(input.lines.map((line, index) => { const calculated = totals.lines[index]; if (!calculated) throw new DomainError('PURCHASE_TOTALS_INVALID', 'Purchase totals do not match invoice lines', 422); return { id: newId(), tenantId, invoiceId: id, lineNo: index + 1, itemId: line.itemId, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice, discountRate: line.discountRate ?? '0', discountAmount: calculated.discount, taxGroupId: line.taxGroupId, taxRate: line.taxRate ?? '0', net: calculated.net, tax: calculated.tax, total: calculated.total }; }));
+      await tx.insert(purchaseInvoiceLines).values(input.lines.map((line, index) => { const calculated = totals.lines[index]; if (!calculated) throw new DomainError('PURCHASE_TOTALS_INVALID', 'Purchase totals do not match invoice lines', 422); return { id: newId(), tenantId, invoiceId: id, lineNo: index + 1, itemId: line.itemId, unitId: line.unitId, lotId: line.lotId, serialIds: line.serialIds ?? [], description: line.description, quantity: line.quantity, unitPrice: line.unitPrice, discountRate: line.discountRate ?? '0', discountAmount: calculated.discount, taxGroupId: line.taxGroupId, taxRate: line.taxRate ?? '0', net: calculated.net, tax: calculated.tax, total: calculated.total }; }));
     });
     return this.get(tenantId, id);
   }
@@ -148,7 +176,7 @@ export class PurchasesService {
       const stockable = new Set(itemRows.filter((row) => row.kind === 'stock').map((row) => row.id));
       const stocked = lines.filter((line) => stockable.has(line.itemId) && money(line.quantity).gt(0));
       if (stocked.length && !locked.warehouseId) throw new DomainError('PURCHASE_WAREHOUSE_REQUIRED', 'Posting purchases requires a warehouse', 422);
-      const inventoryLines: InventoryLine[] = stocked.map((line) => { const allocated = byLine.get(line.id); return { itemId: line.itemId, warehouseId: locked.warehouseId ?? '', qty: line.quantity, unitCost: allocated?.effectiveUnitCost ?? line.unitPrice, direction: isReturn ? 'out' : 'in', docType, docId: id, lineId: line.id, costing: isReturn ? 'outAtAvg' : 'inWithCost' }; });
+      const inventoryLines: InventoryLine[] = stocked.map((line) => { const allocated = byLine.get(line.id); return { itemId: line.itemId, warehouseId: locked.warehouseId ?? '', qty: line.quantity, unitId: line.unitId ?? undefined, unitCost: allocated?.effectiveUnitCost ?? line.unitPrice, lotId: line.lotId ?? undefined, serialIds: line.serialIds, direction: isReturn ? 'out' : 'in', docType, docId: id, lineId: line.id, sourceLineId: line.id, costing: isReturn ? 'outAtAvg' : 'inWithCost' }; });
       if (inventoryLines.length) await this.inventory.recordInTx(tx, tenantId, inventoryLines);
       for (const line of lines) {
         const allocated = byLine.get(line.id);
@@ -332,6 +360,27 @@ export class PurchasesService {
     if (money(invoice.paidTotal).abs().gt(0)) {
       throw new DomainError('PURCHASE_VOID_HAS_PAYMENTS', 'Unallocate the payments before voiding', 409);
     }
+    const [postedReturn] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: purchaseInvoices.id })
+        .from(purchaseInvoices)
+        .where(
+          and(
+            eq(purchaseInvoices.tenantId, tenantId),
+            eq(purchaseInvoices.referenceInvoiceId, id),
+            eq(purchaseInvoices.kind, 'purchase_return'),
+            eq(purchaseInvoices.status, 'posted'),
+          ),
+        )
+        .limit(1),
+    );
+    if (postedReturn) {
+      throw new DomainError(
+        'PURCHASE_VOID_HAS_RETURNS',
+        'This purchase already has a posted return; reverse that document first',
+        409,
+      );
+    }
     // The old cloud void only flipped the flag and left the journal and the stock
     // behind. Like the sales side, voiding now reverses all three legs — journal,
     // stock and status — in one transaction.
@@ -384,7 +433,9 @@ export class PurchasesService {
       const mirrors: InventoryLine[] = movements.map((movement) => ({
         itemId: movement.itemId,
         warehouseId: movement.warehouseId,
-        qty: movement.qty,
+        // Ledger unit_cost is per base unit; reverse in base units so historical
+        // non-base purchase lines retain their exact inventory value.
+        qty: movement.baseQty,
         unitCost: movement.unitCost ?? '0',
         direction: movement.direction === 'out' ? 'in' : 'out',
         docType: 'purchase_void',

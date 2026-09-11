@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
-
 import { OrgProvisioningService } from '../src/modules/organization/provisioning/org-provisioning.service.js';
+
+import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
 import { api } from './http.js';
 import { createTestApp, type TestApp } from './test-app.js';
 
@@ -21,6 +21,7 @@ describe('goods requests and stock deliveries', () => {
   let toWarehouseId = '';
   let itemId = '';
   let otherItemId = '';
+  let cashAccountId = '';
 
   const inventoryPermissions = [
     'inventory.view',
@@ -54,6 +55,10 @@ describe('goods requests and stock deliveries', () => {
 
     const defaults = await ctx.app.get(OrgProvisioningService).provisionOrgDefaults(actor.tenantId);
     branchId = defaults.branchId;
+    const cashLocations = await api(ctx.server, 'get', '/api/v1/cash-locations', { token: actor.token });
+    cashAccountId = ((cashLocations.body.data ?? cashLocations.body) as Array<{ id: string; accountId: string | null }>)
+      .find((location) => location.id === defaults.cashLocationId)?.accountId ?? '';
+    expect(cashAccountId).toBeTruthy();
 
     const year = new Date().getUTCFullYear();
     const fiscal = await api(ctx.server, 'post', '/api/v1/fiscal-years', {
@@ -164,7 +169,10 @@ describe('goods requests and stock deliveries', () => {
     expect(tooEarly.status).toBe(422);
     expect(tooEarly.body.code).toBe('DELIVERY_INVOICE_NOT_POSTED');
 
-    const posted = await api(ctx.server, 'post', `/api/v1/sales/invoices/${invoice.id}/post`, { token: actor.token, body: {} });
+    const posted = await api(ctx.server, 'post', `/api/v1/sales/invoices/${invoice.id}/post`, {
+      token: actor.token,
+      body: { settlement: 'cash', settlementAccountId: cashAccountId },
+    });
     expect(posted.status).toBe(201);
 
     const outstanding = await api(ctx.server, 'get', '/api/v1/inventory/deliveries/outstanding', { token: actor.token });

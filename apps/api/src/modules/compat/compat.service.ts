@@ -1,12 +1,12 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
-import { accounts, branches, compatDevices, inventoryTransactions, items, journalEntries, parties, salesInvoices, taxGroups, vouchers, warehouses, withTenantTx, type CompatDevice, type DatabaseHandle } from '@erp/database';
+import { accounts, branches, cashLocations, compatDevices, inventoryTransactions, items, journalEntries, parties, salesInvoices, taxGroups, vouchers, warehouses, withTenantTx, type CompatDevice, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
-import { SalesService } from '../sales/sales.service.js';
+import { SalesService, type PostingInput } from '../sales/sales.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 
 import { mapLegacySale, mapLegacyVoucher, type LegacySalesInvoiceDto, type LegacyVoucherDto } from './compat-mappers.js';
@@ -112,19 +112,85 @@ export class CompatService {
   async pushSale(tenantId: string, token: string, body: LegacySalesInvoiceDto, idempotencyKey?: string) {
     const session = await this.requireSession(tenantId, token);
     await this.rateLimit(tenantId, session.device.id);
-    const mapped = mapLegacySale({ ...body, BranchID: body.BranchID ?? session.device.branchId }, session.device.enumMaps);
+    this.assertDeviceBranch(session, body.BranchID);
+    const mapped = mapLegacySale({ ...body, BranchID: body.BranchID || session.device.branchId }, session.device.enumMaps);
     const existing = await this.status(tenantId, mapped.legacyId);
     if (existing.data.found) return { data: { duplicate: true, ...existing.data } };
-    const invoice = await this.sales.create(tenantId, mapped);
-    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salesInvoices).set({ legacySource: 'compat', legacyId: mapped.legacyId, updatedAt: new Date() }).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, invoice.id))));
-    const posted = await this.sales.post(tenantId, invoice.id);
-    return { data: { duplicate: false, legacyId: mapped.legacyId, cloudId: posted.id, number: posted.number, idempotencyKey: idempotencyKey ?? mapped.legacyId } };
+
+    // `payMethod` belongs to the desktop wire DTO, not to SalesInvoiceInput. Resolve
+    // it before posting so the old default credit settlement never turns a walk-in
+    // customer into a party-less receivable. A cash/card desktop sale must name a
+    // real, branch-local cash location and gets the same payment row as cloud POS.
+    const { legacyId, payMethod, ...invoiceInput } = mapped;
+    const posting = await this.resolveLegacySalePosting(tenantId, invoiceInput.branchId, payMethod);
+    const invoice = await this.sales.create(tenantId, invoiceInput);
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(salesInvoices)
+        .set({ legacySource: 'compat', legacyId, updatedAt: new Date() })
+        .where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, invoice.id))),
+    );
+    const posted = await this.sales.post(tenantId, invoice.id, posting);
+    return { data: { duplicate: false, legacyId, cloudId: posted.id, number: posted.number, idempotencyKey: idempotencyKey ?? legacyId } };
+  }
+
+  private async resolveLegacySalePosting(
+    tenantId: string,
+    branchId: string,
+    payMethod: string,
+  ): Promise<PostingInput> {
+    if (payMethod === 'credit') return { settlement: 'credit' };
+    if (payMethod === 'split') {
+      throw new DomainError(
+        'COMPAT_SPLIT_SETTLEMENT_UNSUPPORTED',
+        'A legacy split payment needs explicit tender amounts before it can be imported',
+        422,
+        { field: 'PayType' },
+      );
+    }
+    if (!['cash', 'card', 'bank'].includes(payMethod)) {
+      throw new DomainError('COMPAT_ENUM_UNKNOWN', `Unknown legacy payMethod '${payMethod}'`, 422, {
+        field: 'PayType',
+      });
+    }
+    const settlement = payMethod as 'cash' | 'card' | 'bank';
+    const locationKind = settlement === 'cash' ? 'safe' : 'bank';
+    const [location] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: cashLocations.id, accountId: cashLocations.accountId })
+        .from(cashLocations)
+        .where(
+          and(
+            eq(cashLocations.tenantId, tenantId),
+            eq(cashLocations.branchId, branchId),
+            eq(cashLocations.kind, locationKind),
+            eq(cashLocations.isDefault, true),
+            eq(cashLocations.isActive, true),
+            isNull(cashLocations.deletedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (!location?.accountId) {
+      throw new DomainError(
+        'COMPAT_SETTLEMENT_LOCATION_REQUIRED',
+        `No active default ${locationKind} with a posting account is configured for this branch`,
+        422,
+        { field: 'PayType' },
+      );
+    }
+    return {
+      settlement,
+      settlementAccountId: location.accountId,
+      settlementCashLocationId: location.id,
+    };
   }
 
   async pushVoucher(tenantId: string, token: string, body: LegacyVoucherDto, idempotencyKey?: string) {
     const session = await this.requireSession(tenantId, token);
     await this.rateLimit(tenantId, session.device.id);
-    const mapped = mapLegacyVoucher({ ...body, BranchID: body.BranchID ?? session.device.branchId }, session.device.enumMaps);
+    this.assertDeviceBranch(session, body.BranchID);
+    const mapped = mapLegacyVoucher({ ...body, BranchID: body.BranchID || session.device.branchId }, session.device.enumMaps);
     const existing = await this.status(tenantId, mapped.legacyId);
     if (existing.data.found) return { data: { duplicate: true, ...existing.data } };
     const voucher = await this.treasury.createVoucher(tenantId, { ...mapped, idempotencyKey: idempotencyKey ?? mapped.legacyId });
@@ -151,6 +217,18 @@ export class CompatService {
       if (voucher) return { data: { found: true, entity: 'voucher', legacyId, cloudId: voucher.id, number: voucher.number, status: voucher.status } };
       return { data: { found: false, legacyId } };
     });
+  }
+
+  /** A device credential is scoped to one branch; a payload may omit BranchID but may not override it. */
+  private assertDeviceBranch(session: DeviceSession, requestedBranchId?: string): void {
+    if (requestedBranchId && requestedBranchId !== session.device.branchId) {
+      throw new DomainError(
+        'COMPAT_DEVICE_BRANCH_MISMATCH',
+        'This compat device is not authorized to submit documents for the requested branch',
+        403,
+        { field: 'BranchID' },
+      );
+    }
   }
 
   private async requireSession(tenantId: string, token: string): Promise<DeviceSession> {

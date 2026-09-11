@@ -14,12 +14,28 @@ describe('inventory phase 09 integration', () => {
     alpha = await createActor(ctx, {
       tenantCode: 'inventory-alpha',
       email: 'owner@inventory-alpha.test',
-      permissions: [...ALL_PLATFORM_PERMISSIONS, 'inventory.view', 'inventory.adjust', 'inventory.negative.override'],
+      permissions: [
+        ...ALL_PLATFORM_PERMISSIONS,
+        'inventory.view',
+        'inventory.adjust',
+        'inventory.adjust.approve',
+        'inventory.transfer',
+        'inventory.transfer.receive',
+        'inventory.negative.override',
+      ],
     });
     beta = await createActor(ctx, {
       tenantCode: 'inventory-beta',
       email: 'owner@inventory-beta.test',
-      permissions: [...ALL_PLATFORM_PERMISSIONS, 'inventory.view', 'inventory.adjust', 'inventory.negative.override'],
+      permissions: [
+        ...ALL_PLATFORM_PERMISSIONS,
+        'inventory.view',
+        'inventory.adjust',
+        'inventory.adjust.approve',
+        'inventory.transfer',
+        'inventory.transfer.receive',
+        'inventory.negative.override',
+      ],
     });
   }, 240_000);
 

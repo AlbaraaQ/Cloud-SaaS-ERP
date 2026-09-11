@@ -16,6 +16,11 @@ const nextConfig = {
     // the UI work from any host (LAN, tunnel, container) without touching CORS.
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? '',
   },
+  async redirects() {
+    // Opening stock previously pointed at the generic scaffold namespace. Keep saved
+    // desktop-style links useful while ensuring it can never land on stock adjustment.
+    return [{ source: '/s/inventory/opening-stock', destination: '/inventory/opening-stock', permanent: false }];
+  },
   async rewrites() {
     return [
       { source: '/api/v1/:path*', destination: `${apiTarget}/api/v1/:path*` },

@@ -408,6 +408,9 @@ export const erpFunctionalRoleCatalog: readonly RoleCatalogEntry[] = [
       'catalog.item.manage',
       'catalog.category.view',
       'catalog.unit.view',
+      // The advanced item card lets an inventory manager select and inspect the VAT group;
+      // without this read code its tax selector would be silently empty.
+      'catalog.taxgroup.view',
       'inventory.view',
       'inventory.adjust',
       'inventory.adjust.approve',

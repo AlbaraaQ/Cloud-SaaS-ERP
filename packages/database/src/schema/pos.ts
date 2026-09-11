@@ -4,8 +4,9 @@ import { date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueI
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
 import { branches } from './organization.js';
+import { items } from './catalog.js';
 import { salesInvoices } from './sales.js';
-import { tenants } from './platform.js';
+import { tenants, users } from './platform.js';
 
 const qty = { precision: 20, scale: 4, mode: 'string' as const };
 const money = { precision: 20, scale: 4, mode: 'string' as const };
@@ -71,6 +72,40 @@ export const orderEvents = pgTable('order_events', {
   orderEventsDayIdx: index('order_events_day_idx').on(table.tenantId, table.branchId, table.businessDay),
 }));
 
+/** The desktop till's eight save-and-recall slots, scoped to one cashier and branch. */
+export const posHeldTickets = pgTable('pos_held_tickets', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  branchId: uuid('branch_id').notNull().references(() => branches.id, { onDelete: 'restrict' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  slot: integer('slot').notNull(),
+  status: text('status').notNull().default('held'),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+  heldAt: timestamp('held_at', { withTimezone: true }).notNull().defaultNow(),
+  recalledAt: timestamp('recalled_at', { withTimezone: true }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  ...baseAuditColumns(),
+}, (t) => ({
+  slot: uniqueIndex('pos_held_tickets_live_slot_key').on(t.tenantId, t.branchId, t.userId, t.slot).where(sql`status = 'held'`),
+  scope: index('pos_held_tickets_scope_idx').on(t.tenantId, t.branchId, t.userId, t.status, t.heldAt),
+}));
+
+/** Configurable quick keys for high-volume tills. */
+export const posShortcutItems = pgTable('pos_shortcut_items', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  branchId: uuid('branch_id').notNull().references(() => branches.id, { onDelete: 'restrict' }),
+  slot: integer('slot').notNull(),
+  itemId: uuid('item_id').notNull().references(() => items.id, { onDelete: 'restrict' }),
+  ...baseAuditColumns(),
+}, (t) => ({
+  slot: uniqueIndex('pos_shortcut_items_slot_key').on(t.tenantId, t.branchId, t.slot),
+  item: uniqueIndex('pos_shortcut_items_item_key').on(t.tenantId, t.branchId, t.itemId),
+  scope: index('pos_shortcut_items_scope_idx').on(t.tenantId, t.branchId, t.slot),
+}));
+
 export type TableCategory = typeof tableCategories.$inferSelect;
 export type DiningTable = typeof diningTables.$inferSelect;
 export type OrderEvent = typeof orderEvents.$inferSelect;
+export type PosHeldTicket = typeof posHeldTickets.$inferSelect;
+export type PosShortcutItem = typeof posShortcutItems.$inferSelect;

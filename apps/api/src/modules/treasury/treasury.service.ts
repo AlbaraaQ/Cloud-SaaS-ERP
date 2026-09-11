@@ -21,6 +21,7 @@ import {
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService, type JournalLineInput } from '../accounting/accounting.service.js';
+import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
 import { SequencesService } from '../platform-services/index.js';
 
 export type VoucherInput = {
@@ -67,6 +68,7 @@ export class TreasuryService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly accounting: AccountingService,
+    private readonly profiles: PostingProfilesService,
     private readonly sequences: SequencesService,
   ) {}
 
@@ -620,6 +622,54 @@ export class TreasuryService {
             amount: total.amount.toFixed(4),
             metadata: total.metadata ?? {},
           });
+      let journalEntryId: string | null = null;
+      const variance = counted.minus(expected);
+      if (!variance.isZero()) {
+        const profile = await this.profiles.resolvePostProfileInTx(tx, tenantId, shift.branchId, 'shift_close');
+        const mapping = profile.mapping as unknown as Record<string, string | null | undefined>;
+        const cashAccountId = mapping.cashAccountId;
+        const overShortAccountId = mapping.cashOverShortAccountId;
+        if (!cashAccountId || !overShortAccountId) {
+          throw new DomainError(
+            'SHIFT_VARIANCE_ACCOUNT_REQUIRED',
+            'Configure cashAccountId and cashOverShortAccountId before closing a shift with a variance',
+            422,
+          );
+        }
+        const closeDate = new Date().toISOString().slice(0, 10);
+        const fiscalPeriodId = await this.accounting.openPeriodForDateInTx(tx, tenantId, closeDate);
+        const amount = variance.abs().toFixed(4);
+        const journal = await this.accounting.postJournalInTx(tx, tenantId, {
+          branchId: shift.branchId,
+          fiscalPeriodId,
+          date: closeDate,
+          description: `Cash drawer variance for shift ${id}`,
+          sourceType: 'shift_close',
+          sourceId: id,
+          idempotencyKey: `shift-close-variance:${id}`,
+          lines: variance.gt(0)
+            ? [
+                { accountId: cashAccountId, debit: amount, credit: '0.0000' },
+                { accountId: overShortAccountId, debit: '0.0000', credit: amount },
+              ]
+            : [
+                { accountId: overShortAccountId, debit: amount, credit: '0.0000' },
+                { accountId: cashAccountId, debit: '0.0000', credit: amount },
+              ],
+        });
+        journalEntryId = journal?.id ?? null;
+        await tx
+          .insert(shiftCloseLines)
+          .values({
+            shiftCloseId: id,
+            lineNo: summaryLine++,
+            tenantId,
+            kind: 'variance',
+            method: 'cash',
+            amount: variance.toFixed(4),
+            metadata: { journalEntryId },
+          });
+      }
       await tx
         .update(shiftCloses)
         .set({
@@ -629,12 +679,13 @@ export class TreasuryService {
           countedCash: counted.toFixed(4),
           diff: counted.minus(expected).toFixed(4),
           summary,
+          journalEntryId,
           updatedAt: new Date(),
         })
         .where(
           and(eq(shiftCloses.tenantId, tenantId), eq(shiftCloses.id, id), eq(shiftCloses.status, 'open')),
         );
-      return { id, status: 'closed', summary };
+      return { id, status: 'closed', summary, journalEntryId };
     });
   }
   printShiftData(tenantId: string, id: string) {

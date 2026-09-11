@@ -21,6 +21,7 @@ const DOCS: Record<string, { path: string; title: string; back: string; backLabe
   voucher: { path: 'vouchers', title: 'طباعة السند', back: '/treasury/vouchers', backLabel: 'السندات' },
   'journal-entry': { path: 'journal-entries', title: 'طباعة سند القيد', back: '/accounting/journal-entries', backLabel: 'القيود' },
   shift: { path: 'shifts', title: 'طباعة إغلاق اليومية', back: '/sales/shifts', backLabel: 'إغلاقات اليومية' },
+  'inventory-document': { path: 'inventory-documents', title: 'طباعة مستند المخزون', back: '/inventory/receipts', backLabel: 'مستندات المخزون' },
 };
 
 export default function PrintPage({ params }: { params: Promise<{ doc: string; id: string }> }) {

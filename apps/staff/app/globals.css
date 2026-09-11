@@ -580,6 +580,135 @@ th.num {
   max-width: 420px;
 }
 
+/* ------------------------------------------------------------------ inventory item card */
+.item-card {
+  display: grid;
+  gap: 14px;
+  border-color: #cbd5e1;
+}
+.item-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.item-card-head h2,
+.item-section-intro h3,
+.item-subform h3 {
+  margin: 0;
+}
+.item-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.item-summary span {
+  display: grid;
+  gap: 3px;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: var(--muted);
+  font-size: 11px;
+}
+.item-summary b {
+  color: var(--ink);
+  font-size: 13px;
+}
+.item-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.item-tab {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 11px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.item-tab:hover:not(:disabled) {
+  background: #fff;
+  border-color: #dbe3ec;
+}
+.item-tab.active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+.item-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.item-section-intro {
+  display: grid;
+  gap: 3px;
+}
+.item-section-intro p {
+  margin: 0;
+}
+.item-switches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 8px;
+}
+.item-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+.item-switch:has(input:checked) {
+  border-color: #5eead4;
+  background: #f0fdfa;
+}
+.item-switch input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--brand);
+}
+.item-switch span {
+  display: grid;
+  gap: 3px;
+}
+.item-switch b {
+  font-size: 12.5px;
+}
+.item-switch small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.item-switch.compact {
+  min-height: 0;
+  align-items: center;
+  padding: 8px 10px;
+}
+.item-subform {
+  display: grid;
+  gap: 10px;
+  background: #fbfdff;
+  border-color: #dbeafe;
+}
+
 /* ------------------------------------------------------------------ misc */
 .chips {
   display: flex;
@@ -677,6 +806,12 @@ th.num {
   }
 }
 @media (max-width: 1000px) {
+  .item-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .item-card-head {
+    flex-direction: column;
+  }
   .shell {
     grid-template-columns: 1fr;
   }

@@ -174,6 +174,113 @@ export class PrintTemplatesService {
     });
   }
 
+  /**
+   * The printed counterpart of the opening, receipt, issue and adjustment workspace.
+   * Quantities are the operator-entered quantities; valuation is derived from the immutable
+   * ledger after posting, so a goods issue displays its actual moving-average cost rather
+   * than the browser's (often zero) input cost.
+   */
+  async inventoryDocument(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const company = await this.company(tx, tenantId);
+      const document = first(
+        await tx.execute(sql`
+          SELECT d.*, b.name_ar AS branch_name, w.name AS warehouse_name,
+                 a.code AS counter_code, a.name_ar AS counter_name,
+                 j.number AS journal_number
+            FROM inventory_documents d
+            LEFT JOIN branches b ON b.id = d.branch_id
+            LEFT JOIN warehouses w ON w.id = d.warehouse_id
+            LEFT JOIN accounts a ON a.id = d.counter_account_id
+            LEFT JOIN journal_entries j ON j.id = d.journal_entry_id
+           WHERE d.tenant_id = ${tenantId} AND d.id = ${id}
+        `),
+      );
+      if (!document) throw new DomainError('NOT_FOUND', 'Inventory document was not found', 404);
+
+      const lines = rows(
+        await tx.execute(sql`
+          SELECT l.*, i.sku, i.name_ar AS item_name, u.code AS unit_code,
+                 lot.lot_no,
+                 CASE
+                   WHEN d.kind IN ('opening', 'receipt') THEN 'in'
+                   WHEN d.kind = 'issue' THEN 'out'
+                   ELSE l.adjustment_direction
+                 END AS movement_direction,
+                 COALESCE((
+                   SELECT sum(t.total_cost)
+                     FROM inventory_transactions t
+                    WHERE t.tenant_id = l.tenant_id
+                      AND t.doc_type = concat('inventory_', d.kind)
+                      AND t.doc_id = d.id
+                      AND (t.line_id = l.id OR t.metadata ->> 'sourceLineId' = l.id::text)
+                 ), 0) AS movement_value,
+                 COALESCE((
+                   SELECT string_agg(serial.serial_no, '، ' ORDER BY serial.serial_no)
+                     FROM item_serials serial
+                     JOIN jsonb_array_elements_text(l.serial_ids) selected(serial_id) ON selected.serial_id::uuid = serial.id
+                    WHERE serial.tenant_id = l.tenant_id
+                 ), '') AS serial_numbers
+            FROM inventory_document_lines l
+            JOIN inventory_documents d ON d.id = l.document_id
+            LEFT JOIN items i ON i.id = l.item_id
+            LEFT JOIN units_of_measure u ON u.id = l.unit_id
+            LEFT JOIN item_lots lot ON lot.id = l.lot_id
+           WHERE l.tenant_id = ${tenantId} AND l.document_id = ${id}
+           ORDER BY l.line_no
+        `),
+      );
+      const kind = str(document.kind);
+      const posted = str(document.status) === 'posted' || str(document.status) === 'voided';
+      const incomingValue = lines
+        .filter((line) => str(line.movement_direction) === 'in')
+        .reduce((sum, line) => sum.plus(str(line.movement_value) || '0'), new Decimal(0));
+      const outgoingValue = lines
+        .filter((line) => str(line.movement_direction) === 'out')
+        .reduce((sum, line) => sum.plus(str(line.movement_value) || '0'), new Decimal(0));
+      const valueChange = incomingValue.minus(outgoingValue);
+      const kindTitle = INVENTORY_DOCUMENT_TITLES[kind] ?? 'مستند مخزون';
+
+      return this.page({
+        title: `${kindTitle} ${str(document.number) || ''}`.trim(),
+        body: `
+          ${this.header(company, {
+            docTitle: kindTitle,
+            docTitleEn: INVENTORY_DOCUMENT_TITLES_EN[kind] ?? 'Inventory Document',
+            number: str(document.number) || '—',
+            date: dateText(document.document_date),
+            status: STATUS_LABELS[str(document.status)] ?? str(document.status),
+            extra: [
+              ['الفرع', str(document.branch_name)],
+              ['المستودع', str(document.warehouse_name)],
+              ['القيد المرتبط', str(document.journal_number)],
+            ],
+          })}
+          <section class="panel">
+            ${str(document.reason) ? `<div class="kv"><span>السبب / البيان</span><b>${escapeHtml(str(document.reason))}</b></div>` : ''}
+            ${str(document.notes) ? `<div class="kv"><span>ملاحظات</span><b>${escapeHtml(str(document.notes))}</b></div>` : ''}
+            ${str(document.counter_code) ? `<div class="kv"><span>الحساب المقابل</span><b dir="ltr">${escapeHtml(`${str(document.counter_code)} — ${str(document.counter_name)}`)}</b></div>` : ''}
+            ${!posted ? '<div class="kv"><span>التقييم</span><b class="warn">هذه مسودة؛ لا توجد حركة أو قيمة مرحّلة بعد.</b></div>' : ''}
+          </section>
+          ${this.inventoryDocumentLinesTable(lines, posted)}
+          ${
+            posted
+              ? `<section class="totals">
+                   <div class="totals-side"><p class="words">قيم الحركة أدناه ناتجة من دفتر المخزون المرحّل.</p></div>
+                   <table class="totals-table">
+                     <tr><th>قيمة الداخل</th><td class="num">${escapeHtml(money(incomingValue.toFixed(4)))}</td></tr>
+                     <tr><th>قيمة الخارج</th><td class="num">${escapeHtml(money(outgoingValue.toFixed(4)))}</td></tr>
+                     <tr class="grand"><th>صافي التغير</th><td class="num">${escapeHtml(money(valueChange.toFixed(4)))}</td></tr>
+                   </table>
+                 </section>`
+              : ''
+          }
+          ${this.signatures(['أمين المستودع', 'المحاسب', 'المعتمد'])}
+        `,
+      });
+    });
+  }
+
   async voucher(tenantId: string, id: string) {
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const company = await this.company(tx, tenantId);
@@ -516,6 +623,46 @@ export class PrintTemplatesService {
     `;
   }
 
+  private inventoryDocumentLinesTable(lines: Array<Record<string, unknown>>, posted: boolean) {
+    if (!lines.length) return '<p class="empty">لا توجد بنود على هذا المستند.</p>';
+    return `
+      <table class="lines">
+        <thead>
+          <tr>
+            <th>#</th><th>الصنف</th><th>الوحدة</th><th>الكمية</th><th>بالوحدة الأساسية</th>
+            <th>الحركة</th><th>تكلفة الإدخال</th><th>قيمة الحركة</th><th>التتبع</th><th>ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lines
+            .map((line) => {
+              const tracking = [
+                str(line.lot_no) ? `تشغيلة: ${str(line.lot_no)}` : '',
+                str(line.serial_numbers) ? `مسلسل: ${str(line.serial_numbers)}` : '',
+              ]
+                .filter(Boolean)
+                .join(' — ');
+              const direction = INVENTORY_DIRECTION_LABELS[str(line.movement_direction)] ?? '—';
+              const enteredCost = str(line.unit_cost);
+              return `<tr>
+                <td class="num">${escapeHtml(str(line.line_no))}</td>
+                <td>${escapeHtml(str(line.item_name))}${str(line.sku) ? `<span class="sku" dir="ltr">${escapeHtml(str(line.sku))}</span>` : ''}</td>
+                <td>${escapeHtml(str(line.unit_code))}</td>
+                <td class="num">${escapeHtml(qty(str(line.quantity)))}</td>
+                <td class="num">${escapeHtml(qty(str(line.base_quantity)))}</td>
+                <td>${escapeHtml(direction)}</td>
+                <td class="num">${escapeHtml(enteredCost === '0.0000' && direction === 'صرف' ? '—' : money(enteredCost))}</td>
+                <td class="num">${posted ? escapeHtml(money(str(line.movement_value))) : '—'}</td>
+                <td>${escapeHtml(tracking || '—')}</td>
+                <td>${escapeHtml(str(line.note) || '—')}</td>
+              </tr>`;
+            })
+            .join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
   private totalsBlock(totals: {
     currency: string;
     subtotal: string;
@@ -718,6 +865,19 @@ const ZATCA_STATUS_LABELS: Record<string, string> = {
 
 const SALES_KIND_TITLES: Record<string, string> = { sale: 'فاتورة مبيعات', return: 'مردود مبيعات', quotation: 'عرض سعر', contracting: 'فاتورة مقاولات' };
 const SALES_KIND_TITLES_EN: Record<string, string> = { sale: 'Sales Invoice', return: 'Sales Return', quotation: 'Quotation', contracting: 'Contracting Invoice' };
+const INVENTORY_DOCUMENT_TITLES: Record<string, string> = {
+  opening: 'مستند مخزون أول المدة',
+  receipt: 'إذن استلام بضاعة',
+  issue: 'إذن صرف بضاعة',
+  adjustment: 'تسوية مخزنية',
+};
+const INVENTORY_DOCUMENT_TITLES_EN: Record<string, string> = {
+  opening: 'Opening Stock Document',
+  receipt: 'Goods Receipt',
+  issue: 'Goods Issue',
+  adjustment: 'Stock Adjustment',
+};
+const INVENTORY_DIRECTION_LABELS: Record<string, string> = { in: 'إضافة', out: 'صرف' };
 const STATUS_LABELS: Record<string, string> = { draft: 'مسودة', posted: 'مرحّلة', void: 'ملغاة', voided: 'ملغاة', paid: 'مدفوعة', open: 'مفتوحة', closed: 'مغلقة' };
 const PAYMENT_METHODS: Record<string, string> = { cash: 'نقداً', card: 'شبكة', bank_transfer: 'تحويل بنكي', transfer: 'تحويل بنكي', cheque: 'شيك', credit: 'آجل' };
 const VOUCHER_SUBTYPES: Record<string, string> = { customer: 'دفعة من عميل', supplier: 'دفعة لمورد', expense: 'مصروف', salary: 'رواتب', tax: 'ضريبة', other: 'أخرى' };

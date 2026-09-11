@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { DataTable, Notice } from '../../../../components/data-view';
 import { ErrorBox, Loading, Screen } from '../../../../components/screen';
@@ -58,7 +58,7 @@ export default function SalesInvoiceDetailPage() {
   const parties = useQuery<Party[]>(() => listParties('customer'), []);
   const cashLocations = useQuery<CashLocation[]>(() => listCashLocations(), []);
 
-  const [settlement, setSettlement] = useState<'credit' | 'cash' | 'bank'>('credit');
+  const [settlement, setSettlement] = useState<'credit' | 'cash' | 'card' | 'bank'>('credit');
   const [settleLocationId, setSettleLocationId] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
@@ -66,6 +66,13 @@ export default function SalesInvoiceDetailPage() {
   const [payMethod, setPayMethod] = useState('cash');
   const [payLocationId, setPayLocationId] = useState('');
   const [voidReason, setVoidReason] = useState('');
+
+  // A walk-in/customer-name invoice has no receivable subledger. Default it to an
+  // immediate settlement as soon as its data arrives, instead of presenting the
+  // legacy "credit" default and letting the user discover the error at posting.
+  useEffect(() => {
+    if (invoice.data?.cashCustomerName && !invoice.data.partyId) setSettlement('cash');
+  }, [invoice.data?.cashCustomerName, invoice.data?.partyId]);
 
   if (invoice.status === 'loading') return <Loading />;
   if (invoice.status !== 'success' || !invoice.data) {
@@ -100,6 +107,9 @@ export default function SalesInvoiceDetailPage() {
     // The posting engine builds the journal from the branch's posting profile,
     // relieves the warehouse at average cost, and stamps each line's cost — all
     // in one transaction. The screen only declares how the invoice settles.
+    if (!doc.partyId && settlement === 'credit') {
+      throw new ApiError(422, 'SALES_CASH_CUSTOMER_SETTLEMENT_REQUIRED', 'العميل النقدي يجب أن يُرحَّل إلى صندوق أو بنك، وليس على الذمم.');
+    }
     if (settlement !== 'credit' && !settleLocationId) {
       throw new ApiError(422, 'VALIDATION_FAILED', 'اختر الصندوق أو البنك الذي استلم المبلغ.');
     }
@@ -164,22 +174,30 @@ export default function SalesInvoiceDetailPage() {
             <>
               <label className="field">
                 <span>طريقة التحصيل عند الترحيل</span>
-                <select className="input" value={settlement} onChange={(event) => setSettlement(event.target.value as 'credit' | 'cash' | 'bank')}>
-                  <option value="credit">على حساب العميل (ذمم)</option>
+                <select
+                  className="input"
+                  value={settlement}
+                  onChange={(event) => setSettlement(event.target.value as 'credit' | 'cash' | 'card' | 'bank')}
+                >
+                  <option value="credit" disabled={!doc.partyId}>على حساب العميل (ذمم)</option>
                   <option value="cash">نقداً (الصندوق)</option>
-                  <option value="bank">بنك</option>
+                  <option value="card">شبكة / بطاقة</option>
+                  <option value="bank">تحويل بنكي</option>
                 </select>
+                {!doc.partyId && <span className="muted small">العميل النقدي لا يُرحَّل على الذمم؛ اختر صندوقاً أو بنكاً.</span>}
               </label>
               {settlement !== 'credit' && (
                 <label className="field">
-                  <span>الصندوق / البنك المستلم *</span>
+                  <span>{settlement === 'cash' ? 'الصندوق المستلم' : 'البنك المستلم'} *</span>
                   <select className="input" value={settleLocationId} onChange={(event) => setSettleLocationId(event.target.value)}>
                     <option value="">— اختر —</option>
-                    {(cashLocations.data ?? []).map((row) => (
-                      <option key={row.id} value={row.id}>
-                        {cashLocationLabel(row)}
-                      </option>
-                    ))}
+                    {(cashLocations.data ?? [])
+                      .filter((row) => settlement === 'cash' ? row.kind === 'safe' : row.kind === 'bank')
+                      .map((row) => (
+                        <option key={row.id} value={row.id}>
+                          {cashLocationLabel(row)}
+                        </option>
+                      ))}
                   </select>
                   <span className="muted small">يُقيَّد المبلغ على حساب هذا الموقع وتُسجَّل دفعة بنفس القيمة.</span>
                 </label>

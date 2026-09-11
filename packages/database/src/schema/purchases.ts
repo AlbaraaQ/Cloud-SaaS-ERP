@@ -4,7 +4,7 @@ import { boolean, date, index, integer, jsonb, numeric, pgTable, text, timestamp
 import { baseAuditColumns, baseLegacyColumns } from '../columns.js';
 
 import { accounts, journalEntries } from './accounting.js';
-import { items, taxGroups } from './catalog.js';
+import { items, taxGroups, unitsOfMeasure } from './catalog.js';
 import { branches, warehouses } from './organization.js';
 import { parties } from './parties.js';
 import { tenants } from './platform.js';
@@ -54,6 +54,9 @@ export const purchaseInvoiceLines = pgTable('purchase_invoice_lines', {
   invoiceId: uuid('invoice_id').notNull().references(() => purchaseInvoices.id, { onDelete: 'cascade' }),
   lineNo: integer('line_no').notNull(),
   itemId: uuid('item_id').notNull().references(() => items.id),
+  unitId: uuid('unit_id').references(() => unitsOfMeasure.id, { onDelete: 'restrict' }),
+  lotId: uuid('lot_id'),
+  serialIds: jsonb('serial_ids').$type<string[]>().notNull().default([]),
   taxGroupId: uuid('tax_group_id').references(() => taxGroups.id),
   description: text('description'),
   quantity: numeric('quantity', qty).notNull(),

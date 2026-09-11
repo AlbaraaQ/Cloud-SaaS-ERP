@@ -1,11 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { calculateInvoiceTotals, DomainError, newId } from '@erp/contracts';
+import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { calculateInvoiceTotals, DomainError, newId, permissionGrants } from '@erp/contracts';
 import {
+  branches,
   cashLocations,
   diningTables,
+  itemUnits,
+  items,
   orderEvents,
+  posHeldTickets,
+  posShortcutItems,
   salesInvoices,
   shiftCloses,
   tableCategories,
@@ -13,10 +18,12 @@ import {
   warehouses,
   withTenantTx,
   type DatabaseHandle,
+  type DrizzleTx,
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { SalesService } from '../sales/sales.service.js';
+import { getTenantContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
 
 export type TableCategoryInput = { branchId: string; name: string; sortOrder?: number; printerName?: string };
@@ -38,6 +45,10 @@ export type OrderItemInput = {
 /** One cart line at the till — the smallest shape a cashier screen can send. */
 export type PosCheckoutLine = {
   itemId: string;
+  /** Omitted means the item's base unit. */
+  unitId?: string;
+  lotId?: string;
+  serialIds?: string[];
   quantity: string;
   unitPrice: string;
   taxRate?: string;
@@ -51,12 +62,22 @@ export type PosCheckoutLine = {
  */
 export type PosCheckoutPayment = {
   method: 'cash' | 'card' | 'bank' | 'credit';
+  /** Portion of the invoice settled by this tender; required for a split ticket. */
+  amount?: string;
   cashLocationId?: string;
   settlementAccountId?: string;
   /** Cash handed over by the customer; the difference is returned as change. */
   tendered?: string;
   reference?: string;
 };
+export type PosHeldTicketInput = {
+  branchId: string;
+  slot: number;
+  /** Client cart state only; it never becomes a sale until checkout is called. */
+  payload: Record<string, unknown>;
+};
+export type PosShortcutInput = { branchId: string; slot: number; itemId: string };
+
 export type PosCheckoutInput = {
   branchId: string;
   warehouseId?: string;
@@ -68,8 +89,12 @@ export type PosCheckoutInput = {
   orderType?: string;
   /** Force the sale onto a specific shift; defaults to the caller's open shift. */
   shiftId?: string;
+  taxType?: 'simplified' | 'standard';
   lines: PosCheckoutLine[];
-  payment: PosCheckoutPayment;
+  /** Legacy single tender. */
+  payment?: PosCheckoutPayment;
+  /** Desktop multi-tender payment: amounts must exactly cover the invoice. */
+  payments?: PosCheckoutPayment[];
 };
 
 type OpenLine = {
@@ -99,6 +124,221 @@ export class PosService {
     );
     if (flag && flag.value !== true && flag.value !== 'true')
       throw new DomainError('NOT_FOUND', 'POS pack is disabled for this tenant', 404);
+  }
+
+  /** The desktop's eight hold/recall slots, persisted per cashier rather than in browser state. */
+  async holdTicket(tenantId: string, userId: string, input: PosHeldTicketInput) {
+    await this.ensureEnabled(tenantId);
+    this.assertSlot(input.slot, 8, 'POS_HOLD_SLOT_INVALID');
+    if (!input.payload || Array.isArray(input.payload) || typeof input.payload !== 'object') {
+      throw new DomainError('POS_HOLD_PAYLOAD_INVALID', 'Held ticket payload must be an object', 422, { field: 'payload' });
+    }
+    if (Buffer.byteLength(JSON.stringify(input.payload), 'utf8') > 128_000) {
+      throw new DomainError('POS_HOLD_PAYLOAD_TOO_LARGE', 'Held ticket payload is too large', 422, { field: 'payload' });
+    }
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.assertPosBranchInTx(tx, tenantId, input.branchId);
+      // Re-saving a numbered slot supersedes the live ticket but preserves its audit
+      // record. The partial unique index makes this safe even under two till tabs.
+      await tx
+        .update(posHeldTickets)
+        .set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date(), updatedBy: userId })
+        .where(
+          and(
+            eq(posHeldTickets.tenantId, tenantId),
+            eq(posHeldTickets.branchId, input.branchId),
+            eq(posHeldTickets.userId, userId),
+            eq(posHeldTickets.slot, input.slot),
+            eq(posHeldTickets.status, 'held'),
+          ),
+        );
+      const [ticket] = await tx
+        .insert(posHeldTickets)
+        .values({
+          id: newId(),
+          tenantId,
+          branchId: input.branchId,
+          userId,
+          slot: input.slot,
+          status: 'held',
+          payload: input.payload,
+          heldAt: new Date(),
+          createdBy: userId,
+        })
+        .returning();
+      return ticket;
+    });
+  }
+
+  listHeldTickets(tenantId: string, userId: string, branchId?: string, includeHistory = false) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(posHeldTickets)
+        .where(
+          and(
+            eq(posHeldTickets.tenantId, tenantId),
+            eq(posHeldTickets.userId, userId),
+            branchId ? eq(posHeldTickets.branchId, branchId) : undefined,
+            includeHistory ? undefined : eq(posHeldTickets.status, 'held'),
+          ),
+        )
+        .orderBy(asc(posHeldTickets.slot), asc(posHeldTickets.heldAt)),
+    );
+  }
+
+  async recallHeldTicket(tenantId: string, userId: string, ticketId: string) {
+    await this.ensureEnabled(tenantId);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [ticket] = await tx
+        .select()
+        .from(posHeldTickets)
+        .where(
+          and(
+            eq(posHeldTickets.tenantId, tenantId),
+            eq(posHeldTickets.id, ticketId),
+            eq(posHeldTickets.userId, userId),
+            eq(posHeldTickets.status, 'held'),
+          ),
+        );
+      if (!ticket) throw new DomainError('POS_HOLD_NOT_FOUND', 'Held ticket was not found', 404);
+      const [recalled] = await tx
+        .update(posHeldTickets)
+        .set({ status: 'recalled', recalledAt: new Date(), updatedAt: new Date(), updatedBy: userId })
+        .where(and(eq(posHeldTickets.tenantId, tenantId), eq(posHeldTickets.id, ticketId), eq(posHeldTickets.status, 'held')))
+        .returning();
+      if (!recalled) throw new DomainError('POS_HOLD_ALREADY_RECALLED', 'Held ticket is no longer available', 409);
+      return recalled;
+    });
+  }
+
+  async cancelHeldTicket(tenantId: string, userId: string, ticketId: string) {
+    await this.ensureEnabled(tenantId);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [cancelled] = await tx
+        .update(posHeldTickets)
+        .set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date(), updatedBy: userId })
+        .where(
+          and(
+            eq(posHeldTickets.tenantId, tenantId),
+            eq(posHeldTickets.id, ticketId),
+            eq(posHeldTickets.userId, userId),
+            eq(posHeldTickets.status, 'held'),
+          ),
+        )
+        .returning();
+      if (!cancelled) throw new DomainError('POS_HOLD_NOT_FOUND', 'Held ticket was not found or already recalled', 404);
+      return cancelled;
+    });
+  }
+
+  async listShortcuts(tenantId: string, branchId: string) {
+    await this.ensureEnabled(tenantId);
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({
+          id: posShortcutItems.id,
+          branchId: posShortcutItems.branchId,
+          slot: posShortcutItems.slot,
+          itemId: posShortcutItems.itemId,
+          sku: items.sku,
+          nameAr: items.nameAr,
+          nameEn: items.nameEn,
+          salePrice: items.salePrice,
+        })
+        .from(posShortcutItems)
+        .innerJoin(items, eq(items.id, posShortcutItems.itemId))
+        .where(
+          and(
+            eq(posShortcutItems.tenantId, tenantId),
+            eq(posShortcutItems.branchId, branchId),
+            eq(items.tenantId, tenantId),
+            isNull(items.deletedAt),
+          ),
+        )
+        .orderBy(asc(posShortcutItems.slot)),
+    );
+  }
+
+  async setShortcut(tenantId: string, userId: string, input: PosShortcutInput) {
+    await this.ensureEnabled(tenantId);
+    this.assertSlot(input.slot, 48, 'POS_SHORTCUT_SLOT_INVALID');
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.assertPosBranchInTx(tx, tenantId, input.branchId);
+      const [item] = await tx
+        .select({ id: items.id, showInPos: items.showInPos })
+        .from(items)
+        .where(and(eq(items.tenantId, tenantId), eq(items.id, input.itemId), isNull(items.deletedAt)));
+      if (!item || !item.showInPos) {
+        throw new DomainError('POS_SHORTCUT_ITEM_INVALID', 'Shortcut item must be an active POS item', 422, {
+          field: 'itemId',
+        });
+      }
+      // The branch has a unique item constraint as well as a unique slot constraint.
+      // Removing an old placement first makes moving a tile a single atomic action.
+      await tx
+        .delete(posShortcutItems)
+        .where(
+          and(
+            eq(posShortcutItems.tenantId, tenantId),
+            eq(posShortcutItems.branchId, input.branchId),
+            eq(posShortcutItems.itemId, input.itemId),
+            ne(posShortcutItems.slot, input.slot),
+          ),
+        );
+      const [shortcut] = await tx
+        .insert(posShortcutItems)
+        .values({
+          id: newId(),
+          tenantId,
+          branchId: input.branchId,
+          slot: input.slot,
+          itemId: input.itemId,
+          createdBy: userId,
+          updatedBy: userId,
+        })
+        .onConflictDoUpdate({
+          target: [posShortcutItems.tenantId, posShortcutItems.branchId, posShortcutItems.slot],
+          set: { itemId: input.itemId, updatedAt: new Date(), updatedBy: userId },
+        })
+        .returning();
+      return shortcut;
+    });
+  }
+
+  async removeShortcut(tenantId: string, branchId: string, slot: number) {
+    await this.ensureEnabled(tenantId);
+    this.assertSlot(slot, 48, 'POS_SHORTCUT_SLOT_INVALID');
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [removed] = await tx
+        .delete(posShortcutItems)
+        .where(
+          and(
+            eq(posShortcutItems.tenantId, tenantId),
+            eq(posShortcutItems.branchId, branchId),
+            eq(posShortcutItems.slot, slot),
+          ),
+        )
+        .returning();
+      if (!removed) throw new DomainError('POS_SHORTCUT_NOT_FOUND', 'Shortcut slot is not configured', 404);
+      return { slot, deleted: true };
+    });
+  }
+
+  private assertSlot(slot: number, maximum: number, code: string) {
+    if (!Number.isInteger(slot) || slot < 1 || slot > maximum) {
+      throw new DomainError(code, `Slot must be between 1 and ${maximum}`, 422, { field: 'slot' });
+    }
+  }
+
+  private async assertPosBranchInTx(tx: DrizzleTx, tenantId: string, branchId: string) {
+    const [branch] = await tx
+      .select({ id: branches.id, isActive: branches.isActive })
+      .from(branches)
+      .where(and(eq(branches.tenantId, tenantId), eq(branches.id, branchId), isNull(branches.deletedAt)));
+    if (!branch || !branch.isActive) {
+      throw new DomainError('POS_BRANCH_INVALID', 'POS branch was not found or is inactive', 422, { field: 'branchId' });
+    }
   }
 
   async categories(tenantId: string, branchId?: string) {
@@ -570,57 +810,111 @@ export class PosService {
     return flag?.value === true || flag?.value === 'true';
   }
 
-  /** One call, one transaction: the sale, its stock, its journal, its money. */
+  /** One call, one transaction: the sale, its stock, its journal, and every tender. */
   async checkout(tenantId: string, userId: string, input: PosCheckoutInput) {
     await this.ensureEnabled(tenantId);
     if (!input.lines.length) throw new DomainError('POS_CART_EMPTY', 'The cart is empty', 422);
-    const method = input.payment.method;
-    if (!['cash', 'card', 'bank', 'credit'].includes(method))
-      throw new DomainError('POS_PAYMENT_METHOD_INVALID', 'Unsupported payment method', 422, {
-        field: 'payment.method',
-      });
+    if (input.payment && input.payments?.length) {
+      throw new DomainError('POS_PAYMENT_SHAPE_INVALID', 'Use payment or payments, not both', 422, { field: 'payments' });
+    }
+    const tenderInputs = input.payments?.length ? input.payments : input.payment ? [input.payment] : [];
+    if (!tenderInputs.length) {
+      throw new DomainError('POS_PAYMENT_REQUIRED', 'Choose at least one payment method', 422, { field: 'payments' });
+    }
     for (const line of input.lines) {
       if (!line.itemId) throw new DomainError('POS_LINE_ITEM_REQUIRED', 'Every cart line needs an item', 422);
       if (!new Decimal(line.quantity).isFinite() || new Decimal(line.quantity).lte(0))
         throw new DomainError('POS_LINE_QUANTITY_INVALID', 'Cart quantities must be positive', 422);
+      if (!new Decimal(line.unitPrice).isFinite() || new Decimal(line.unitPrice).lt(0))
+        throw new DomainError('POS_LINE_PRICE_INVALID', 'Cart prices must be non-negative', 422);
     }
-    if (method === 'credit' && !input.partyId)
-      throw new DomainError(
-        'POS_CREDIT_CUSTOMER_REQUIRED',
-        'A postponed sale needs a customer account',
-        422,
-        { field: 'partyId' },
-      );
 
     // The engine recomputes and remains authoritative; this pre-check exists so a
-    // short tender can be refused *before* anything is written.
+    // short cash tender is refused before any invoice, stock or journal row exists.
     const priceIncludesVat = input.priceIncludesVat ?? true;
     const totals = calculateInvoiceTotals({
       lines: input.lines.map((line) => ({ ...line, taxRate: line.taxRate ?? '0' })),
       priceIncludesVat,
       invoiceDiscount: input.invoiceDiscount,
     });
-    const tendered = input.payment.tendered ? new Decimal(input.payment.tendered) : undefined;
-    if (tendered && !tendered.isFinite())
-      throw new DomainError('POS_TENDER_INVALID', 'The tendered amount is not a number', 422, {
-        field: 'payment.tendered',
+    const split = Boolean(input.payments?.length);
+    const payments = tenderInputs.map((payment) => {
+      if (!['cash', 'card', 'bank', 'credit'].includes(payment.method)) {
+        throw new DomainError('POS_PAYMENT_METHOD_INVALID', 'Unsupported payment method', 422, {
+          field: 'payments',
+        });
+      }
+      if (split && payment.amount === undefined) {
+        throw new DomainError('POS_PAYMENT_AMOUNT_REQUIRED', 'Each split tender needs an amount', 422, {
+          field: 'payments',
+        });
+      }
+      const tenderValue = new Decimal(payment.amount ?? totals.total);
+      if (!tenderValue.isFinite() || tenderValue.lte(0)) {
+        throw new DomainError('POS_PAYMENT_AMOUNT_INVALID', 'Tender amount must be positive', 422, {
+          field: 'payments',
+        });
+      }
+      return { ...payment, amount: tenderValue };
+    });
+    const allocated = payments.reduce((sum, payment) => sum.plus(payment.amount), new Decimal(0));
+    if (allocated.minus(totals.total).abs().gt('0.00005')) {
+      throw new DomainError('POS_PAYMENT_TOTAL_MISMATCH', 'Tender amounts must equal the sale total', 422, {
+        field: 'payments',
       });
-    if (tendered && tendered.lt(totals.total))
-      throw new DomainError('POS_INSUFFICIENT_CASH', 'The tendered amount is less than the sale total', 422, {
-        field: 'payment.tendered',
-      });
-    const change = tendered ? tendered.minus(totals.total).toFixed(4) : '0.0000';
+    }
+    if (payments.some((payment) => payment.method === 'credit') && !input.partyId) {
+      throw new DomainError(
+        'POS_CREDIT_CUSTOMER_REQUIRED',
+        'A postponed sale needs a customer account',
+        422,
+        { field: 'partyId' },
+      );
+    }
 
-    const target =
-      method === 'credit'
-        ? undefined
-        : await this.resolveTenderTarget(tenantId, input.branchId, input.payment);
+    let tenderedTotal = new Decimal(0);
+    let changeTotal = new Decimal(0);
+    for (const payment of payments) {
+      if (payment.tendered === undefined) continue;
+      if (payment.method !== 'cash') {
+        throw new DomainError('POS_TENDER_METHOD_INVALID', 'Tendered cash is valid only for cash payments', 422, {
+          field: 'payments',
+        });
+      }
+      const tendered = new Decimal(payment.tendered);
+      if (!tendered.isFinite()) {
+        throw new DomainError('POS_TENDER_INVALID', 'The tendered amount is not a number', 422, {
+          field: 'payments',
+        });
+      }
+      if (tendered.lt(payment.amount)) {
+        throw new DomainError('POS_INSUFFICIENT_CASH', 'The tendered amount is less than the cash portion', 422, {
+          field: 'payments',
+        });
+      }
+      tenderedTotal = tenderedTotal.plus(tendered);
+      changeTotal = changeTotal.plus(tendered.minus(payment.amount));
+    }
+
+    await this.assertPricePolicy(tenantId, input.lines);
+    const targets = await Promise.all(
+      payments.map(async (payment) => ({
+        payment,
+        target:
+          payment.method === 'credit'
+            ? undefined
+            : await this.resolveTenderTarget(tenantId, input.branchId, {
+                ...payment,
+                amount: payment.amount.toFixed(4),
+              }),
+      })),
+    );
     const shiftId = await this.resolveShiftId(
       tenantId,
       input.branchId,
       userId,
       input.shiftId,
-      method === 'cash',
+      payments.some((payment) => payment.method === 'cash'),
     );
 
     const invoice = await this.sales.createAndPost(
@@ -636,8 +930,13 @@ export class PosService {
         invoiceDiscount: input.invoiceDiscount,
         orderType: input.orderType ?? 'pos',
         shiftId,
+        cashierId: userId,
+        taxType: input.taxType ?? 'simplified',
         lines: input.lines.map((line) => ({
           itemId: line.itemId,
+          unitId: line.unitId,
+          lotId: line.lotId,
+          serialIds: line.serialIds,
           description: line.description,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
@@ -646,9 +945,13 @@ export class PosService {
         })),
       },
       {
-        settlement: method === 'credit' ? 'credit' : method,
-        settlementAccountId: target?.accountId,
-        settlementCashLocationId: target?.cashLocationId,
+        settlements: targets.map(({ payment, target }) => ({
+          method: payment.method,
+          amount: payment.amount.toFixed(4),
+          settlementAccountId: target?.accountId,
+          cashLocationId: target?.cashLocationId,
+          reference: payment.reference,
+        })),
       },
     );
 
@@ -661,13 +964,83 @@ export class PosService {
         total: invoice.total,
         paidTotal: invoice.paidTotal,
         paymentStatus: invoice.paymentStatus,
-        method,
-        cashLocationId: target?.cashLocationId ?? null,
+        // Legacy fields remain available for a one-tender desktop bridge client.
+        method: payments.length === 1 ? payments[0]!.method : 'split',
+        cashLocationId: payments.length === 1 ? targets[0]?.target?.cashLocationId ?? null : null,
         shiftId: shiftId ?? null,
-        change,
-        tendered: tendered ? tendered.toFixed(4) : null,
+        change: changeTotal.toFixed(4),
+        tendered: tenderedTotal.gt(0) ? tenderedTotal.toFixed(4) : null,
+        payments: targets.map(({ payment, target }) => ({
+          method: payment.method,
+          amount: payment.amount.toFixed(4),
+          cashLocationId: target?.cashLocationId ?? null,
+          reference: payment.reference ?? null,
+        })),
       },
     };
+  }
+
+  /**
+   * A non-catalog price is a sensitive cashier override. The permission check uses
+   * `permissionGrants`, not `includes`, so tenant owners and legacy aliases retain
+   * their documented wildcard semantics.
+   */
+  private async assertPricePolicy(tenantId: string, lines: PosCheckoutLine[]) {
+    const permissions = getTenantContext().permissions;
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      for (const line of lines) {
+        const [item] = await tx
+          .select({
+            id: items.id,
+            salePrice: items.salePrice,
+            maxDiscountPct: items.maxDiscountPct,
+            maxDiscountAmt: items.maxDiscountAmt,
+            showInPos: items.showInPos,
+          })
+          .from(items)
+          .where(and(eq(items.tenantId, tenantId), eq(items.id, line.itemId), isNull(items.deletedAt)));
+        if (!item || !item.showInPos) {
+          throw new DomainError('POS_ITEM_NOT_AVAILABLE', 'This item is not available at the POS', 422, {
+            field: 'lines',
+          });
+        }
+        let configured = item.salePrice === null ? undefined : new Decimal(item.salePrice);
+        if (line.unitId) {
+          const [unit] = await tx
+            .select({ salePrice: itemUnits.salePrice })
+            .from(itemUnits)
+            .where(and(eq(itemUnits.itemId, item.id), eq(itemUnits.unitId, line.unitId)));
+          if (!unit) {
+            throw new DomainError('POS_ITEM_UNIT_INVALID', 'The selected unit is not configured for this item', 422, {
+              field: 'lines',
+            });
+          }
+          if (unit.salePrice !== null) configured = new Decimal(unit.salePrice);
+        }
+        // An item without a configured shelf price is intentionally priced by the
+        // cashier (we still validate non-negative input above). Once a price exists,
+        // any difference is an override and must have the dedicated permission.
+        if (!configured || new Decimal(line.unitPrice).minus(configured).abs().lte('0.00005')) continue;
+        if (!permissionGrants(permissions, 'pos.priceoverride')) {
+          throw new DomainError('POS_PRICE_OVERRIDE_FORBIDDEN', 'Price override permission is required', 403, {
+            field: 'lines',
+          });
+        }
+        if (new Decimal(line.unitPrice).gte(configured)) continue;
+        const reduction = configured.minus(line.unitPrice);
+        const pct = configured.isZero() ? new Decimal(0) : reduction.div(configured).mul(100);
+        if (item.maxDiscountAmt !== null && reduction.gt(item.maxDiscountAmt)) {
+          throw new DomainError('POS_PRICE_OVERRIDE_LIMIT', 'Price reduction exceeds the item amount cap', 422, {
+            field: 'lines',
+          });
+        }
+        if (item.maxDiscountPct !== null && pct.gt(item.maxDiscountPct)) {
+          throw new DomainError('POS_PRICE_OVERRIDE_LIMIT', 'Price reduction exceeds the item percentage cap', 422, {
+            field: 'lines',
+          });
+        }
+      }
+    });
   }
 
   async openLines(tenantId: string, tableId: string): Promise<OpenLine[]> {

@@ -55,6 +55,7 @@ and the same string is what gets saved to disk or sent to a printer.
 | `GET /reports/print/vouchers/:id` | سند قبض / سند صرف |
 | `GET /reports/print/journal-entries/:id` | سند قيد |
 | `GET /reports/print/shifts/:id` | إغلاق اليومية |
+| `GET /reports/print/inventory-documents/:id` | مستند مخزون أول المدة / استلام / صرف / تسوية |
 
 All five require `reporting.view` and are tenant-scoped through `withTenantTx`, so a
 document id from another tenant is a 404 rather than a leak.

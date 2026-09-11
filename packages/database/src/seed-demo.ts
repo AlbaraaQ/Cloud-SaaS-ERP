@@ -89,6 +89,8 @@ type AccountSeed = {
 export const DEMO_CHART_OF_ACCOUNTS: AccountSeed[] = [
   ...DESKTOP_DEFAULT_COA,
   { code: '3200004', nameAr: 'تكلفة المبيعات', type: 'expense', parent: '32' },
+  // Cashier shortages debit this expense; drawer surpluses credit the same contra-capable leaf.
+  { code: '3200005', nameAr: 'فروقات الصندوق', nameEn: 'Cash over and short', type: 'expense', parent: '32' },
 ];
 
 /**
@@ -133,6 +135,7 @@ export const DEMO_POSTING_PROFILE: Record<string, string> = {
   exciseTaxAccountId: '2222002',
   inventoryAccountId: '1270001',
   cogsAccountId: '3200004',
+  cashOverShortAccountId: '3200005',
   cashAccountId: '1211001',
   bankAccountId: '1221001',
   receivableAccountId: '12310001',

@@ -4,7 +4,8 @@ import { date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timest
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
 import { branches, warehouses } from './organization.js';
-import { items } from './catalog.js';
+import { accounts, journalEntries } from './accounting.js';
+import { items, unitsOfMeasure } from './catalog.js';
 import { tenants } from './platform.js';
 
 const qty = { precision: 20, scale: 4, mode: 'string' as const };
@@ -13,7 +14,7 @@ const money = { precision: 20, scale: 4, mode: 'string' as const };
 export const inventoryTransactions = pgTable('inventory_transactions', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   itemId: uuid('item_id').notNull().references(() => items.id, { onDelete: 'restrict' }), warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'restrict' }),
-  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(), docType: text('doc_type').notNull(), docId: uuid('doc_id').notNull(), lineId: uuid('line_id'), direction: text('direction').notNull(), qty: numeric('qty', qty).notNull(), baseQty: numeric('base_qty', qty).notNull(), unitCost: numeric('unit_cost', money).notNull(), totalCost: numeric('total_cost', money).notNull(), costing: text('costing').notNull(), lotId: uuid('lot_id'), serialId: uuid('serial_id'), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), createdBy: uuid('created_by'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(), docType: text('doc_type').notNull(), docId: uuid('doc_id').notNull(), lineId: uuid('line_id'), direction: text('direction').notNull(), qty: numeric('qty', qty).notNull(), baseQty: numeric('base_qty', qty).notNull(), unitId: uuid('unit_id').references(() => unitsOfMeasure.id, { onDelete: 'restrict' }), unitCost: numeric('unit_cost', money).notNull(), totalCost: numeric('total_cost', money).notNull(), costing: text('costing').notNull(), lotId: uuid('lot_id'), serialId: uuid('serial_id'), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), createdBy: uuid('created_by'),
 }, (t) => ({ scope: index('inventory_transactions_scope_idx').on(t.tenantId, t.itemId, t.warehouseId, t.occurredAt), document: uniqueIndex('inventory_transactions_document_line_key').on(t.tenantId, t.docType, t.docId, t.lineId), lot: index('inventory_transactions_lot_idx').on(t.tenantId, t.lotId), serial: index('inventory_transactions_serial_idx').on(t.tenantId, t.serialId) }));
 
 export const stockBalances = pgTable('stock_balances', {
@@ -24,7 +25,7 @@ export const stockAdjustments = pgTable('stock_adjustments', { id: uuid('id').pr
 export const stockAdjustmentLines = pgTable('stock_adjustment_lines', { adjustmentId: uuid('adjustment_id').notNull().references(() => stockAdjustments.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), expectedQty: numeric('expected_qty', qty).notNull(), countedQty: numeric('counted_qty', qty).notNull(), unitCost: numeric('unit_cost', money), lotId: uuid('lot_id'), note: text('note') }, (t) => ({ pk: primaryKey({ columns: [t.adjustmentId, t.lineNo] }), scope: index('stock_adjustment_lines_scope_idx').on(t.tenantId, t.itemId) }));
 
 export const stockTransfers = pgTable('stock_transfers', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), fromWarehouseId: uuid('from_warehouse_id').notNull().references(() => warehouses.id), toWarehouseId: uuid('to_warehouse_id').notNull().references(() => warehouses.id), number: text('number').notNull(), status: text('status').notNull().default('draft'), sentAt: timestamp('sent_at', { withTimezone: true }), receivedAt: timestamp('received_at', { withTimezone: true }), cancelledAt: timestamp('cancelled_at', { withTimezone: true }), ...baseAuditColumns(), ...baseLegacyColumns() }, (t) => ({ number: uniqueIndex('stock_transfers_tenant_number_key').on(t.tenantId, t.number), status: index('stock_transfers_status_idx').on(t.tenantId, t.status) }));
-export const stockTransferLines = pgTable('stock_transfer_lines', { transferId: uuid('transfer_id').notNull().references(() => stockTransfers.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), qty: numeric('qty', qty).notNull(), sentQty: numeric('sent_qty', qty).notNull().default('0'), receivedQty: numeric('received_qty', qty).notNull().default('0'), unitCost: numeric('unit_cost', money).notNull().default('0'), lotId: uuid('lot_id'), serialIds: jsonb('serial_ids').$type<string[]>().notNull().default([]) }, (t) => ({ pk: primaryKey({ columns: [t.transferId, t.lineNo] }), scope: index('stock_transfer_lines_scope_idx').on(t.tenantId, t.itemId) }));
+export const stockTransferLines = pgTable('stock_transfer_lines', { transferId: uuid('transfer_id').notNull().references(() => stockTransfers.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), unitId: uuid('unit_id').references(() => unitsOfMeasure.id, { onDelete: 'restrict' }), qty: numeric('qty', qty).notNull(), sentQty: numeric('sent_qty', qty).notNull().default('0'), receivedQty: numeric('received_qty', qty).notNull().default('0'), unitCost: numeric('unit_cost', money).notNull().default('0'), lotId: uuid('lot_id'), serialIds: jsonb('serial_ids').$type<string[]>().notNull().default([]) }, (t) => ({ pk: primaryKey({ columns: [t.transferId, t.lineNo] }), scope: index('stock_transfer_lines_scope_idx').on(t.tenantId, t.itemId) }));
 
 export const itemLots = pgTable('item_lots', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), lotNo: text('lot_no').notNull(), expiryDate: date('expiry_date'), receivedAt: timestamp('received_at', { withTimezone: true }), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ lot: uniqueIndex('item_lots_tenant_item_lot_key').on(t.tenantId, t.itemId, t.lotNo).where(isNull(t.deletedAt)) }));
 export const itemSerials = pgTable('item_serials', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), itemId: uuid('item_id').notNull().references(() => items.id), serialNo: text('serial_no').notNull(), lotId: uuid('lot_id'), status: text('status').notNull().default('available'), warehouseId: uuid('warehouse_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ serial: uniqueIndex('item_serials_tenant_serial_key').on(t.tenantId, t.serialNo).where(isNull(t.deletedAt)), item: index('item_serials_stock_idx').on(t.tenantId, t.itemId, t.warehouseId, t.status) }));
@@ -46,7 +47,55 @@ export const stockDeliveryLines = pgTable('stock_delivery_lines', { deliveryId: 
 
 export const invoiceItemAttributes = pgTable('invoice_item_attributes', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), documentType: text('document_type').notNull(), documentId: uuid('document_id').notNull(), lineId: uuid('line_id').notNull(), attributes: jsonb('attributes').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns() }, (t) => ({ line: uniqueIndex('invoice_item_attributes_line_key').on(t.tenantId, t.documentType, t.documentId, t.lineId) }));
 
-export const inventoryTables = { inventoryTransactions, stockBalances, stockAdjustments, stockAdjustmentLines, stockTransfers, stockTransferLines, goodsRequests, goodsRequestLines, stockDeliveries, stockDeliveryLines, itemLots, itemSerials, invoiceItemAttributes };
+/**
+ * User-authored inventory documents. They are the immutable-ledger-friendly replacement
+ * for browser-built stock lines: a draft captures intent; posting emits ledger rows and a
+ * generated journal in one transaction.
+ */
+export const inventoryDocuments = pgTable('inventory_documents', {
+  id: uuid('id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  branchId: uuid('branch_id').notNull().references(() => branches.id, { onDelete: 'restrict' }),
+  warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'restrict' }),
+  number: text('number').notNull(),
+  kind: text('kind').notNull(),
+  status: text('status').notNull().default('draft'),
+  documentDate: date('document_date').notNull(),
+  reason: text('reason'),
+  counterAccountId: uuid('counter_account_id').references(() => accounts.id, { onDelete: 'restrict' }),
+  journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'restrict' }),
+  notes: text('notes'),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  voidedAt: timestamp('voided_at', { withTimezone: true }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  ...baseAuditColumns(),
+}, (t) => ({
+  number: uniqueIndex('inventory_documents_tenant_number_key').on(t.tenantId, t.number),
+  scope: index('inventory_documents_scope_idx').on(t.tenantId, t.branchId, t.warehouseId, t.kind, t.status, t.documentDate),
+}));
+
+export const inventoryDocumentLines = pgTable('inventory_document_lines', {
+  id: uuid('id').primaryKey(),
+  documentId: uuid('document_id').notNull().references(() => inventoryDocuments.id, { onDelete: 'cascade' }),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  lineNo: integer('line_no').notNull(),
+  itemId: uuid('item_id').notNull().references(() => items.id, { onDelete: 'restrict' }),
+  unitId: uuid('unit_id').notNull().references(() => unitsOfMeasure.id, { onDelete: 'restrict' }),
+  quantity: numeric('quantity', qty).notNull(),
+  baseQuantity: numeric('base_quantity', qty).notNull(),
+  unitCost: numeric('unit_cost', money).notNull().default('0'),
+  lotId: uuid('lot_id').references(() => itemLots.id, { onDelete: 'restrict' }),
+  serialIds: jsonb('serial_ids').$type<string[]>().notNull().default([]),
+  adjustmentDirection: text('adjustment_direction'),
+  note: text('note'),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+  ...baseAuditColumns(),
+}, (t) => ({
+  line: uniqueIndex('inventory_document_lines_document_line_key').on(t.documentId, t.lineNo),
+  item: index('inventory_document_lines_item_idx').on(t.tenantId, t.itemId),
+}));
+
+export const inventoryTables = { inventoryTransactions, stockBalances, stockAdjustments, stockAdjustmentLines, stockTransfers, stockTransferLines, goodsRequests, goodsRequestLines, stockDeliveries, stockDeliveryLines, itemLots, itemSerials, invoiceItemAttributes, inventoryDocuments, inventoryDocumentLines };
 export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
 export type StockBalance = typeof stockBalances.$inferSelect;
 export type StockTransfer = typeof stockTransfers.$inferSelect;
@@ -56,6 +105,8 @@ export type StockDelivery = typeof stockDeliveries.$inferSelect;
 export type StockDeliveryLine = typeof stockDeliveryLines.$inferSelect;
 export type ItemLot = typeof itemLots.$inferSelect;
 export type ItemSerial = typeof itemSerials.$inferSelect;
+export type InventoryDocument = typeof inventoryDocuments.$inferSelect;
+export type InventoryDocumentLine = typeof inventoryDocumentLines.$inferSelect;
 
 /**
  * أمر الإنتاج — components out, one finished item in. Ledger-neutral by construction:

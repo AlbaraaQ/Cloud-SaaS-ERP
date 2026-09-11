@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { calculateInvoiceTotals, DomainError, newId } from '@erp/contracts';
 import {
   accounts,
@@ -9,7 +9,9 @@ import {
   items,
   journalEntries,
   journalEntryLines,
+  memberships,
   offers,
+  parties,
   salesAdjustmentNotes,
   salesInvoiceLines,
   salesInvoices,
@@ -30,6 +32,10 @@ import { SequencesService } from '../platform-services/index.js';
 
 export type SalesLineInput = {
   itemId?: string;
+  /** Unit entered on the commercial document; omitted means the item's base unit. */
+  unitId?: string;
+  lotId?: string;
+  serialIds?: string[];
   description?: string;
   quantity: string;
   unitPrice: string;
@@ -56,11 +62,22 @@ export type SalesInvoiceInput = {
   cashCustomerMobile?: string;
   orderType?: string;
   shiftId?: string;
+  /** Desktop TaxType-2 / B2B invoice; requires a customer VAT number at post. */
+  taxType?: 'simplified' | 'standard';
+  /** POS cashier identity, validated against an active staff membership. */
+  cashierId?: string;
 };
 export type PaymentInput = {
   method: 'cash' | 'card' | 'bank' | 'credit' | 'split';
   amount: string;
   idempotencyKey: string;
+  cashLocationId?: string;
+  reference?: string;
+};
+export type SettlementInput = {
+  method: 'credit' | 'cash' | 'card' | 'bank';
+  amount: string;
+  settlementAccountId?: string;
   cashLocationId?: string;
   reference?: string;
 };
@@ -74,12 +91,22 @@ export type PostingInput = {
     description?: string;
   }[];
   inventoryLines?: InventoryLine[];
+  /** Legacy single-tender fields. Prefer `settlements` for a split POS payment. */
   settlement?: 'credit' | 'cash' | 'card' | 'bank';
   settlementAccountId?: string;
   settlementCashLocationId?: string;
+  settlements?: SettlementInput[];
 };
 
 const money = (value: string) => new Decimal(value);
+
+type ResolvedSettlement = {
+  method: SettlementInput['method'];
+  amount: Decimal;
+  settlementAccountId?: string;
+  cashLocationId?: string;
+  reference?: string;
+};
 
 @Injectable()
 export class SalesService {
@@ -137,6 +164,14 @@ export class SalesService {
       throw new DomainError('SALES_LINES_REQUIRED', 'At least one invoice line is required', 422);
     if (!input.partyId && !input.cashCustomerName)
       throw new DomainError('SALES_CUSTOMER_REQUIRED', 'Party or cash customer name is required', 422);
+    if (input.taxType && !['simplified', 'standard'].includes(input.taxType)) {
+      throw new DomainError('SALES_TAX_TYPE_INVALID', 'Tax type must be simplified or standard', 422, { field: 'taxType' });
+    }
+    // Validate even an immediately-paid customer selection now. The FK alone can
+    // accept a globally existing party from another tenant, which is neither a
+    // customer relationship nor safe to retain on a draft.
+    if (input.partyId) await this.requireCustomerPartyInTx(tx, tenantId, input.partyId);
+    if (input.cashierId) await this.assertCashierInTx(tx, tenantId, input.cashierId);
     const totals = calculateInvoiceTotals({
       lines: input.lines,
       priceIncludesVat: input.priceIncludesVat,
@@ -163,6 +198,8 @@ export class SalesService {
         cashCustomerMobile: input.cashCustomerMobile,
         orderType: input.orderType,
         shiftId: input.shiftId ?? null,
+        cashierId: input.cashierId ?? null,
+        taxType: input.taxType ?? 'simplified',
         createdBy: tryGetAuthContext()?.userId,
         invoiceDiscount: totals.discount,
         extraTax: totals.extraTax,
@@ -183,6 +220,9 @@ export class SalesService {
           invoiceId: id,
           lineNo: index + 1,
           itemId: line.itemId,
+          unitId: line.unitId,
+          lotId: line.lotId,
+          serialIds: line.serialIds ?? [],
           description: line.description,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
@@ -238,6 +278,15 @@ export class SalesService {
       } as SalesInvoiceInput);
       return replacement;
     }
+    if (input.cashierId) {
+      await withTenantTx(this.database.db, tenantId, (tx) => this.assertCashierInTx(tx, tenantId, input.cashierId!));
+    }
+    if (input.partyId) {
+      await withTenantTx(this.database.db, tenantId, (tx) => this.requireCustomerPartyInTx(tx, tenantId, input.partyId!));
+    }
+    if (input.taxType && !['simplified', 'standard'].includes(input.taxType)) {
+      throw new DomainError('SALES_TAX_TYPE_INVALID', 'Tax type must be simplified or standard', 422, { field: 'taxType' });
+    }
     await withTenantTx(this.database.db, tenantId, (tx) =>
       tx
         .update(salesInvoices)
@@ -247,6 +296,8 @@ export class SalesService {
           warehouseId: input.warehouseId,
           cashCustomerName: input.cashCustomerName,
           cashCustomerMobile: input.cashCustomerMobile,
+          cashierId: input.cashierId ?? invoice.cashierId,
+          taxType: input.taxType ?? invoice.taxType,
           updatedAt: new Date(),
         })
         .where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, id))),
@@ -297,6 +348,188 @@ export class SalesService {
     }
   }
 
+  /** A cashier is a staff member of this tenant, not just any globally visible user UUID. */
+  private async assertCashierInTx(tx: DrizzleTx, tenantId: string, userId: string): Promise<void> {
+    const [membership] = await tx
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.tenantId, tenantId),
+          eq(memberships.userId, userId),
+          eq(memberships.kind, 'staff'),
+          eq(memberships.status, 'active'),
+          isNull(memberships.deletedAt),
+        ),
+      );
+    if (!membership) {
+      throw new DomainError('SALES_CASHIER_INVALID', 'Cashier must be an active staff member of this tenant', 422, {
+        field: 'cashierId',
+      });
+    }
+  }
+
+  /** Resolves a tenant-owned active customer; callers may lock the row first when needed. */
+  private async requireCustomerPartyInTx(tx: DrizzleTx, tenantId: string, partyId: string) {
+    const [party] = await tx
+      .select({ id: parties.id, kind: parties.kind, taxNo: parties.taxNo, creditLimit: parties.creditLimit })
+      .from(parties)
+      .where(and(eq(parties.tenantId, tenantId), eq(parties.id, partyId), isNull(parties.deletedAt)));
+    if (!party || !['customer', 'both'].includes(party.kind)) {
+      throw new DomainError('SALES_CUSTOMER_INVALID', 'The selected party is not an active customer', 422, {
+        field: 'partyId',
+      });
+    }
+    return party;
+  }
+
+  /**
+   * Canonicalises legacy one-tender postings and new split tenders into a plan whose
+   * amounts exactly cover the invoice. A journal is then built from this same plan,
+   * so the payment rows and accounting settlement legs can never disagree.
+   */
+  private resolveSettlements(totalText: string, posting: PostingInput): ResolvedSettlement[] {
+    const invoiceTotal = money(totalText);
+    if (invoiceTotal.isZero() && !posting.settlements?.length) return [];
+    const supplied = posting.settlements?.length
+      ? posting.settlements
+      : [
+          {
+            method: posting.settlement ?? 'credit',
+            amount: invoiceTotal.toFixed(4),
+            settlementAccountId: posting.settlementAccountId,
+            cashLocationId: posting.settlementCashLocationId,
+          },
+        ];
+    const plan = supplied.map((settlement) => {
+      if (!['credit', 'cash', 'card', 'bank'].includes(settlement.method)) {
+        throw new DomainError('SALES_SETTLEMENT_METHOD_INVALID', 'Unsupported settlement method', 422, {
+          field: 'settlements',
+        });
+      }
+      const settlementValue = money(settlement.amount);
+      if (!settlementValue.isFinite() || settlementValue.lte(0)) {
+        throw new DomainError('SALES_SETTLEMENT_AMOUNT_INVALID', 'Every settlement amount must be positive', 422, {
+          field: 'settlements',
+        });
+      }
+      if (settlement.method === 'credit' && settlement.settlementAccountId) {
+        throw new DomainError('SALES_CREDIT_SETTLEMENT_ACCOUNT_INVALID', 'Credit settlement uses the customer receivable account', 422, {
+          field: 'settlements',
+        });
+      }
+      return { ...settlement, amount: settlementValue };
+    });
+    const paid = plan.reduce((sum, settlement) => sum.plus(settlement.amount), new Decimal(0));
+    if (paid.minus(invoiceTotal).abs().gt('0.00005')) {
+      throw new DomainError('SALES_SETTLEMENT_TOTAL_MISMATCH', 'Settlement amounts must equal the invoice total', 422, {
+        field: 'settlements',
+      });
+    }
+    return plan;
+  }
+
+  /**
+   * Desktop TaxType-2 and credit-limit gates. The party row is locked while the
+   * outstanding balance is checked so two concurrent credit invoices cannot both
+   * approve against the same remaining limit.
+   */
+  private async assertTaxAndCreditGateInTx(
+    tx: DrizzleTx,
+    tenantId: string,
+    invoice: { id?: string; partyId?: string | null; taxType: string; kind: string; total: string },
+    settlements: ResolvedSettlement[],
+  ): Promise<void> {
+    if (!['simplified', 'standard'].includes(invoice.taxType)) {
+      throw new DomainError('SALES_TAX_TYPE_INVALID', 'Tax type must be simplified or standard', 422, {
+        field: 'taxType',
+      });
+    }
+    const creditAmount = settlements
+      .filter((settlement) => settlement.method === 'credit')
+      .reduce((sum, settlement) => sum.plus(settlement.amount), new Decimal(0));
+    const creditCreatesReceivable = creditAmount.gt(0) && ['sale', 'debit_note'].includes(invoice.kind);
+    // A party supplied on an immediate sale still has to belong to this tenant and
+    // be a customer. Otherwise a cash ticket can retain a foreign/deleted party id
+    // even though no credit settlement happens today.
+    const needsParty = Boolean(invoice.partyId) || invoice.taxType === 'standard' || creditCreatesReceivable;
+    if (!needsParty) return;
+    if (!invoice.partyId) {
+      throw new DomainError(
+        invoice.taxType === 'standard' ? 'SALES_TAX_CUSTOMER_REQUIRED' : 'SALES_CREDIT_CUSTOMER_REQUIRED',
+        invoice.taxType === 'standard'
+          ? 'A standard tax invoice requires a customer party'
+          : 'A credit sale requires a customer party',
+        422,
+        { field: 'partyId' },
+      );
+    }
+
+    // Lock first, then read under the lock. `withTenantTx` has set app.tenant_id,
+    // so the raw statement retains the same RLS boundary as the ORM queries.
+    await tx.execute(sql`
+      SELECT id FROM parties
+      WHERE tenant_id = ${tenantId} AND id = ${invoice.partyId} AND deleted_at IS NULL
+      FOR UPDATE
+    `);
+    const party = await this.requireCustomerPartyInTx(tx, tenantId, invoice.partyId);
+    if (invoice.taxType === 'standard' && !party.taxNo?.trim()) {
+      throw new DomainError('SALES_TAX_NUMBER_REQUIRED', 'A standard tax invoice requires the customer VAT number', 422, {
+        field: 'partyId',
+      });
+    }
+    if (creditAmount.lte(0) || !['sale', 'debit_note'].includes(invoice.kind)) return;
+    const limit = money(party.creditLimit);
+    // Zero is the legacy "unlimited" value. A positive limit is an enforceable cap.
+    if (limit.lte(0)) return;
+    const openInvoices = await tx
+      .select({ kind: salesInvoices.kind, total: salesInvoices.total, paidTotal: salesInvoices.paidTotal })
+      .from(salesInvoices)
+      .where(
+        and(
+          eq(salesInvoices.tenantId, tenantId),
+          eq(salesInvoices.partyId, invoice.partyId),
+          eq(salesInvoices.status, 'posted'),
+        ),
+      );
+    const outstanding = openInvoices.reduce((sum, row) => {
+      const remaining = money(row.total).minus(row.paidTotal);
+      return ['sale_return', 'credit_note'].includes(row.kind) ? sum.minus(remaining) : sum.plus(remaining);
+    }, new Decimal(0));
+    const requested = creditAmount;
+    if (outstanding.plus(requested).gt(limit)) {
+      throw new DomainError('SALES_CREDIT_LIMIT_EXCEEDED', 'Customer credit limit would be exceeded', 422, {
+        field: 'partyId',
+      });
+    }
+  }
+
+  private async assertSettlementAccountsInTx(
+    tx: DrizzleTx,
+    tenantId: string,
+    settlements: ResolvedSettlement[],
+  ): Promise<void> {
+    const ids = settlements
+      .filter((settlement) => settlement.method !== 'credit')
+      .map((settlement) => settlement.settlementAccountId)
+      .filter((id): id is string => Boolean(id));
+    if (ids.length !== settlements.filter((settlement) => settlement.method !== 'credit').length) {
+      throw new DomainError('SALES_SETTLEMENT_ACCOUNT_REQUIRED', 'Every immediate settlement needs a till or bank account', 422, {
+        field: 'settlements',
+      });
+    }
+    if (!ids.length) return;
+    const rows = await tx
+      .select({ id: accounts.id, isPostable: accounts.isPostable })
+      .from(accounts)
+      .where(and(eq(accounts.tenantId, tenantId), inArray(accounts.id, [...new Set(ids)]), isNull(accounts.deletedAt)));
+    if (rows.length !== new Set(ids).size || rows.some((row) => !row.isPostable)) {
+      throw new DomainError('SALES_SETTLEMENT_ACCOUNT_INVALID', 'A settlement account is unavailable or not postable', 422, {
+        field: 'settlements',
+      });
+    }
+  }
+
   /**
    * The whole posting engine inside an open transaction: gates, numbering, stock,
    * journal and settlement. Returns `undefined` only when a concurrent caller
@@ -343,6 +576,25 @@ export class SalesService {
     }
     if (!invoice.partyId && !invoice.cashCustomerName)
       throw new DomainError('SALES_CUSTOMER_REQUIRED', 'Party or cash customer name is required', 422);
+    const settlements = posting.journalLines?.length ? [] : this.resolveSettlements(invoice.total, posting);
+    // A legacy/walk-in customer is a label, not a receivable subledger. Never let
+    // the historical default (`credit` when no settlement was supplied) quietly
+    // turn that label into an uncollectable credit sale; require the caller to name
+    // a real till/bank instead.
+    if (
+      !posting.journalLines?.length &&
+      !invoice.partyId &&
+      Boolean(invoice.cashCustomerName?.trim()) &&
+      settlements.some((settlement) => settlement.method === 'credit')
+    ) {
+      throw new DomainError(
+        'SALES_CASH_CUSTOMER_SETTLEMENT_REQUIRED',
+        'A cash customer must be settled to a cash or bank location, not customer credit',
+        422,
+        { field: 'settlement' },
+      );
+    }
+    await this.assertTaxAndCreditGateInTx(tx, tenantId, invoice, settlements);
     if (posting.journalLines?.length && !posting.fiscalPeriodId)
       throw new DomainError(
         'SALES_FISCAL_PERIOD_REQUIRED',
@@ -420,31 +672,8 @@ export class SalesService {
         .where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.invoiceId, id)));
       const cogsTotal = costRows.reduce((sum, row) => sum.plus(row.costTotal ?? '0'), new Decimal(0));
       const mapping = profile.mapping as unknown as Record<string, string | null | undefined>;
-      if (
-        !posting.journalLines?.length &&
-        posting.settlement !== undefined &&
-        posting.settlement !== 'credit' &&
-        posting.settlementAccountId
-      ) {
-        const [settlementAccount] = await tx
-          .select({ id: accounts.id })
-          .from(accounts)
-          .where(and(eq(accounts.tenantId, tenantId), eq(accounts.id, posting.settlementAccountId)));
-        if (!settlementAccount)
-          throw new DomainError(
-            'SALES_SETTLEMENT_ACCOUNT_INVALID',
-            'The settlement account does not belong to this tenant',
-            422,
-            { field: 'settlementAccountId' },
-          );
-      }
-      const lines = this.buildAutoJournal(
-        locked,
-        mapping,
-        cogsTotal,
-        posting.settlement ?? 'credit',
-        posting.settlementAccountId,
-      );
+      await this.assertSettlementAccountsInTx(tx, tenantId, settlements);
+      const lines = this.buildAutoJournal(locked, mapping, cogsTotal, settlements);
       await this.accounting.postJournalInTx(tx, tenantId, {
         branchId: locked.branchId,
         fiscalPeriodId,
@@ -456,36 +685,41 @@ export class SalesService {
         idempotencyKey: `sales-post:${id}`,
       });
     }
-    // Immediate settlement (cash/bank) is recorded as the invoice's first payment
-    // in the same transaction, so a cash sale lands fully paid with a payment
-    // row the portal and the statements can see — not just a flipped flag.
+    // Each immediate tender becomes its own payment row. The amount is the exact
+    // amount used in the journal settlement leg; a split cash/card ticket therefore
+    // reconciles cleanly in the shift-close report.
     const isReturnKind = locked.kind === 'sale_return' || locked.kind === 'credit_note';
-    const settled =
-      !posting.journalLines?.length &&
-      !isReturnKind &&
-      posting.settlement !== undefined &&
-      posting.settlement !== 'credit' &&
-      money(locked.total).gt(0);
-    if (settled) {
+    const immediate = !posting.journalLines?.length && !isReturnKind
+      ? settlements.filter((settlement) => settlement.method !== 'credit')
+      : [];
+    const paidNow = immediate.reduce((sum, settlement) => sum.plus(settlement.amount), new Decimal(0));
+    for (const [index, settlement] of immediate.entries()) {
       await tx.insert(invoicePayments).values({
         id: newId(),
         tenantId,
         invoiceId: id,
-        method: posting.settlement!,
-        amount: locked.total,
-        cashLocationId: posting.settlementCashLocationId ?? null,
-        reference: number,
-        idempotencyKey: `sales-settle:${id}`,
+        method: settlement.method,
+        amount: settlement.amount.toFixed(4),
+        cashLocationId: settlement.cashLocationId ?? null,
+        reference: settlement.reference ?? number,
+        idempotencyKey: `sales-settle:${id}:${index}`,
       });
     }
-    const paymentStatus = locked.total === '0' || settled ? 'paid' : 'unpaid';
+    const paidTotal = money(locked.paidTotal).plus(paidNow);
+    const paymentStatus = locked.total === '0'
+      ? 'paid'
+      : paidTotal.gte(money(locked.total))
+        ? 'paid'
+        : paidTotal.gt(0)
+          ? 'partial'
+          : 'unpaid';
     await tx
       .update(salesInvoices)
       .set({
         status: 'posted',
         number,
         postedAt: new Date(),
-        paidTotal: settled ? locked.total : locked.paidTotal,
+        paidTotal: paidTotal.toFixed(4),
         paymentStatus,
       })
       .where(
@@ -545,16 +779,16 @@ export class SalesService {
             eq(salesInvoiceLines.invoiceId, locked.referenceInvoiceId),
           ),
         );
-      const cost = new Map<string, Decimal>();
+      const costByItem = new Map<string, Decimal>();
       const qty = new Map<string, Decimal>();
       for (const line of sourceLines) {
         if (!line.itemId) continue;
-        cost.set(line.itemId, (cost.get(line.itemId) ?? new Decimal(0)).plus(line.costTotal ?? '0'));
+        costByItem.set(line.itemId, (costByItem.get(line.itemId) ?? new Decimal(0)).plus(line.costTotal ?? '0'));
         qty.set(line.itemId, (qty.get(line.itemId) ?? new Decimal(0)).plus(line.quantity));
       }
-      for (const [itemId, total] of cost) {
+      for (const [itemId, sourceTotal] of costByItem) {
         const totalQty = qty.get(itemId) ?? new Decimal(0);
-        if (totalQty.gt(0)) sourceCost.set(itemId, total.div(totalQty));
+        if (totalQty.gt(0)) sourceCost.set(itemId, sourceTotal.div(totalQty));
       }
     }
 
@@ -563,7 +797,7 @@ export class SalesService {
       if (locked.kind === 'sale_return') {
         let unitCost = sourceCost.get(line.itemId!);
         if (!unitCost || unitCost.lte(0)) {
-          const [balance] = await tx
+          const [stockRow] = await tx
             .select({ averageCost: stockBalances.averageCost })
             .from(stockBalances)
             .where(
@@ -573,13 +807,17 @@ export class SalesService {
                 eq(stockBalances.warehouseId, locked.warehouseId),
               ),
             );
-          unitCost = money(balance?.averageCost ?? '0');
+          unitCost = money(stockRow?.averageCost ?? '0');
         }
         movements.push({
           itemId: line.itemId!,
           warehouseId: locked.warehouseId,
           qty: line.quantity,
+          unitId: line.unitId ?? undefined,
           unitCost: unitCost.toFixed(4),
+          lotId: line.lotId ?? undefined,
+          serialIds: line.serialIds,
+          sourceLineId: line.id,
           direction: 'in',
           docType: 'sales_return',
           docId: locked.id,
@@ -591,6 +829,10 @@ export class SalesService {
           itemId: line.itemId!,
           warehouseId: locked.warehouseId,
           qty: line.quantity,
+          unitId: line.unitId ?? undefined,
+          lotId: line.lotId ?? undefined,
+          serialIds: line.serialIds,
+          sourceLineId: line.id,
           direction: 'out',
           docType: 'sales_invoice',
           docId: locked.id,
@@ -599,22 +841,18 @@ export class SalesService {
         });
       }
     }
-    await this.inventory.recordInTx(tx, tenantId, movements);
+    const recorded = await this.inventory.recordInTx(tx, tenantId, movements);
 
-    const txns = await tx
-      .select({ lineId: inventoryTransactions.lineId, unitCost: inventoryTransactions.unitCost })
-      .from(inventoryTransactions)
-      .where(and(eq(inventoryTransactions.tenantId, tenantId), eq(inventoryTransactions.docId, locked.id)));
-    for (const txn of txns) {
-      if (!txn.lineId) continue;
-      const line = stocked.find((candidate) => candidate.id === txn.lineId);
-      if (!line) continue;
-      const costTotal = money(line.quantity)
-        .mul(txn.unitCost ?? '0')
-        .toFixed(4);
+    // A serialised sales line fans out into one ledger row per serial. Sum the
+    // source-line movements instead of multiplying the displayed quantity by the
+    // last row's base-unit cost; that keeps COGS correct for cartons and serials.
+    for (const line of stocked) {
+      const costTotal = recorded.movements
+        .filter((movement) => (movement.sourceLineId ?? movement.lineId) === line.id)
+        .reduce((sum, movement) => sum.plus(movement.totalCost), new Decimal(0));
       await tx
         .update(salesInvoiceLines)
-        .set({ costTotal })
+        .set({ costTotal: costTotal.toFixed(4) })
         .where(and(eq(salesInvoiceLines.tenantId, tenantId), eq(salesInvoiceLines.id, line.id)));
     }
   }
@@ -651,8 +889,7 @@ export class SalesService {
     },
     mapping: Record<string, string | null | undefined>,
     cogsTotal: Decimal,
-    settlement: 'credit' | 'cash' | 'card' | 'bank',
-    settlementAccountId?: string,
+    settlements: ResolvedSettlement[],
   ): { accountId: string; debit?: string; credit?: string; partyId?: string }[] {
     const need = (key: string): string => {
       const accountId = mapping[key];
@@ -662,21 +899,6 @@ export class SalesService {
         });
       return accountId;
     };
-    // Cash and bank sales debit the till/bank account instead of the receivable,
-    // exactly like the desktop's payment-method choice at save time. The account
-    // must come from a real cash location — never from an unvalidated mapping.
-    const settlementAccount =
-      settlement === 'credit'
-        ? need('receivableAccountId')
-        : (settlementAccountId ??
-          (() => {
-            throw new DomainError(
-              'SALES_SETTLEMENT_ACCOUNT_REQUIRED',
-              'A cash or bank account is required for immediate settlement',
-              422,
-              { field: 'settlementAccountId' },
-            );
-          })());
     if (
       money(locked.withholding ?? '0')
         .abs()
@@ -691,7 +913,6 @@ export class SalesService {
     const discount = money(locked.invoiceDiscount ?? '0');
     const extra = money(locked.extraTax ?? '0');
     const tax = money(locked.taxTotal);
-    const total = money(locked.total);
     const gross = money(locked.subtotal).plus(discount);
     const isReturn = locked.kind === 'sale_return' || locked.kind === 'credit_note';
     const lines: { accountId: string; debit?: string; credit?: string; partyId?: string }[] = [];
@@ -709,17 +930,34 @@ export class SalesService {
         partyId: partyId ?? undefined,
       });
     };
-    // The till/bank leg carries no party subledger — cash has no customer account.
-    const settlementParty = settlement === 'credit' ? locked.partyId : null;
+    // The till/bank legs carry no party subledger; only a credit portion belongs
+    // to the customer receivable. Multiple tenders deliberately stay separate so
+    // card and cash can be reconciled without reverse-engineering one aggregate.
+    const settlementLeg = (settlement: ResolvedSettlement): void => {
+      const accountId = settlement.method === 'credit' ? need('receivableAccountId') : settlement.settlementAccountId;
+      if (!accountId) {
+        throw new DomainError(
+          'SALES_SETTLEMENT_ACCOUNT_REQUIRED',
+          'A cash or bank account is required for immediate settlement',
+          422,
+          { field: 'settlements' },
+        );
+      }
+      if (!isReturn) {
+        leg(accountId, settlement.amount, new Decimal(0), settlement.method === 'credit' ? locked.partyId : null);
+      } else {
+        leg(accountId, new Decimal(0), settlement.amount, settlement.method === 'credit' ? locked.partyId : null);
+      }
+    };
+
+    for (const settlement of settlements) settlementLeg(settlement);
 
     if (!isReturn) {
-      leg(settlementAccount, total, new Decimal(0), settlementParty);
       leg(need('salesAccountId'), new Decimal(0), gross);
       if (discount.gt(0)) leg(need('discountGivenAccountId'), discount, new Decimal(0));
       if (tax.abs().gt(0)) leg(need('vatOutputAccountId'), new Decimal(0), tax);
       if (extra.abs().gt(0)) leg(need('exciseTaxAccountId'), new Decimal(0), extra);
     } else {
-      leg(settlementAccount, new Decimal(0), total, settlementParty);
       leg(need('salesReturnAccountId'), gross, new Decimal(0));
       if (discount.gt(0)) leg(need('discountGivenAccountId'), new Decimal(0), discount);
       if (tax.abs().gt(0)) leg(need('vatOutputAccountId'), tax, new Decimal(0));
@@ -757,6 +995,27 @@ export class SalesService {
       throw new DomainError(
         'SALES_VOID_HAS_PAYMENTS',
         'Refund or unallocate the payments before voiding',
+        409,
+      );
+    }
+    const [postedReturn] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: salesInvoices.id })
+        .from(salesInvoices)
+        .where(
+          and(
+            eq(salesInvoices.tenantId, tenantId),
+            eq(salesInvoices.referenceInvoiceId, id),
+            inArray(salesInvoices.kind, ['sale_return', 'credit_note']),
+            eq(salesInvoices.status, 'posted'),
+          ),
+        )
+        .limit(1),
+    );
+    if (postedReturn) {
+      throw new DomainError(
+        'SALES_VOID_HAS_RETURNS',
+        'This invoice already has a posted return or credit note; reverse that document first',
         409,
       );
     }
@@ -828,7 +1087,9 @@ export class SalesService {
       const mirrors: InventoryLine[] = movements.map((movement) => ({
         itemId: movement.itemId,
         warehouseId: movement.warehouseId,
-        qty: movement.qty,
+        // `unit_cost` is stored per base unit in the immutable ledger. Reverse in
+        // base units so a historical carton does not multiply its value twice.
+        qty: movement.baseQty,
         unitCost: movement.unitCost ?? '0',
         direction: movement.direction === 'out' ? 'in' : 'out',
         docType: 'sales_void',

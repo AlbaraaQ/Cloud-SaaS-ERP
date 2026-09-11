@@ -53,6 +53,7 @@ describe('sales posting engine', () => {
         'accounting.reports.view',
         'accounting.account.view',
         'organization.postingprofile.view',
+        'compat.manage',
       ],
     });
 
@@ -247,6 +248,97 @@ describe('sales posting engine', () => {
     expect(debit).toBeCloseTo(460 + 160, 4);
   });
 
+  it('never defaults a named cash customer to party credit, and validates a supplied customer on immediate sales', async () => {
+    const chart = await api(ctx.server, 'get', '/api/v1/accounts', { token: actor.token });
+    const till = ((chart.body.data ?? chart.body) as Array<{ id: string; code: string }>).find((row) => row.code === '1211001');
+    expect(till).toBeDefined();
+
+    const namedCash = await api(ctx.server, 'post', '/api/v1/sales/invoices', {
+      token: actor.token,
+      body: {
+        branchId,
+        warehouseId,
+        cashCustomerName: 'عميل نقدي افتراضي',
+        lines: [{ itemId, quantity: '1', unitPrice: '100', taxRate: '15' }],
+      },
+    });
+    expect(namedCash.status).toBe(201);
+    const cashDraft = data(namedCash.body) as { id: string };
+
+    // Omitting settlement used to fall through to the legacy `credit` default.
+    // A free-text customer cannot own a receivable subledger, so it must fail
+    // before stock or a journal is written.
+    const omittedSettlement = await api(ctx.server, 'post', `/api/v1/sales/invoices/${cashDraft.id}/post`, {
+      token: actor.token,
+      body: {},
+    });
+    expect(omittedSettlement.status).toBe(422);
+    expect(omittedSettlement.body.code).toBe('SALES_CASH_CUSTOMER_SETTLEMENT_REQUIRED');
+    const remainsDraft = await api(ctx.server, 'get', `/api/v1/sales/invoices/${cashDraft.id}`, { token: actor.token });
+    expect((data(remainsDraft.body) as { status: string }).status).toBe('draft');
+
+    const cashPosted = await api(ctx.server, 'post', `/api/v1/sales/invoices/${cashDraft.id}/post`, {
+      token: actor.token,
+      body: { settlement: 'cash', settlementAccountId: till!.id },
+    });
+    expect(cashPosted.status).toBe(201);
+    expect(data(cashPosted.body)).toMatchObject({ paymentStatus: 'paid', paidTotal: '115.0000' });
+
+    const unknownParty = await api(ctx.server, 'post', '/api/v1/sales/invoices', {
+      token: actor.token,
+      body: {
+        branchId,
+        warehouseId,
+        partyId: '00000000-0000-4000-8000-000000000099',
+        lines: [{ itemId, quantity: '1', unitPrice: '100', taxRate: '15' }],
+      },
+    });
+    expect(unknownParty.status).toBe(422);
+    expect(unknownParty.body.code).toBe('SALES_CUSTOMER_INVALID');
+  });
+
+  it('imports a legacy cash sale to the device branch default safe instead of falling back to credit', async () => {
+    const device = await api(ctx.server, 'post', '/api/v1/compat/devices', {
+      token: actor.token,
+      body: { name: 'Legacy cash terminal', branchId },
+    });
+    expect(device.status).toBe(201);
+    const apiKey = (data(device.body) as { apiKey: string }).apiKey;
+
+    const authenticated = await api(ctx.server, 'post', '/api/v1/compat/auth/device', {
+      body: { tenantId: actor.tenantId, apiKey },
+    });
+    expect(authenticated.status).toBe(201);
+    const compatToken = (data(authenticated.body) as { accessToken: string }).accessToken;
+
+    const pushed = await api(ctx.server, 'post', '/api/v1/compat/docs/sales-invoice', {
+      headers: { 'x-tenant-id': actor.tenantId, 'x-compat-token': compatToken },
+      body: {
+        GlobalID: 'LEGACY-CASH-POST-01',
+        BranchID: branchId,
+        StockID: warehouseId,
+        CashCustomer: 'عميل سطح المكتب النقدي',
+        InvType: 2,
+        PayType: 1,
+        Lines: [{ ItemID: itemId, Qty: '1', Price: '100', VAT: '15' }],
+      },
+    });
+    expect(pushed.status).toBe(201);
+    const result = data(pushed.body) as { cloudId: string };
+
+    const invoice = await api(ctx.server, 'get', `/api/v1/sales/invoices/${result.cloudId}`, { token: actor.token });
+    expect(invoice.status).toBe(200);
+    const document = data(invoice.body) as { paymentStatus: string; paidTotal: string; partyId: string | null; cashCustomerName: string | null; payments: Array<{ method: string }> };
+    expect(document).toMatchObject({
+      paymentStatus: 'paid',
+      paidTotal: '115.0000',
+      partyId: null,
+      cashCustomerName: 'عميل سطح المكتب النقدي',
+    });
+    expect(document.payments).toHaveLength(1);
+    expect(document.payments[0]).toMatchObject({ method: 'cash' });
+  });
+
   it('settles a cash sale against the till with a payment row in the same transaction', async () => {
     const chart = await api(ctx.server, 'get', '/api/v1/accounts', { token: actor.token });
     const till = ((chart.body.data ?? chart.body) as Array<{ id: string; code: string }>).find((row) => row.code === '1211001');
@@ -288,6 +380,9 @@ describe('sales posting engine', () => {
   });
 
   it('voids by reversing the journal and the stock, and refuses paid invoices', async () => {
+    const openingLevel = Number(await levelsOf());
+    const afterFirstPosting = (openingLevel - 5).toFixed(4);
+    const afterSecondPosting = (openingLevel - 10).toFixed(4);
     const created = await api(ctx.server, 'post', '/api/v1/sales/invoices', {
       token: actor.token,
       body: {
@@ -299,7 +394,7 @@ describe('sales posting engine', () => {
     });
     const draft = data(created.body) as { id: string };
     await api(ctx.server, 'post', `/api/v1/sales/invoices/${draft.id}/post`, { token: actor.token, body: {} });
-    expect(await levelsOf()).toBe('78.0000');
+    expect(await levelsOf()).toBe(afterFirstPosting);
 
     const paid = await api(ctx.server, 'post', `/api/v1/sales/invoices/${draft.id}/payments`, {
       token: actor.token,
@@ -325,7 +420,7 @@ describe('sales posting engine', () => {
     });
     const freshDraft = data(fresh.body) as { id: string };
     await api(ctx.server, 'post', `/api/v1/sales/invoices/${freshDraft.id}/post`, { token: actor.token, body: {} });
-    expect(await levelsOf()).toBe('73.0000');
+    expect(await levelsOf()).toBe(afterSecondPosting);
 
     const voided = await api(ctx.server, 'post', `/api/v1/sales/invoices/${freshDraft.id}/void`, {
       token: actor.token,
@@ -333,7 +428,7 @@ describe('sales posting engine', () => {
     });
     expect(voided.status).toBe(201);
     expect((data(voided.body) as { status: string }).status).toBe('voided');
-    expect(await levelsOf()).toBe('78.0000');
+    expect(await levelsOf()).toBe(afterFirstPosting);
 
     const freshPosted = await api(ctx.server, 'get', `/api/v1/sales/invoices/${freshDraft.id}`, { token: actor.token });
     const freshNumber = (data(freshPosted.body) as { number: string }).number;

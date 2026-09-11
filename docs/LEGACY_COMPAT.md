@@ -85,6 +85,30 @@ device `enumMaps`. Accepted sales are mapped to the normal sales module, posted 
 cloud sequence allocation, and stored with `legacy_source='compat'` and `legacy_id`.
 Duplicates return the original cloud id/number.
 
+### PayType settlement rules
+
+`PayType` is an accounting instruction, not just legacy metadata. The default mapping is
+`1 → cash`, `2 → card`, and `4 → split`; a device `enumMaps.payMethod` may also map a
+legacy value to `bank` or `credit`.
+
+- `cash` posts a paid invoice to the active **default safe** for the device's branch.
+- `card` and `bank` post a paid invoice to the active **default bank** for that branch.
+- The selected location must have a posting account. Missing/inactive/default-less setup
+  is rejected with `COMPAT_SETTLEMENT_LOCATION_REQUIRED`; the gateway never silently
+  changes it to customer credit.
+- `credit` creates a normal receivable and therefore needs a valid `CustID` customer.
+  A free-text `CashCustomer` cannot be posted to credit and is rejected with
+  `SALES_CASH_CUSTOMER_SETTLEMENT_REQUIRED`.
+- `split` is rejected with `COMPAT_SPLIT_SETTLEMENT_UNSUPPORTED`. The sales DTO has no
+  tender amounts or per-tender locations, so importing it as a guessed credit/cash sale
+  would corrupt settlement accounting. Add an explicit split-tender DTO before enabling it.
+
+Sales payloads intentionally do **not** use `SafeID`: unlike vouchers, the legacy invoice
+wire shape does not provide a reliable location ID. Configure a branch-local active default
+safe/bank in Cloud instead. A device can omit `BranchID`, in which case its own branch is
+used; it cannot override it and receives `COMPAT_DEVICE_BRANCH_MISMATCH` (403) if it tries.
+
+
 ## 5. Voucher push
 
 `POST /compat/docs/voucher` accepts the legacy receipt/payment shape:

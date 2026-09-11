@@ -90,7 +90,7 @@ describe('organization provisioning and default flags (PHASE_05 §5.7, §11)', (
     expect(rows.cash.rows[0]).toMatchObject({ kind: 'safe', is_default: true });
     // The desktop chart is seeded in the same transaction, so the safe posts to
     // 1211001 (الصندوق الرئيسي) from day one — CR-006 is closed.
-    expect(rows.chart.rows[0]).toMatchObject({ total: '113', roots: '4', cashbox: '1211001' });
+    expect(rows.chart.rows[0]).toMatchObject({ total: '114', roots: '4', cashbox: '1211001' });
     const linked = await withClient(async (client) => {
       const byId = await client.query<{ code: string }>('SELECT code FROM accounts WHERE id = $1', [
         rows.cash.rows[0]?.account_id,

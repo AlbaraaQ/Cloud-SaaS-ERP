@@ -26,6 +26,7 @@ export class ReportingController {
   @Get('print/vouchers/:id') @RequiresPermission('reporting.view') async voucherPrint(@Param('id') id: string) { return { html: await this.print.voucher(getTenantContext().tenantId, id) }; }
   @Get('print/journal-entries/:id') @RequiresPermission('reporting.view') async journalPrint(@Param('id') id: string) { return { html: await this.print.journalEntry(getTenantContext().tenantId, id) }; }
   @Get('print/shifts/:id') @RequiresPermission('reporting.view') async shiftPrint(@Param('id') id: string) { return { html: await this.print.shiftClose(getTenantContext().tenantId, id) }; }
+  @Get('print/inventory-documents/:id') @RequiresPermission('inventory.view') async inventoryDocumentPrint(@Param('id') id: string) { return { html: await this.print.inventoryDocument(getTenantContext().tenantId, id) }; }
   @Get(':key') @RequiresPermission('reporting.view') run(@Param('key') key: string, @Query() query: Record<string, string | undefined>) { return this.reporting.run(getTenantContext().tenantId, key, query); }
   @Post(':key/export') @RequiresPermission('reporting.export.execute') export(@Param('key') key: string, @Query() query: Record<string, string | undefined>, @Body() body: { format?: ExportFormat }) { return this.reporting.export(getTenantContext().tenantId, key, query, body.format ?? 'csv'); }
 }

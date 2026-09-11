@@ -411,7 +411,7 @@ export class AccountingService {
     return period.id;
   }
 
-  async postJournalInTx(tx: DrizzleTx, tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string }) {
+  async postJournalInTx(tx: DrizzleTx, tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string; kind?: string; reversalOf?: string }) {
     if (input.lines.length < 2) throw new DomainError('JOURNAL_LINES_REQUIRED', 'A journal entry needs at least two lines', 422);
     const debit = input.lines.reduce((sum, line) => sum.plus(line.debit ?? '0'), new Decimal(0));
     const credit = input.lines.reduce((sum, line) => sum.plus(line.credit ?? '0'), new Decimal(0));
@@ -432,12 +432,13 @@ export class AccountingService {
       fiscalPeriodId: input.fiscalPeriodId,
       date: input.date,
       number: allocated.display,
-      kind: 'manual',
+      kind: input.kind ?? 'manual',
       status: 'posted',
       description: input.description ?? null,
       sourceType: input.sourceType ?? null,
       sourceId: input.sourceId ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
+      reversalOf: input.reversalOf ?? null,
       postedAt: new Date(),
     });
     await tx.insert(journalEntryLines).values(input.lines.map((line, index) => ({

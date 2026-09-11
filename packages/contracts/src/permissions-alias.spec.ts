@@ -132,6 +132,9 @@ describe('role catalogues', () => {
 
   it('defines ERP functional roles with known tenant permissions', () => {
     expect(erpFunctionalRoleCatalog.length).toBe(13);
+    const inventoryManager = erpFunctionalRoleCatalog.find((role) => role.code === 'inventory_manager');
+    // The item workspace needs the rate/name lookup to make its tax selector usable.
+    expect(inventoryManager?.permissions).toContain('catalog.taxgroup.view');
     for (const role of erpFunctionalRoleCatalog) {
       expect(role.permissions.length).toBeGreaterThan(0);
       for (const code of role.permissions) {

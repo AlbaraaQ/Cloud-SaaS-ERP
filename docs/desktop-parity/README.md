@@ -6,6 +6,10 @@ is the functional specification. The cloud (this repo) is a clean-room rebuild:
 **same behaviours and Arabic data, new architecture** (NestJS API + Next.js surfaces +
 Postgres, multi-tenant, RBAC).
 
+> **ابدأ هنا عند استئناف العمل في جلسة جديدة:**
+> [`CONTINUATION_HANDOFF.md`](./CONTINUATION_HANDOFF.md) هو سجل الحالة الحية،
+> التغييرات غير المُرحّلة، الأولوية الفورية، ومعيار القبول الكامل لكل مرحلة.
+
 ## Rules of the programme
 
 1. Desktop code is **read for rules, never copied for architecture** — no `SqlClient`,
@@ -26,7 +30,7 @@ Postgres, multi-tenant, RBAC).
 | 02 | Sales invoice engine (calc, save, post, returns, notes) | ✅ done | `PHASE_02_SALES_ENGINE.md` |
 | 03 | Purchase engine (invoices, returns, landed cost) | ✅ done | `PHASE_03_PURCHASE_ENGINE.md` |
 | 04 | POS checkout + cashier shifts + day close | ✅ done | `PHASE_04_POS_SHIFTS.md` |
-| 05 | Inventory (stock in/out, transfers, serials, barcode, expiry) | ⬜ next | `ROADMAP_PHASES_02_11.md` |
+| 05 | Inventory (stock in/out, transfers, serials, barcode, expiry) | ⏳ in progress — documents/ledger/print and advanced item-card slices delivered; not accepted yet | `PHASE_05_INVENTORY.md`, `CONTINUATION_HANDOFF.md`, `ROADMAP_PHASES_02_11.md` |
 | 06 | Treasury (receipts, payments, safes/banks, cheques) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 07 | Accounting (manual entries, periods, trial balance, cost centres) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 08 | HRM (employees, attendance, payroll, custody) | ⬜ | `ROADMAP_PHASES_02_11.md` |
@@ -36,4 +40,12 @@ Postgres, multi-tenant, RBAC).
 
 Deferred by the owner: marketing CMS, per-tenant mobile-shop module.
 Done earlier, outside this programme: RBAC reorganisation (PR #4), desktop chart
-seeding (112 accounts + COGS extension, `packages/database/src/desktop-coa.ts`).
+seeding (112 desktop accounts + COGS and cash-over/short extensions, `packages/database/src/desktop-coa.ts`).
+
+Phase 05 now has an auditable opening/receipt/issue/adjustment document slice with a
+real staff workspace and A4 inventory printout, plus a real `/inventory/items` directory
+and advanced RTL card for item master data, operational controls, alternate units,
+barcodes, and supplier/legacy codes. It remains **in progress** until
+transfer/request/production UX, specialised stock reports, and deferred item extensions
+(such as image/properties/components/expanded price history) are completed; this is
+recorded in `PHASE_05_INVENTORY.md`.

@@ -5,6 +5,8 @@ import { RequiresPermission } from '../platform/decorators/requires-permission.d
 
 import {
   PosService,
+  type PosHeldTicketInput,
+  type PosShortcutInput,
   type DiningTableInput,
   type OrderItemInput,
   type PosCheckoutInput,
@@ -14,6 +16,54 @@ import {
 @Controller('pos')
 export class PosController {
   constructor(private readonly pos: PosService) {}
+
+  @Get('held-tickets')
+  @RequiresPermission('pos.operate')
+  heldTickets(@Query('branch_id') branchId?: string, @Query('history') history?: string) {
+    const ctx = getTenantContext();
+    return this.pos.listHeldTickets(ctx.tenantId, ctx.userId, branchId, history === 'true');
+  }
+
+  @Post('held-tickets')
+  @RequiresPermission('pos.operate')
+  holdTicket(@Body() body: PosHeldTicketInput) {
+    const ctx = getTenantContext();
+    return this.pos.holdTicket(ctx.tenantId, ctx.userId, body);
+  }
+
+  @Post('held-tickets/:id/recall')
+  @RequiresPermission('pos.operate')
+  recallHeldTicket(@Param('id') id: string) {
+    const ctx = getTenantContext();
+    return this.pos.recallHeldTicket(ctx.tenantId, ctx.userId, id);
+  }
+
+  @Post('held-tickets/:id/cancel')
+  @RequiresPermission('pos.operate')
+  cancelHeldTicket(@Param('id') id: string) {
+    const ctx = getTenantContext();
+    return this.pos.cancelHeldTicket(ctx.tenantId, ctx.userId, id);
+  }
+
+  @Get('shortcuts')
+  @RequiresPermission('pos.view')
+  shortcuts(@Query('branch_id') branchId: string) {
+    return this.pos.listShortcuts(getTenantContext().tenantId, branchId);
+  }
+
+  @Post('shortcuts')
+  @RequiresPermission('pos.config.manage')
+  setShortcut(@Body() body: PosShortcutInput) {
+    const ctx = getTenantContext();
+    return this.pos.setShortcut(ctx.tenantId, ctx.userId, body);
+  }
+
+  @Post('shortcuts/:slot/remove')
+  @RequiresPermission('pos.config.manage')
+  removeShortcut(@Param('slot') slot: string, @Body() body: { branchId: string }) {
+    return this.pos.removeShortcut(getTenantContext().tenantId, body.branchId, Number(slot));
+  }
+
   @Get('categories') @RequiresPermission('pos.view') categories(@Query('branchId') branchId?: string) {
     return this.pos.categories(getTenantContext().tenantId, branchId);
   }
