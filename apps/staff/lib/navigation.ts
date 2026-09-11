@@ -100,10 +100,6 @@ const accounting: ModuleNode = {
           permission: 'parties.view',
           endpoint: '/payment-methods',
         }),
-        screen('expense-card', 'بطاقة المصاريف', 'Expense card', '/accounting/expenses', 'ready', {
-          permission: 'treasury.view',
-          endpoint: '/expense-types',
-        }),
       ],
     },
     {
@@ -122,14 +118,6 @@ const accounting: ModuleNode = {
         screen('journal-voucher', 'سند قيد', 'Journal voucher', '/accounting/journal-entries/new', 'ready', {
           permission: 'accounting.journal.post',
           endpoint: 'POST /journal-entries',
-        }),
-        screen('receipt-voucher', 'سند قبض', 'Receipt voucher', '/treasury/vouchers?kind=receipt', 'ready', {
-          permission: 'treasury.view',
-          endpoint: '/vouchers',
-        }),
-        screen('payment-voucher', 'سند صرف', 'Payment voucher', '/treasury/vouchers?kind=payment', 'ready', {
-          permission: 'treasury.view',
-          endpoint: '/vouchers',
         }),
         screen('periods', 'الفترات المحاسبية', 'Fiscal periods', '/accounting/periods', 'ready', {
           permission: 'accounting.period.view',
@@ -651,10 +639,6 @@ const sales: ModuleNode = {
         screen('quotation', 'عرض سعر', 'Quotation', '/sales/quotations', 'ready', {
           permission: 'sales.view',
           endpoint: '/sales/quotations',
-        }),
-        screen('day-close', 'إغلاق اليومية', 'Day close', '/sales/shifts', 'ready', {
-          permission: 'treasury.view',
-          endpoint: '/shift-closes',
         }),
         screen(
           'contracting-return',
@@ -1290,8 +1274,66 @@ const support: ModuleNode = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// 2. الخزينة
+//
+// `frmSandQ` / `frmSandD` (the documents), `frmTreasury` / `frmBanks` (the masters) and
+// `frmRptKhzna` (the statement) are one module in the desktop too; the voucher screens
+// used to sit under المحاسبة › العمليات because the treasury module had no home. They
+// moved here — the routes did not change, and no endpoint was touched.
+// ---------------------------------------------------------------------------
+const treasury: ModuleNode = {
+  key: 'treasury',
+  icon: '🏦',
+  labelAr: 'الخزينة',
+  labelEn: 'Treasury',
+  href: '/treasury/vouchers',
+  permission: 'treasury.view',
+  groups: [
+    {
+      key: 'treasury-defs',
+      labelAr: 'تعاريف',
+      labelEn: 'Definitions',
+      items: [
+        screen('safe-card', '🏦 تعريف الخزينة', 'Safes', '/treasury/safes', 'ready', {
+          permission: 'organization.cashlocation.view',
+          endpoint: '/cash-locations?filter[kind]=safe',
+        }),
+        screen('bank-def', '🏦 تعريف البنوك', 'Banks', '/treasury/banks', 'ready', {
+          permission: 'organization.cashlocation.view',
+          endpoint: '/cash-locations?filter[kind]=bank',
+        }),
+        screen('expense-card', '📒 بطاقة حساب المصاريف', 'Expense card', '/accounting/expenses', 'ready', {
+          permission: 'treasury.view',
+          endpoint: '/expense-types',
+        }),
+      ],
+    },
+    {
+      key: 'treasury-ops',
+      labelAr: 'العمليات',
+      labelEn: 'Operations',
+      items: [
+        screen('receipt-voucher', '📄 سند قبض', 'Receipt voucher', '/treasury/vouchers?kind=receipt', 'ready', {
+          permission: 'treasury.view',
+          endpoint: '/vouchers',
+        }),
+        screen('payment-voucher', '📄 سند صرف', 'Payment voucher', '/treasury/vouchers?kind=payment', 'ready', {
+          permission: 'treasury.view',
+          endpoint: '/vouchers',
+        }),
+        screen('day-close', '📊 إغلاق اليومية', 'Day close', '/sales/shifts', 'ready', {
+          permission: 'treasury.view',
+          endpoint: '/shift-closes',
+        }),
+      ],
+    },
+  ],
+};
+
 export const modules: ModuleNode[] = [
   accounting,
+  treasury,
   inventory,
   purchases,
   sales,

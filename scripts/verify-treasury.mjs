@@ -319,5 +319,104 @@ try {
 }
 console.log('');
 
+// ── 7. تعريف الخزن والبنوك ─────────────────────────────────────────────────
+// `frmTreasury.xaml.cs:222` refuses a الصندوق with no مسئول — «يجب اختيار موظف مسئول» —
+// and replaces Stock_Emps inside the treasury's own transaction. `frmBanks.xaml` carries
+// the bank's card on the same row: الدولة، المدينة، المنطقة، الهواتف، نسبة الاقتطاع.
+console.log('7. تعريف الخزن والبنوك');
+const secondEmployee = await call('post', '/hrm/employees', token, {
+  employeeNo: `E2-${stamp}`,
+  name: 'مساعد أمين الصندوق',
+  branchId,
+});
+const custodySafe = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'safe',
+  name: `صندوق بمسئول ${stamp}`,
+  accountId: safeAccountId,
+  custodianIds: [employee.id, secondEmployee.id],
+  notes: 'يُغلق يومياً الساعة الثامنة',
+});
+check(
+  '👤 مسئولو الصندوق يُحفظون مع الصندوق نفسه',
+  (custodySafe.custodianIds ?? []).length === 2,
+  (custodySafe.custodianIds ?? []).join(' · ').slice(0, 24),
+);
+check('📝 ملاحظات الصندوق تُحفظ', custodySafe.notes === 'يُغلق يومياً الساعة الثامنة', custodySafe.notes);
+
+try {
+  await call('post', '/cash-locations', token, {
+    branchId,
+    kind: 'safe',
+    name: `صندوق بلا مسئول ${stamp}`,
+    accountId: safeAccountId,
+    custodianIds: [],
+  });
+  check('صندوق بلا مسئول مرفوض', false, 'expected 422');
+} catch (error) {
+  check('صندوق بلا مسئول مرفوض', error.status === 422, `${error.status} ${error.code}`);
+}
+
+try {
+  await call('post', '/cash-locations', token, {
+    branchId,
+    kind: 'safe',
+    name: `صندوق بمسئول غريب ${stamp}`,
+    accountId: safeAccountId,
+    custodianIds: ['00000000-0000-4000-8000-000000000000'],
+  });
+  check('موظف من مؤسسة أخرى لا يُجعل مسئولاً', false, 'expected 422');
+} catch (error) {
+  check('موظف من مؤسسة أخرى لا يُجعل مسئولاً', error.status === 422, `${error.status} ${error.code}`);
+}
+
+// التحديث يستبدل المجموعة كما يفعل الديسكتوب: حذف ثم إدراج.
+const trimmed = await call('PATCH', `/cash-locations/${custodySafe.id}`, token, {
+  custodianIds: [secondEmployee.id],
+  notes: 'مسئول واحد بعد التسليم',
+});
+check('التحديث يستبدل المسئولين', (trimmed.custodianIds ?? []).length === 1, `${(trimmed.custodianIds ?? []).length}`);
+try {
+  await call('PATCH', `/cash-locations/${custodySafe.id}`, token, { custodianIds: [] });
+  check('ولا يُسمح بتجريد الصندوق من مسئوليه', false, 'expected 422');
+} catch (error) {
+  check('ولا يُسمح بتجريد الصندوق من مسئوليه', error.status === 422, `${error.status} ${error.code}`);
+}
+
+const bankCard = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'bank',
+  name: `بنك ببطاقة ${stamp}`,
+  accountId: bankAccountId,
+  bank: {
+    bankName: `بنك التحقق ${stamp}`,
+    iban: 'SA0380000000608010167519',
+    country: 'المملكة العربية السعودية',
+    city: 'الرياض',
+    region: 'العليا',
+    phone: '0114013030',
+    mobile: '0550000000',
+    deductionPct: '2.5',
+  },
+});
+const card = bankCard.bank ?? {};
+check(
+  '🏦 بطاقة البنك كاملة: الدولة · المدينة · المنطقة · نسبة الاقتطاع',
+  card.country === 'المملكة العربية السعودية' &&
+    card.city === 'الرياض' &&
+    card.region === 'العليا' &&
+    card.deductionPct === '2.5',
+  `${card.country} / ${card.city} / ${card.deductionPct}`,
+);
+
+const listed = await call('get', '/cash-locations?filter[kind]=safe&limit=100', token);
+const listedRows = Array.isArray(listed) ? listed : listed.data ?? [];
+check(
+  'القائمة تعيد المسئولين مع كل صندوق',
+  listedRows.some((row) => (row.custodianIds ?? []).includes(secondEmployee.id)),
+  `${listedRows.length} صندوقاً`,
+);
+console.log('');
+
 console.log(failures === 0 ? '\n✔ Phase 06 treasury documents verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

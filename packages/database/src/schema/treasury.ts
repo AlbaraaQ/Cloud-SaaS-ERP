@@ -33,6 +33,38 @@ export const vouchers = pgTable('vouchers', {
       .where(sql`status = 'posted'`),
     salesman: index('vouchers_salesman_idx').on(t.tenantId, t.salesmanId).where(sql`salesman_id IS NOT NULL`) }));
 
+/**
+ * 👤 مسئولي الصندوق — the desktop's `Stock_Emps (stock_id, emp_id)`.
+ *
+ * `frmTreasury.xaml.cs:222` refuses to save a الصندوق with no responsible employee and
+ * replaces the whole set inside the treasury's own transaction. A box is a physical
+ * thing; the signature is what makes its balance somebody's answer.
+ */
+export const cashLocationCustodians = pgTable(
+  'cash_location_custodians',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    cashLocationId: uuid('cash_location_id')
+      .notNull()
+      .references(() => cashLocations.id, { onDelete: 'cascade' }),
+    employeeId: uuid('employee_id')
+      .notNull()
+      .references(() => employees.id, { onDelete: 'cascade' }),
+    ...baseAuditColumns(),
+  },
+  (table) => ({
+    one: uniqueIndex('cash_location_custodians_key').on(
+      table.tenantId,
+      table.cashLocationId,
+      table.employeeId,
+    ),
+    employee: index('cash_location_custodians_employee_idx').on(table.tenantId, table.employeeId),
+  }),
+);
+
 export const cashTransfers = pgTable('cash_transfers', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').notNull().references(() => branches.id), fromCashLocationId: uuid('from_cash_location_id').notNull().references(() => cashLocations.id), toCashLocationId: uuid('to_cash_location_id').notNull().references(() => cashLocations.id), number: text('number'), amount: numeric('amount', money).notNull(), currency: text('currency').notNull().default('SAR'), status: text('status').notNull().default('draft'), sentJournalEntryId: uuid('sent_journal_entry_id').references(() => journalEntries.id), receivedJournalEntryId: uuid('received_journal_entry_id').references(() => journalEntries.id), sentAt: timestamp('sent_at', { withTimezone: true }), receivedAt: timestamp('received_at', { withTimezone: true }), ...baseAuditColumns(), ...baseLegacyColumns() }, (t) => ({ number: uniqueIndex('cash_transfers_tenant_number_key').on(t.tenantId, t.number).where(sql`number IS NOT NULL`), scope: index('cash_transfers_scope_idx').on(t.tenantId, t.status) }));
 
 export const expenseTypes = pgTable('expense_types', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), nameAr: text('name_ar').notNull(), nameEn: text('name_en'), accountId: uuid('account_id').notNull().references(() => accounts.id), costCenterId: uuid('cost_center_id').references(() => costCenters.id), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns() }, (t) => ({ name: uniqueIndex('expense_types_tenant_name_key').on(t.tenantId, t.nameAr).where(sql`deleted_at IS NULL`) }));
@@ -43,7 +75,7 @@ export const shiftCloseLines = pgTable('shift_close_lines', { shiftCloseId: uuid
 
 export const cashCountLines = pgTable('cash_count_lines', { shiftCloseId: uuid('shift_close_id').notNull().references(() => shiftCloses.id, { onDelete: 'cascade' }), lineNo: integer('line_no').notNull(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), currencyCode: text('currency_code').notNull().default('SAR'), denomination: numeric('denomination', money).notNull(), count: integer('count').notNull(), total: numeric('total', money).notNull() }, (t) => ({ pk: primaryKey({ columns: [t.shiftCloseId, t.lineNo] }) }));
 
-export const treasuryTables = { vouchers, cashTransfers, expenseTypes, shiftCloses, shiftCloseLines, cashCountLines };
+export const treasuryTables = { vouchers, cashLocationCustodians, cashTransfers, expenseTypes, shiftCloses, shiftCloseLines, cashCountLines };
 export type Voucher = typeof vouchers.$inferSelect;
 export type CashTransfer = typeof cashTransfers.$inferSelect;
 export type ShiftClose = typeof shiftCloses.$inferSelect;

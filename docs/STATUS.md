@@ -226,6 +226,25 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `apps/api/test/treasury-vouchers.spec.ts` (7) and `scripts/verify-treasury.mjs`
   (6 sections against the live stack).
 
+* **المرحلة 06 — الخزينة، الجزء الثاني: تعريف الخزن والبنوك** (`frmTreasury.xaml` +
+  `.xaml.cs` L87 grid / L222 «يجب اختيار موظف مسئول»، و`frmBanks.xaml`). Migration `0041`
+  is additive: `cash_locations.notes` for 📝 ملاحظات, and a real `cash_location_custodians`
+  table for the desktop's `Stock_Emps` — one row per (tenant, safe, employee), unique so an
+  employee cannot be signed twice onto the same safe, indexed by employee, RLS like the rest.
+  The desktop deletes `Stock_Emps` first and inserts after, so a typed typo leaves a safe
+  with no custodian on the way to failing; here the employees are validated **before any
+  write**, and emptying a safe of its custodians is refused with the same
+  «يجب اختيار موظف مسئول» rather than performed. Banks keep the full `frmBanks` card —
+  🌍 الدولة، 🏙️ المدينة، 📍 المنطقة، تليفون، موبايل، 💰 نسبة الاقتطاع — carried in the
+  `bank` JSON block, so no column touches half a table that is safes. Screens
+  `/treasury/safes` and `/treasury/banks` are one component with the desktop's three tabs
+  (📋 بيانات · 👤 مسئولي الصندوق · 📝 ملاحظات), and الخزينة became its own `🏦` module in
+  the staff navigation as it is in `Desktop_ERP`, taking 📄 سند قبض / 📄 سند صرف /
+  📒 بطاقة حساب المصاريف / 📊 إغلاق اليومية home from المحاسبة › العمليات — routes
+  untouched, endpoints untouched, duplicates removed. Tests
+  `apps/api/test/treasury-custody.spec.ts` (6) and section 7 of
+  `scripts/verify-treasury.mjs`. 488 API tests, 36 staff tests, 71 contract tests.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the
