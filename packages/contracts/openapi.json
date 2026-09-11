@@ -3621,6 +3621,11 @@
                         "format": "uuid",
                         "nullable": true
                       },
+                      "chequesInHandAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
                       "costCenterId": {
                         "type": "string",
                         "format": "uuid",
@@ -7572,7 +7577,32 @@
     "/api/v1/vouchers": {
       "get": {
         "operationId": "TreasuryController_vouchers",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""

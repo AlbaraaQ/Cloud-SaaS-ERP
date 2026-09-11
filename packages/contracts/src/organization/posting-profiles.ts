@@ -77,6 +77,12 @@ export const POST_PROFILE_ACCOUNT_KEYS = [
   'bankAccountId',
   'receivableAccountId',
   'payableAccountId',
+  /**
+   * Phase 06 — أوراق القبض: where a cheque sits between being taken and being honoured.
+   * A pending cheque is a promise, not money, so neither the safe nor the bank has moved
+   * yet; the account is what keeps the promise visible in the ledger until clearance.
+   */
+  'chequesInHandAccountId',
 ] as const;
 
 export type PostProfileAccountKey = (typeof POST_PROFILE_ACCOUNT_KEYS)[number];

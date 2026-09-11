@@ -8,7 +8,11 @@ import { TreasuryService, type TransferInput, type VoucherInput, type VoucherPos
 @Controller()
 export class TreasuryController {
   constructor(private readonly treasury: TreasuryService) {}
-  @Get('vouchers') @RequiresPermission('treasury.view') vouchers() { return this.treasury.vouchers(getTenantContext().tenantId); }
+  @Get('vouchers')
+  @RequiresPermission('treasury.view')
+  vouchers(@Query('from') from?: string, @Query('to') to?: string, @Query('q') q?: string) {
+    return this.treasury.vouchers(getTenantContext().tenantId, { from, to, q });
+  }
   @Get('vouchers/:id') @RequiresPermission('treasury.view') getVoucher(@Param('id') id: string) { return this.treasury.getVoucher(getTenantContext().tenantId, id); }
   @Post('vouchers') @RequiresPermission('treasury.voucher.create') createVoucher(@Body() body: VoucherInput) { return this.treasury.createVoucher(getTenantContext().tenantId, body); }
   @Patch('vouchers/:id') @RequiresPermission('treasury.voucher.create') updateVoucher(@Param('id') id: string, @Body() body: Partial<VoucherInput>) { return this.treasury.updateDraftVoucher(getTenantContext().tenantId, id, body); }

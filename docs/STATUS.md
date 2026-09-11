@@ -204,6 +204,28 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `🔢 الأرقام التسلسلية` column and a paste-box with a live count; the serials screen gained
   a `🔍` trace per row.
 
+* **المرحلة 06 — الخزينة، الجزء الأول: سند القبض وسند الصرف** (`frmSandQ` / `frmSandD` /
+  `frmSandVAT` / `frmPaymentVoucher`، و`Class/ReceiptOper.cs` L21 `BindReceiptToEntry`).
+  Migration `0040` puts the document's context on the row — `description` (📝 البيان، وهو
+  نفسه بيان القيد كما في `entry.Note = Receipt.Notes`), `voucher_time` (⏰ الوقت، فكشف
+  الصندوق يُرشَّح بالساعة), `salesman_id → employees` (👔 المندوب) و`foreign_amount`
+  (💲 قيمة السند بعملتها) — and the engine now builds the entry a voucher writes instead
+  of waiting for the caller to supply lines: the cash location's own account against the
+  party's receivable/payable account, then the posting profile. Callers who forgot — HRM's
+  `payRun` chief among them — used to move cash out of the safe with **no entry at all**.
+  A cheque is a promise, not money: `chequesInHandAccountId` (أوراق القبض) holds it until
+  clearance, which now posts its own entry (`مدين الصندوق / دائن أوراق القبض`), and a
+  bounced cheque puts the debt back on the customer and is terminal
+  (`422 CHEQUE_INVALID_STATE`). `PATCH /vouchers/:id` edits a whole draft the way
+  `frmSandQ.xaml.cs:903` does and seals a posted one (`409 VOUCHER_IMMUTABLE`);
+  `GET /vouchers?from=&to=&q=` is the 🔍 panel of `frmSandQD`/`frmSandSD`. Screen
+  `/treasury/vouchers` rebuilt as a document: tabs 📥 سند قبض / 📤 سند صرف, a search panel,
+  a document header, `💼 تفاصيل الدفع` with the cheque block behind the bankish methods,
+  and a grid with `🔢 الرقم · 📅 التاريخ · ⏰ الوقت · الطرف · 📝 البيان · 🏦 الصندوق ·
+  💳 نوع الدفع · 💰 المبلغ · 📋 الحالة`. New profile key `chequesInHandAccountId`. Tests
+  `apps/api/test/treasury-vouchers.spec.ts` (7) and `scripts/verify-treasury.mjs`
+  (6 sections against the live stack).
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the
