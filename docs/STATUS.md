@@ -174,9 +174,21 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   components is refused `PRODUCTION_COMPONENTS_REQUIRED`. A component's unit must be its own
   base unit or one defined on its card, and a recipe may not form a loop
   (`CATALOG_COMPONENT_CYCLE`). The
+  `unit_id` (0038) holds the unit the produced quantity was counted in, so `2 علب` of a
+  six-piece box puts twelve pieces on the shelf. The
   `line_id` of each stock movement is the item id, so the existing
   `(tenant, doc_type, doc_id, line_id)` unique index enforces one movement per item per
   order. Screen `/inventory/production`, report key `production-orders`.
+
+* **الأرقام التسلسلية والدفعات** — `item_serials` + `item_lots`. A serial is a state machine
+  (`available → reserved → sold → available`) driven from `/inventory/serials` the way
+  `frmItemSerialNo` drives it: two grids (`📋 الأرقام المتاحة` / `📤 الأرقام المباعة`), a
+  generator that makes a batch off one prefix (`POST /inventory/serials/generate`,
+  all-or-nothing, `409 SERIAL_DUPLICATE` on a clash), and `DELETE /inventory/serials/:id`
+  for a number that never left the shelf — a sold one is refused `422 SERIAL_INVALID_STATE`,
+  because deleting it is how a stock count stops adding up. A lot carrying serials answers
+  `409 LOT_IN_USE`. Screens `/inventory/serials`, `/inventory/lots`, report keys
+  `serial-tracking`, `expiry-report`.
 
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.

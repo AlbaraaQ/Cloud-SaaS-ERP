@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 import { getTenantContext } from '../platform/context/tenant-context.js';
@@ -217,8 +217,14 @@ export class InventoryController {
   ) {
     return this.inventory.belowMinimum(getTenantContext().tenantId, warehouseId);
   }
-  @Get('lots') @RequiresPermission('inventory.view') lots(@Query('item_id') itemId?: string) {
-    return this.inventory.listLots(getTenantContext().tenantId, itemId);
+  @Get('lots') @RequiresPermission('inventory.view') lots(
+    @Query('item_id') itemId?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.inventory.listLots(getTenantContext().tenantId, { itemId, q });
+  }
+  @Delete('lots/:id') @RequiresPermission('inventory.adjust') deleteLot(@Param('id') lotId: string) {
+    return this.inventory.deleteLot(getTenantContext().tenantId, lotId);
   }
   @Post('lots') @RequiresPermission('inventory.adjust') createLot(
     @Body() body: { itemId: string; lotNo: string; expiryDate?: string; receivedAt?: string },
@@ -228,13 +234,24 @@ export class InventoryController {
   @Get('serials') @RequiresPermission('inventory.view') serials(
     @Query('item_id') itemId?: string,
     @Query('status') status?: string,
+    @Query('warehouse_id') warehouseId?: string,
+    @Query('q') q?: string,
   ) {
-    return this.inventory.listSerials(getTenantContext().tenantId, itemId, status);
+    return this.inventory.listSerials(getTenantContext().tenantId, { itemId, status, warehouseId, q });
   }
   @Post('serials') @RequiresPermission('inventory.adjust') createSerial(
     @Body() body: { itemId: string; serialNo: string; lotId?: string; warehouseId?: string; status?: string },
   ) {
     return this.inventory.createSerial(getTenantContext().tenantId, body);
+  }
+  /** ⚙️ توليد — a batch of serials off one prefix, the way the desktop's generator does it. */
+  @Post('serials/generate') @RequiresPermission('inventory.adjust') generateSerials(
+    @Body() body: { itemId: string; prefix: string; startAt?: number; count: number; warehouseId?: string; lotId?: string },
+  ) {
+    return this.inventory.generateSerials(getTenantContext().tenantId, body);
+  }
+  @Delete('serials/:id') @RequiresPermission('inventory.adjust') deleteSerial(@Param('id') serialId: string) {
+    return this.inventory.deleteSerial(getTenantContext().tenantId, serialId);
   }
   @Post('serials/reserve') @RequiresPermission('inventory.adjust') reserveSerials(
     @Body() body: { serialIds: string[] },

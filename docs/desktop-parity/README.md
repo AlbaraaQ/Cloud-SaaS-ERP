@@ -26,7 +26,7 @@ Postgres, multi-tenant, RBAC).
 | 02 | Sales invoice engine (calc, save, post, returns, notes) | ✅ done | `PHASE_02_SALES_ENGINE.md` |
 | 03 | Purchase engine (invoices, returns, landed cost) | ✅ done | `PHASE_03_PURCHASE_ENGINE.md` |
 | 04 | POS checkout + cashier shifts + day close | ✅ done | `PHASE_04_POS_SHIFTS.md` |
-| 05 | Inventory (vouchers, transfers, counts, serials/lots, reorder, multi-unit, barcodes, expiry, **in-transit, item card, BOM/مكوّنات الصنف**) | 🟡 parts 1–5 done; part six open | `PHASE_05_INVENTORY.md` §10 · `NEXT_SESSION_PROMPT_PHASE_05_PART6.md` |
+| 05 | Inventory (vouchers, transfers, counts, **serial/lot lifecycle**, reorder, multi-unit, barcodes, expiry, in-transit, item card, BOM/مكوّنات الصنف, production header, inventory reports) | ✅ parts 1–6 done (one item deferred: §11.6) | `PHASE_05_INVENTORY.md` §10–§11 · `NEXT_SESSION_PROMPT_AFTER_PHASE_05.md` |
 | 06 | Treasury (receipts, payments, safes/banks, cheques) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 07 | Accounting (manual entries, periods, trial balance, cost centres) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 08 | HRM (employees, attendance, payroll, custody) | ⬜ | `ROADMAP_PHASES_02_11.md` |

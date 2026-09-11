@@ -1,20 +1,45 @@
 'use client';
 
+import { useState } from 'react';
+
 import { Directory } from '../../../components/directory';
-import { apiList, apiPost } from '../../../lib/api';
-import { itemLabel, listItems, shortDate, type Item } from '../../../lib/lookups';
+import { Notice } from '../../../components/data-view';
+import { FilterBar } from '../../../components/ui';
+import { ApiError, apiPost } from '../../../lib/api';
+import { deleteLot, itemLabel, listItems, listLots, shortDate, type Item, type Lot } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
-type Lot = { id: string; itemId: string; lotNo: string; expiryDate?: string | null; receivedAt?: string | null };
-
 export default function LotsPage() {
   const { can } = useSession();
-  const lots = useQuery<Lot[]>(() => apiList<Lot>('/inventory/lots'), []);
+  const manage = can('inventory.adjust');
+  const [itemId, setItemId] = useState('');
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
+  const lots = useQuery<Lot[]>(() => listLots({ itemId: itemId || undefined, q: search.trim() || undefined }), [itemId, search]);
   const items = useQuery<Item[]>(() => listItems(), []);
   const itemRows = items.data ?? [];
   const lotRows = lots.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
+
+  async function drop(row: Lot) {
+    if (!window.confirm(`حذف الدفعة ${row.lotNo}؟`)) return;
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      await deleteLot(row.id);
+      setNotice({ kind: 'ok', text: `حُذفت الدفعة ${row.lotNo}.` });
+      lots.reload();
+    } catch (error) {
+      setNotice({
+        kind: 'danger',
+        text: error instanceof ApiError ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Directory<Lot>
@@ -22,19 +47,21 @@ export default function LotsPage() {
       subtitle="دفعات الإنتاج وتواريخ انتهاء الصلاحية المرتبطة بالمواد."
       crumbs={['المستودعات', 'تقارير مستودعية']}
       query={lots}
-      canCreate={can('inventory.adjust')}
+      canCreate={manage}
       createLabel="دفعة جديدة"
       blocked={itemRows.length === 0 ? 'أضف مادة واحدة على الأقل من «دليل المواد».' : undefined}
       fields={[
         { name: 'itemId', label: 'المادة', type: 'select', required: true, options: itemRows.map((row) => ({ id: row.id, label: itemLabel(row) })) },
         { name: 'lotNo', label: 'رقم الدفعة', required: true, ltr: true },
-        { name: 'expiryDate', label: 'تاريخ انتهاء الصلاحية', type: 'date' },
+        { name: 'expiryDate', label: '⏳ تاريخ الانتهاء', type: 'date' },
+        { name: 'receivedAt', label: '📅 تاريخ الإنتاج', type: 'date' },
       ]}
       onCreate={(values) =>
         apiPost('/inventory/lots', {
           itemId: String(values.itemId),
           lotNo: String(values.lotNo).trim(),
           expiryDate: String(values.expiryDate) || undefined,
+          receivedAt: String(values.receivedAt) || undefined,
         })
       }
       successText={(values) => `تمت إضافة الدفعة ${String(values.lotNo)}.`}
@@ -65,6 +92,34 @@ export default function LotsPage() {
         { label: 'مواد لها دفعات', value: new Set(lotRows.map((row) => row.itemId)).size, hint: 'مادة' },
       ]}
       empty="لا توجد دفعات"
+      children={
+        <>
+          {notice ? <Notice notice={notice} /> : null}
+          <FilterBar>
+          <label className="field">
+            <span>المادة</span>
+            <select className="input" value={itemId} onChange={(event) => setItemId(event.target.value)}>
+              <option value="">كل المواد</option>
+              {itemRows.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {itemLabel(row)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>بحث برقم الدفعة</span>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder="LOT-1"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          </FilterBar>
+        </>
+      }
       columns={[
         {
           key: 'item',
@@ -74,9 +129,24 @@ export default function LotsPage() {
             return item ? itemLabel(item) : row.itemId;
           },
         },
-        { key: 'lot', header: 'رقم الدفعة', align: 'ltr', cell: (row) => row.lotNo },
-        { key: 'expiry', header: 'الصلاحية', align: 'ltr', cell: (row) => shortDate(row.expiryDate) },
+        { key: 'lot', header: '📁 رقم الدفعة', align: 'ltr', cell: (row) => row.lotNo },
+        { key: 'produced', header: '📅 تاريخ الإنتاج', align: 'ltr', cell: (row) => shortDate(row.receivedAt) },
+        { key: 'expiry', header: '⏳ تاريخ الانتهاء', align: 'ltr', cell: (row) => shortDate(row.expiryDate) },
+        ...(manage
+          ? [
+              {
+                key: 'actions',
+                header: '',
+                cell: (row: Lot) => (
+                  <button className="btn sm danger" type="button" disabled={busy} onClick={() => void drop(row)}>
+                    حذف
+                  </button>
+                ),
+              },
+            ]
+          : []),
       ]}
+
     />
   );
 }

@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   inventoryTransactions,
+  itemUnits,
   items,
   productionOrderComponents,
   productionOrders,
@@ -26,6 +27,12 @@ export type ProductionOrderInput = {
   orderDate?: string;
   outputItemId: string;
   outputQty: string;
+  /** 📄 رقم المرجع — the document this build answers. */
+  referenceNo?: string;
+  /** 📅 تاريخ المرجع — the date of the referenced document. */
+  referenceDate?: string;
+  /** 📐 الوحدة the produced quantity is counted in; defaults to the item's base unit. */
+  unitId?: string;
   notes?: string;
   /**
    * Leave it out and the bill of materials on the item card fills it in, scaled to the
@@ -117,8 +124,11 @@ export class ProductionOrdersService {
         );
 
       const referenced = [input.outputItemId, ...components.map((component) => component.itemId)];
-      const known = await tx.select({ id: items.id }).from(items).where(and(eq(items.tenantId, tenantId), inArray(items.id, referenced)));
+      const known = await tx.select({ id: items.id, baseUnitId: items.baseUnitId }).from(items).where(and(eq(items.tenantId, tenantId), inArray(items.id, referenced)));
       if (known.length !== new Set(referenced).size) throw new DomainError('ITEM_NOT_FOUND', 'One of the items on this order was not found', 404);
+      const outputItem = known.find((row) => row.id === input.outputItemId)!;
+      // 📐 الوحدة — a unit the item does not carry has no ratio, so it cannot be honoured.
+      const unitId = input.unitId ? await this.outputUnit(tx, tenantId, outputItem, input.unitId) : outputItem.baseUnitId;
 
       const allocated = await this.sequences.next({ tenantId, branchId: input.branchId ?? warehouse.branchId ?? undefined, docType: 'production_order' }, tx, { prefix: 'MO-', padding: 6 });
       await tx.insert(productionOrders).values({
@@ -131,6 +141,9 @@ export class ProductionOrdersService {
         status: 'draft',
         outputItemId: input.outputItemId,
         outputQty: outputQty.toFixed(4),
+        unitId,
+        referenceNo: input.referenceNo?.trim() || null,
+        referenceDate: input.referenceDate || null,
         notes: input.notes,
         createdBy: tryGetAuthContext()?.userId,
       });
@@ -169,6 +182,7 @@ export class ProductionOrdersService {
         itemId: order.outputItemId,
         warehouseId: order.warehouseId,
         qty: order.outputQty,
+        unitId: order.unitId ?? undefined,
         unitCost: unitCost.toFixed(4),
         direction: 'in' as const,
         docType: 'production_order',
@@ -203,10 +217,27 @@ export class ProductionOrdersService {
     });
   }
 
+  /** A produced quantity may be counted in the item's base unit or any unit on its card. */
+  private async outputUnit(
+    tx: DrizzleTx,
+    tenantId: string,
+    outputItem: { id: string; baseUnitId: string },
+    unitId: string,
+  ) {
+    if (unitId === outputItem.baseUnitId) return unitId;
+    const [row] = await tx
+      .select({ unitId: itemUnits.unitId })
+      .from(itemUnits)
+      .where(and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.itemId, outputItem.id), eq(itemUnits.unitId, unitId)));
+    if (!row) throw new DomainError('PRODUCTION_UNIT_INVALID', 'The produced quantity must be counted in the item base unit or one of its own units', 422, { field: 'unitId' });
+    return row.unitId;
+  }
+
   private async load(tx: DrizzleTx, tenantId: string, id: string) {
     const [order] = await tx.select().from(productionOrders).where(and(eq(productionOrders.tenantId, tenantId), eq(productionOrders.id, id)));
     if (!order) throw new DomainError('PRODUCTION_ORDER_NOT_FOUND', 'Production order was not found', 404);
     const components = await tx.select().from(productionOrderComponents).where(and(eq(productionOrderComponents.tenantId, tenantId), eq(productionOrderComponents.orderId, id)));
-    return { ...order, components: components.sort((a, b) => a.lineNo - b.lineNo) };
+    const [output] = await tx.select({ baseUnitId: items.baseUnitId }).from(items).where(and(eq(items.tenantId, tenantId), eq(items.id, order.outputItemId)));
+    return { ...order, unitId: order.unitId ?? output?.baseUnitId ?? null, components: components.sort((a, b) => a.lineNo - b.lineNo) };
   }
 }

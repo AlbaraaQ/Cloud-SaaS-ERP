@@ -1,4 +1,4 @@
-import { isNull } from 'drizzle-orm';
+import { isNotNull, isNull } from 'drizzle-orm';
 import {
   date,
   index,
@@ -518,6 +518,11 @@ export const productionOrders = pgTable(
       .notNull()
       .references(() => items.id),
     outputQty: numeric('output_qty', qty).notNull(),
+    /** 📄 رقم المرجع / 📅 تاريخ المرجع — the document this build answers. */
+    referenceNo: text('reference_no'),
+    referenceDate: date('reference_date'),
+    /** 📐 الوحدة the produced quantity was counted in; null means the item's base unit. */
+    unitId: uuid('unit_id').references(() => unitsOfMeasure.id),
     componentCost: numeric('component_cost', money).notNull().default('0'),
     unitCost: numeric('unit_cost', money).notNull().default('0'),
     notes: text('notes'),
@@ -528,6 +533,9 @@ export const productionOrders = pgTable(
   (t) => ({
     number: uniqueIndex('production_orders_tenant_number_key').on(t.tenantId, t.number),
     status: index('production_orders_status_idx').on(t.tenantId, t.status, t.orderDate),
+    reference: index('production_orders_reference_idx')
+      .on(t.tenantId, t.referenceNo)
+      .where(isNotNull(t.referenceNo)),
   }),
 );
 

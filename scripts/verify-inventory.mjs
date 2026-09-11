@@ -16,6 +16,9 @@
  *   9. تواريخ الصلاحية — a lot inside the horizon is reported, one outside is not
  *   10. بضاعة في الطريق — a half-received transfer is listed, then closed
  *   11. بطاقة الصنف — the item card's running balance agrees with the balance table
+ *   12. مكوّنات الصنف — a recipe fills a production order and is consumed by it
+ *   13. دورة الأرقام التسلسلية — generated, reserved, sold, returned, withdrawn
+ *   14. ترويسة أمر الإنتاج — رقم المرجع · تاريخ المرجع · الوحدة on a real build
  *
  * Every step asserts the *ledger*, not just the stock level: a stock document that
  * moves quantity without a journal is the desktop bug this phase exists to remove.
@@ -89,6 +92,7 @@ const secondWarehouseId = warehouseRows.find((row) => row.id !== warehouseId).id
 const categories = await call('get', '/organization/catalog/categories', token);
 const units = await call('get', '/organization/catalog/units', token);
 const stamp = Date.now().toString().slice(-6);
+const today = new Date().toISOString().slice(0, 10);
 const categoryId = categories[0].id;
 const item = await call('post', '/organization/catalog/items', token, {
   sku: `SKU-INV-${stamp}`,
@@ -336,19 +340,19 @@ check(
 // document counts cartons, the ledger stores pieces.
 console.log('');
 console.log('7. وحدات القياس المتعددة');
-const boxUnit = await call('post', '/organization/catalog/units', token, {
+const packUnit = await call('post', '/organization/catalog/units', token, {
   code: `BOX${stamp}`,
   nameAr: 'علبة',
 });
 await call('post', `/organization/catalog/items/${itemId}/units`, token, {
-  unitId: boxUnit.id,
+  unitId: packUnit.id,
   ratio: '12',
   isDefaultSale: true,
 });
 const unitRows = await call('get', `/organization/catalog/items/${itemId}/units`, token);
 check(
   'the box is listed with its factor',
-  unitRows.some((row) => row.unitId === boxUnit.id && Number(row.ratio) === 12),
+  unitRows.some((row) => row.unitId === packUnit.id && Number(row.ratio) === 12),
   `${unitRows.length} unit(s)`,
 );
 check('the base unit is still 1:1', Number(unitRows[0].ratio) === 1, unitRows[0]?.ratio ?? '');
@@ -372,7 +376,7 @@ const boxReceipt = await call('post', '/inventory/vouchers', token, {
   warehouseId,
   kind: 'stock_in',
   reason: 'استلام بالعلب',
-  lines: [{ itemId, qty: '2', unitId: boxUnit.id, unitCost: '120' }],
+  lines: [{ itemId, qty: '2', unitId: packUnit.id, unitCost: '120' }],
 });
 await call('post', `/inventory/vouchers/${boxReceipt.id}/post`, token, {});
 check(
@@ -389,7 +393,7 @@ check(
   Number(boxMovement?.qty) === 2 &&
     Number(boxMovement?.baseQty) === 24 &&
     Number(boxMovement?.factor) === 12 &&
-    boxMovement?.unitId === boxUnit.id,
+    boxMovement?.unitId === packUnit.id,
   `${boxMovement?.qty} ${boxMovement?.unitId ?? ''} → ${boxMovement?.baseQty} base`,
 );
 
@@ -399,12 +403,12 @@ console.log('8. الباركود المتعدد');
 const label = `BOX-${stamp}`;
 await call('post', `/organization/catalog/items/${itemId}/barcodes`, token, {
   barcode: label,
-  unitId: boxUnit.id,
+  unitId: packUnit.id,
 });
 const scanned = await call('get', `/inventory/barcode/${label}`, token);
 check(
   'a scan answers the item, the unit and the factor',
-  scanned.itemId === itemId && scanned.unitId === boxUnit.id && Number(scanned.factor) === 12,
+  scanned.itemId === itemId && scanned.unitId === packUnit.id && Number(scanned.factor) === 12,
   `${scanned.matchedBy} ×${scanned.factor}`,
 );
 try {
@@ -438,7 +442,7 @@ const strayUnit = await call('post', '/inventory/vouchers', token, {
   warehouseId,
   kind: 'stock_out',
   reason: 'وحدة غير معرّفة على الصنف',
-  lines: [{ itemId: secondItem.id, qty: '1', unitId: boxUnit.id }],
+  lines: [{ itemId: secondItem.id, qty: '1', unitId: packUnit.id }],
 });
 try {
   await call('post', `/inventory/vouchers/${strayUnit.id}/post`, token, {});
@@ -768,6 +772,155 @@ try {
     `${error.status} ${error.code}`,
   );
 }
+
+// ── 13. دورة الأرقام التسلسلية ───────────────────────────────────────────────
+// `frmItemSerialNo.xaml` split the shelf in two — `📋 الأرقام المتاحة` and
+// `📤 الأرقام المباعة` — generated numbers off a prefix with `⚙️ توليد`, and took a
+// number back out with `🗑️`. The cloud had the state machine all along; this walks it
+// end to end, then puts the order's own header (📄 رقم المرجع · 📅 تاريخ المرجع ·
+// 📐 الوحدة) on a build and checks the output lands in the unit it was counted in.
+console.log('');
+console.log('13. دورة الأرقام التسلسلية');
+const serialItem = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-SER-${stamp}`,
+  nameAr: 'صنف مُرقّم',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+// The prefix carries the run's stamp: a serial number is unique per tenant, and the
+// script has to stay re-runnable.
+const serialPrefix = `SN${stamp}-`;
+const generated = await call('post', '/inventory/serials/generate', token, {
+  itemId: serialItem.id,
+  prefix: serialPrefix,
+  startAt: 1,
+  count: 5,
+  warehouseId,
+});
+check(
+  '⚙️ توليد makes a batch off one prefix',
+  generated.count === 5 &&
+    generated.serialNos[0] === `${serialPrefix}1` &&
+    generated.serialNos[4] === `${serialPrefix}5`,
+  generated.serialNos.join(', '),
+);
+try {
+  await call('post', '/inventory/serials/generate', token, {
+    itemId: serialItem.id,
+    prefix: serialPrefix,
+    startAt: 3,
+    count: 3,
+    warehouseId,
+  });
+  check('a batch that clashes with a live number is refused', false, 'expected 409');
+} catch (error) {
+  check(
+    'a batch that clashes with a live number is refused',
+    error.status === 409 && error.code === 'SERIAL_DUPLICATE',
+    `${error.status} ${error.code}`,
+  );
+}
+const found = await call('get', `/inventory/serials?item_id=${serialItem.id}&q=${serialPrefix}1`, token);
+check(
+  'a number can be found by searching for it',
+  found.length === 1 && found[0].serialNo === `${serialPrefix}1`,
+  found.map((row) => row.serialNo).join(', '),
+);
+const serialRows = await call('get', `/inventory/serials?item_id=${serialItem.id}`, token);
+check('the whole batch is on the shelf', serialRows.length === 5, `${serialRows.length} numbers`);
+
+const firstSerial = serialRows[0];
+const reserved = await call('post', '/inventory/serials/reserve', token, { serialIds: [firstSerial.id] });
+check('حجز moves it off the shelf', reserved.status === 'reserved', reserved.status);
+try {
+  await call('post', '/inventory/serials/reserve', token, { serialIds: [firstSerial.id] });
+  check('reserving twice is refused', false, 'expected 422');
+} catch (error) {
+  check(
+    'reserving twice is refused',
+    error.status === 422 && error.code === 'SERIAL_INVALID_STATE',
+    `${error.status} ${error.code}`,
+  );
+}
+const released = await call('post', '/inventory/serials/release', token, { serialIds: [firstSerial.id] });
+check('إفراج puts it back', released.status === 'available', released.status);
+
+const toSell = serialRows.slice(0, 3).map((row) => row.id);
+await call('post', '/inventory/serials/consume', token, { serialIds: toSell });
+const sold = await call('get', `/inventory/serials?item_id=${serialItem.id}&status=sold`, token);
+check('📤 الأرقام المباعة holds what left', sold.length === 3, `${sold.length} sold`);
+const broughtBack = await call('post', '/inventory/serials/return', token, { serialIds: [toSell[0]] });
+check('إرجاع brings a sold number home', broughtBack.status === 'available', broughtBack.status);
+
+try {
+  await call('delete', `/inventory/serials/${toSell[1]}`, token);
+  check('a sold number cannot be withdrawn', false, 'expected 422');
+} catch (error) {
+  check(
+    'a sold number cannot be withdrawn',
+    error.status === 422 && error.code === 'SERIAL_INVALID_STATE',
+    `${error.status} ${error.code}`,
+  );
+}
+const withdrawn = serialRows[4].id;
+await call('delete', `/inventory/serials/${withdrawn}`, token);
+const afterDelete = await call('get', `/inventory/serials?item_id=${serialItem.id}`, token);
+check(
+  '🗑️ an available number can be withdrawn',
+  afterDelete.length === 4 && !afterDelete.some((row) => row.id === withdrawn),
+  `${afterDelete.length} left`,
+);
+
+// ── 14. ترويسة أمر الإنتاج: رقم المرجع · تاريخ المرجع · الوحدة ─────────────────
+console.log('');
+console.log('14. ترويسة أمر الإنتاج');
+const refUnit = await call('post', '/organization/catalog/units', token, { code: `BX${stamp}`, nameAr: 'علبة' });
+await call('post', `/organization/catalog/items/${serialItem.id}/units`, token, {
+  unitId: refUnit.id,
+  ratio: '6',
+});
+const packPart = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-BXP-${stamp}`,
+  nameAr: 'مكوّن الصندقة',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+const partFeed = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'تغذية المكوّن',
+  lines: [{ itemId: packPart.id, qty: '60', unitCost: '10' }],
+});
+await call('post', `/inventory/vouchers/${partFeed.id}/post`, token, {});
+
+const refOrder = await call('post', '/inventory/production-orders', token, {
+  warehouseId,
+  outputItemId: serialItem.id,
+  outputQty: '2',
+  unitId: refUnit.id,
+  referenceNo: 'SO-4417',
+  referenceDate: today,
+  components: [{ itemId: packPart.id, qty: '4' }],
+});
+check(
+  'the order remembers its reference',
+  refOrder.referenceNo === 'SO-4417' && refOrder.referenceDate === today,
+  `${refOrder.referenceNo} — ${refOrder.referenceDate}`,
+);
+check('the order remembers the unit', refOrder.unitId === refUnit.id, refOrder.unitId);
+const refDone = await call('post', `/inventory/production-orders/${refOrder.id}/complete`, token, {});
+check('the order is completed', refDone.status === 'completed', refDone.number);
+const packLevels = await call(
+  'get',
+  `/inventory/levels?warehouse_id=${warehouseId}&item_id=${serialItem.id}`,
+  token,
+);
+check(
+  '2 علب × 6 = 12 pieces came in, not 2',
+  Number(packLevels[0]?.quantity ?? 0) === 12,
+  String(packLevels[0]?.quantity ?? 0),
+);
 
 console.log(failures === 0 ? '\n✔ Phase 05 inventory documents verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

@@ -10,6 +10,7 @@ import { ApiError, apiList, apiPost } from '../../../lib/api';
 import {
   arabicName,
   itemLabel,
+  listItemUnits,
   listItems,
   listWarehouses,
   money,
@@ -18,6 +19,7 @@ import {
   statusLabel,
   today,
   type Item,
+  type ItemUnit,
   type Warehouse,
 } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
@@ -32,6 +34,9 @@ type ProductionOrder = {
   status: string;
   outputItemId: string;
   outputQty: string;
+  unitId?: string | null;
+  referenceNo?: string | null;
+  referenceDate?: string | null;
   componentCost: string;
   unitCost: string;
   notes: string | null;
@@ -59,12 +64,31 @@ export default function ProductionOrdersPage() {
   const [orderDate, setOrderDate] = useState(today());
   const [outputItemId, setOutputItemId] = useState('');
   const [outputQty, setOutputQty] = useState('1');
+  const [referenceNo, setReferenceNo] = useState('');
+  const [referenceDate, setReferenceDate] = useState('');
+  const [unitId, setUnitId] = useState('');
   const [notes, setNotes] = useState('');
   const [components, setComponents] = useState<ComponentDraft[]>([emptyComponent(), emptyComponent(), emptyComponent()]);
   const [expanded, setExpanded] = useState('');
   const [fromCard, setFromCard] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
+
+  const outputUnits = useQuery<ItemUnit[]>(
+    () => (outputItemId ? listItemUnits(outputItemId) : Promise.resolve([])),
+    [outputItemId],
+  );
+  const levels = useQuery<Array<{ itemId: string; quantity: string }>>(
+    () =>
+      warehouseId
+        ? apiList<{ itemId: string; quantity: string }>(`/inventory/levels?warehouse_id=${warehouseId}`)
+        : Promise.resolve([]),
+    [warehouseId],
+  );
+  const onHand = (item: string) => {
+    const row = (levels.data ?? []).find((entry) => entry.itemId === item);
+    return row ? Number(row.quantity) : 0;
+  };
 
   const cardComponents = useQuery<ItemComponent[]>(
     () => (outputItemId ? listItemComponents(outputItemId) : Promise.resolve([])),
@@ -104,6 +128,9 @@ export default function ProductionOrdersPage() {
         orderDate,
         outputItemId,
         outputQty,
+        unitId: unitId || undefined,
+        referenceNo: referenceNo.trim() || undefined,
+        referenceDate: referenceDate || undefined,
         notes: notes.trim() || undefined,
         // Nothing typed means "read the bill of materials off the card", scaled to the
         // quantity being built.
@@ -111,6 +138,8 @@ export default function ProductionOrdersPage() {
       });
       setNotice({ kind: 'ok', text: `تم إنشاء أمر الإنتاج ${created.number} كمسودة — لم يتحرك المخزون بعد.` });
       setComponents([emptyComponent(), emptyComponent(), emptyComponent()]);
+      setReferenceNo('');
+      setReferenceDate('');
       setNotes('');
       orders.reload();
     } catch (error) {
@@ -198,6 +227,34 @@ export default function ProductionOrdersPage() {
               <span>الكمية المنتجة</span>
               <input className="input" value={outputQty} onChange={(event) => setOutputQty(event.target.value)} inputMode="decimal" />
             </label>
+            <label className="field">
+              <span>📐 الوحدة</span>
+              <select
+                className="input"
+                value={unitId}
+                onChange={(event) => setUnitId(event.target.value)}
+                disabled={!outputItemId}
+              >
+                <option value="">الوحدة الأساسية</option>
+                {(outputUnits.data ?? []).map((row) => (
+                  <option key={row.unitId} value={row.unitId}>
+                    {`${row.unitNameAr ?? row.unitCode} (×${Number(row.ratio).toLocaleString('ar-EG')})`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>📊 الكمية المتوفرة</span>
+              <input className="input" dir="ltr" readOnly value={outputItemId ? quantity(onHand(outputItemId)) : '—'} />
+            </label>
+            <label className="field">
+              <span>📄 رقم المرجع</span>
+              <input className="input" dir="ltr" value={referenceNo} onChange={(event) => setReferenceNo(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>📅 تاريخ المرجع</span>
+              <input className="input" type="date" value={referenceDate} onChange={(event) => setReferenceDate(event.target.value)} />
+            </label>
             <label className="field wide">
               <span>البيان</span>
               <input className="input" value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -232,6 +289,7 @@ export default function ProductionOrdersPage() {
                         <th>الكمية الأساسية</th>
                         <th>الوحدة</th>
                         <th>الكمية</th>
+                        <th>المتوفرة</th>
                         <th>المستودع</th>
                       </tr>
                     </thead>
@@ -245,6 +303,7 @@ export default function ProductionOrdersPage() {
                           <td dir="ltr" className="num">
                             <strong>{quantity(Number(row.qty) * builtQty)}</strong>
                           </td>
+                          <td dir="ltr" className="num">{quantity(onHand(row.componentItemId))}</td>
                           <td>{row.warehouseName ?? '—'}</td>
                         </tr>
                       ))}

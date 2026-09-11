@@ -137,6 +137,8 @@ export type Lot = {
   lot_no?: string;
   expiryDate?: string | null;
   expiry_date?: string | null;
+  receivedAt?: string | null;
+  received_at?: string | null;
 };
 /** A serialised unit (رقم تسلسلي) — one tracked piece of stock. */
 export type Serial = {
@@ -148,6 +150,7 @@ export type Serial = {
   status: string;
   warehouseId?: string | null;
   warehouse_id?: string | null;
+  lotId?: string | null;
 };
 
 /** Both spellings exist in the API surface (DTOs vs. raw rows); ask once, here. */
@@ -356,10 +359,37 @@ export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');
 export const listCostCenters = () => apiList<CostCenter>('/cost-centers');
 export const listPeriods = () => apiList<FiscalPeriod>('/fiscal-periods');
 export const listEmployees = () => apiList<Employee>('/hrm/employees');
-export const listLots = (itemId?: string) =>
-  apiList<Lot>(`/inventory/lots${itemId ? `?item_id=${itemId}` : ''}`);
-export const listSerials = (itemId?: string) =>
-  apiList<Serial>(`/inventory/serials${itemId ? `?item_id=${itemId}` : ''}`);
+export const listLots = (filters: { itemId?: string; q?: string } = {}) => {
+  const query = new URLSearchParams();
+  if (filters.itemId) query.set('item_id', filters.itemId);
+  if (filters.q) query.set('q', filters.q);
+  const qs = query.toString();
+  return apiList<Lot>(`/inventory/lots${qs ? `?${qs}` : ''}`);
+};
+export const deleteLot = (lotId: string) => apiDelete<{ deleted: boolean }>(`/inventory/lots/${lotId}`);
+export const listSerials = (filters: { itemId?: string; status?: string; warehouseId?: string; q?: string } = {}) => {
+  const query = new URLSearchParams();
+  if (filters.itemId) query.set('item_id', filters.itemId);
+  if (filters.status) query.set('status', filters.status);
+  if (filters.warehouseId) query.set('warehouse_id', filters.warehouseId);
+  if (filters.q) query.set('q', filters.q);
+  const qs = query.toString();
+  return apiList<Serial>(`/inventory/serials${qs ? `?${qs}` : ''}`);
+};
+/** ⚙️ توليد — a batch of serial numbers off one prefix (frmItemSerialNo's generator). */
+export const generateSerials = (body: {
+  itemId: string;
+  prefix: string;
+  startAt?: number;
+  count: number;
+  warehouseId?: string;
+  lotId?: string;
+}) => apiData<{ count: number; serialNos: string[] }>('/inventory/serials/generate', { method: 'POST', body: JSON.stringify(body) });
+export const deleteSerial = (serialId: string) => apiDelete<{ deleted: boolean }>(`/inventory/serials/${serialId}`);
+export const reserveSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/reserve', { method: 'POST', body: JSON.stringify({ serialIds }) });
+export const releaseSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/release', { method: 'POST', body: JSON.stringify({ serialIds }) });
+export const consumeSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/consume', { method: 'POST', body: JSON.stringify({ serialIds }) });
+export const returnSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/return', { method: 'POST', body: JSON.stringify({ serialIds }) });
 
 export function branchOptions(rows: Branch[]): Option[] {
   return rows.map((row) => ({ id: row.id, label: `${row.code ? `${row.code} — ` : ''}${arabicName(row)}` }));

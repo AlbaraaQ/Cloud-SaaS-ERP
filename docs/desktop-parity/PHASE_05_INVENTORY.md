@@ -376,11 +376,11 @@ Presentation layer only: not one endpoint changed, not one permission widened.
   opening + in − out agrees with the balance table, and the movement list honours a
   period.
 * `node scripts/verify-inventory.mjs` — the same journey against a live stack, now
-  twelve sections: opening → issue → count → transfer → negative → reorder → وحدات
-  القياس → الباركود → تواريخ الصلاحية → **بضاعة في الطريق → بطاقة الصنف → مكوّنات الصنف**,
-  asserting the ledger at every step.
-* Suite: API **79 files / 462 tests** green (was 78/454 — the eight BOM tests of §11.8),
-  `@erp/database` **17/17** green, staff build **100/100** static pages.
+  fourteen sections: opening → issue → count → transfer → negative → reorder → وحدات
+  القياس → الباركود → تواريخ الصلاحية → **بضاعة في الطريق → بطاقة الصنف → مكوّنات الصنف →
+  دورة الأرقام التسلسلية → ترويسة أمر الإنتاج**, asserting the ledger at every step.
+* Suite: API **80 files / 468 tests** green (78/454 before part five; +8 BOM, +6 serial and
+  production-header), `@erp/database` **17/17** green, staff build **100/100** static pages.
 
 ---
 
@@ -511,7 +511,125 @@ recipe rows), and the empty-state sentence «بطاقة هذا الصنف لا �
 
 ---
 
-## 11. Deliberately deferred
+## 11. Part six — دورة الأرقام التسلسلية والدفعات، وترويسة أمر الإنتاج
+
+### 11.1 What the desktop did, file by file
+
+| Behaviour | `Desktop_ERP` source | What it did | What we built |
+|---|---|---|---|
+| شبكتا الأرقام | `Form_WPF/frmItemSerialNo.xaml` L1-140 | two grids side by side: `📋 الأرقام المتاحة` and `📤 الأرقام المباعة`, with `🔄 جديد`, `✅ إدراج`, `⚙️ توليد` and `🗑️` per row | `/inventory/serials` — the same two tabs (`available`/`reserved` against `sold`/`returned`), with the four transitions as row actions |
+| أعمدة الشبكة | `frmItemSerialNo.xaml` | `🔢 الرقم التسلسلي`، `📁 رقم الدفعة`، `📅 تاريخ الإنتاج`، `⏳ تاريخ الانتهاء`، `📦 الكمية`، `🎨 اللون`، `📐 الحجم`، `🗑️ حذف` | `🔢 الرقم التسلسلي · الصنف · المستودع · رقم الدفعة · ⚙️ الحالة` on the serial grid, and `📁 رقم الدفعة · 📅 تاريخ الإنتاج · ⏳ تاريخ الانتهاء` on the lot grid (اللون والحجم belong to the tailoring/optics verticals, phase 09) |
+| توليد دفعة | `frmItemSerialNo.xaml` `⚙️ توليد` | one prefix + a running number, N rows at once | `POST /inventory/serials/generate` — all-or-nothing, because a half-made batch is worse than none |
+| إدراج رقم واحد | `frmItemSerialNo.xaml` `✅ إدراج` | type one number | the same form beneath the grid |
+| نقل رقم بين الشبكتين | `frmItemSerialNo.xaml.cs` L282 / L340 | move a number from المتاحة to المباعة and back | `reserve` / `release` / `consume` / `return`, now reachable from the screen |
+| الرقم على سطر المستند | `Class/InvoiceOper.cs` L1635 — `InvoiceItemDetail(ItemSerialNo, BatchNo, ItemProductionDate, ItemExpireDate, …)` | the serial and the batch ride on the **document line** | deliberately deferred — see §11.6 |
+| ترويسة أمر الإنتاج | `Form_WPF/frmProductionOrder.xaml` L246-320 | `📄 رقم المرجع`، `📅 تاريخ المرجع`، `📦 المنتج`، `📐 الوحدة`، `🏭 مستودع الإنتاج`، `🔢 الكمية المنتجة`، `📊 الكمية المتوفرة`، `📝 البيان` | the order stores the first two and the unit (migration 0038); الكمية المتوفرة is read live off the balance table |
+| عمود المتوفرة | `frmProductionOrder.xaml` L528 — `Header="المتوفرة"` | the planner sees what the shelf holds before promising a build | the مكونات الإنتاج preview shows المتوفرة per component, from `stock_balances` |
+| تقارير المخزون | `Reports/rptInventoryReport.repx`, `rptItemsExpire.repx`, `rptItemsTotalGrd.repx`, `RptInvOrderItems.repx`, `rptProductionOrder.repx` | printed from `frmRptInventory` | already in the report catalogue (phase 10 rebuilt it as `inventory-turnover`, `inventory-valuation`, `stock-limits`, `expiry-report`, `serial-tracking`); part six only had to make the four that were unreachable **reachable** |
+
+### 11.2 The serial lifecycle
+
+`item_serials` already had the state machine (`available → reserved → sold → available`) and
+nothing that could drive it, so the numbers were a list to read instead of a shelf to work:
+
+| Method | Path | Permission | Rule |
+|---|---|---|---|
+| `GET` | `/inventory/serials` | `inventory.view` | filters by `item_id`, `status`, `warehouse_id` and `q` (a `serial_no` search); rows withdrawn with `🗑️` are gone |
+| `POST` | `/inventory/serials` | `inventory.adjust` | one number (`✅ إدراج`) |
+| `POST` | `/inventory/serials/generate` | `inventory.adjust` | `⚙️ توليد` — `{ itemId, prefix, startAt, count, warehouseId?, lotId? }`, 1–500 at a time, all-or-nothing; a batch that clashes with a live number answers `409 SERIAL_DUPLICATE` and writes nothing |
+| `DELETE` | `/inventory/serials/:id` | `inventory.adjust` | `🗑️` — only a number that never left the shelf (`available`); anything else is `422 SERIAL_INVALID_STATE`, because deleting a sold serial is how a stock count stops adding up |
+| `POST` | `/inventory/serials/reserve` · `release` · `consume` · `return` | `inventory.adjust` | the transitions, each refusing to move a number that is not in the state it expects (`422 SERIAL_INVALID_STATE`) |
+| `DELETE` | `/inventory/lots/:id` | `inventory.adjust` | a lot that still carries serials answers `409 LOT_IN_USE` |
+
+The generator pads to the width of the last number in the batch (`98 → 100` yields
+`BX-098, BX-099, BX-100, BX-101`), so a list of 500 numbers still sorts the way a human reads
+it. The screen is the desktop's two grids: pick rows, then حجز · إفراج · استهلاك · إرجاع ·
+حذف; the tab you are on decides which of the four actions make sense, and the API is what
+refuses the rest.
+
+### 11.3 Lots
+
+Lots gained what the serial grid shows about them: `q` search, soft-deleted rows hidden, the
+production date (`📅 تاريخ الإنتاج`, `received_at`) surfaced next to `⏳ تاريخ الانتهاء`, and a
+`🗑️ حذف` that refuses a lot whose serials are still on the shelf.
+
+### 11.4 Migration `0038_production_order_reference.sql`
+
+Additive, with its paired `down` file:
+
+1. `production_orders.reference_no text` — `📄 رقم المرجع`;
+2. `production_orders.reference_date date` — `📅 تاريخ المرجع`;
+3. `production_orders.unit_id → units_of_measure(id)` — `📐 الوحدة`, nullable so every order
+   written before this migration stays valid, with the base unit resolved at read time;
+4. the partial index `production_orders_reference_idx (tenant_id, reference_no) WHERE
+   reference_no IS NOT NULL`.
+
+The unit is not decoration: `complete()` now records the **output** in the unit the order was
+counted in, so an order for `2 علب` of a six-piece box puts **12** pieces on the shelf and
+costs them accordingly — the same arithmetic the components have had since part five. A unit
+the item does not carry has no ratio, and is refused `422 PRODUCTION_UNIT_INVALID`.
+
+### 11.5 Screens
+
+* `/inventory/serials` — two tabs, five tiles (إجمالي · متاح · محجوز · مُباع · مُرتجع), filters
+  by item/warehouse/number, bulk selection with the four transitions plus حذف, the generator
+  (`⚙️ توليد`) and the single insert (`✅ إدراج`).
+* `/inventory/lots` — `📁 رقم الدفعة · 📅 تاريخ الإنتاج · ⏳ تاريخ الانتهاء`, item filter and
+  lot search, and `🗑️ حذف` guarded by `LOT_IN_USE`.
+* `/inventory/production` — the form now asks for the desktop's own header:
+  `مستودع الإنتاج · التاريخ · المنتج · الكمية المنتجة · 📐 الوحدة · 📊 الكمية المتوفرة ·
+  📄 رقم المرجع · 📅 تاريخ المرجع · البيان`, and مكونات الإنتاج shows `المتوفرة` per component.
+* Navigation gained the four inventory reports the catalogue already defined but the menu never
+  offered: `/reports/inventory-valuation` (جرد المواد وتقييم المخزون), `/reports/stock-limits`
+  (الأصناف تحت الحد الأدنى), `/reports/expiry-report` (صلاحية المواد) and
+  `/reports/serial-tracking` (تتبّع الأرقام التسلسلية).
+
+### 11.6 What is still deferred, and why
+
+**The serial and the batch on the document line** (`InvoiceItemDetail.ItemSerialNo`,
+`BatchNo`, `ItemProductionDate`, `ItemExpireDate` in `Class/InvoiceOper.cs:1635`). A serial's
+status says where the piece is; it does not say *which document* moved it, and a sold number
+cannot be traced back to the invoice that sold it. Doing this properly touches every document
+that moves stock — vouchers, transfers, adjustments, sales invoices, purchase invoices and
+returns — at once, in five modules, and it is the one change in this phase that can silently
+corrupt a ledger if it is wrong. It is a phase of its own (the document-line pass), not a
+silent add-on to the serial screen; the state machine and the screens it needs are ready, and
+the line tables already carry `unit_id`/`factor` from 0035, which is the hook it will use.
+
+### 11.7 Label match against `Desktop_ERP`
+
+| Desktop | Ours | |
+|---|---|---|
+| `📋 الأرقام المتاحة` · `📤 الأرقام المباعة` | the same | verbatim |
+| `🔢 الرقم التسلسلي` · `📁 رقم الدفعة` · `⚙️ توليد` · `✅ إدراج` · `🗑️ حذف` | the same | verbatim |
+| `📅 تاريخ الإنتاج` · `⏳ تاريخ الانتهاء` | the same | verbatim |
+| `📄 رقم المرجع` · `📅 تاريخ المرجع` · `📐 الوحدة` · `📊 الكمية المتوفرة` · `المتوفرة` | the same | verbatim |
+| `🏭 مستودع الإنتاج` · `🔢 الكمية المنتجة` · `المنتج` · `البيان` · `🧾 مكونات الإنتاج` | the same | verbatim (part five) |
+| `🎨 اللون` · `📐 الحجم` | — | tailoring/optics vertical fields; they live with those verticals (phase 09), not on the stock card |
+| `📦 الكمية` on the serial grid | — | one serial is one piece; a quantity column on it would only ever print 1 |
+
+Invented labels, all of them for actions the desktop does with a menu or a drag:
+**حجز** (reserve), **إفراج** (release), **استهلاك (بيع)** (consume), **إرجاع** (return),
+**«تحديد الكل»** (the select-all checkbox), and **«بحث بالرقم»** (the number filter). The
+desktop's grid shows state by which grid a row is sitting in; ours has one grid with a
+`⚙️ الحالة` column, so the transitions need names.
+
+### 11.8 Verification
+
+* `apps/api/test/inventory-serials.spec.ts` — 6 tests: a batch is generated off one prefix and
+  padded, a clashing batch writes nothing, a reader cannot move a number, the four transitions
+  run and refuse to run twice, a sold number cannot be withdrawn while an available one can, a
+  lot carrying serials cannot be deleted, another tenant sees nothing, and an order built in
+  cartons of six puts twelve pieces on the shelf with its reference remembered.
+* Suite: API **80 files / 468 tests** green, `apps/staff` **36/36** green, staff build
+  **100/100** static pages.
+* `node scripts/verify-inventory.mjs` — **fourteen** sections; the two new ones walk the serial
+  lifecycle against the live stack (generate → clash → search → reserve → refuse → release →
+  sell → return → refuse to delete → delete) and build an order in a box of six.
+* `/inventory/serials`, `/inventory/lots`, `/inventory/production` and the four newly reachable
+  report screens all render (200).
+
+## 12. Deliberately deferred
 
 * Production orders / item assembly (`frmProductionOrder*`) already have their own service;
   §10 wired the item card's recipe into it, and the order itself is deliberately still
@@ -519,3 +637,7 @@ recipe rows), and the empty-state sentence «بطاقة هذا الصنف لا �
 * Unit-aware *pricing lists* — a unit carries its own sale/purchase price, but price lists
   (phase 08) do not yet choose a unit.
 * Printing barcode labels and the stock documents themselves (phase 10).
+* **The serial and the batch on the document line** (`InvoiceItemDetail.ItemSerialNo`,
+  `BatchNo`, `ItemProductionDate`, `ItemExpireDate` — `Class/InvoiceOper.cs:1635`). A serial's
+  status says where a piece is, not which document moved it. It touches every document that
+  moves stock, in five modules, and belongs to a document-line pass of its own — see §11.6.

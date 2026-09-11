@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   accounts,
@@ -29,6 +29,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
 import { getRequestContext } from '../../request-context/request-context.js';
@@ -608,14 +609,44 @@ export class InventoryService {
     return lot;
   }
 
-  listLots(tenantId: string, itemId?: string) {
+  listLots(tenantId: string, filters: { itemId?: string; q?: string } = {}) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx
         .select()
         .from(itemLots)
-        .where(and(eq(itemLots.tenantId, tenantId), itemId ? eq(itemLots.itemId, itemId) : undefined))
+        .where(
+          and(
+            eq(itemLots.tenantId, tenantId),
+            isNull(itemLots.deletedAt),
+            filters.itemId ? eq(itemLots.itemId, filters.itemId) : undefined,
+            filters.q?.trim() ? ilike(itemLots.lotNo, `%${filters.q!.trim()}%`) : undefined,
+          ),
+        )
         .orderBy(asc(itemLots.lotNo)),
     );
+  }
+
+  /** 🗑️ حذف — a lot that already carries serials cannot be withdrawn. */
+  async deleteLot(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [lot] = await tx
+        .select()
+        .from(itemLots)
+        .where(and(eq(itemLots.tenantId, tenantId), eq(itemLots.id, id), isNull(itemLots.deletedAt)));
+      if (!lot) throw new DomainError('LOT_NOT_FOUND', 'The lot was not found', 404);
+      const [used] = await tx
+        .select({ id: itemSerials.id })
+        .from(itemSerials)
+        .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.lotId, id), isNull(itemSerials.deletedAt)))
+        .limit(1);
+      if (used)
+        throw new DomainError('LOT_IN_USE', 'This lot still carries serial numbers; delete them first', 409);
+      await tx
+        .update(itemLots)
+        .set({ deletedAt: new Date(), deletedBy: tryGetAuthContext()?.userId })
+        .where(and(eq(itemLots.tenantId, tenantId), eq(itemLots.id, id)));
+      return { id, deleted: true };
+    });
   }
 
   async createSerial(
@@ -639,7 +670,10 @@ export class InventoryService {
     return serial;
   }
 
-  listSerials(tenantId: string, itemId?: string, status?: string) {
+  listSerials(
+    tenantId: string,
+    filters: { itemId?: string; status?: string; warehouseId?: string; q?: string } = {},
+  ) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx
         .select()
@@ -647,12 +681,89 @@ export class InventoryService {
         .where(
           and(
             eq(itemSerials.tenantId, tenantId),
-            itemId ? eq(itemSerials.itemId, itemId) : undefined,
-            status ? eq(itemSerials.status, status) : undefined,
+            isNull(itemSerials.deletedAt),
+            filters.itemId ? eq(itemSerials.itemId, filters.itemId) : undefined,
+            filters.status ? eq(itemSerials.status, filters.status) : undefined,
+            filters.warehouseId ? eq(itemSerials.warehouseId, filters.warehouseId) : undefined,
+            filters.q?.trim() ? ilike(itemSerials.serialNo, `%${filters.q!.trim()}%`) : undefined,
           ),
         )
         .orderBy(asc(itemSerials.serialNo)),
     );
+  }
+
+  /**
+   * ⚙️ توليد — the desktop's generator: `prefix` + a running number, `count` rows in one
+   * go. All-or-nothing, because a half-generated batch is worse than none: the clerk
+   * would not know which numbers are real.
+   */
+  async generateSerials(
+    tenantId: string,
+    input: { itemId: string; prefix: string; startAt?: number; count: number; warehouseId?: string; lotId?: string },
+  ) {
+    const prefix = input.prefix.trim();
+    if (!prefix) throw new DomainError('SERIAL_PREFIX_REQUIRED', 'A generated serial needs a prefix', 422, { field: 'prefix' });
+    const startAt = Number.isFinite(input.startAt) ? Math.max(0, Math.trunc(input.startAt ?? 1)) : 1;
+    const count = Math.trunc(input.count);
+    if (!Number.isFinite(count) || count < 1 || count > 500)
+      throw new DomainError('SERIAL_COUNT_INVALID', 'Generate between 1 and 500 serials at a time', 422, { field: 'count' });
+
+    const width = String(startAt + count - 1).length;
+    const serialNos = Array.from({ length: count }, (_, index) => `${prefix}${String(startAt + index).padStart(width, '0')}`);
+
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [item] = await tx
+        .select({ id: items.id })
+        .from(items)
+        .where(and(eq(items.tenantId, tenantId), eq(items.id, input.itemId), isNull(items.deletedAt)));
+      if (!item) throw new DomainError('ITEM_NOT_FOUND', 'The item was not found', 404);
+
+      const existing = await tx
+        .select({ serialNo: itemSerials.serialNo })
+        .from(itemSerials)
+        .where(and(eq(itemSerials.tenantId, tenantId), isNull(itemSerials.deletedAt), inArray(itemSerials.serialNo, serialNos)));
+      if (existing.length)
+        throw new DomainError(
+          'SERIAL_DUPLICATE',
+          `The serial ${existing[0]?.serialNo ?? ''} already exists`,
+          409,
+          { field: 'prefix', details: existing.map((row) => row.serialNo).slice(0, 5) },
+        );
+
+      const rows = serialNos.map((serialNo) => ({
+        id: newId(),
+        tenantId,
+        itemId: input.itemId,
+        serialNo,
+        lotId: input.lotId ?? null,
+        warehouseId: input.warehouseId ?? null,
+        status: 'available',
+      }));
+      await tx.insert(itemSerials).values(rows);
+      return { count: rows.length, serialNos };
+    });
+  }
+
+  /** 🗑️ حذف — only a serial that never left the shelf can be withdrawn. */
+  async deleteSerial(tenantId: string, id: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [serial] = await tx
+        .select()
+        .from(itemSerials)
+        .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, id), isNull(itemSerials.deletedAt)));
+      if (!serial) throw new DomainError('SERIAL_NOT_FOUND', 'The serial was not found', 404);
+      if (serial.status !== 'available')
+        throw new DomainError(
+          'SERIAL_INVALID_STATE',
+          'Only an available serial can be deleted; return it to stock first',
+          422,
+        );
+      await tx
+        .update(itemSerials)
+        .set({ deletedAt: new Date(), deletedBy: tryGetAuthContext()?.userId })
+        .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, id)));
+      return { id, deleted: true };
+    });
   }
 
   async reserveSerials(tenantId: string, serialIds: string[]) {
