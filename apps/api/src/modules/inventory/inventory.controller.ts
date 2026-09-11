@@ -92,7 +92,14 @@ export class InventoryController {
       branchId?: string;
       fromWarehouseId: string;
       toWarehouseId: string;
-      lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }>;
+      lines: Array<{
+        itemId: string;
+        qty: string;
+        unitCost?: string;
+        lotId?: string;
+        serialIds?: string[];
+        serialNos?: string[];
+      }>;
     },
   ) {
     return this.inventory.createTransfer(getTenantContext().tenantId, body);
@@ -252,6 +259,10 @@ export class InventoryController {
   }
   @Delete('serials/:id') @RequiresPermission('inventory.adjust') deleteSerial(@Param('id') serialId: string) {
     return this.inventory.deleteSerial(getTenantContext().tenantId, serialId);
+  }
+  /** Which documents has this number travelled through? */
+  @Get('serials/:id/documents') @RequiresPermission('inventory.view') serialTrace(@Param('id') serialId: string) {
+    return this.inventory.serialTrace(getTenantContext().tenantId, serialId);
   }
   @Post('serials/reserve') @RequiresPermission('inventory.adjust') reserveSerials(
     @Body() body: { serialIds: string[] },

@@ -26,7 +26,15 @@ import {
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
-type TransferLine = { lineNo: number; itemId: string; qty: string; receivedQty: string; unitCost: string };
+type TransferLine = {
+  lineNo: number;
+  itemId: string;
+  qty: string;
+  receivedQty: string;
+  unitCost: string;
+  /** 🔢 الأرقام التسلسلية riding with the goods — one per piece. */
+  serialNos?: string[];
+};
 type Transfer = {
   id: string;
   number: string;
@@ -93,8 +101,8 @@ export default function TransfersPage() {
   const [fromWarehouseId, setFrom] = useState('');
   const [toWarehouseId, setTo] = useState('');
   const [lines, setLines] = useState<
-    Array<{ itemId: string; qtyText: string; unitId: string; unitCostText: string }>
-  >([{ itemId: '', qtyText: '', unitId: '', unitCostText: '' }]);
+    Array<{ itemId: string; qtyText: string; unitId: string; unitCostText: string; serialNos: string }>
+  >([{ itemId: '', qtyText: '', unitId: '', unitCostText: '', serialNos: '' }]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
   const [selectedId, setSelectedId] = useState('');
@@ -120,7 +128,13 @@ export default function TransfersPage() {
 
   function updateLine(
     index: number,
-    patch: Partial<{ itemId: string; qtyText: string; unitId: string; unitCostText: string }>,
+    patch: Partial<{
+      itemId: string;
+      qtyText: string;
+      unitId: string;
+      unitCostText: string;
+      serialNos: string;
+    }>,
   ) {
     setLines((current) =>
       current.map((line, position) => (position === index ? { ...line, ...patch } : line)),
@@ -146,10 +160,14 @@ export default function TransfersPage() {
           qty: line.qtyText,
           unitId: line.unitId || undefined,
           unitCost: line.unitCostText || undefined,
+          serialNos: line.serialNos
+            .split(/[\s,،;؛]+/)
+            .map((entry) => entry.trim())
+            .filter(Boolean),
         })),
       });
       setNotice({ kind: 'ok', text: 'تم إنشاء المناقلة كمسودة. أرسِلها لخصم الكمية من المستودع المصدر.' });
-      setLines([{ itemId: '', qtyText: '', unitId: '', unitCostText: '' }]);
+      setLines([{ itemId: '', qtyText: '', unitId: '', unitCostText: '', serialNos: '' }]);
       transfers.reload();
     } catch (error) {
       setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
@@ -262,6 +280,7 @@ export default function TransfersPage() {
                   <th>الكمية</th>
                   <th>الوحدة</th>
                   <th>تكلفة الوحدة</th>
+                  <th>🔢 الأرقام التسلسلية</th>
                   <th />
                 </tr>
               </thead>
@@ -322,6 +341,25 @@ export default function TransfersPage() {
                       />
                     </td>
                     <td>
+                      {itemOf(line.itemId)?.trackSerial ? (
+                        <>
+                          <textarea
+                            className="input"
+                            rows={2}
+                            dir="ltr"
+                            placeholder="A-1 A-2"
+                            value={line.serialNos}
+                            onChange={(event) => updateLine(index, { serialNos: event.target.value })}
+                          />
+                          <span className="chip">
+                            {`${line.serialNos.split(/[\s,،;؛]+/).filter(Boolean).length} من ${line.qtyText || '—'}`}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>
                       <button
                         className="btn sm"
                         type="button"
@@ -341,7 +379,10 @@ export default function TransfersPage() {
             className="btn sm"
             type="button"
             onClick={() =>
-              setLines((current) => [...current, { itemId: '', qtyText: '', unitId: '', unitCostText: '' }])
+              setLines((current) => [
+                ...current,
+                { itemId: '', qtyText: '', unitId: '', unitCostText: '', serialNos: '' },
+              ])
             }
           >
             + سطر
@@ -473,6 +514,18 @@ export default function TransfersPage() {
                   },
                   { key: 'cost', header: 'تكلفة الوحدة', align: 'num', cell: (line) => money(line.unitCost) },
                   { key: 'qty', header: 'الكمية', align: 'num', cell: (line) => quantity(line.qty) },
+                  {
+                    key: 'serials',
+                    header: '🔢 الأرقام التسلسلية',
+                    cell: (line) =>
+                      line.serialNos?.length ? (
+                        <span dir="ltr" className="small">
+                          {line.serialNos.join(' · ')}
+                        </span>
+                      ) : (
+                        '—'
+                      ),
+                  },
                   { key: 'received', header: 'المُستلَم', align: 'num', cell: (line) => quantity(line.receivedQty) },
                   {
                     key: 'left',

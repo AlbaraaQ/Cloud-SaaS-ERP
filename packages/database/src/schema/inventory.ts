@@ -140,6 +140,8 @@ export const stockAdjustmentLines = pgTable(
     varianceQty: numeric('variance_qty', qty),
     varianceValue: numeric('variance_value', money).notNull().default('0'),
     lotId: uuid('lot_id'),
+    /** 🔢 الأرقام التسلسلية counted on the line. */
+    serialNos: jsonb('serial_nos').$type<string[]>().notNull().default([]),
     note: text('note'),
   },
   (t) => ({
@@ -210,6 +212,8 @@ export const stockVoucherLines = pgTable(
     lineCost: numeric('line_cost', money).notNull().default('0'),
     lotId: uuid('lot_id').references(() => itemLots.id),
     serialId: uuid('serial_id').references(() => itemSerials.id),
+    /** 🔢 الأرقام التسلسلية as typed on the line; resolved into `stockDocumentSerials` at posting. */
+    serialNos: jsonb('serial_nos').$type<string[]>().notNull().default([]),
     note: text('note'),
   },
   (t) => ({
@@ -272,7 +276,10 @@ export const stockTransferLines = pgTable(
     closedQty: numeric('closed_qty', qty).notNull().default('0'),
     unitCost: numeric('unit_cost', money).notNull().default('0'),
     lotId: uuid('lot_id'),
+    /** Superseded by `stockDocumentSerials` — kept so nothing that reads it breaks. */
     serialIds: jsonb('serial_ids').$type<string[]>().notNull().default([]),
+    /** 🔢 الأرقام التسلسلية travelling on the line. */
+    serialNos: jsonb('serial_nos').$type<string[]>().notNull().default([]),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.transferId, t.lineNo] }),
@@ -500,6 +507,37 @@ export type ItemSerial = typeof itemSerials.$inferSelect;
  * `unit_cost` is the total component cost spread over the produced quantity, so the value
  * that leaves the warehouse is exactly the value that re-enters it.
  */
+/**
+ * Which serial number travelled on which document line — the desktop's
+ * `InvoiceItemDetail.ItemSerialNo` (`Class/InvoiceOper.cs:1635`), kept as a relation
+ * instead of a text column so that "which documents has this number been through?" is a
+ * query and not a `LIKE`.
+ */
+export const stockDocumentSerials = pgTable(
+  'stock_document_serials',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    docType: text('doc_type').notNull(),
+    docId: uuid('doc_id').notNull(),
+    lineNo: integer('line_no').notNull(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id),
+    serialId: uuid('serial_id')
+      .notNull()
+      .references(() => itemSerials.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    line: uniqueIndex('stock_document_serials_line_key').on(t.tenantId, t.docType, t.docId, t.lineNo, t.serialId),
+    doc: uniqueIndex('stock_document_serials_doc_key').on(t.tenantId, t.docType, t.docId, t.serialId),
+    serial: index('stock_document_serials_serial_idx').on(t.tenantId, t.serialId),
+  }),
+);
+
 export const productionOrders = pgTable(
   'production_orders',
   {

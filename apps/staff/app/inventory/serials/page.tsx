@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
+import type { SerialTrace } from '../../../lib/lookups';
 import { FilterBar, StatTile, StatTiles, Tabs } from '../../../components/ui';
 import { ApiError, apiPost } from '../../../lib/api';
 import {
@@ -20,6 +21,7 @@ import {
   reserveSerials,
   returnSerials,
   shortDate,
+  traceSerial,
   type Item,
   type Lot,
   type Serial,
@@ -35,6 +37,14 @@ import { useQuery } from '../../../lib/use-query';
  * machine (available → reserved → sold → available) but no screen that could drive it,
  * so the numbers were a list to read instead of a shelf to work.
  */
+const DOC_LABELS: Record<string, string> = {
+  stock_voucher: 'سند إدخال / إخراج مخزني',
+  opening: 'بضاعة أول المدة',
+  stock_adjustment: 'جرد وتسوية',
+  stock_transfer: 'مناقلة',
+  production_order: 'أمر إنتاج',
+};
+
 const STATUS_LABELS: Record<string, string> = {
   available: 'متاح',
   reserved: 'محجوز',
@@ -65,6 +75,7 @@ export default function SerialsPage() {
   // The generator: one prefix, a starting number, a count — the desktop's ⚙️ توليد.
   const [draft, setDraft] = useState({ itemId: '', prefix: 'SN-', startAt: '1', count: '10', warehouseId: '', lotId: '' });
   const [single, setSingle] = useState({ itemId: '', serialNo: '', warehouseId: '' });
+  const [trace, setTrace] = useState<SerialTrace | undefined>();
 
   const serials = useQuery<Serial[]>(
     () => listSerials({ itemId: itemId || undefined, warehouseId: warehouseId || undefined, q: search.trim() || undefined }),
@@ -94,6 +105,18 @@ export default function SerialsPage() {
     const lot = (lots.data ?? []).find((row) => row.id === id);
     return lot ? lot.lotNo : '—';
   };
+
+  async function showTrace(row: Serial) {
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      setTrace(await traceSerial(row.id));
+    } catch (error) {
+      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function act(run: () => Promise<unknown>, okText: string) {
     setBusy(true);
@@ -254,6 +277,7 @@ export default function SerialsPage() {
               '',
               '',
               '',
+              '',
             ]}
             columns={[
               {
@@ -284,6 +308,15 @@ export default function SerialsPage() {
               { key: 'warehouse', header: 'المستودع', cell: (row) => warehouseName(row.warehouseId) },
               { key: 'lot', header: 'رقم الدفعة', cell: (row) => lotNo(row.lotId) },
               {
+                key: 'trace',
+                header: '',
+                cell: (row) => (
+                  <button className="btn sm" type="button" disabled={busy} onClick={() => void showTrace(row)}>
+                    🔍
+                  </button>
+                ),
+              },
+              {
                 key: 'status',
                 header: '⚙️ الحالة',
                 cell: (row) => (
@@ -300,6 +333,43 @@ export default function SerialsPage() {
           />
         )}
       </QueryView>
+
+      {trace && (
+        <div className="card">
+          <div className="section-title">
+            <h4>{`🔍 مسار الرقم ${trace.serial.serialNo}`}</h4>
+            <button className="btn sm" type="button" onClick={() => setTrace(undefined)}>
+              إغلاق
+            </button>
+          </div>
+          {trace.documents.length === 0 ? (
+            <p className="muted">لم يتحرك هذا الرقم على أي مستند بعد.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="zebra">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>المستند</th>
+                    <th>السطر</th>
+                    <th>التاريخ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trace.documents.map((row, index) => (
+                    <tr key={`${row.docId}-${row.lineNo}`}>
+                      <td className="num">{index + 1}</td>
+                      <td>{DOC_LABELS[row.docType] ?? row.docType}</td>
+                      <td className="num">{row.lineNo}</td>
+                      <td dir="ltr">{shortDate(row.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {manage && (
         <div className="card">

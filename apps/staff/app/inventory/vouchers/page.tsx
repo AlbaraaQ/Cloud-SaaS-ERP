@@ -36,6 +36,13 @@ import {
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
+/** One number per piece: typed one per line, or separated by spaces, commas or newlines. */
+const splitSerials = (value: string): string[] =>
+  value
+    .split(/[\s,،;؛]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
 /**
  * سند إدخال / إخراج مخزني — and بضاعة أول المدة as its third kind.
  *
@@ -56,6 +63,8 @@ type VoucherLine = {
   lineCost?: string | null;
   lotId?: string | null;
   serialId?: string | null;
+  /** 🔢 الأرقام التسلسلية — one number per piece, as `Class/InvoiceOper.cs` stores them. */
+  serialNos?: string[];
   note?: string | null;
 };
 
@@ -108,12 +117,13 @@ export default function VouchersPage() {
       unitId: string;
       costText: string;
       lotId: string;
-      serialId: string;
+      /** The numbers as typed — one per line, or separated by spaces and commas. */
+      serialNos: string;
       note: string;
     }>
-  >([{ itemId: '', qtyText: '', unitId: '', costText: '', lotId: '', serialId: '', note: '' }]);
+  >([{ itemId: '', qtyText: '', unitId: '', costText: '', lotId: '', serialNos: '', note: '' }]);
   const [scan, setScan] = useState('');
-  const blankLine = { itemId: '', qtyText: '', unitId: '', costText: '', lotId: '', serialId: '', note: '' };
+  const blankLine = { itemId: '', qtyText: '', unitId: '', costText: '', lotId: '', serialNos: '', note: '' };
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
 
@@ -232,7 +242,7 @@ export default function VouchersPage() {
       unitId: string;
       costText: string;
       lotId: string;
-      serialId: string;
+      serialNos: string;
       note: string;
     }>,
   ) {
@@ -276,7 +286,7 @@ export default function VouchersPage() {
           unitId: line.unitId || undefined,
           unitCost: isIssue ? undefined : line.costText || undefined,
           lotId: line.lotId || undefined,
-          serialId: line.serialId || undefined,
+          serialNos: splitSerials(line.serialNos),
           note: line.note || undefined,
         })),
       });
@@ -457,7 +467,7 @@ export default function VouchersPage() {
                           className="input"
                           value={line.itemId}
                           onChange={(event) =>
-                            updateLine(index, { itemId: event.target.value, lotId: '', serialId: '' })
+                            updateLine(index, { itemId: event.target.value, lotId: '', serialNos: '' })
                           }
                         >
                           <option value="">— اختر —</option>
@@ -534,21 +544,36 @@ export default function VouchersPage() {
                         </select>
                       </td>
                       <td>
-                        <select
-                          className="input"
-                          value={line.serialId}
-                          onChange={(event) => updateLine(index, { serialId: event.target.value })}
-                          disabled={!item || !item.trackSerial}
-                        >
-                          <option value="">—</option>
-                          {serialRows
-                            .filter((serial) => serial.itemId === line.itemId)
-                            .map((serial) => (
-                              <option key={serial.id} value={serial.id}>
-                                {serial.serialNo}
-                              </option>
-                            ))}
-                        </select>
+                        {item?.trackSerial ? (
+                          <>
+                            <textarea
+                              className="input"
+                              rows={2}
+                              dir="ltr"
+                              placeholder={isIssue ? 'A-1 A-2' : 'A-1 A-2 A-3'}
+                              value={line.serialNos}
+                              onChange={(event) => updateLine(index, { serialNos: event.target.value })}
+                            />
+                            <span
+                              className={`chip ${
+                                splitSerials(line.serialNos).length > 0 &&
+                                splitSerials(line.serialNos).length !== Number(line.qtyText || '0')
+                                  ? 'warn'
+                                  : ''
+                              }`}
+                            >
+                              {`${splitSerials(line.serialNos).length} من ${line.qtyText || '—'}`}
+                            </span>
+                            {!isIssue && serialRows.some((serial) => serial.itemId === line.itemId) && (
+                              <span className="muted small">
+                                {' '}
+                                رقم جديد لكل قطعة — أو ألصق أرقاماً مولَّدة من شاشة الأرقام التسلسلية.
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
                       </td>
                       <td>
                         <input
@@ -713,6 +738,7 @@ export default function VouchersPage() {
                   '',
                   money(selected.totalCost),
                   '',
+                  '',
                 ]}
                 columns={[
                   { key: 'no', header: '#', align: 'num', cell: (line) => line.lineNo },
@@ -740,6 +766,18 @@ export default function VouchersPage() {
                   },
                   { key: 'cost', header: 'تكلفة الوحدة', align: 'num', cell: (line) => money(line.unitCost) },
                   { key: 'value', header: 'القيمة', align: 'num', cell: (line) => money(line.lineCost) },
+                  {
+                    key: 'serials',
+                    header: '🔢 الأرقام التسلسلية',
+                    cell: (line) =>
+                      line.serialNos?.length ? (
+                        <span dir="ltr" className="small">
+                          {line.serialNos.join(' · ')}
+                        </span>
+                      ) : (
+                        '—'
+                      ),
+                  },
                   { key: 'note', header: 'ملاحظة', cell: (line) => line.note ?? '—' },
                 ]}
               />

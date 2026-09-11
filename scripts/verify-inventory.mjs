@@ -922,5 +922,177 @@ check(
   String(packLevels[0]?.quantity ?? 0),
 );
 
+// ── 15. الرقم التسلسلي على سطر المستند ───────────────────────────────────────
+// `Class/InvoiceOper.cs:1635` carries `ItemSerialNo` on the document line, and
+// `frmItemSerialNo.xaml.cs:524` reads a number's history back out of it. Until now the
+// cloud had a serial's state and no idea which document moved it: a receipt invented no
+// pieces, and a sold number could not be traced to the voucher that sold it. This walks
+// one number from the receipt that created it, through the issue that sold it, to the
+// void that brought it home.
+console.log('');
+console.log('15. الرقم التسلسلي على سطر المستند');
+const tracedItem = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-TRC-${stamp}`,
+  nameAr: 'صنف مُرقّم بالسند',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+const tracePrefix = `TR${stamp}-`;
+
+const inVoucher = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'إدخال أجهزة مُرقّمة',
+  lines: [{ itemId: tracedItem.id, qty: '3', unitCost: '100', serialNos: [`${tracePrefix}1`, `${tracePrefix}2`, `${tracePrefix}3`] }],
+});
+check(
+  'the draft remembers the numbers before the stock arrives',
+  inVoucher.lines[0].serialNos.length === 3,
+  inVoucher.lines[0].serialNos.join(', '),
+);
+await call('post', `/inventory/vouchers/${inVoucher.id}/post`, token, {});
+const createdSerials = await call('get', `/inventory/serials?item_id=${tracedItem.id}`, token);
+check(
+  'إدخال brings three pieces in, one number each',
+  createdSerials.length === 3 && createdSerials.every((row) => row.status === 'available'),
+  createdSerials.map((row) => `${row.serialNo}:${row.status}`).join(' · '),
+);
+
+// 3 pieces, 2 numbers: the count is the whole point of serialising the item.
+const shortVoucher = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_in',
+  reason: 'إدخال ناقص الأرقام',
+  lines: [{ itemId: tracedItem.id, qty: '3', unitCost: '100', serialNos: [`${tracePrefix}7`, `${tracePrefix}8`] }],
+});
+try {
+  await call('post', `/inventory/vouchers/${shortVoucher.id}/post`, token, {});
+  check('3 pieces with 2 numbers is refused', false, 'expected 422');
+} catch (error) {
+  check(
+    '3 pieces with 2 numbers is refused',
+    error.status === 422 && error.code === 'SERIAL_COUNT_MISMATCH',
+    `${error.status} ${error.code}`,
+  );
+}
+const untouched = await call('get', `/inventory/vouchers/${shortVoucher.id}`, token);
+check('a refused document stays a draft and invents nothing', untouched.status === 'draft', untouched.status);
+
+const outVoucher = await call('post', '/inventory/vouchers', token, {
+  branchId,
+  warehouseId,
+  kind: 'stock_out',
+  reason: 'صرف جهازين',
+  lines: [{ itemId: tracedItem.id, qty: '2', serialNos: [`${tracePrefix}1`, `${tracePrefix}2`] }],
+});
+await call('post', `/inventory/vouchers/${outVoucher.id}/post`, token, {});
+const afterIssue = await call('get', `/inventory/serials?item_id=${tracedItem.id}`, token);
+const stateOf = (rows, serialNo) => rows.find((row) => row.serialNo === serialNo)?.status;
+check(
+  'إخراج sells exactly the numbers it names',
+  stateOf(afterIssue, `${tracePrefix}1`) === 'sold' &&
+    stateOf(afterIssue, `${tracePrefix}2`) === 'sold' &&
+    stateOf(afterIssue, `${tracePrefix}3`) === 'available',
+  afterIssue.map((row) => `${row.serialNo}:${row.status}`).join(' · '),
+);
+
+try {
+  const twice = await call('post', '/inventory/vouchers', token, {
+    branchId,
+    warehouseId,
+    kind: 'stock_out',
+    reason: 'صرف رقم مباع',
+    lines: [{ itemId: tracedItem.id, qty: '1', serialNos: [`${tracePrefix}1`] }],
+  });
+  await call('post', `/inventory/vouchers/${twice.id}/post`, token, {});
+  check('selling the same number twice is refused', false, 'expected 422');
+} catch (error) {
+  check(
+    'selling the same number twice is refused',
+    error.status === 422 && error.code === 'SERIAL_INVALID_STATE',
+    `${error.status} ${error.code}`,
+  );
+}
+
+const tracedOne = afterIssue.find((row) => row.serialNo === `${tracePrefix}1`);
+const trace = await call('get', `/inventory/serials/${tracedOne.id}/documents`, token);
+check(
+  'the number carries the documents that moved it',
+  trace.documents.length === 2 && trace.documents.every((row) => row.docType === 'stock_voucher'),
+  trace.documents.map((row) => row.docType).join(' → '),
+);
+
+// Voiding the receipt takes the pieces it invented back out; voiding the issue puts the
+// piece it sold back on the shelf.
+await call('post', `/inventory/vouchers/${outVoucher.id}/void`, token, { reason: 'تراجع عن الصرف' });
+const afterVoid = await call('get', `/inventory/serials?item_id=${tracedItem.id}`, token);
+check(
+  'إلغاء الصرف يعيد الرقم إلى الرف',
+  stateOf(afterVoid, `${tracePrefix}1`) === 'available' && stateOf(afterVoid, `${tracePrefix}2`) === 'available',
+  afterVoid.map((row) => `${row.serialNo}:${row.status}`).join(' · '),
+);
+await call('post', `/inventory/vouchers/${inVoucher.id}/void`, token, { reason: 'خطأ في الإدخال' });
+const afterBoth = await call('get', `/inventory/serials?item_id=${tracedItem.id}`, token);
+check(
+  'إلغاء الإدخال يمحو الأرقام التي أنشأها',
+  afterBoth.length === 0,
+  `${afterBoth.length} left`,
+);
+
+// A مناقلة moves pieces the source already owns: the numbers ride with the goods and
+// only change warehouse, never leave the shelf for good.
+const transferItem = await call('post', '/organization/catalog/items', token, {
+  sku: `SKU-TRF-${stamp}`,
+  nameAr: 'صنف مُرقّم للمناقلة',
+  categoryId,
+  baseUnitId: item.baseUnitId,
+});
+const trfPrefix = `TF${stamp}-`;
+await call(
+  'post',
+  `/inventory/vouchers/${(await call('post', '/inventory/vouchers', token, {
+    branchId,
+    warehouseId,
+    kind: 'stock_in',
+    reason: 'تجهيز المناقلة',
+    lines: [{ itemId: transferItem.id, qty: '2', unitCost: '80', serialNos: [`${trfPrefix}1`, `${trfPrefix}2`] }],
+  })).id}/post`,
+  token,
+  {},
+);
+const dossier = await call('post', '/warehouses', token, { branchId, code: `WH-T-${stamp}`, name: 'مستودع المناقلة' });
+const named = await call('post', '/inventory/transfers/draft', token, {
+  branchId,
+  fromWarehouseId: warehouseId,
+  toWarehouseId: dossier.id,
+  lines: [{ itemId: transferItem.id, qty: '1', serialNos: [`${trfPrefix}1`] }],
+});
+await call('post', `/inventory/transfers/${named.id}/send`, token, {});
+const onRoad = await call('get', `/inventory/serials?item_id=${transferItem.id}`, token);
+check(
+  'المناقلة تحجز الرقم المسمّى ولا تبيعه',
+  onRoad.find((row) => row.serialNo === `${trfPrefix}1`)?.status === 'reserved',
+  onRoad.map((row) => `${row.serialNo}:${row.status}`).join(' · '),
+);
+await call('post', `/inventory/transfers/${named.id}/receive`, token, {
+  received: [{ lineNo: 1, qty: '1' }],
+});
+const arrived = await call('get', `/inventory/serials?item_id=${transferItem.id}`, token);
+const movedOne = arrived.find((row) => row.serialNo === `${trfPrefix}1`);
+check(
+  'الاستلام يعيده متاحاً في المستودع الجديد',
+  movedOne?.status === 'available' && movedOne?.warehouseId === dossier.id,
+  `${movedOne?.status} @ ${movedOne?.warehouseId === dossier.id ? 'الوجهة' : 'المصدر'}`,
+);
+const movedTrace = await call('get', `/inventory/serials/${movedOne.id}/documents`, token);
+check(
+  'المسار يذكر الرحلة كاملة: إدخال ← مناقلة ← استلام',
+  movedTrace.documents.map((row) => row.docType).join(' → ') ===
+    'stock_voucher → stock_transfer → stock_transfer_receipt',
+  movedTrace.documents.map((row) => row.docType).join(' → '),
+);
+
 console.log(failures === 0 ? '\n✔ Phase 05 inventory documents verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

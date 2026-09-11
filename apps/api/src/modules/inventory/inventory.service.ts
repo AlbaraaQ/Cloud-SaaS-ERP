@@ -10,6 +10,7 @@ import {
   journalEntryLines,
   itemLots,
   itemSerials,
+  stockDocumentSerials,
   itemBarcodes,
   itemUnits,
   items,
@@ -60,6 +61,12 @@ export type StockVoucherLineInput = {
   unitCost?: string;
   lotId?: string;
   serialId?: string;
+  /**
+   * 🔢 الأرقام التسلسلية — one number per piece, the desktop's
+   * `InvoiceItemDetail.ItemSerialNo`. Kept on the line through the draft and resolved
+   * into `stock_document_serials` when the document posts.
+   */
+  serialNos?: string[];
   note?: string;
 };
 export type StockVoucherInput = {
@@ -83,6 +90,11 @@ export type StockAdjustmentInput = {
     unitId?: string;
     unitCost?: string;
     lotId?: string;
+    /**
+     * 🔢 الأرقام التسلسلية counted on the line. On a shortage they are consumed, on a
+     * surplus they are brought in — the variance decides, not the clerk.
+     */
+    serialNos?: string[];
     note?: string;
   }>;
 };
@@ -847,7 +859,20 @@ export class InventoryService {
       branchId?: string;
       fromWarehouseId: string;
       toWarehouseId: string;
-      lines: Array<{ itemId: string; qty: string; unitCost?: string; lotId?: string; serialIds?: string[] }>;
+      lines: Array<{
+        itemId: string;
+        qty: string;
+        unitCost?: string;
+        lotId?: string;
+        /**
+         * Existing pieces to move, by id. Superseded by 🔢 `serialNos` below: an id only
+         * works for a number the warehouse already owns and someone has already looked
+         * up, which is not how a storeman reads a box off a shelf.
+         */
+        serialIds?: string[];
+        /** 🔢 الأرقام التسلسلية read off the line — one per piece. */
+        serialNos?: string[];
+      }>;
     },
   ) {
     if (!input.lines.length || input.fromWarehouseId === input.toWarehouseId)
@@ -920,6 +945,7 @@ export class InventoryService {
           unitCost: line.unitCost ?? '0',
           lotId: line.lotId,
           serialIds: line.serialIds ?? [],
+          serialNos: (line.serialNos ?? []).map((value) => String(value).trim()).filter(Boolean),
         })),
       );
       return { id, number, branchId, status: 'draft' };
@@ -1021,8 +1047,100 @@ export class InventoryService {
             ),
           );
       }
+      /**
+       * 🔢 الأرقام التسلسلية named on the line. A مناقلة moves pieces the source already
+       * owns — unlike a receipt it invents nothing — so each number has to be found
+       * there, on the shelf, before the goods leave it. Their state is not spent, only
+       * held: `available → reserved` keeps them booked to this transfer while they are
+       * on the road.
+       */
+      const namedByLine = new Map<number, string[]>();
+      for (const line of transfer.lines) {
+        const numbers = (line.serialNos ?? []).map((value) => String(value).trim()).filter(Boolean);
+        if (!numbers.length) continue;
+        const unique = new Set(numbers);
+        if (unique.size !== numbers.length)
+          throw new DomainError('SERIAL_DUPLICATE', 'The same serial number appears twice on one line', 422, {
+            field: 'serialNos',
+          });
+        const found = await tx
+          .select()
+          .from(itemSerials)
+          .where(
+            and(
+              eq(itemSerials.tenantId, tenantId),
+              eq(itemSerials.itemId, line.itemId),
+              inArray(itemSerials.serialNo, numbers),
+            ),
+          );
+        if (found.length !== numbers.length) {
+          const missing = numbers.filter((value) => !found.some((row) => row.serialNo === value));
+          throw new DomainError(
+            'SERIAL_NOT_FOUND',
+            `This item has no serial number ${missing[0]}`,
+            422,
+            { field: 'serialNos' },
+          );
+        }
+        // A transfer line counts in base units — it has no unit of measure of its own —
+        // so the quantity on the line is exactly the number of pieces to be named.
+        const expected = new Decimal(line.qty).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber();
+        if (found.length !== expected)
+          throw new DomainError(
+            'SERIAL_COUNT_MISMATCH',
+            `This line moves ${Number(expected)} pieces but carries ${found.length} serial numbers`,
+            422,
+            { field: 'serialNos' },
+          );
+        const offShelf = found.find((row) => row.status !== 'available');
+        if (offShelf)
+          throw new DomainError(
+            'SERIAL_INVALID_STATE',
+            `Serial number ${offShelf.serialNo} is ${offShelf.status} and cannot be sent`,
+            422,
+            { field: 'serialNos' },
+          );
+        const elsewhere = found.find((row) => row.warehouseId !== transfer.fromWarehouseId);
+        if (elsewhere)
+          throw new DomainError(
+            'SERIAL_WRONG_WAREHOUSE',
+            `Serial number ${elsewhere.serialNo} is not in the sending warehouse`,
+            422,
+            { field: 'serialNos' },
+          );
+        namedByLine.set(line.lineNo, found.map((row) => row.id));
+        await tx.insert(stockDocumentSerials).values(
+          found.map((row) => ({
+            id: newId(),
+            tenantId,
+            docType: 'stock_transfer',
+            docId: transferId,
+            lineNo: line.lineNo,
+            itemId: line.itemId,
+            serialId: row.id,
+          })),
+        );
+      }
+      if (namedByLine.size)
+        for (const [lineNo, ids] of namedByLine) {
+          const existing = transfer.lines.find((row) => row.lineNo === lineNo)?.serialIds ?? [];
+          await tx
+            .update(stockTransferLines)
+            .set({ serialIds: Array.from(new Set([...existing, ...ids])) })
+            .where(
+              and(
+                eq(stockTransferLines.tenantId, tenantId),
+                eq(stockTransferLines.transferId, transferId),
+                eq(stockTransferLines.lineNo, lineNo),
+              ),
+            );
+        }
+
       for (const line of transfer.lines)
-        await this.transitionSerialsInTx(tx, tenantId, line.serialIds ?? [], ['available'], 'reserved');
+        await this.transitionSerialsInTx(tx, tenantId, [
+          ...(line.serialIds ?? []),
+          ...(namedByLine.get(line.lineNo) ?? []),
+        ], ['available'], 'reserved');
 
       const value = await this.valueOfMovements(tx, tenantId, transferId, 'stock_transfer');
       let sentJournalEntryId: string | undefined;
@@ -1142,6 +1260,27 @@ export class InventoryService {
         'available',
         transfer.toWarehouseId,
       );
+      // 🔢 the numbers arrive on the receipt as well — a trace that stopped at the
+      // send would leave a piece suspended in transit forever.
+      if (serialIds.length)
+        await tx.insert(stockDocumentSerials).values(
+          serialIds.map((serialId) => {
+            const line =
+              byLine.get(
+                received.find((row) => (byLine.get(row.lineNo)?.serialIds ?? []).includes(serialId))
+                  ?.lineNo ?? -1,
+              ) ?? transfer.lines[0];
+            return {
+              id: newId(),
+              tenantId,
+              docType: 'stock_transfer_receipt',
+              docId: transferId,
+              lineNo: line?.lineNo ?? 1,
+              itemId: line?.itemId ?? '',
+              serialId,
+            };
+          }),
+        );
 
       const value = await this.valueOfMovements(tx, tenantId, transferId, 'stock_transfer_receipt');
       let receivedJournalEntryId: string | undefined;
@@ -1766,6 +1905,214 @@ export class InventoryService {
     return created?.id;
   }
 
+  // ── الرقم التسلسلي على سطر المستند ──────────────────────────────────────────
+
+  /**
+   * Resolves the serial numbers typed on a document line, at posting time.
+   *
+   * In: the numbers are created (`available`) — the stock is arriving, so the piece is
+   * real from now on. Out: they must already exist, belong to the same item, be on the
+   * shelf and sit in this warehouse, and are then marked `sold`. Either way the line
+   * and its numbers are linked in `stock_document_serials`, which is what makes
+   * "which document moved this number?" a query instead of a guess.
+   */
+  private async resolveLineSerials(
+    tx: DrizzleTx,
+    tenantId: string,
+    input: {
+      docType: string;
+      docId: string;
+      lineNo: number;
+      itemId: string;
+      warehouseId: string;
+      lotId?: string | null;
+      serialNos?: string[];
+      qty: string;
+      unitId?: string | null;
+      direction: 'in' | 'out';
+    },
+  ): Promise<string[]> {
+    const numbers = (input.serialNos ?? []).map((value) => String(value).trim()).filter(Boolean);
+    if (!numbers.length) return [];
+    if (new Set(numbers).size !== numbers.length)
+      throw new DomainError('SERIAL_DUPLICATE', 'The same serial number appears twice on this line', 422, {
+        field: 'serialNos',
+      });
+
+    // A line that moves 12 pieces has to carry 12 numbers — the count is the point of
+    // serialising the item in the first place.
+    const { factor } = await this.resolveUnit(tx, tenantId, {
+      itemId: input.itemId,
+      unitId: input.unitId ?? undefined,
+    } as InventoryLine);
+    const baseQty = new Decimal(input.qty).mul(factor);
+    if (!baseQty.equals(numbers.length))
+      throw new DomainError(
+        'SERIAL_COUNT_MISMATCH',
+        `This line moves ${baseQty} pieces but carries ${numbers.length} serial numbers`,
+        422,
+        { field: 'serialNos' },
+      );
+
+    let ids: string[] = [];
+    if (input.direction === 'in') {
+      const existing = await tx
+        .select({ serialNo: itemSerials.serialNo })
+        .from(itemSerials)
+        .where(
+          and(
+            eq(itemSerials.tenantId, tenantId),
+            isNull(itemSerials.deletedAt),
+            inArray(itemSerials.serialNo, numbers),
+          ),
+        );
+      if (existing.length)
+        throw new DomainError('SERIAL_DUPLICATE', `The serial ${existing[0]?.serialNo ?? ''} already exists`, 409, {
+          field: 'serialNos',
+        });
+      const created = numbers.map((serialNo) => ({
+        id: newId(),
+        tenantId,
+        itemId: input.itemId,
+        serialNo,
+        lotId: input.lotId ?? null,
+        warehouseId: input.warehouseId,
+        status: 'available',
+      }));
+      await tx.insert(itemSerials).values(created);
+      ids = created.map((row) => row.id);
+    } else {
+      const rows = await tx
+        .select()
+        .from(itemSerials)
+        .where(
+          and(
+            eq(itemSerials.tenantId, tenantId),
+            eq(itemSerials.itemId, input.itemId),
+            isNull(itemSerials.deletedAt),
+            inArray(itemSerials.serialNo, numbers),
+          ),
+        );
+      if (rows.length !== numbers.length) {
+        const found = new Set(rows.map((row) => row.serialNo));
+        const missing = numbers.find((serialNo) => !found.has(serialNo));
+        throw new DomainError(
+          'SERIAL_NOT_FOUND',
+          `The serial ${missing ?? ''} does not belong to this item`,
+          422,
+          { field: 'serialNos' },
+        );
+      }
+      const gone = rows.find((row) => !['available', 'reserved'].includes(row.status));
+      if (gone)
+        throw new DomainError('SERIAL_INVALID_STATE', `The serial ${gone.serialNo} is no longer on the shelf`, 422, {
+          field: 'serialNos',
+        });
+      const elsewhere = rows.find((row) => row.warehouseId && row.warehouseId !== input.warehouseId);
+      if (elsewhere)
+        throw new DomainError(
+          'SERIAL_WRONG_WAREHOUSE',
+          `The serial ${elsewhere.serialNo} is not in this warehouse`,
+          422,
+          { field: 'serialNos' },
+        );
+      ids = rows.map((row) => row.id);
+      for (const row of rows) {
+        await tx
+          .update(itemSerials)
+          .set({ status: 'sold', warehouseId: input.warehouseId, updatedAt: new Date() })
+          .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, row.id)));
+      }
+    }
+
+    await tx.insert(stockDocumentSerials).values(
+      ids.map((serialId) => ({
+        id: newId(),
+        tenantId,
+        docType: input.docType,
+        docId: input.docId,
+        lineNo: input.lineNo,
+        itemId: input.itemId,
+        serialId,
+      })),
+    );
+    return ids;
+  }
+
+  /**
+   * Undoes what `resolveLineSerials` did — the numbers a receipt brought in are taken
+   * back out (only while they are still sitting where the receipt put them), and the
+   * numbers an issue sold are put back on the shelf.
+   */
+  private async reverseDocumentSerials(
+    tx: DrizzleTx,
+    tenantId: string,
+    input: { docType: string; docId: string; direction: 'in' | 'out' },
+  ) {
+    const links = await tx
+      .select()
+      .from(stockDocumentSerials)
+      .where(
+        and(
+          eq(stockDocumentSerials.tenantId, tenantId),
+          eq(stockDocumentSerials.docType, input.docType),
+          eq(stockDocumentSerials.docId, input.docId),
+        ),
+      );
+    if (!links.length) return;
+    const rows = await tx
+      .select()
+      .from(itemSerials)
+      .where(
+        and(
+          eq(itemSerials.tenantId, tenantId),
+          inArray(itemSerials.id, links.map((link) => link.serialId)),
+        ),
+      );
+    for (const row of rows) {
+      if (input.direction === 'in') {
+        // Created by this document. If somebody has already moved the piece, deleting
+        // the number would erase its history; leave it and let the ledger speak.
+        if (row.status === 'available')
+          await tx
+            .update(itemSerials)
+            .set({ deletedAt: new Date(), deletedBy: tryGetAuthContext()?.userId })
+            .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, row.id)));
+      } else if (row.status === 'sold') {
+        await tx
+          .update(itemSerials)
+          .set({ status: 'available', updatedAt: new Date() })
+          .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, row.id)));
+      }
+    }
+    await tx
+      .delete(stockDocumentSerials)
+      .where(
+        and(
+          eq(stockDocumentSerials.tenantId, tenantId),
+          eq(stockDocumentSerials.docType, input.docType),
+          eq(stockDocumentSerials.docId, input.docId),
+        ),
+      );
+  }
+
+  /** Which documents has this number travelled through? */
+  async serialTrace(tenantId: string, serialId: string) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [serial] = await tx
+        .select()
+        .from(itemSerials)
+        .where(and(eq(itemSerials.tenantId, tenantId), eq(itemSerials.id, serialId), isNull(itemSerials.deletedAt)));
+      if (!serial) throw new DomainError('SERIAL_NOT_FOUND', 'The serial was not found', 404);
+      const links = await tx
+        .select()
+        .from(stockDocumentSerials)
+        .where(and(eq(stockDocumentSerials.tenantId, tenantId), eq(stockDocumentSerials.serialId, serialId)))
+        .orderBy(asc(stockDocumentSerials.createdAt));
+      return { serial, documents: links };
+    });
+  }
+
   // ── سند إدخال / إخراج مخزني ────────────────────────────────────────────────
 
   async createVoucher(tenantId: string, input: StockVoucherInput) {
@@ -1806,6 +2153,16 @@ export class InventoryService {
           createdBy: getRequestContext().tenant?.userId,
         })
         .returning();
+      for (const line of input.lines) {
+        const numbers = (line.serialNos ?? []).map((value) => String(value).trim()).filter(Boolean);
+        if (new Set(numbers).size !== numbers.length)
+          throw new DomainError(
+            'SERIAL_DUPLICATE',
+            'The same serial number appears twice on one line',
+            422,
+            { field: 'serialNos' },
+          );
+      }
       await tx.insert(stockVoucherLines).values(
         input.lines.map((line, index) => ({
           voucherId: id,
@@ -1817,6 +2174,7 @@ export class InventoryService {
           unitCost: line.unitCost ?? null,
           lotId: line.lotId,
           serialId: line.serialId,
+          serialNos: (line.serialNos ?? []).map((value) => String(value).trim()).filter(Boolean),
           note: line.note,
         })),
       );
@@ -1926,6 +2284,26 @@ export class InventoryService {
         };
       });
       await this.recordInTx(tx, tenantId, movements, { allowNegative });
+
+      // 🔢 الأرقام التسلسلية — the pieces this document actually moved, resolved now
+      // that the stock has a direction. A line that carries numbers must move exactly
+      // as many pieces as it names.
+      const docType = voucher.kind === 'opening' ? 'opening' : 'stock_voucher';
+      for (const line of voucher.lines) {
+        await this.resolveLineSerials(tx, tenantId, {
+          docType,
+          docId: id,
+          lineNo: line.lineNo,
+          itemId: line.itemId,
+          warehouseId: voucher.warehouseId,
+          lotId: line.lotId,
+          serialNos: line.serialNos,
+          qty: line.qty,
+          unitId: line.unitId,
+          direction,
+        });
+      }
+
       const value = await this.valueOfMovements(tx, tenantId, id);
 
       const inventoryAccount = await this.profileAccount(
@@ -2036,6 +2414,11 @@ export class InventoryService {
         costing: movement.direction === 'out' ? 'returnAtOriginalCost' : 'outAtAvg',
       }));
       if (mirrors.length) await this.recordInTx(tx, tenantId, mirrors, { allowNegative: true });
+      await this.reverseDocumentSerials(tx, tenantId, {
+        docType: voucher.kind === 'opening' ? 'opening' : 'stock_voucher',
+        docId: id,
+        direction: voucher.kind === 'stock_out' ? 'out' : 'in',
+      });
       if (voucher.journalEntryId) await this.reversalEntry(tx, tenantId, voucher.journalEntryId, reason);
       await tx
         .update(stockVouchers)
@@ -2093,6 +2476,7 @@ export class InventoryService {
           unitId: line.unitId ?? null,
           unitCost: line.unitCost ?? null,
           lotId: line.lotId,
+          serialNos: (line.serialNos ?? []).map((value) => String(value).trim()).filter(Boolean),
           note: line.note,
         })),
       );
@@ -2244,6 +2628,19 @@ export class InventoryService {
           lineId: newId(),
           lotId: line.lotId ?? undefined,
           costing: variance.gt(0) ? 'inWithCost' : 'outAtAvg',
+        });
+        // 🔢 الأرقام التسلسلية — a surplus brings pieces in, a shortage sends them out.
+        await this.resolveLineSerials(tx, tenantId, {
+          docType: 'stock_adjustment',
+          docId: id,
+          lineNo: line.lineNo,
+          itemId: line.itemId,
+          warehouseId: adjustment.warehouseId,
+          lotId: line.lotId,
+          serialNos: line.serialNos,
+          qty: variance.abs().toFixed(4),
+          unitId: line.unitId ?? null,
+          direction: variance.gt(0) ? 'in' : 'out',
         });
         await tx
           .update(stockAdjustmentLines)

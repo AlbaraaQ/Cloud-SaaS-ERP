@@ -386,6 +386,12 @@ export const generateSerials = (body: {
   lotId?: string;
 }) => apiData<{ count: number; serialNos: string[] }>('/inventory/serials/generate', { method: 'POST', body: JSON.stringify(body) });
 export const deleteSerial = (serialId: string) => apiDelete<{ deleted: boolean }>(`/inventory/serials/${serialId}`);
+/** Which documents has this number travelled through? (`frmItemSerialNo.xaml.cs:524` reads them the same way.) */
+export type SerialTrace = {
+  serial: Serial;
+  documents: Array<{ docType: string; docId: string; lineNo: number; createdAt: string }>;
+};
+export const traceSerial = (serialId: string) => apiData<SerialTrace>(`/inventory/serials/${serialId}/documents`);
 export const reserveSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/reserve', { method: 'POST', body: JSON.stringify({ serialIds }) });
 export const releaseSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/release', { method: 'POST', body: JSON.stringify({ serialIds }) });
 export const consumeSerials = (serialIds: string[]) => apiData<{ status: string }>('/inventory/serials/consume', { method: 'POST', body: JSON.stringify({ serialIds }) });

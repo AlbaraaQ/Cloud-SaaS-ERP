@@ -522,7 +522,7 @@ recipe rows), and the empty-state sentence «بطاقة هذا الصنف لا �
 | توليد دفعة | `frmItemSerialNo.xaml` `⚙️ توليد` | one prefix + a running number, N rows at once | `POST /inventory/serials/generate` — all-or-nothing, because a half-made batch is worse than none |
 | إدراج رقم واحد | `frmItemSerialNo.xaml` `✅ إدراج` | type one number | the same form beneath the grid |
 | نقل رقم بين الشبكتين | `frmItemSerialNo.xaml.cs` L282 / L340 | move a number from المتاحة to المباعة and back | `reserve` / `release` / `consume` / `return`, now reachable from the screen |
-| الرقم على سطر المستند | `Class/InvoiceOper.cs` L1635 — `InvoiceItemDetail(ItemSerialNo, BatchNo, ItemProductionDate, ItemExpireDate, …)` | the serial and the batch ride on the **document line** | deliberately deferred — see §11.6 |
+| الرقم على سطر المستند | `Class/InvoiceOper.cs` L1635 — `InvoiceItemDetail(ItemSerialNo, BatchNo, ItemProductionDate, ItemExpireDate, …)` | the serial and the batch ride on the **document line** | the serial half shipped in §12 — `serialNos` on the line and a `stock_document_serials` trace; the batch half is still deferred |
 | ترويسة أمر الإنتاج | `Form_WPF/frmProductionOrder.xaml` L246-320 | `📄 رقم المرجع`، `📅 تاريخ المرجع`، `📦 المنتج`، `📐 الوحدة`، `🏭 مستودع الإنتاج`، `🔢 الكمية المنتجة`، `📊 الكمية المتوفرة`، `📝 البيان` | the order stores the first two and the unit (migration 0038); الكمية المتوفرة is read live off the balance table |
 | عمود المتوفرة | `frmProductionOrder.xaml` L528 — `Header="المتوفرة"` | the planner sees what the shelf holds before promising a build | the مكونات الإنتاج preview shows المتوفرة per component, from `stock_balances` |
 | تقارير المخزون | `Reports/rptInventoryReport.repx`, `rptItemsExpire.repx`, `rptItemsTotalGrd.repx`, `RptInvOrderItems.repx`, `rptProductionOrder.repx` | printed from `frmRptInventory` | already in the report catalogue (phase 10 rebuilt it as `inventory-turnover`, `inventory-valuation`, `stock-limits`, `expiry-report`, `serial-tracking`); part six only had to make the four that were unreachable **reachable** |
@@ -584,17 +584,16 @@ the item does not carry has no ratio, and is refused `422 PRODUCTION_UNIT_INVALI
   (الأصناف تحت الحد الأدنى), `/reports/expiry-report` (صلاحية المواد) and
   `/reports/serial-tracking` (تتبّع الأرقام التسلسلية).
 
-### 11.6 What is still deferred, and why
+### 11.6 What was deferred then, and what became of it
 
-**The serial and the batch on the document line** (`InvoiceItemDetail.ItemSerialNo`,
-`BatchNo`, `ItemProductionDate`, `ItemExpireDate` in `Class/InvoiceOper.cs:1635`). A serial's
-status says where the piece is; it does not say *which document* moved it, and a sold number
-cannot be traced back to the invoice that sold it. Doing this properly touches every document
-that moves stock — vouchers, transfers, adjustments, sales invoices, purchase invoices and
-returns — at once, in five modules, and it is the one change in this phase that can silently
-corrupt a ledger if it is wrong. It is a phase of its own (the document-line pass), not a
-silent add-on to the serial screen; the state machine and the screens it needs are ready, and
-the line tables already carry `unit_id`/`factor` from 0035, which is the hook it will use.
+**The serial on the document line** (`InvoiceItemDetail.ItemSerialNo` in
+`Class/InvoiceOper.cs:1635`). It was held back here because it touches every document that
+moves stock in five modules at once, and it is the one change in this phase that can silently
+corrupt a ledger if it is wrong. **It shipped in §12 as part seven** — vouchers, adjustments
+and transfers, the three stock documents — off the `unit_id`/`factor` hook that 0035 put on
+the line tables, which is exactly what the deferred note predicted. Still open from the same
+row: the batch half (`BatchNo`, `ItemProductionDate`, `ItemExpireDate`) and the five invoice
+modules — see §13.
 
 ### 11.7 Label match against `Desktop_ERP`
 
@@ -629,7 +628,128 @@ desktop's grid shows state by which grid a row is sitting in; ours has one grid 
 * `/inventory/serials`, `/inventory/lots`, `/inventory/production` and the four newly reachable
   report screens all render (200).
 
-## 12. Deliberately deferred
+## 12. Part seven — الرقم التسلسلي على سطر المستند
+
+### 12.1 What the desktop did, file by file
+
+| Behaviour | `Desktop_ERP` source | What it did | What we built |
+|---|---|---|---|
+| الرقم على سطر المستند | `SmartAuditERP/Class/InvoiceOper.cs` L1635 — `INSERT into InvoiceItemDetail(…, ItemSerialNo, BatchNo, ItemProductionDate, ItemExpireDate, …)` | the serial and the batch ride on the **document line**, so every document that moves stock can say *which* piece it moved | `serial_nos jsonb` on `stock_voucher_lines`, `stock_adjustment_lines` and `stock_transfer_lines`, and a `stock_document_serials` link table (§12.2) |
+| قراءة الرقم من السطر | `InvoiceOper.cs` L3885 — `invoiceItemDetail.ItemSerialNo = Conversions.ToString(dataTable.Rows[i]["ItemSerialNo"])` | re-opens a saved document and reads the numbers back off its lines | the same: a draft and a posted document both answer their lines' `serialNos` |
+| تتبّع الرقم | `SmartAuditERP/Form_WPF/frmItemSerialNo.xaml.cs` L524 — `SELECT SerialNo AS DgvSerialNo FROM ItemSerialNo, inv {cond}` | a serial is read **joined to the invoice table**, i.e. the numbers a document carries | `GET /inventory/serials/:id/documents` — the same join, done with a link row instead of a string match (§12.5) |
+| أعمدة الشبكة | `frmItemSerialNo.xaml` L423 — `Header="🔢 الرقم التسلسلي"` | one grid column for the number | `🔢 الأرقام التسلسلية` on the voucher, adjustment and transfer line grids |
+
+**One deliberate departure.** The desktop stores a **single** `ItemSerialNo` per detail row
+(`nvarchar`), and a clerk who receives ten identical machines writes ten lines of one piece
+each. The cloud stores a list: one line, `qty: 10`, ten numbers — and the count is then
+checked against the quantity (§12.3), which is the whole point of serialising an item and the
+one thing a free-text column can never enforce. A document that must keep the desktop's
+one-piece-per-line shape can still be written that way; nothing about the API forbids it.
+
+### 12.2 Data (migration `0039_document_line_serials.sql`)
+
+Additive, with its paired `down` file:
+
+1. `stock_voucher_lines.serial_nos jsonb NOT NULL DEFAULT '[]'`, and the same on
+   `stock_adjustment_lines` and `stock_transfer_lines` — what the clerk counted, kept as
+   text, so a draft can be saved before the pieces exist.
+2. `stock_document_serials(tenant_id, doc_type, doc_id, line_no, item_id, serial_id)` with
+   RLS (`FORCE`), a tenant policy, and three indexes: unique
+   `(tenant_id, doc_type, doc_id, line_no, serial_id)` so the same number cannot be written
+   to one line twice, unique `(tenant_id, doc_type, doc_id, serial_id)` so a number cannot be
+   on two lines of one document, and `(tenant_id, serial_id)` for the trace.
+
+`stock_transfer_lines.serial_ids` (which took the **ids** of numbers that already existed)
+is kept and still works; 🔢 `serialNos` supersedes it, because an id is only usable after
+someone has looked the number up, and a storeman reads numbers off boxes, not ids.
+
+### 12.3 The rule at posting time
+
+A draft remembers the numbers and invents nothing — no `item_serials` row exists for stock
+that has not arrived. The numbers are resolved by `resolveLineSerials` **when the document is
+posted**, one line at a time, and every refusal leaves the document a draft and moves no
+stock:
+
+| Situation | Answer | Why |
+|---|---|---|
+| the same number twice on one line | `422 SERIAL_DUPLICATE` | one piece, one number |
+| an إدخال (or a surplus, or a receipt) names a number that already exists | `409 SERIAL_DUPLICATE` | the piece is already on the shelf; receiving it twice is how a stock count stops adding up |
+| the count ≠ `qty × unit factor` pieces | `422 SERIAL_COUNT_MISMATCH` — *«This line moves N pieces but carries M serial numbers»* | this is the check the desktop's single text column could not make |
+| an إخراج (or a shortage, or a send) names a number the item does not have | `422 SERIAL_NOT_FOUND` | you cannot spend what you never received |
+| that number is not `available` or `reserved` | `422 SERIAL_INVALID_STATE` | a sold piece cannot be sold again |
+| that number sits in another warehouse | `422 SERIAL_WRONG_WAREHOUSE` | a piece is in one place at a time |
+
+On the way **in** the numbers are created `available`, in the document's warehouse and the
+line's lot. On the way **out** they are found, checked, and set `sold`. Either way a link row
+is written, so the document is the answer to *who moved this piece*.
+
+### 12.4 إلغاء المستند
+
+`reverseDocumentSerials` is the mirror image, and it is deliberately asymmetric:
+
+* a document that brought stock **in** deletes the numbers it created — **only while they are
+  still `available`**. A piece that has already been sold has a history now; erasing it to
+  tidy up a cancelled receipt is how a sold number disappears from a customer's file. The
+  stock is reversed either way.
+* a document that sent stock **out** puts its numbers back to `available`.
+
+Then the link rows for that `(doc_type, doc_id)` are removed, so a void leaves no trace —
+which is exactly what a void means.
+
+### 12.5 التتبّع — `GET /inventory/serials/:id/documents`
+
+`frmItemSerialNo.xaml.cs:524` answers *which documents has this number travelled through* by
+joining `ItemSerialNo` to `inv` and string-matching. Ours reads the link table instead:
+
+```json
+{ "serial": { "serialNo": "A-1", "status": "sold", … },
+  "documents": [
+    { "docType": "stock_voucher",         "docId": "…", "lineNo": 1, "createdAt": "…" },
+    { "docType": "stock_transfer",        "docId": "…", "lineNo": 1, "createdAt": "…" },
+    { "docType": "stock_transfer_receipt","docId": "…", "lineNo": 1, "createdAt": "…" }
+  ] }
+```
+
+Permission is `inventory.view`; another tenant's number is a `404`, not a `403`, so the
+endpoint cannot be used to probe for ids. A مناقلة contributes **two** legs — the send and
+the receipt — because a trace that stopped at the send would leave a piece suspended in
+transit forever.
+
+### 12.6 Screens (`apps/staff`)
+
+| Screen | What changed |
+|---|---|
+| `/inventory/vouchers` | the single-serial dropdown became a 🔢 box: one number per piece, typed or pasted, with a live `٣ من ٣` chip that warns when the count disagrees with the quantity; the posted document's line grid gained a `🔢 الأرقام التسلسلية` column |
+| `/inventory/adjustments` | the same box on the count line for items that carry numbers — a surplus brings pieces in, a shortage sends them out, decided by the variance |
+| `/inventory/transfers` | the same box on the transfer line; the numbers ride with the goods and only change warehouse |
+| `/inventory/serials` | a 🔍 button per row opens **مسار الرقم**: the documents the number has travelled through, oldest first |
+
+### 12.7 Arabic labels — verbatim or justified
+
+| Desktop | Ours | |
+|---|---|---|
+| `🔢 الرقم التسلسلي` (`frmItemSerialNo.xaml` L423) | `🔢 الأرقام التسلسلية` on the line grids | plural — one line carries N numbers (§12.1) |
+| `SELECT … FROM ItemSerialNo, inv` (`.xaml.cs` L524) | `مسار الرقم` / `documents` | the same join; invented label, because the desktop has no caption for it — it is a query, not a screen |
+| `ItemSerialNo` (`InvoiceOper.cs` L1635) | `serialNos` on the API, `🔢 الأرقام التسلسلية` on the screen | — |
+
+Every other label on the four screens is unchanged from parts one to six. Match: **3/3
+captions verbatim**, one invented (`مسار الرقم`) for a screen the desktop never had.
+
+### 12.8 Verification
+
+* `apps/api/test/inventory-document-serials.spec.ts` — **7 tests**: a receipt creates one
+  piece per number; 3 pieces with 2 numbers is refused and the document stays a draft; an
+  issue sells exactly the numbers it names and refuses a sold one and a foreign one; a number
+  in another warehouse cannot be sent; the trace carries the documents; voiding an issue
+  returns the number and voiding a receipt removes the pieces it invented; and a مناقلة
+  reserves the named piece, releases it at the destination, and records both legs.
+* Suite: API **81 files / 475 tests** green, `apps/staff` **36/36** green, staff build
+  **100/100** static pages, `tsc --noEmit` clean for both.
+* `node scripts/verify-inventory.mjs` — **fifteen** sections; the new one walks the same
+  journey against the live stack, and the transfer is checked live too
+  (`إدخال ← مناقلة ← استلام`).
+
+## 13. Deliberately deferred
 
 * Production orders / item assembly (`frmProductionOrder*`) already have their own service;
   §10 wired the item card's recipe into it, and the order itself is deliberately still
@@ -637,7 +757,12 @@ desktop's grid shows state by which grid a row is sitting in; ours has one grid 
 * Unit-aware *pricing lists* — a unit carries its own sale/purchase price, but price lists
   (phase 08) do not yet choose a unit.
 * Printing barcode labels and the stock documents themselves (phase 10).
-* **The serial and the batch on the document line** (`InvoiceItemDetail.ItemSerialNo`,
-  `BatchNo`, `ItemProductionDate`, `ItemExpireDate` — `Class/InvoiceOper.cs:1635`). A serial's
-  status says where a piece is, not which document moved it. It touches every document that
-  moves stock, in five modules, and belongs to a document-line pass of its own — see §11.6.
+* **The batch, the production date and the expiry date on the document line**
+  (`BatchNo`, `ItemProductionDate`, `ItemExpireDate` — `Class/InvoiceOper.cs:1635`). The
+  serial half of that line shipped in §12; the batch half belongs with the lot-consuming
+  documents, where `lot_id` already exists on the line and production/expiry belong to the
+  lot rather than to the line.
+* **The five invoice modules** (sales, purchase, and their returns, plus quotations) still
+  write their lines without numbers. Stock moves through stock documents only for now; the
+  sales and purchase documents get the same treatment when their phases land, off the same
+  `stock_document_serials` table.

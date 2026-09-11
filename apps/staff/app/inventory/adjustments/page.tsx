@@ -48,6 +48,8 @@ type AdjustmentLine = {
   varianceQty?: string | null;
   varianceValue?: string | null;
   unitCost?: string | null;
+  /** 🔢 الأرقام التسلسلية counted on the line. */
+  serialNos?: string[];
 };
 
 type Bucket = 'all' | 'draft' | 'posted';
@@ -87,8 +89,8 @@ export default function StockAdjustmentsPage() {
   const [warehouseId, setWarehouseId] = useState('');
   const [reason, setReason] = useState('جرد دوري');
   const [lines, setLines] = useState<
-    Array<{ itemId: string; countedText: string; unitId: string; costText: string }>
-  >([{ itemId: '', countedText: '', unitId: '', costText: '' }]);
+    Array<{ itemId: string; countedText: string; unitId: string; costText: string; serialNos: string }>
+  >([{ itemId: '', countedText: '', unitId: '', costText: '', serialNos: '' }]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
   const [selected, setSelected] = useState<Adjustment | undefined>();
@@ -133,7 +135,7 @@ export default function StockAdjustmentsPage() {
 
   function updateLine(
     index: number,
-    patch: Partial<{ itemId: string; countedText: string; unitId: string; costText: string }>,
+    patch: Partial<{ itemId: string; countedText: string; unitId: string; costText: string; serialNos: string }>,
   ) {
     setLines((current) =>
       current.map((line, position) => (position === index ? { ...line, ...patch } : line)),
@@ -163,10 +165,14 @@ export default function StockAdjustmentsPage() {
           countedQty: line.countedText,
           unitId: line.unitId || undefined,
           unitCost: line.costText || undefined,
+          serialNos: line.serialNos
+            .split(/[\s,،;؛]+/)
+            .map((entry) => entry.trim())
+            .filter(Boolean),
         })),
       });
       setNotice({ kind: 'ok', text: `حُفظ الجرد ${created.number} كمسودة. راجع الفروقات ثم اعتمده.` });
-      setLines([{ itemId: '', countedText: '', unitId: '', costText: '' }]);
+      setLines([{ itemId: '', countedText: '', unitId: '', costText: '', serialNos: '' }]);
       setOpen(false);
       await reload();
     } catch (error) {
@@ -390,6 +396,20 @@ export default function StockAdjustmentsPage() {
                         />
                       </td>
                       <td>
+                        {itemOf(line.itemId)?.trackSerial ? (
+                          <textarea
+                            className="input"
+                            rows={2}
+                            dir="ltr"
+                            placeholder="A-1 A-2"
+                            value={line.serialNos}
+                            onChange={(event) => updateLine(index, { serialNos: event.target.value })}
+                          />
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
                         <button
                           className="btn sm"
                           type="button"
@@ -411,7 +431,10 @@ export default function StockAdjustmentsPage() {
               className="btn sm"
               type="button"
               onClick={() =>
-                setLines((current) => [...current, { itemId: '', countedText: '', unitId: '', costText: '' }])
+                setLines((current) => [
+                  ...current,
+                  { itemId: '', countedText: '', unitId: '', costText: '', serialNos: '' },
+                ])
               }
             >
               + سطر

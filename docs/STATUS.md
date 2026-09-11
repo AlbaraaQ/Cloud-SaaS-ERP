@@ -189,6 +189,20 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   because deleting it is how a stock count stops adding up. A lot carrying serials answers
   `409 LOT_IN_USE`. Screens `/inventory/serials`, `/inventory/lots`, report keys
   `serial-tracking`, `expiry-report`.
+* **الرقم التسلسلي على سطر المستند** (`InvoiceItemDetail.ItemSerialNo`,
+  `Class/InvoiceOper.cs:1635`) — migration `0039` puts `serial_nos` on the voucher,
+  adjustment and transfer line tables and adds `stock_document_serials`, so a document says
+  *which piece* it moved and a number can be traced back to the documents that moved it
+  (`GET /inventory/serials/:id/documents`, permission `inventory.view`). The numbers are
+  resolved at posting, not at saving: a draft invents no pieces for stock that has not
+  arrived, a count that disagrees with the quantity is `422 SERIAL_COUNT_MISMATCH`, a number
+  in another warehouse is `422 SERIAL_WRONG_WAREHOUSE`, and selling a number twice is
+  `422 SERIAL_INVALID_STATE`. إلغاء is the mirror image and deliberately asymmetric: a
+  receipt's numbers are withdrawn only while they are still on the shelf, an issue's numbers
+  go back on it. A مناقلة contributes two legs — the send that reserves the piece and the
+  receipt that releases it. Screens: the four stock document grids gained a
+  `🔢 الأرقام التسلسلية` column and a paste-box with a live count; the serials screen gained
+  a `🔍` trace per row.
 
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
