@@ -1015,6 +1015,128 @@ const itemRows = await call('get', '/inventory/transfers?number=TR-', token);
 check('🔍 مناقلة الأصناف تقبل الرقم', Array.isArray(itemRows), `${itemRows.length} صف`);
 const futureItemRows = await call('get', '/inventory/transfers?from=2099-01-01&to=2099-12-31', token);
 check('📅 مناقلة الأصناف تقبل الفترة', Array.isArray(futureItemRows), `${futureItemRows.length} صف`);
+
+// ── 12. قيد الإغلاق — frmCloseShift: 📉 الفرق وحده يُرحَّل ──────────────────────────
+console.log('12. قيد الإغلاق');
+
+const differenceAccountId = await account('5320', 'فرق بالصندوق — تحقق', 'expense');
+await call('post', '/branch-posting-profiles', token, {
+  branchId,
+  docType: 'shift_close',
+  mapping: { version: 1, cashAccountId: safeAccountId, cashDifferenceAccountId: differenceAccountId },
+});
+
+// Every drawer left open by an earlier section is closed first.
+for (const row of (await dayCloses()).filter((entry) => entry.status === 'open')) {
+  await call('post', `/shift-closes/${row.id}/close`, token, { counts: [] });
+}
+
+const shortShift = await call('post', '/shift-closes/open', token, { branchId });
+await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1'); // 100 in the drawer
+const shortClosed = await call('post', `/shift-closes/${shortShift.id}/close`, token, {
+  counts: [{ denomination: '50', count: 1 }], // 50 in hand — عجز 50
+});
+check('📉 الفرق عجز 50', near(Number((shortClosed.summary ?? {}).diff), -50), money((shortClosed.summary ?? {}).diff));
+
+const postedShift = await call('post', `/shift-closes/${shortShift.id}/post`, token, {});
+const closeEntryId = postedShift?.journalEntryId;
+check('📒 القيد يُرحَّل', Boolean(closeEntryId), String(closeEntryId));
+
+const closeEntry = await call('get', `/journal-entries/${closeEntryId}`, token);
+const closeDebits = (closeEntry.lines ?? []).filter((line) => Number(line.debit) > 0);
+const closeCredits = (closeEntry.lines ?? []).filter((line) => Number(line.credit) > 0);
+check('📉 عجز: مدين فرق الصندوق', closeDebits[0]?.accountId === differenceAccountId, `${closeDebits.length} سطر مدين`);
+check('📉 عجز: دائن الصندوق', closeCredits[0]?.accountId === safeAccountId, `${closeCredits.length} سطر دائن`);
+check(
+  '⚖️ القيد متوازن',
+  near(closeDebits.reduce((sum, line) => sum + Number(line.debit), 0), 50) &&
+    near(closeCredits.reduce((sum, line) => sum + Number(line.credit), 0), 50),
+  `${money(closeDebits.reduce((sum, line) => sum + Number(line.debit), 0))}`,
+);
+check(
+  '📝 البيان يحمل الإغلاق ورقمه',
+  /اغلاق اليومية/.test(String(closeEntry.description)) &&
+    String(closeEntry.description).includes(String(shortClosed.number)),
+  String(closeEntry.description),
+);
+
+// الترحيل مرّة واحدة.
+try {
+  await call('post', `/shift-closes/${shortShift.id}/post`, token, {});
+  check('الترحيل مرّتين مرفوض', false, 'expected 409');
+} catch (error) {
+  check(
+    'الترحيل مرّتين مرفوض',
+    error.status === 409 && error.code === 'SHIFT_ALREADY_POSTED',
+    `${error.status} ${error.code}`,
+  );
+}
+
+// زيادة — القيد معكوس.
+const overShift = await call('post', '/shift-closes/open', token, { branchId });
+await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1'); // 100 expected
+await call('post', `/shift-closes/${overShift.id}/close`, token, {
+  counts: [{ denomination: '100', count: 1 }, { denomination: '50', count: 1 }], // 150 in hand
+});
+const overPosted = await call('post', `/shift-closes/${overShift.id}/post`, token, {});
+const overEntry = await call('get', `/journal-entries/${overPosted.journalEntryId}`, token);
+check(
+  '📈 زيادة: مدين الصندوق ودائن الفرق',
+  (overEntry.lines ?? []).some((line) => Number(line.debit) > 0 && line.accountId === safeAccountId) &&
+    (overEntry.lines ?? []).some((line) => Number(line.credit) > 0 && line.accountId === differenceAccountId),
+  `${(overEntry.lines ?? []).length} سطر`,
+);
+
+// صندوق مطابق — لا قيد.
+const balancedShift = await call('post', '/shift-closes/open', token, { branchId });
+await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1');
+await call('post', `/shift-closes/${balancedShift.id}/close`, token, {
+  counts: [{ denomination: '100', count: 1 }],
+});
+try {
+  await call('post', `/shift-closes/${balancedShift.id}/post`, token, {});
+  check('صندوق مطابق بلا قيد', false, 'expected 422');
+} catch (error) {
+  check(
+    'صندوق مطابق بلا قيد',
+    error.status === 422 && error.code === 'SHIFT_BALANCED',
+    `${error.status} ${error.code}`,
+  );
+}
+
+// 🔢 الرقم سلسلة واحدة للمؤسسة: فرعان لا يصدران رقماً واحداً.
+const secondBranch = await call('post', '/branches', token, {
+  code: `SB${stamp}`,
+  nameAr: 'فرع ثانٍ للتحقق',
+});
+const otherBranchShift = await call('post', '/shift-closes/open', token, { branchId: secondBranch.id });
+const otherClosed = await call('post', `/shift-closes/${otherBranchShift.id}/close`, token, {
+  counts: [{ denomination: '10', count: 1 }],
+});
+check(
+  '🔢 رقم الإغلاق لا يتكرر بين الفروع',
+  Boolean(otherClosed?.number) && otherClosed.number !== shortClosed.number && otherClosed.number !== overPosted?.number,
+  `${otherClosed?.number} ≠ ${shortClosed.number}`,
+);
+
+// 🏦 التحويل البنكي يُدخل على حساب البنك نفسه — `EntryOper.cs` L620، لا على حساب الشبكة.
+const bankShift = await call('post', '/shift-closes/open', token, { branchId });
+const bankSale = await sellOnTill({ method: 'bank', cashLocationId: bankA.id }, '1');
+const bankEntries = await call('get', `/journal-entries?from=${today}&to=${today}`, token);
+const bankEntry = bankEntries.find((row) => row.description === `Sales invoice ${bankSale.number ?? bankSale.data?.number}`);
+const bankEntryId = bankEntry?.id;
+const saleLines = bankEntryId ? (await call('get', `/journal-entries/${bankEntryId}`, token)).lines ?? [] : [];
+check(
+  '🏦 التحويل على حساب البنك نفسه',
+  saleLines.some((line) => Number(line.debit) > 0 && line.accountId === transferBankAId),
+  `${saleLines.filter((line) => Number(line.debit) > 0).map((line) => line.accountId).join(',')}`,
+);
+check(
+  '🏦 لا على حساب الصندوق العام',
+  !saleLines.some((line) => Number(line.debit) > 0 && line.accountId === safeAccountId),
+  'حساب البنك لا الصندوق',
+);
+await call('post', `/shift-closes/${bankShift.id}/close`, token, { counts: [] });
 console.log('');
 
 console.log(failures === 0 ? '\n✔ Phase 06 treasury documents verified' : `\n✗ ${failures} check(s) failed`);

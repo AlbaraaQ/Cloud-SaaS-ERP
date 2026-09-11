@@ -1261,6 +1261,14 @@ export class TreasuryService {
             membershipId: staff.find((person) => person.userId === row.userId)?.membershipId ?? null,
             openedAt: row.openedAt,
             closedAt: row.closedAt,
+            /**
+             * 📒 القيد — the entry this count produced, and whether one is still owed.
+             * `SHIFT_BALANCED` is the honest answer for a drawer that matched the books:
+             * there is nothing to post, and posting a zero-value entry would be theatre.
+             */
+            journalEntryId: row.journalEntryId,
+            postedAt: row.postedAt,
+            postable: row.status === 'closed' && !row.journalEntryId && money(row.diff).abs().gt(0),
             /** 💹 الصافي */
             net: pick('net'),
             /** 🏦 رصيد الصندوق — what the cashier counted, not what the till expected. */
@@ -1378,11 +1386,19 @@ export class TreasuryService {
        * exactly the way a voucher is numbered when it is posted and not when it is
        * drafted. An open drawer stays unnumbered.
        */
-      const allocated = await this.sequences.next(
-        { tenantId, branchId: shift.branchId, docType: 'shift_close' },
-        tx,
-        { prefix: 'CS-', padding: 6 },
-      );
+      /**
+       * 🔢 الرقم is numbered **tenant-wide**, not per branch — and that is forced, not
+       * stylistic: `shift_closes_number_key` is unique on `(tenant_id, number)`, so two
+       * branches each running their own `shift_close` sequence both reach `CS-000001`
+       * and the second close dies on a duplicate key. The desktop's `ClosedID` is one
+       * series for the whole company too, which is what makes `✖` on a printed close
+       * report mean one close and not one of several. Migration 0044 seeds the
+       * tenant-wide counter from the numbers already issued.
+       */
+      const allocated = await this.sequences.next({ tenantId, docType: 'shift_close' }, tx, {
+        prefix: 'CS-',
+        padding: 6,
+      });
       const counted = counts.reduce(
         (sum, line) => sum.plus(money(line.denomination).mul(line.count)),
         new Decimal(0),
@@ -1478,6 +1494,124 @@ export class TreasuryService {
       return { id, number: allocated.display, status: 'closed', summary };
     });
   }
+  /**
+   * 📒 قيد الإغلاق — `Class/EntryOper.cs` `BindCloseShiftToEntry`.
+   *
+   * The desktop's close entry is the *only* accounting a POS day ever gets: nothing is
+   * posted when an invoice is saved, so the close itself debits the treasury, debits
+   * `1221001` الشبكة, debits each named bank's own account, and credits `4100001`
+   * المبيعات, `2222001` الضريبة المضافة and the rest.
+   *
+   * Copying that here would post the day **twice**. In the cloud every posted invoice
+   * already wrote its entry — sales, VAT, discount, and the debit to the till's or the
+   * bank's own account (`pos.service.ts` resolves a named bank's `accountId` the way
+   * `EntryOper.cs:620` resolves `bank.AccCode`). So the close is left holding exactly
+   * one number no other document can know: **📉 الفرق**, the difference between the
+   * drawer the cashier counted by hand and the drawer the books expected.
+   *
+   *   counted < expected (عجز)  →  Dr فرق الصندوق  /  Cr الصندوق
+   *   counted > expected (زيادة) →  Dr الصندوق      /  Cr فرق الصندوق
+   *
+   * A balanced drawer posts nothing and says so (`SHIFT_BALANCED`), because an entry
+   * of two zero lines is how a ledger stops being evidence.
+   *
+   * عهدة الإغلاق (`1211002`) is deliberately **not** reproduced: in the desktop it parks
+   * the counted cash on the cashier's custody account until it is deposited, and the
+   * cloud has no deposit step to clear it — a balance nothing can ever clear is worse
+   * than a leg we can add with the deposit screen.
+   */
+  async postShiftClose(tenantId: string, id: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+      throw new DomainError('SHIFT_NOT_FOUND', 'Shift close was not found', 404);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(shiftCloses)
+        .where(and(eq(shiftCloses.tenantId, tenantId), eq(shiftCloses.id, id)));
+      if (!row) throw new DomainError('SHIFT_NOT_FOUND', 'Shift close was not found', 404);
+      if (row.status !== 'closed')
+        throw new DomainError('SHIFT_INVALID_STATE', 'Only a counted shift can be posted', 422, {
+          field: 'status',
+        });
+      if (row.journalEntryId)
+        throw new DomainError('SHIFT_ALREADY_POSTED', 'This shift was already posted', 409, {
+          field: 'journalEntryId',
+        });
+
+      const diff = money(row.diff);
+      if (!diff.abs().gt(0))
+        throw new DomainError(
+          'SHIFT_BALANCED',
+          'الصندوق مطابق — لا قيد: counted cash matches the books, so there is nothing to post',
+          422,
+          { field: 'diff' },
+        );
+
+      const cashAccountId = await this.profileAccount(tx, tenantId, row.branchId, 'shift_close', 'cashAccountId');
+      const differenceAccountId = await this.profileAccount(
+        tx,
+        tenantId,
+        row.branchId,
+        'shift_close',
+        'cashDifferenceAccountId',
+      );
+      const employeeName = await this.staffName(tx, tenantId, row.userId);
+      const amount = diff.abs().toFixed(4);
+      /**
+       * 📝 البيان — the desktop's own note, رقم الإغلاق and all
+       * (`"اغلاق اليومية خاصة الموظف {name} رقم{ClosedId}"`), so an accountant searching
+       * the ledger for a shift finds the shift.
+       */
+      const journal = await this.accounting.postJournalInTx(tx, tenantId, {
+        branchId: row.branchId,
+        fiscalPeriodId: await this.accounting.openPeriodForDateInTx(
+          tx,
+          tenantId,
+          (row.closedAt ?? new Date()).toISOString().slice(0, 10),
+        ),
+        date: (row.closedAt ?? new Date()).toISOString().slice(0, 10),
+        description: `اغلاق اليومية خاصة الموظف ${employeeName} رقم${row.number ?? row.id}`,
+        lines: diff.lt(0)
+          ? [
+              { accountId: differenceAccountId!, debit: amount, credit: '0' },
+              { accountId: cashAccountId!, debit: '0', credit: amount },
+            ]
+          : [
+              { accountId: cashAccountId!, debit: amount, credit: '0' },
+              { accountId: differenceAccountId!, debit: '0', credit: amount },
+            ],
+        sourceType: 'shift_close',
+        sourceId: id,
+      });
+
+      const postedAt = new Date();
+      await tx
+        .update(shiftCloses)
+        .set({ journalEntryId: journal?.id ?? null, postedAt, updatedAt: postedAt })
+        .where(and(eq(shiftCloses.tenantId, tenantId), eq(shiftCloses.id, id)));
+
+      return {
+        id,
+        number: row.number,
+        journalEntryId: journal?.id ?? null,
+        postedAt,
+        /** 📉 الفرق — signed, so a caller can show عجز or زيادة without re-deriving it. */
+        diff: row.diff,
+      };
+    });
+  }
+
+  /** 👤 الموظف — the employee record behind a user's membership, or the user's own name. */
+  private async staffName(tx: DrizzleTx, tenantId: string, userId: string) {
+    const [found] = await tx
+      .select({ employeeName: employees.name, fullName: users.fullName })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(employees, and(eq(employees.membershipId, memberships.id), isNull(employees.deletedAt)))
+      .where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, userId)));
+    return found?.employeeName ?? found?.fullName ?? '';
+  }
+
   printShiftData(tenantId: string, id: string) {
     return withTenantTx(this.database.db, tenantId, async (tx) => ({
       shift: (

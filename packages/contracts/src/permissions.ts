@@ -200,6 +200,7 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('treasury.transfer.manage', 'Create, send and receive cash transfers.'),
   perm('treasury.expensetype.manage', 'Maintain treasury expense types.'),
   perm('treasury.shift.close', 'Open and close cashier shifts.'),
+  perm('treasury.shift.post', 'Post the journal entry a counted shift produces.'),
 
   // e-invoicing (PHASE_13)
   perm('einvoice.view', 'Read e-invoice credentials and submissions.'),

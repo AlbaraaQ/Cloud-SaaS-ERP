@@ -83,6 +83,14 @@ export const POST_PROFILE_ACCOUNT_KEYS = [
    * yet; the account is what keeps the promise visible in the ledger until clearance.
    */
   'chequesInHandAccountId',
+  /**
+   * Phase 06 — فرق الصندوق: where the counted drawer and the books disagree.
+   * The desktop posts the difference to `3110004` («فرق بالصندوق») when it closes a
+   * shift (`Class/EntryOper.cs`, `BindCloseShiftToEntry`). Everything else in that
+   * entry — sales, VAT, discount, the bank legs — the cloud already posted when each
+   * invoice was posted, so the close only ever moves the difference.
+   */
+  'cashDifferenceAccountId',
 ] as const;
 
 export type PostProfileAccountKey = (typeof POST_PROFILE_ACCOUNT_KEYS)[number];

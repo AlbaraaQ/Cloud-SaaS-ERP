@@ -57,6 +57,10 @@ type DayClose = {
   safeBalance: string;
   expected: string;
   diff: string;
+  /** 📒 القيد — the entry the count produced, and whether one is still owed. */
+  journalEntryId: string | null;
+  postedAt: string | null;
+  postable: boolean;
   postponed: string;
   network: string;
   cash: string;
@@ -162,6 +166,13 @@ export default function DayClosePage() {
       setBusy(false);
     }
   }
+
+  /**
+   * 📒 ترحيل القيد — `BindCloseShiftToEntry`. The count disagreed with the books, so the
+   * difference is posted; a drawer that matched posts nothing, and the API says so.
+   */
+  const postEntry = (row: DayClose) =>
+    run(() => apiPost(`/shift-closes/${row.id}/post`, {}), `📒 رُحِّل قيد الإغلاق ${row.number ?? ''} — الفرق ${money(row.diff)}.`);
 
   async function showDetail(row: DayClose) {
     if (detail?.shift.id === row.id) {
@@ -377,6 +388,35 @@ export default function DayClosePage() {
               { key: 'net', header: '💹 الصافي', align: 'num', cell: (row) => money(row.net) },
               { key: 'safeBalance', header: '🏦 رصيد الصندوق', align: 'num', cell: (row) => money(row.safeBalance) },
               {
+                key: 'entry',
+                header: '📒 القيد',
+                cell: (row) =>
+                  row.journalEntryId ? (
+                    <span className="badge posted" title={row.postedAt ? dateTime(row.postedAt) : undefined}>
+                      ✅ مُرحَّل
+                    </span>
+                  ) : row.postable ? (
+                    can('treasury.shift.post') ? (
+                      <button
+                        type="button"
+                        className="btn sm"
+                        disabled={busy}
+                        onClick={(click) => {
+                          // The row itself opens the detail — a click on the button is not a click on the row.
+                          click.stopPropagation();
+                          postEntry(row);
+                        }}
+                      >
+                        📒 ترحيل القيد
+                      </button>
+                    ) : (
+                      <span className="badge pending">بلا قيد</span>
+                    )
+                  ) : (
+                    <span className="muted small">— مطابق</span>
+                  ),
+              },
+              {
                 key: 'diff',
                 header: '📉 الفرق',
                 align: 'num',
@@ -403,6 +443,7 @@ export default function DayClosePage() {
               '',
               '',
               <strong key="foot-tax">{money(totals.tax.toFixed(4))}</strong>,
+              '',
               '',
               '',
               <strong key="foot-diff">{money(totals.diff.toFixed(4))}</strong>,

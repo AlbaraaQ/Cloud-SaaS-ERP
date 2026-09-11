@@ -545,16 +545,16 @@ export class SalesService {
             eq(salesInvoiceLines.invoiceId, locked.referenceInvoiceId),
           ),
         );
-      const cost = new Map<string, Decimal>();
+      const costByItem = new Map<string, Decimal>();
       const qty = new Map<string, Decimal>();
       for (const line of sourceLines) {
         if (!line.itemId) continue;
-        cost.set(line.itemId, (cost.get(line.itemId) ?? new Decimal(0)).plus(line.costTotal ?? '0'));
+        costByItem.set(line.itemId, (costByItem.get(line.itemId) ?? new Decimal(0)).plus(line.costTotal ?? '0'));
         qty.set(line.itemId, (qty.get(line.itemId) ?? new Decimal(0)).plus(line.quantity));
       }
-      for (const [itemId, total] of cost) {
+      for (const [itemId, costTotal] of costByItem) {
         const totalQty = qty.get(itemId) ?? new Decimal(0);
-        if (totalQty.gt(0)) sourceCost.set(itemId, total.div(totalQty));
+        if (totalQty.gt(0)) sourceCost.set(itemId, costTotal.div(totalQty));
       }
     }
 
@@ -563,7 +563,7 @@ export class SalesService {
       if (locked.kind === 'sale_return') {
         let unitCost = sourceCost.get(line.itemId!);
         if (!unitCost || unitCost.lte(0)) {
-          const [balance] = await tx
+          const [stockBalance] = await tx
             .select({ averageCost: stockBalances.averageCost })
             .from(stockBalances)
             .where(
@@ -573,7 +573,7 @@ export class SalesService {
                 eq(stockBalances.warehouseId, locked.warehouseId),
               ),
             );
-          unitCost = money(balance?.averageCost ?? '0');
+          unitCost = money(stockBalance?.averageCost ?? '0');
         }
         movements.push({
           itemId: line.itemId!,
@@ -691,7 +691,7 @@ export class SalesService {
     const discount = money(locked.invoiceDiscount ?? '0');
     const extra = money(locked.extraTax ?? '0');
     const tax = money(locked.taxTotal);
-    const total = money(locked.total);
+    const documentTotal = money(locked.total);
     const gross = money(locked.subtotal).plus(discount);
     const isReturn = locked.kind === 'sale_return' || locked.kind === 'credit_note';
     const lines: { accountId: string; debit?: string; credit?: string; partyId?: string }[] = [];
@@ -713,13 +713,13 @@ export class SalesService {
     const settlementParty = settlement === 'credit' ? locked.partyId : null;
 
     if (!isReturn) {
-      leg(settlementAccount, total, new Decimal(0), settlementParty);
+      leg(settlementAccount, documentTotal, new Decimal(0), settlementParty);
       leg(need('salesAccountId'), new Decimal(0), gross);
       if (discount.gt(0)) leg(need('discountGivenAccountId'), discount, new Decimal(0));
       if (tax.abs().gt(0)) leg(need('vatOutputAccountId'), new Decimal(0), tax);
       if (extra.abs().gt(0)) leg(need('exciseTaxAccountId'), new Decimal(0), extra);
     } else {
-      leg(settlementAccount, new Decimal(0), total, settlementParty);
+      leg(settlementAccount, new Decimal(0), documentTotal, settlementParty);
       leg(need('salesReturnAccountId'), gross, new Decimal(0));
       if (discount.gt(0)) leg(need('discountGivenAccountId'), new Decimal(0), discount);
       if (tax.abs().gt(0)) leg(need('vatOutputAccountId'), tax, new Decimal(0));

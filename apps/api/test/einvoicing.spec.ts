@@ -2,10 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { decodeQrPayload } from '../src/modules/einvoicing/zatca/qr.js';
 import { GENESIS_PIH } from '../src/modules/einvoicing/zatca/ubl.js';
+import { OrgProvisioningService } from '../src/modules/organization/provisioning/org-provisioning.service.js';
 
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
-
-import { OrgProvisioningService } from '../src/modules/organization/provisioning/org-provisioning.service.js';
 import { api } from './http.js';
 import { createTestApp, type TestApp } from './test-app.js';
 

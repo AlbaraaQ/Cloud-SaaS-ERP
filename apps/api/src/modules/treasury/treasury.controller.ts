@@ -68,6 +68,17 @@ export class TreasuryController {
     return this.treasury.shiftClose(getTenantContext().tenantId, id);
   }
 
+  /**
+   * 📒 قيد الإغلاق — `BindCloseShiftToEntry`. The close's entry carries the one number
+   * no other document can know: 📉 الفرق between the drawer counted by hand and the
+   * drawer the books expected. Everything else was posted when each invoice was posted.
+   */
+  @Post('shift-closes/:id/post')
+  @RequiresPermission('treasury.shift.post')
+  postShiftClose(@Param('id') id: string) {
+    return this.treasury.postShiftClose(getTenantContext().tenantId, id);
+  }
+
   @Get('shift-closes/:id/print-data') @RequiresPermission('treasury.view') printShift(@Param('id') id: string) { return this.treasury.printShiftData(getTenantContext().tenantId, id); }
   /**
    * 🏦 حركة الصندوق — `frmRptKhzna`. Reads the safe's **ledger** (not the voucher table),

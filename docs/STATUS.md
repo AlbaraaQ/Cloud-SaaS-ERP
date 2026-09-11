@@ -364,6 +364,40 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `🏪 من مخزن` / `🏪 إلى مخزن` with the store replaced by the safe — this module moves
   cash, not stock; and `📋 الحالة` names a column the desktop grid leaves unheaded.
 
+* **المرحلة 06 — الخزينة، الجزء السابع: 📒 قيد الإغلاق** (`Class/EntryOper.cs`
+  `BindCloseShiftToEntry` L404–L830، `Form_WPF/ClosShiftAndroid.xaml.cs:925`
+  `BindCloseShiftToEntry1`، و`EntryOper.cs` L620 للتحويل البنكي). **The entry was not
+  copied, and that is the finding.** The desktop builds one big entry at close — Dr
+  treasury, Dr `1221001` شبكة, Dr each named bank's own account, Cr `4100001` sales,
+  Cr `2222001` VAT, Dr `1211002` عهدة الإغلاق, and `3110004` فرق بالصندوق for the
+  difference — because in the desktop *nothing is posted when an invoice is saved*; the
+  close is the whole accounting event. The cloud is the mirror image: every posted
+  invoice already wrote its own entry (sales, VAT, discount, and the debit to the till's
+  or the **bank's own** account — `pos.service.ts` resolves a named bank cash location's
+  `accountId`, which is what `bank.AccCode` is in L620, and a live test asserts the sale
+  entry debits the bank and *not* the generic drawer). Copying the desktop's entry would
+  therefore post the day twice. What no other document can know is the **count**: the
+  drawer was counted by hand and it disagreed with the books, so 📉 الفرق is what the
+  close posts — Dr فرق الصندوق / Cr الصندوق for a shortage, mirrored for an overage, and
+  **nothing at all** for a balanced drawer (`422 SHIFT_BALANCED`, because a two-line
+  zero entry is not evidence). عهدة الإغلاق is deliberately *not* reproduced: it parks
+  the counted cash on the cashier's custody account until a deposit clears it, and there
+  is no deposit step yet. Migrations `0043` (additive `shift_closes.journal_entry_id` /
+  `posted_at`) and `0044`, which fixes a **real bug found on the way**: `0042` made
+  `number` unique per *tenant* but allocated it per *branch*, so two branches both
+  issued `CS-000001` and the second close died on a duplicate-key 500 — numbering is now
+  tenant-wide (as the desktop's global `ClosedID` is) and the migration seeds the
+  counter from the highest number each tenant already printed. New
+  `POST /shift-closes/:id/post` behind a new permission `treasury.shift.post` (counting
+  a drawer and posting its entry are different decisions — the cashier role gets the
+  first, not the second), new posting-profile key `cashDifferenceAccountId`, and every
+  day-close row now reports `journalEntryId` / `postable`. Screen `/treasury/day-close`
+  gained a 📒 القيد column. Tests `apps/api/test/treasury-shift-entry.spec.ts` (11) and
+  section 12 of `scripts/verify-treasury.mjs` (12 checks). **537** API tests, 36 staff,
+  71 contract. Side effect worth recording: `pnpm -r run lint` was **red** on
+  pre-existing `no-restricted-syntax`/`import/order` errors in `sales.service.ts` and
+  six test files; it is now green across the repository.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

@@ -76,6 +76,14 @@ export const shiftCloses = pgTable('shift_closes', { id: uuid('id').primaryKey()
    * open shift — a draft — has none until it is counted (migration 0042).
    */
   number: text('number'),
+  /**
+   * 📒 القيد — `Class/EntryOper.cs` `BindCloseShiftToEntry` hangs the close's entry on the
+   * close's own number. In the cloud the entry carries only what the *count* revealed
+   * (📉 الفرق), because sales, VAT and the bank legs were posted per invoice; NULL means
+   * the drawer balanced, or was never posted (migration 0043).
+   */
+  journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
   expectedCash: numeric('expected_cash', money).notNull().default('0'), countedCash: numeric('counted_cash', money).notNull().default('0'), diff: numeric('diff', money).notNull().default('0'), summary: jsonb('summary').$type<Record<string, unknown>>().notNull().default({}), reportHtml: text('report_html'), ...baseAuditColumns() }, (t) => ({ open: uniqueIndex('shift_closes_one_open_key').on(t.tenantId, t.branchId, t.userId).where(sql`status = 'open'`),
     number: uniqueIndex('shift_closes_number_key').on(t.tenantId, t.number).where(sql`${t.number} IS NOT NULL`), scope: index('shift_closes_scope_idx').on(t.tenantId, t.branchId, t.status) }));
 
