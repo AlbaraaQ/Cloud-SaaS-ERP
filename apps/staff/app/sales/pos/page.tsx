@@ -29,6 +29,8 @@ import {
   type TaxGroup,
   type Warehouse,
 } from '../../../lib/lookups';
+import { BankChooser } from '../../../components/bank-chooser';
+import { CashCustomerPicker } from '../../../components/cash-customer-picker';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
@@ -120,7 +122,15 @@ export default function PosPage() {
   const [ticket, setTicket] = useState<Ticket[]>([]);
   const [customerMode, setCustomerMode] = useState<'walkin' | 'account'>('walkin');
   const [customerName, setCustomerName] = useState('');
+  const [customerMobile, setCustomerMobile] = useState('');
   const [partyId, setPartyId] = useState('');
+  /**
+   * 🏦 اختر البنك / 👤 عميل نقدي — `frmPayBank` و`frmCashCustomer` are windows opened
+   * *from* the sale, and each returns one answer to it: which bank the transfer went to,
+   * and which walk-in the invoice is written for.
+   */
+  const [pickingBank, setPickingBank] = useState(false);
+  const [pickingCustomer, setPickingCustomer] = useState(false);
   const [method, setMethod] = useState<Method>('cash');
   const [cashLocationId, setCashLocationId] = useState('');
   const [tendered, setTendered] = useState('');
@@ -230,6 +240,7 @@ export default function PosPage() {
         shiftId: shift.data?.id,
         partyId: customerMode === 'account' ? partyId || undefined : undefined,
         cashCustomerName: customerMode === 'walkin' ? customerName.trim() || 'عميل نقدي' : undefined,
+        cashCustomerMobile: customerMode === 'walkin' ? customerMobile.trim() || undefined : undefined,
         lines: ticket.map((entry) => ({
           itemId: entry.item.id,
           quantity: entry.line.quantityText,
@@ -464,15 +475,32 @@ export default function PosPage() {
               </select>
             </label>
             {customerMode === 'walkin' ? (
-              <label className="field">
-                <span>اسم العميل</span>
-                <input
-                  className="input"
-                  placeholder="عميل نقدي"
-                  value={customerName}
-                  onChange={(event) => setCustomerName(event.target.value)}
-                />
-              </label>
+              <>
+                <label className="field">
+                  <span>🏷️ الاسم:</span>
+                  <div className="row" style={{ flexWrap: 'nowrap' }}>
+                    <input
+                      className="input"
+                      placeholder="عميل نقدي"
+                      value={customerName}
+                      onChange={(event) => setCustomerName(event.target.value)}
+                    />
+                    <button type="button" className="btn" onClick={() => setPickingCustomer(true)}>
+                      👤 عميل نقدي
+                    </button>
+                  </div>
+                </label>
+                <label className="field">
+                  <span>📱 رقم الجوال:</span>
+                  <input
+                    className="input"
+                    dir="ltr"
+                    inputMode="tel"
+                    value={customerMobile}
+                    onChange={(event) => setCustomerMobile(event.target.value)}
+                  />
+                </label>
+              </>
             ) : (
               <label className="field">
                 <span>حساب العميل</span>
@@ -508,7 +536,25 @@ export default function PosPage() {
           </div>
           <p className="muted small">{METHODS.find((row) => row.id === method)?.hint}</p>
 
-          {method !== 'credit' && (
+          {method === 'bank' ? (
+            /**
+             * 🏦 تحويل بنكي — `frmPayBank.xaml`: a tile per bank, `✔ موافق` / `✖ خروج`,
+             * and no sale without a named bank. `EntryOper.cs` L493/L620 then debits
+             * *that* bank's account instead of the generic شبكة account, so the choice
+             * cannot be a dropdown default the cashier never looked at.
+             */
+            <div className="card tight" style={{ marginTop: 8 }}>
+              <div className="card-head">🏦 البنوك المتاحة</div>
+              <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{effectiveDrawer ? cashLocationLabel(drawers.find((row) => row.id === effectiveDrawer) ?? ({} as CashLocation)) : 'لم يُختر بنك'}</span>
+                <button type="button" className="btn primary" onClick={() => setPickingBank(true)}>
+                  🏦 اختر البنك
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {method !== 'credit' && method !== 'bank' && (
             <label className="field" style={{ marginTop: 8 }}>
               <span>{method === 'cash' ? 'الصندوق' : 'حساب التحصيل'}</span>
               <select
@@ -650,6 +696,36 @@ export default function PosPage() {
           </table>
         </div>
       </div>
+
+      {/**
+       * 🏦 `frmPayBank` — the bank is chosen at the moment of payment, or the sale is
+       * not made: `SelectedBankId == 0` is the desktop's "يرجى اختر بنك أولًا".
+       */}
+      {pickingBank ? (
+        <BankChooser
+          banks={drawers}
+          selectedId={effectiveDrawer}
+          loading={cashLocations.status === 'loading'}
+          onPick={(bank) => {
+            setCashLocationId(bank.id);
+            setPickingBank(false);
+          }}
+          onCancel={() => setPickingBank(false)}
+        />
+      ) : null}
+
+      {/** 👤 `frmCashCustomer` — a walk-in is a name and a mobile, not a ledger account. */}
+      {pickingCustomer ? (
+        <CashCustomerPicker
+          value={{ name: customerName, mobile: customerMobile }}
+          onPick={(customer) => {
+            setCustomerName(customer.name);
+            setCustomerMobile(customer.mobile);
+            setPickingCustomer(false);
+          }}
+          onClose={() => setPickingCustomer(false)}
+        />
+      ) : null}
     </Screen>
   );
 }

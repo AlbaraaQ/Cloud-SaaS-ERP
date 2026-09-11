@@ -913,7 +913,13 @@ export class TreasuryService {
     );
 
     const settled = await tx
-      .select({ method: invoicePayments.method, amount: invoicePayments.amount, kind: salesInvoices.kind })
+      .select({
+        method: invoicePayments.method,
+        amount: invoicePayments.amount,
+        kind: salesInvoices.kind,
+        /** 🏦 أي بنك؟ `EntryOper.cs:493` يفرّق التحويل المسمّى من شبكة بلا اسم. */
+        cashLocationId: invoicePayments.cashLocationId,
+      })
       .from(invoicePayments)
       .innerJoin(salesInvoices, eq(salesInvoices.id, invoicePayments.invoiceId))
       .where(
@@ -938,10 +944,36 @@ export class TreasuryService {
     const returns = zero();
     const bucket = (method: string) =>
       method === 'cash' || method === 'card' || method === 'bank' || method === 'credit' ? method : 'other';
+    /**
+     * 🏦 البنوك — `Class/EntryOper.cs` L493 وL537 وL620.
+     * A bank transfer is network money that went to a **named** bank, so the close
+     * keeps it apart: an unnamed transfer stays in 🌐 الشبكة (the desktop's
+     * `BankId > 2` test — ids 1 and 2 are its الصندوق/المحفظة placeholders, which in
+     * our model are simply not of kind `bank`), while a named one earns a line of
+     * its own, and the close's entry debits *that* bank's account instead of the
+     * generic network account. Returns subtract from the same bank.
+     */
+    const perBank = new Map<string, Decimal>();
     for (const row of settled) {
-      const target = row.kind === 'sale_return' || row.kind === 'credit_note' ? returns : sales;
+      const isReturn = row.kind === 'sale_return' || row.kind === 'credit_note';
+      const target = isReturn ? returns : sales;
       target[bucket(row.method)] = target[bucket(row.method)].plus(row.amount);
+      if (row.method !== 'bank' || !row.cashLocationId) continue;
+      const running = perBank.get(row.cashLocationId) ?? new Decimal(0);
+      perBank.set(row.cashLocationId, isReturn ? running.minus(row.amount) : running.plus(row.amount));
     }
+    const namedBanks = await tx
+      .select({ id: cashLocations.id, name: cashLocations.name })
+      .from(cashLocations)
+      .where(
+        and(
+          eq(cashLocations.tenantId, tenantId),
+          perBank.size > 0 ? inArray(cashLocations.id, [...perBank.keys()]) : isNull(cashLocations.id),
+        ),
+      );
+    const banks = namedBanks
+      .map((bank) => ({ id: bank.id, name: bank.name, amount: (perBank.get(bank.id) ?? new Decimal(0)).toFixed(4) }))
+      .sort((left, right) => Number(right.amount) - Number(left.amount));
 
     // ══ what the drawer actually sold — the invoice side of `frmCloseShift` ══
     // `ClosShiftAndroid.xaml.cs` L780–L930 walks the shift's own invoices and carries
@@ -1036,6 +1068,10 @@ export class TreasuryService {
       expectedCash: expectedCash.toFixed(4),
       /** 💵 النقدي — the desktop's `SAfeNetVal`. */
       cash: expectedCash.toFixed(4),
+      /** 🏦 التحويلات البنكية ببنكها — كل بنك على سطره (`EntryOper.cs` L620). */
+      banks,
+      /** إجمالي ما نُسب إلى بنك مسمّى؛ جزء من 🌐 الشبكة لا إضافة عليه. */
+      bankTransfers: banks.reduce((sum, bank) => sum.plus(bank.amount), new Decimal(0)).toFixed(4),
       network: network.toFixed(4),
       /** 💰 مجموع الشبكة والنقدي — the desktop's `sumCashAndCredit`. */
       sumCashAndNetwork: expectedCash.plus(network).toFixed(4),
@@ -1165,6 +1201,10 @@ export class TreasuryService {
             expected: row.status === 'closed' ? row.expectedCash : (live?.expectedCash ?? '0'),
             /** 📉 الفرق */
             diff: row.status === 'closed' ? row.diff : '0',
+            /** 🏦 التحويلات البنكية ببنكها (سطور `bank-transfer` عند الإقفال). */
+            banks: (live?.banks ??
+              (summary.banks as Array<{ id: string; name: string; amount: string }> | undefined) ??
+              []) as Array<{ id: string; name: string; amount: string }>,
             /** 📋 آجل */
             postponed: pick('postponed'),
             /** 🌐 الشبكة */
@@ -1323,6 +1363,18 @@ export class TreasuryService {
           amount: money(takings.sales.credit).minus(money(takings.returns.credit)),
         },
         { kind: 'voucher-cash', method: 'cash', amount: money(takings.vouchersCash) },
+        /**
+         * 🏦 بنك باسمه — `Class/EntryOper.cs` L620: the close's own children carry one
+         * row per bank so `frmCloseShiftDetails` can show where the transfer went and
+         * the entry can debit *that* bank's account. An unnamed transfer has no line
+         * here; it stays inside 🌐 الشبكة.
+         */
+        ...takings.banks.map((bank) => ({
+          kind: 'bank-transfer',
+          method: 'bank',
+          amount: money(bank.amount),
+          metadata: { cashLocationId: bank.id, name: bank.name },
+        })),
       ];
       for (const total of totals)
         await tx
@@ -1333,6 +1385,11 @@ export class TreasuryService {
             tenantId,
             kind: total.kind,
             method: total.method,
+            /**
+             * `party_id` is a FK to `parties` — a bank is not a party, so the bank rides
+             * in `metadata`, the way the desktop carries `CloseShiftBanks.BankId`.
+             */
+            partyId: null,
             amount: total.amount.toFixed(4),
             metadata: total.metadata ?? {},
           });

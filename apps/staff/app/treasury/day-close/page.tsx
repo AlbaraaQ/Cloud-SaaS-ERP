@@ -69,7 +69,25 @@ type DayClose = {
 type CloseDetail = {
   shift: { id: string; number: string | null; status: string };
   counts: Array<{ denomination: string; count: number; total: string }>;
-  lines: Array<{ kind: string; method: string | null; amount: string }>;
+  lines: Array<{
+    kind: string;
+    method: string | null;
+    amount: string;
+    metadata?: { cashLocationId?: string; name?: string };
+  }>;
+};
+
+/** سطور الملخّص تُقرأ بالعربية — `frmCloseShiftDetails` لا يعرض مُعرّفات. */
+const KIND_LABELS: Record<string, string> = {
+  'method-total': 'إجمالي طريقة الدفع',
+  'voucher-cash': 'نقد السندات',
+  'bank-transfer': '🏦 تحويل بنكي',
+};
+const METHOD_LABELS: Record<string, string> = {
+  cash: '💵 نقدي',
+  card: '💳 شبكة',
+  bank: '🏦 بنك',
+  credit: '📋 آجل',
 };
 
 /** The denominations a cashier actually counts — ريال and its halves. */
@@ -427,8 +445,16 @@ export default function DayClosePage() {
                       <tbody>
                         {detail.lines.map((line, index) => (
                           <tr key={`${line.kind}-${index}`}>
-                            <td>{line.kind}</td>
-                            <td>{line.method ?? '—'}</td>
+                            <td>{KIND_LABELS[line.kind] ?? line.kind}</td>
+                            <td>
+                              {/**
+                               * 🏦 a named transfer names its bank — the whole point of
+                               * `frmPayBank`, and the reason the line exists at all.
+                               */}
+                              {line.kind === 'bank-transfer' && line.metadata?.name
+                                ? line.metadata.name
+                                : (METHOD_LABELS[line.method ?? ''] ?? line.method ?? '—')}
+                            </td>
                             <td>{money(line.amount)}</td>
                           </tr>
                         ))}

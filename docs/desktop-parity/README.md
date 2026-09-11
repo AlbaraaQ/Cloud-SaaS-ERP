@@ -27,7 +27,7 @@ Postgres, multi-tenant, RBAC).
 | 03 | Purchase engine (invoices, returns, landed cost) | ✅ done | `PHASE_03_PURCHASE_ENGINE.md` |
 | 04 | POS checkout + cashier shifts + day close | ✅ done | `PHASE_04_POS_SHIFTS.md` |
 | 05 | Inventory (vouchers, transfers, counts, **serial/lot lifecycle**, **الرقم التسلسلي على سطر المستند**, reorder, multi-unit, barcodes, expiry, in-transit, item card, BOM/مكوّنات الصنف, production header, inventory reports) | ✅ parts 1–7 done (deferred: the batch half of the document line, §13) | `PHASE_05_INVENTORY.md` §10–§12 · `NEXT_SESSION_PROMPT_AFTER_PHASE_06.md` |
-| 06 | Treasury (سند القبض والصرف بوثيقة كاملة + القيد، **تعريف الخزن والبنوك**، حركة الصندوق، **إغلاقات اليومية**، تحويل بنكي، مناقلة الخزن) | 🟡 parts 1–4 done (`سند القبض وسند الصرف`، `تعريف الخزن والبنوك`، `حركة الصندوق`، `إغلاقات اليومية`); parts 5–6 planned | `PHASE_06_TREASURY.md` §1–§12 · `NEXT_SESSION_PROMPT_AFTER_PHASE_06.md` |
+| 06 | Treasury (سند القبض والصرف بوثيقة كاملة + القيد، **تعريف الخزن والبنوك**، حركة الصندوق، **إغلاقات اليومية**، **التحويل البنكي والعميل النقدي**، مناقلة الخزن) | 🟡 parts 1–5 done (`سند القبض وسند الصرف`، `تعريف الخزن والبنوك`، `حركة الصندوق`، `إغلاقات اليومية`، `التحويل البنكي والعميل النقدي`); part 6 planned | `PHASE_06_TREASURY.md` §1–§13 · `NEXT_SESSION_PROMPT_AFTER_PHASE_06.md` |
 | 07 | Accounting (manual entries, periods, trial balance, cost centres) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 08 | HRM (employees, attendance, payroll, custody) | ⬜ | `ROADMAP_PHASES_02_11.md` |
 | 09 | Verticals (contracting/projects, marina, optics, tailoring, Salla…) | ⬜ | `ROADMAP_PHASES_02_11.md` |

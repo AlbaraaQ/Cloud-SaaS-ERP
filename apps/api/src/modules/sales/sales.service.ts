@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { calculateInvoiceTotals, DomainError, newId } from '@erp/contracts';
 import {
   accounts,
@@ -1241,6 +1241,48 @@ export class SalesService {
     );
     return offer;
   }
+  /**
+   * 👤 عميل نقدي — `Form_WPF/frmCashCustomer.xaml.cs` (`SearchCustomers`).
+   *
+   * The desktop does **not** keep a table of cash customers: it searches the invoices
+   * themselves —
+   * `SELECT CashCustomerName, CashCustomerMobile FROM inv WHERE CashCustomerMobile = @Mobile`
+   * or `… WHERE CashCustomerName LIKE '%' + @Name + '%'`, both with
+   * `CashCustomerName <> ''`. A walk-in is a name and a mobile written **on the sale**,
+   * which is why a till can produce one without opening the customer ledger, and why
+   * "find the customer" means "find a name the shop has already served".
+   *
+   * The cloud keeps that source of truth (`sales_invoices`) and groups it so a name is
+   * an answer, not a row per visit. One intentional difference: the desktop's grid
+   * starts empty and fills only on a keystroke, while a list screen has to show
+   * something, so with no search term we return the most recently served names.
+   */
+  async cashCustomers(tenantId: string, filters: { name?: string; mobile?: string } = {}) {
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({
+          name: salesInvoices.cashCustomerName,
+          mobile: salesInvoices.cashCustomerMobile,
+          /** كم فاتورة بهذا الاسم — `count(*)` over the group. */
+          invoices: sql<number>`count(*)::int`,
+          lastAt: sql<Date>`max(${salesInvoices.createdAt})`,
+        })
+        .from(salesInvoices)
+        .where(
+          and(
+            eq(salesInvoices.tenantId, tenantId),
+            isNotNull(salesInvoices.cashCustomerName),
+            sql`${salesInvoices.cashCustomerName} <> ''`,
+            filters.mobile ? eq(salesInvoices.cashCustomerMobile, filters.mobile) : undefined,
+            filters.name ? ilike(salesInvoices.cashCustomerName, `%${filters.name}%`) : undefined,
+          ),
+        )
+        .groupBy(salesInvoices.cashCustomerName, salesInvoices.cashCustomerMobile)
+        .orderBy(desc(sql`max(${salesInvoices.createdAt})`))
+        .limit(100),
+    );
+  }
+
   async listSalesmen(tenantId: string) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx.select().from(salesmen).where(eq(salesmen.tenantId, tenantId)).orderBy(salesmen.name),

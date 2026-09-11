@@ -306,6 +306,38 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `rptClosedayCust.repx`) wait for the reporting phase — `printShiftData` only prepares
   their data.
 
+* **المرحلة 06 — الخزينة، الجزء الخامس: التحويل البنكي والعميل النقدي**
+  (`Form_WPF/frmPayBank.xaml` + `.xaml.cs` `LoadBanks`/`BankTile_Click`،
+  `Form_WPF/frmCashCustomer.xaml` + `.xaml.cs` `SearchCustomers`، والقاعدة في
+  `Class/EntryOper.cs` L493/L537/L620). Two small windows with one idea each.
+  **🏦 التحويل البنكي** is a chooser, and its answer decides an *account*: the desktop
+  refuses a transfer with no bank («يرجى اختيار بنك أولًا») because `EntryOper.cs` keeps
+  a named transfer out of the generic شبكة bucket and, at close, debits **that bank's own
+  account** instead of `1221001`. The cloud could already route a transfer to a bank, but
+  nothing read the choice back: `shiftTakings` now groups bank payments **per bank**,
+  `closeShift` writes one signed `bank-transfer` line per bank, and every day-close row
+  carries `banks[]` — live while the drawer is open, frozen in `summary` once it is
+  counted. The bank rides in `metadata`, because `party_id` is a foreign key to `parties`
+  and a bank is not a party. 🌐 الشبكة still carries the full amount: the breakdown is a
+  detail *inside* it, not a subtraction from it, or 💰 مجموع الشبكة والنقدي would stop
+  adding up. **👤 العميل النقدي** is the opposite kind of answer: `SearchCustomers` does
+  not open a customer table, it reads the invoices — `SELECT CashCustomerName,
+  CashCustomerMobile FROM inv WHERE … AND CashCustomerName <> ''` — because a walk-in is
+  a name and a mobile **written on the sale**, which is why a till can produce one
+  without opening a ledger account. `GET /sales/cash-customers?name=&mobile=` is that
+  query: exact on mobile, partial on name, grouped so a name is one answer with an
+  invoice count. **No migration — deliberately**: `invoice_payments.cash_location_id`
+  and `sales_invoices.cash_customer_name/mobile` already existed; what was missing was
+  the rule that reads them, not a column. Screens: a `🏦 اختر البنك` window wired into
+  `/sales/pos` (replacing a dropdown a cashier clicks past) and `/treasury/vouchers`, and
+  a `👤 عميل نقدي` picker plus its own page `/sales/cash-customers`. Tests
+  `apps/api/test/treasury-bank-transfer.spec.ts` (8) and
+  `apps/api/test/sales-cash-customer.spec.ts` (7), and section 10 of
+  `scripts/verify-treasury.mjs` (12 checks). **517** API tests, 36 staff tests,
+  71 contract tests. **One justified deviation:** the desktop's cash-customer grid starts
+  empty and fills only on a keystroke; a list screen that opens empty looks broken, so
+  with no search term the API returns the most recently served names.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

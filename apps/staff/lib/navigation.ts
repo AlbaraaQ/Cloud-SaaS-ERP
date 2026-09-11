@@ -632,6 +632,9 @@ const sales: ModuleNode = {
         screen('sales-invoice', 'فاتورة مبيعات', 'Sales invoice', '/sales/invoices', 'ready', {
           endpoint: '/sales/invoices',
         }),
+        screen('cash-customer', '👤 عميل نقدي', 'Cash customer', '/sales/cash-customers', 'ready', {
+          endpoint: '/sales/cash-customers',
+        }),
         screen('sales-return', 'مردود المبيعات', 'Sales return', '/sales/returns', 'ready', {
           permission: 'sales.return.create',
           endpoint: 'POST /sales/invoices/{id}/return',

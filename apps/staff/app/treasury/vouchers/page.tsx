@@ -5,6 +5,7 @@ import Decimal from 'decimal.js';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useState } from 'react';
 
+import { BankChooser } from '../../../components/bank-chooser';
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
 import { Screen } from '../../../components/screen';
 import {
@@ -159,6 +160,11 @@ function VouchersScreen() {
   const vouchers = useQuery<Voucher[]>(() => apiList<Voucher>(query), [query]);
   const branches = useQuery<Branch[]>(() => listBranches(), []);
   const cashLocations = useQuery<CashLocation[]>(() => listCashLocations(), []);
+  /**
+   * 🏦 `frmPayBank` — opened from the voucher the way the desktop opens it from a sale:
+   * a transfer names the bank it went to, and the window refuses to close without one.
+   */
+  const [pickingBank, setPickingBank] = useState(false);
   const parties = useQuery<Party[]>(() => listParties(), []);
   const accounts = useQuery<Account[]>(() => listAccounts(), []);
   const costCenters = useQuery<CostCenter[]>(() => listCostCenters(), []);
@@ -172,6 +178,11 @@ function VouchersScreen() {
   const rows = (vouchers.data ?? []).filter((row) => row.kind === kind);
   const partyOf = (id: string | null) => (parties.data ?? []).find((row) => row.id === id);
   const isBank = METHODS.find((entry) => entry.id === form.method)?.group === 'bank';
+  const isTransfer = form.method === 'bank_transfer';
+  const bankRows = cashRows.filter(
+    (row) =>
+      (row.kind ?? 'safe') === 'bank' && (!effectiveBranch || !row.branchId || row.branchId === effectiveBranch),
+  );
 
   const totals = useMemo(() => {
     const posted = rows.filter((row) => row.status === 'posted');
@@ -392,17 +403,38 @@ function VouchersScreen() {
                 <span className="muted small">كما كُتبت في السند؛ المبلغ الأساسي يبقى بالريال.</span>
               </label>
             )}
-            <label className="field">
-              <span>{kind === 'receipt' ? '🏧 يودع في حساب *' : '🏧 يصرف من حساب *'}</span>
-              <select className="input" value={form.cashLocationId} onChange={(event) => set('cashLocationId', event.target.value)} required>
-                <option value="">— اختر —</option>
-                {cashRows.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {cashLocationLabel(row)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {isTransfer ? (
+              /**
+               * 🏦 اختر طريقة الدفع (تحويل بنكي) — the desktop's tile window. A transfer
+               * that lands in "the default bank" is a transfer nobody chose, so the
+               * voucher names the bank before it is saved.
+               */
+              <div className="card tight">
+                <div className="card-head">🏦 البنوك المتاحة</div>
+                <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>
+                    {form.cashLocationId
+                      ? cashLocationLabel(cashRows.find((row) => row.id === form.cashLocationId) ?? ({} as CashLocation))
+                      : 'لم يُختر بنك'}
+                  </span>
+                  <button type="button" className="btn primary" onClick={() => setPickingBank(true)}>
+                    🏦 اختر البنك
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="field">
+                <span>{kind === 'receipt' ? '🏧 يودع في حساب *' : '🏧 يصرف من حساب *'}</span>
+                <select className="input" value={form.cashLocationId} onChange={(event) => set('cashLocationId', event.target.value)} required>
+                  <option value="">— اختر —</option>
+                  {cashRows.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {cashLocationLabel(row)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="field">
               <span>🏦 دفعة لحساب</span>
               <select className="input" value={form.counterAccountId} onChange={(event) => set('counterAccountId', event.target.value)}>
@@ -656,6 +688,24 @@ function VouchersScreen() {
         current={rows.some((row) => row.status === 'posted') ? 1 : 0}
         cancelled={rows.some((row) => row.status === 'voided')}
       />
+
+      {/**
+       * 🏦 `frmPayBank` — the bank is chosen here, not inherited: `SelectedBankId == 0`
+       * is the desktop's "يرجى اختر بنك أولًا", and a transfer without a bank is a
+       * transfer that will reconcile to the wrong account.
+       */}
+      {pickingBank ? (
+        <BankChooser
+          banks={bankRows}
+          selectedId={form.cashLocationId}
+          loading={cashLocations.status === 'loading'}
+          onPick={(bank) => {
+            set('cashLocationId', bank.id);
+            setPickingBank(false);
+          }}
+          onCancel={() => setPickingBank(false)}
+        />
+      ) : null}
     </Screen>
   );
 }

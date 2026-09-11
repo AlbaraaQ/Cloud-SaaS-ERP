@@ -30,6 +30,8 @@ const email = process.env.VERIFY_EMAIL ?? 'owner@demo.test';
 const password = process.env.DEMO_OWNER_PASSWORD ?? '';
 
 const money = (value) => Number(value).toFixed(2);
+/** Till prices include VAT, so money is compared with a halal tolerance, not bit for bit. */
+const near = (value, expected) => Math.abs(Number(value) - expected) < 0.001;
 let failures = 0;
 
 function check(label, condition, detail = '') {
@@ -728,6 +730,182 @@ check(
   !byStranger.some((row) => row.id === opened.id),
   `${byStranger.length} صف`,
 );
+
+console.log('');
+
+// ── 10. التحويل البنكي والعميل النقدي ───────────────────────────────────────
+// `frmPayBank.xaml` («🏦 اختر طريقة الدفع (تحويل بنكي)») and
+// `frmCashCustomer.xaml` («👤 عميل نقدي»). The first is a chooser whose answer decides
+// an account: `EntryOper.cs` L493/L537/L620 keeps a named transfer out of the generic
+// شبكة bucket and debits *that* bank's own account at close. The second is not a
+// customer table at all — `frmCashCustomer.xaml.cs` searches the invoices
+// (`SELECT … FROM inv WHERE CashCustomerName <> ''`).
+console.log('10. التحويل البنكي والعميل النقدي');
+
+const salesAccountId = await account('4100', 'مبيعات التحقق', 'revenue');
+const vatAccountId = await account('2310', 'ضريبة التحقق', 'liability');
+const stockAccountId = await account('1140', 'مخزون التحقق', 'asset');
+const cogsAccountId = await account('5100', 'تكلفة التحقق', 'expense');
+const transferBankAId = await account('1241', 'بنك التحويل أ', 'asset');
+const transferBankBId = await account('1242', 'بنك التحويل ب', 'asset');
+
+const otherBranch = await call('post', '/branches', token, {
+  code: `OT${stamp}`,
+  nameAr: 'فرع آخر للتحقق',
+});
+
+const bankA = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'bank',
+  name: `بنك الأهلي ${stamp}`,
+  accountId: transferBankAId,
+  bank: { bankName: `بنك الأهلي ${stamp}` },
+});
+const bankB = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'bank',
+  name: `بنك الراجحي ${stamp}`,
+  accountId: transferBankBId,
+  bank: { bankName: `بنك الراجحي ${stamp}` },
+});
+const foreignBank = await call('post', '/cash-locations', token, {
+  branchId: otherBranch.id,
+  kind: 'bank',
+  name: `بنك فرع آخر ${stamp}`,
+  bank: { bankName: `بنك فرع آخر ${stamp}` },
+});
+void foreignBank;
+
+// A till needs something to sell: warehouse, item, stock, and the accounts the sale is
+// posted against.
+const posWarehouse = await call('post', '/warehouses', token, {
+  branchId,
+  code: `PW${stamp}`,
+  name: 'مستودع نقطة البيع',
+  isDefault: false,
+});
+const category = await call('post', '/organization/catalog/categories', token, {
+  code: `PC${stamp}`,
+  nameAr: 'فئة التحقق',
+});
+const unit = await call('post', '/organization/catalog/units', token, {
+  code: `PU${stamp}`,
+  nameAr: 'قطعة',
+});
+const posItem = await call('post', '/organization/catalog/items', token, {
+  sku: `PI${stamp}`,
+  nameAr: 'صنف التحقق',
+  categoryId: category.id,
+  baseUnitId: unit.id,
+  salePrice: '100',
+  costPrice: '60',
+});
+await call('post', '/inventory/ledger/record', token, {
+  lines: [
+    {
+      itemId: posItem.id,
+      warehouseId: posWarehouse.id,
+      qty: '100',
+      unitCost: '60',
+      direction: 'in',
+      docType: 'opening',
+      docId: '00000000-0000-0000-0000-000000000002',
+    },
+  ],
+});
+await call('post', '/branch-posting-profiles', token, {
+  branchId,
+  docType: 'sales_invoice',
+  mapping: {
+    version: 1,
+    salesAccountId,
+    vatOutputAccountId: vatAccountId,
+    cashAccountId: safeAccountId,
+    receivableAccountId,
+    cogsAccountId,
+    inventoryAccountId: stockAccountId,
+  },
+});
+
+const sellOnTill = (payment, quantity = '1', walkIn) =>
+  call('post', '/pos/checkout', token, {
+    branchId,
+    warehouseId: posWarehouse.id,
+    priceIncludesVat: true,
+    orderType: 'pos',
+    cashCustomerName: walkIn?.name ?? 'عميل نقدي',
+    cashCustomerMobile: walkIn?.mobile,
+    lines: [{ itemId: posItem.id, quantity, unitPrice: '100', taxRate: '15' }],
+    payment,
+  });
+
+// Every drawer left open by an earlier section is closed first — section 9 owns the
+// open-shift rule, section 10 only needs a clean one.
+for (const row of (await dayCloses()).filter((entry) => entry.status === 'open')) {
+  await call('post', `/shift-closes/${row.id}/close`, token, { counts: [] });
+}
+const transferShift = await call('post', '/shift-closes/open', token, { branchId });
+
+// 🏦 تحويلان إلى بنكين مختلفين، وثالث إلى البنك الأول.
+await sellOnTill({ method: 'bank', cashLocationId: bankA.id }, '2');
+await sellOnTill({ method: 'bank', cashLocationId: bankB.id }, '3');
+await sellOnTill({ method: 'bank', cashLocationId: bankA.id }, '1');
+
+const liveRows = await dayCloses();
+const liveShift = liveRows.find((row) => row.id === transferShift.id);
+check(
+  '🏦 كل بنك على سطره',
+  (liveShift?.banks ?? []).length === 2,
+  (liveShift?.banks ?? []).map((bank) => `${bank.name}:${money(bank.amount)}`).join(' · '),
+);
+const byBankName = new Map((liveShift?.banks ?? []).map((bank) => [bank.name, Number(bank.amount)]));
+check('🏦 بنك الأهلي 300', near(byBankName.get(`بنك الأهلي ${stamp}`), 300), `${byBankName.get(`بنك الأهلي ${stamp}`)}`);
+check(
+  '🏦 بنك الراجحي 300 — تجميع لا تكرار',
+  near(byBankName.get(`بنك الراجحي ${stamp}`), 300),
+  `${byBankName.get(`بنك الراجحي ${stamp}`)}`,
+);
+check(
+  '🌐 الشبكة تحمل المبلغ كاملاً',
+  near(Number(liveShift?.network), 600),
+  money(liveShift?.network),
+);
+
+// A transfer may not be routed to a bank of another branch.
+try {
+  await sellOnTill({ method: 'bank', cashLocationId: foreignBank.id });
+  check('بنك فرع آخر مرفوض', false, 'expected 422');
+} catch (error) {
+  check('بنك فرع آخر مرفوض', error.status === 422, `${error.status} ${error.code}`);
+}
+
+const closedTransfer = await call('post', `/shift-closes/${transferShift.id}/close`, token, { counts: [] });
+check('الإقفال يرقّم الوردية', /^CS-/.test(String(closedTransfer?.number)), String(closedTransfer?.number));
+
+const closedDetail = await call('get', `/shift-closes/${transferShift.id}`, token);
+const bankLines = (closedDetail.lines ?? []).filter((line) => line.kind === 'bank-transfer');
+check('سطر بنكي لكل بنك في الإغلاق', bankLines.length === 2, `${bankLines.length} سطر`);
+check(
+  'السطر يسمّي بنكه',
+  bankLines.every((line) => Boolean(line.metadata?.cashLocationId)),
+  bankLines.map((line) => line.metadata?.name).join(' · '),
+);
+
+// 👤 عميل نقدي — `frmCashCustomer.xaml.cs` searches the invoices, not a customer table.
+const walkIn = { name: `زياد العتيبي ${stamp}`, mobile: '0550001111' };
+await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1', walkIn);
+await sellOnTill({ method: 'cash', cashLocationId: safe.id }, '1', walkIn);
+
+const byMobile = await call('get', `/sales/cash-customers?mobile=${walkIn.mobile}`, token);
+check('🔍 البحث بالجوال تطابق تام', byMobile.length === 1, `${byMobile.length} صف`);
+check('👤 الاسم محفوظ على الفاتورة', byMobile[0]?.name === walkIn.name, byMobile[0]?.name ?? '—');
+check('الفواتير تُجمَّع لا تُكرَّر', Number(byMobile[0]?.invoices) === 2, String(byMobile[0]?.invoices));
+
+const byName = await call('get', `/sales/cash-customers?name=${encodeURIComponent('زياد العتيبي')}`, token);
+check('🔍 البحث بالاسم يبحث في وسطه', byName.some((row) => row.name === walkIn.name), `${byName.length} صف`);
+
+const strangerName = await call('get', `/sales/cash-customers?mobile=0550009999`, token);
+check('جوال مجهول لا يردّ أحداً', strangerName.length === 0, `${strangerName.length} صف`);
 
 console.log('');
 
