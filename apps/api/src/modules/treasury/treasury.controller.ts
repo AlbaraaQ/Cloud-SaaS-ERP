@@ -32,6 +32,29 @@ export class TreasuryController {
   @Get('shift-closes') @RequiresPermission('treasury.view') history(@Query('branch_id') branchId?: string) { return this.treasury.history(getTenantContext().tenantId, branchId); }
   @Post('shift-closes/:id/close') @RequiresPermission('treasury.shift.close') closeShift(@Param('id') id: string, @Body() body: { counts: ShiftCount[] }) { return this.treasury.closeShift(getTenantContext().tenantId, id, body.counts); }
   @Get('shift-closes/:id/print-data') @RequiresPermission('treasury.view') printShift(@Param('id') id: string) { return this.treasury.printShiftData(getTenantContext().tenantId, id); }
+  /**
+   * 🏦 حركة الصندوق — `frmRptKhzna`. Reads the safe's **ledger** (not the voucher table),
+   * so a sale, a salary and a transfer appear next to a receipt. `all=1` is ☑ كل الفترة;
+   * otherwise `from`/`to` are required and a `رصيد سابق` line opens the statement.
+   */
+  @Get('cash-locations/:id/movements')
+  @RequiresPermission('treasury.view')
+  movements(
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('fromTime') fromTime?: string,
+    @Query('toTime') toTime?: string,
+    @Query('all') all?: string,
+  ) {
+    return this.treasury.movements(getTenantContext().tenantId, id, {
+      from,
+      to,
+      fromTime,
+      toTime,
+      all: all === '1' || all === 'true',
+    });
+  }
   @Get('cash-locations/:id/balance') @RequiresPermission('treasury.view') cashLocationBalance(@Param('id') id: string, @Query('currency') currency?: string) { return this.treasury.getCashBalance(getTenantContext().tenantId, id, currency); }
   @Post('cash-locations/:id/recalc-balance') @RequiresPermission('treasury.transfer.manage') recalc(@Param('id') id: string, @Query('currency') currency?: string) { return this.treasury.recalcCashBalance(getTenantContext().tenantId, id, currency); }
 }

@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, desc, eq, gte, ilike, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   cashLocationBalances,
@@ -9,6 +9,8 @@ import {
   cashTransfers,
   employees,
   expenseTypes,
+  journalEntries,
+  journalEntryLines,
   parties,
   paymentAllocations,
   shiftCloseLines,
@@ -75,8 +77,70 @@ export type TransferInput = {
   currency?: string;
 };
 export type ShiftCount = { currencyCode?: string; denomination: string; count: number };
+export type MovementQuery = {
+  /** `من تاريخ` — `YYYY-MM-DD`. */
+  from?: string;
+  /** `إلى تاريخ` — `YYYY-MM-DD`. */
+  to?: string;
+  /** `من وقت (HH:mm)` — the desktop defaults to `00:00`. */
+  fromTime?: string;
+  /** `إلى وقت (HH:mm)` — the desktop defaults to `23:59`. */
+  toTime?: string;
+  /** ☑ `كل الفترة` — no date window, no `رصيد سابق` line. */
+  all?: boolean;
+};
+export type MovementRow = {
+  seq: number;
+  processType: string;
+  number: string;
+  date: string;
+  income: string;
+  outcome: string;
+  balance: string;
+  note: string;
+  /** The `رصيد سابق` line — a presentation row the desktop prepends, never a real entry. */
+  isOpening?: boolean;
+};
 
 const money = (value: string) => new Decimal(value);
+
+const shiftDay = (day: string, days: number) => {
+  const at = new Date(`${day}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+};
+/**
+ * `العملية` in the desktop is `Common.ResrirectionType(Entry.type)`. Our entry carries
+ * `sourceType` instead, and a voucher's own kind decides whether it was money in or out —
+ * a name an accountant can read, not a code.
+ */
+const processTypeAr = (sourceType: string | null, voucherKind: string | null) => {
+  if (sourceType === 'voucher')
+    return voucherKind === 'payment' ? 'سند صرف' : voucherKind === 'receipt' ? 'سند قبض' : 'سند';
+  switch (sourceType) {
+    case 'voucher_cheque':
+      return 'شيك';
+    case 'sales_invoice':
+      return 'فاتورة مبيعات';
+    case 'sales_return':
+      return 'مرتجع مبيعات';
+    case 'purchase_invoice':
+      return 'فاتورة مشتريات';
+    case 'purchase_return':
+      return 'مرتجع مشتريات';
+    case 'stock_voucher':
+      return 'إذن مخزني';
+    case 'stock_transfer':
+    case 'stock_transfer_receipt':
+      return 'مناقلة مخزنية';
+    case 'stock_adjustment':
+      return 'تسوية مخزنية';
+    case 'reversal':
+      return 'قيد عكسي';
+    default:
+      return 'قيد يومية';
+  }
+};
 
 /**
  * ⏰ الوقت — `Receipts.ReceiptDate` carries a time as well as a date, and حركة الصندوق is
@@ -1001,6 +1065,216 @@ export class TreasuryService {
         .from(cashCountLines)
         .where(and(eq(cashCountLines.tenantId, tenantId), eq(cashCountLines.shiftCloseId, id))),
     }));
+  }
+
+  /**
+   * 🏦 حركة الصندوق — `Form_WPF/frmRptKhzna.xaml`.
+   *
+   * The desktop does **not** read the receipts table for this statement: it resolves the
+   * safe's account and then walks `Entry_sub` (`frmRptKhzna.xaml.cs` L156–L260), so a
+   * movement is anything that posted to that account — a receipt, a sale, a salary, a
+   * transfer. A statement built from `vouchers` alone would silently omit every movement
+   * the treasury screen did not create, and the running balance would not tie to the
+   * ledger.
+   *
+   * Three things the desktop does that the screen is judged by:
+   *  * `رصيد سابق` — a first row carrying everything before `من تاريخ`, when a period is
+   *    chosen and not ☑ `كل الفترة`;
+   *  * a running `⚖️ الرصيد` and the two cards `⚖️ الرصيد الإجمالي` (balance at the end
+   *    of the window) and `📅 رصيد الفترة المحددة` (the window's own movement);
+   *  * only posted entries (`Entry.state = 1`, `IS_Deleted = 0`) — a draft must not move
+   *    a safe on a report.
+   *
+   * One honest deviation, and why: the desktop's `Entry.date` is a *date and time*, so
+   * `من وقت / إلى وقت` is a real filter there. Our `journal_entries.date` is a date; the
+   * time lives on the voucher (`vouchers.voucher_time`, added in part one). A movement
+   * with no recorded time therefore cannot be placed inside a day, so it is never
+   * filtered out and never pushed into the opening balance — hiding a real entry from an
+   * auditor is the worse error. Movements *with* a time obey the window exactly, and the
+   * totals stay continuous because every movement is counted once.
+   */
+  async movements(tenantId: string, cashLocationId: string, query: MovementQuery = {}) {
+    const all = query.all === true;
+    const from = this.movementDate(query.from, 'من تاريخ');
+    const to = this.movementDate(query.to, 'إلى تاريخ');
+    const fromTime = this.movementTime(query.fromTime, '00:00', 'من وقت');
+    const toTime = this.movementTime(query.toTime, '23:59', 'إلى وقت');
+    if (!all && from && to && from > to)
+      throw new DomainError('MOVEMENT_RANGE_INVALID', '«من تاريخ» must not be after «إلى تاريخ»', 422);
+    if (!all && fromTime > toTime)
+      throw new DomainError('MOVEMENT_RANGE_INVALID', '«من وقت» must not be after «إلى وقت»', 422);
+
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [location] = await tx
+        .select({
+          id: cashLocations.id,
+          name: cashLocations.name,
+          kind: cashLocations.kind,
+          accountId: cashLocations.accountId,
+          currencyCode: cashLocations.currencyCode,
+        })
+        .from(cashLocations)
+        .where(
+          and(
+            eq(cashLocations.tenantId, tenantId),
+            eq(cashLocations.id, cashLocationId),
+            isNull(cashLocations.deletedAt),
+          ),
+        );
+      if (!location) throw new DomainError('CASH_LOCATION_NOT_FOUND', 'Cash location was not found', 404);
+      if (!location.accountId)
+        throw new DomainError(
+          'CASH_ACCOUNT_REQUIRED',
+          'لم يتم العثور على حساب مرتبط بهذا الصندوق — اربط الصندوق بحساب في «تعريف الخزن والبنوك»',
+          422,
+        );
+
+      /** Any voucher behind the entry — its ⏰ الوقت is the only time we have. */
+      const voucherJoin = and(
+        eq(vouchers.tenantId, tenantId),
+        eq(vouchers.id, journalEntries.sourceId),
+        eq(journalEntries.sourceType, 'voucher'),
+      );
+      const accountScope = and(
+        eq(journalEntryLines.tenantId, tenantId),
+        eq(journalEntryLines.accountId, location.accountId),
+        eq(journalEntries.status, 'posted'),
+      );
+      const period = !all && from && to ? and(gte(journalEntries.date, from), lte(journalEntries.date, to)) : undefined;
+
+      // ══ الرصيد السابق — `frmRptKhzna.xaml.cs` L200 ══
+      let opening = new Decimal(0);
+      let openingIncome = new Decimal(0);
+      let openingOutcome = new Decimal(0);
+      if (period) {
+        const [prior] = await tx
+          .select({
+            debit: sql<string>`coalesce(sum(${journalEntryLines.debit}), 0)::text`,
+            credit: sql<string>`coalesce(sum(${journalEntryLines.credit}), 0)::text`,
+          })
+          .from(journalEntryLines)
+          .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+          .leftJoin(vouchers, voucherJoin)
+          .where(
+            and(
+              accountScope,
+              or(
+                lt(journalEntries.date, from!),
+                and(
+                  eq(journalEntries.date, from!),
+                  isNotNull(vouchers.voucherTime),
+                  sql`${vouchers.voucherTime} < ${fromTime}::time`,
+                ),
+              ),
+            ),
+          );
+        openingIncome = new Decimal(prior?.debit ?? '0');
+        openingOutcome = new Decimal(prior?.credit ?? '0');
+        opening = openingIncome.minus(openingOutcome);
+      }
+
+      // ══ الحركات في الفترة — grouped per entry, as the desktop groups by `Entry.GlobalID` ══
+      const grouped = await tx
+        .select({
+          date: journalEntries.date,
+          number: journalEntries.number,
+          description: journalEntries.description,
+          sourceType: journalEntries.sourceType,
+          voucherKind: vouchers.kind,
+          debit: sql<string>`sum(${journalEntryLines.debit})::text`,
+          credit: sql<string>`sum(${journalEntryLines.credit})::text`,
+        })
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .leftJoin(vouchers, voucherJoin)
+        .where(
+          and(
+            accountScope,
+            period,
+            or(
+              isNull(vouchers.voucherTime),
+              and(
+                sql`${vouchers.voucherTime} >= ${fromTime}::time`,
+                sql`${vouchers.voucherTime} <= ${toTime}::time`,
+              ),
+            ),
+          ),
+        )
+        .groupBy(
+          journalEntries.id,
+          journalEntries.date,
+          journalEntries.number,
+          journalEntries.description,
+          journalEntries.sourceType,
+          vouchers.kind,
+        )
+        .orderBy(asc(journalEntries.date), asc(journalEntries.number));
+
+      const rows: MovementRow[] = [];
+      let running = opening;
+      if (period) {
+        rows.push({
+          seq: 1,
+          processType: 'رصيد سابق',
+          number: '',
+          date: shiftDay(from!, -1),
+          income: openingIncome.toFixed(4),
+          outcome: openingOutcome.toFixed(4),
+          balance: opening.toFixed(4),
+          note: '',
+          isOpening: true,
+        });
+      }
+      for (const row of grouped) {
+        const income = new Decimal(row.debit ?? '0');
+        const outcome = new Decimal(row.credit ?? '0');
+        running = running.plus(income).minus(outcome);
+        rows.push({
+          seq: rows.length + 1,
+          processType: processTypeAr(row.sourceType, row.voucherKind),
+          number: row.number ?? '—',
+          date: row.date,
+          income: income.toFixed(4),
+          outcome: outcome.toFixed(4),
+          balance: running.toFixed(4),
+          note: row.description ?? '',
+        });
+      }
+
+      return {
+        cashLocationId: location.id,
+        cashLocation: location.name,
+        currencyCode: location.currencyCode ?? 'SAR',
+        accountId: location.accountId,
+        from: period ? from : null,
+        to: period ? to : null,
+        fromTime,
+        toTime,
+        all,
+        openingBalance: opening.toFixed(4),
+        /** ⚖️ الرصيد الإجمالي — the balance at the end of the window. */
+        totalAll: running.toFixed(4),
+        /** 📅 رصيد الفترة المحددة — what the window itself moved. */
+        totalPeriod: running.minus(opening).toFixed(4),
+        rows,
+      };
+    });
+  }
+
+  private movementDate(value: string | undefined, label: string): string | undefined {
+    if (value === undefined || value.trim() === '') return undefined;
+    const text = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text))
+      throw new DomainError('MOVEMENT_DATE_INVALID', `${label} must be a date (YYYY-MM-DD)`, 422);
+    return text;
+  }
+
+  private movementTime(value: string | undefined, fallback: string, label: string): string {
+    if (value === undefined || value.trim() === '') return fallback;
+    const text = value.trim();
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text))
+      throw new DomainError('MOVEMENT_TIME_INVALID', `${label} must be a time (HH:mm)`, 422);
+    return text;
   }
 
   getCashBalance(tenantId: string, cashLocationId: string, currency = 'SAR') {

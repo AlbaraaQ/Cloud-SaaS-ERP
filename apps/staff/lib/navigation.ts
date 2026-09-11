@@ -1328,6 +1328,17 @@ const treasury: ModuleNode = {
         }),
       ],
     },
+    {
+      key: 'treasury-reports',
+      labelAr: 'التقارير',
+      labelEn: 'Reports',
+      items: [
+        screen('safe-movement', '🏦 حركة الصندوق', 'Safe movement', '/treasury/movements', 'ready', {
+          permission: 'treasury.view',
+          endpoint: '/cash-locations/:id/movements',
+        }),
+      ],
+    },
   ],
 };
 

@@ -11,7 +11,8 @@
  *   4. شيك — لا يلمس رصيد الصندوق حتى يُحصَّل، ويُقيَّد يوم التحصيل
  *   5. شيك مرتجع — يعيد الدين على العميل
  *   6. 🔍 البحث — بالتاريخ، بالرقم، وبالبيان
- *   7. المسودة تُعدَّل والمرحَّل لا يُعدَّل
+ *   7. تعريف الخزن والبنوك — المسئولون والملاحظات وبطاقة البنك
+ *   8. حركة الصندوق — كشف من دفتر الأستاذ برصيد متحرك ورصيد سابق وترشيح وقت
  *
  * Every step asserts the *ledger*, not just the balance: the desktop turned a receipt
  * into an entry as it saved it (`Class/ReceiptOper.cs:21`), and a voucher that moves cash
@@ -416,6 +417,145 @@ check(
   listedRows.some((row) => (row.custodianIds ?? []).includes(secondEmployee.id)),
   `${listedRows.length} صندوقاً`,
 );
+console.log('');
+
+// ── 8. حركة الصندوق ────────────────────────────────────────────────────────
+// `frmRptKhzna.xaml.cs` builds the statement from the **ledger** (L156 resolves the
+// safe's account, L229 groups `Entry_sub`), opens it with `رصيد سابق` when a period is
+// chosen (L200), carries a running balance, and closes with the two cards
+// `⚖️ الرصيد الإجمالي` and `📅 رصيد الفترة المحددة` (L482/L502).
+console.log('8. حركة الصندوق');
+const statementAccountId = await account('1212', 'صندوق الكشف — تحقق', 'asset');
+const capitalAccountId = await account('3110', 'رأس المال — تحقق', 'equity');
+const expenseAccountId = await account('5110', 'مصروفات — تحقق', 'expense');
+const statementSafe = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'safe',
+  name: `صندوق الكشف ${stamp}`,
+  accountId: statementAccountId,
+});
+const orphanSafe = await call('post', '/cash-locations', token, {
+  branchId,
+  kind: 'safe',
+  name: `صندوق بلا حساب ${stamp}`,
+});
+
+const movements = (id, query) => call('get', `/cash-locations/${id}/movements?${query}`, token);
+
+// An entry the treasury screen never wrote — a statement built from `vouchers` would
+// simply not see it.
+await call('post', '/journal-entries', token, {
+  branchId,
+  date: '2026-01-05',
+  description: 'إيداع افتتاحي',
+  lines: [
+    { accountId: statementAccountId, debit: '500' },
+    { accountId: capitalAccountId, credit: '500' },
+  ],
+});
+// A hand entry with no time at all, on the same day as two vouchers that have one.
+await call('post', '/journal-entries', token, {
+  branchId,
+  date: today,
+  description: 'إيداع نقدي من الإدارة',
+  lines: [
+    { accountId: statementAccountId, debit: '200' },
+    { accountId: capitalAccountId, credit: '200' },
+  ],
+});
+const morningReceipt = await call('post', '/vouchers', token, {
+  branchId,
+  kind: 'receipt',
+  subtype: 'customer',
+  date: today,
+  voucherTime: '9:00',
+  partyId: customer.id,
+  cashLocationId: statementSafe.id,
+  method: 'cash',
+  amount: '1000',
+  description: 'تحصيل صباحي',
+});
+await call('post', `/vouchers/${morningReceipt.id}/post`, token, {});
+const eveningPayment = await call('post', '/vouchers', token, {
+  branchId,
+  kind: 'payment',
+  subtype: 'expense',
+  date: today,
+  voucherTime: '15:00',
+  cashLocationId: statementSafe.id,
+  counterAccountId: expenseAccountId,
+  method: 'cash',
+  amount: '300',
+  description: 'مصروفات نثرية مسائية',
+});
+await call('post', `/vouchers/${eveningPayment.id}/post`, token, {});
+// A draft: it must not move the safe on paper before it moves it in the box.
+await call('post', '/vouchers', token, {
+  branchId,
+  kind: 'receipt',
+  subtype: 'customer',
+  date: today,
+  partyId: customer.id,
+  cashLocationId: statementSafe.id,
+  method: 'cash',
+  amount: '7000',
+  description: 'مسودة لم تُعتمد',
+});
+
+const everything = await movements(statementSafe.id, 'all=1');
+const kinds = (everything.rows ?? []).map((row) => row.processType);
+check(
+  'الكشف يقرأ دفتر الحساب: قيد يومية + سند قبض + سند صرف',
+  ['قيد يومية', 'سند قبض', 'سند صرف'].every((kind) => kinds.includes(kind)),
+  kinds.join(' · '),
+);
+check('⚖️ الرصيد الإجمالي يجمع كل ما حرّك الصندوق', money(everything.totalAll) === money(1400), everything.totalAll);
+check('والمسوّدة لا تُحرّك الصندوق على الورق', !JSON.stringify(everything.rows).includes('مسودة لم تُعتمد'));
+
+const lastRow = (everything.rows ?? []).at(-1);
+check(
+  'الرصيد المتحرك لا يقفز: آخر رصيد هو الرصيد الإجمالي',
+  money(lastRow?.balance) === money(everything.totalAll),
+  `${lastRow?.balance} / ${everything.totalAll}`,
+);
+
+const period = await movements(statementSafe.id, `from=${today}&to=${today}`);
+const openingRow = (period.rows ?? [])[0];
+check('🧾 رصيد سابق يفتح الكشف عند تحديد فترة', money(period.openingBalance) === money(500), period.openingBalance);
+check(
+  'وسطره مؤرَّخ بيوم قبل «من تاريخ»',
+  openingRow?.isOpening === true && openingRow?.processType === 'رصيد سابق',
+  `${openingRow?.processType} ${openingRow?.date}`,
+);
+check('⚖️ الرصيد الإجمالي يبقى رصيد الصندوق', money(period.totalAll) === money(1400), period.totalAll);
+check('📅 رصيد الفترة المحددة هو ما تحرّك فيها فقط', money(period.totalPeriod) === money(900), period.totalPeriod);
+
+const morning = await movements(statementSafe.id, `from=${today}&to=${today}&toTime=10:00`);
+const morningKinds = (morning.rows ?? []).map((row) => row.processType);
+check('⏰ الوقت يقصّ النهار: سند الخامسة عصراً خارج نافذة الصباح', !morningKinds.includes('سند صرف'), morningKinds.join(' · '));
+check('والقيد الذي بلا وقت لا يُخفى أبداً', morningKinds.includes('قيد يومية'));
+check('والرصيد يتبع النافذة', money(morning.totalAll) === money(1700), morning.totalAll);
+
+try {
+  await movements(orphanSafe.id, 'all=1');
+  check('صندوق بلا حساب لا يُفتح له كشف', false, 'expected 422');
+} catch (error) {
+  check(
+    'صندوق بلا حساب لا يُفتح له كشف',
+    error.status === 422 && error.code === 'CASH_ACCOUNT_REQUIRED',
+    `${error.status} ${error.code}`,
+  );
+}
+try {
+  await movements(statementSafe.id, 'from=15-01-2026');
+  check('وتاريخ غير مفهوم مرفوض', false, 'expected 422');
+} catch (error) {
+  check(
+    'وتاريخ غير مفهوم مرفوض',
+    error.status === 422 && error.code === 'MOVEMENT_DATE_INVALID',
+    `${error.status} ${error.code}`,
+  );
+}
 console.log('');
 
 console.log(failures === 0 ? '\n✔ Phase 06 treasury documents verified' : `\n✗ ${failures} check(s) failed`);

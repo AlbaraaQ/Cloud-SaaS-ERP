@@ -245,6 +245,29 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `apps/api/test/treasury-custody.spec.ts` (6) and section 7 of
   `scripts/verify-treasury.mjs`. 488 API tests, 36 staff tests, 71 contract tests.
 
+* **المرحلة 06 — الخزينة، الجزء الثالث: حركة الصندوق** (`Form_WPF/frmRptKhzna.xaml` +
+  `.xaml.cs` L156–L260، والتقرير `Reports/RptKhzna.repx`). The decisive thing the desktop
+  does here is that the statement is read from the **ledger**, not from the receipts: it
+  resolves the safe's account and groups `Entry_sub` by entry, so a sale, a salary and a
+  transfer are movements of the same safe. The cloud's `cash-movement` report summed
+  receipts and payments per box, which silently omitted every movement the treasury screen
+  had not created. `GET /cash-locations/:id/movements` now returns the statement:
+  `رصيد سابق` opening row (only when a period is chosen, dated `من تاريخ − يوم` as at
+  L200), a running `⚖️ الرصيد`, and the two cards `⚖️ الرصيد الإجمالي` /
+  `📅 رصيد الفترة المحددة` (L482/L502) — with `من وقت / إلى وقت`, and only posted entries,
+  so a draft never moves a safe on paper. No migration: `vouchers.voucher_time` came with
+  part one. **One justified deviation:** the desktop's `Entry.date` carries the time, ours
+  carries it on the voucher, so a movement with no recorded time is never hidden and never
+  pushed into the opening balance — hiding a real entry from a statement is the worse
+  error — while timed movements obey the window exactly and the totals stay continuous.
+  Screen `/treasury/movements` with the desktop's filter panel, its eight columns, six
+  cards and its CSV header verbatim (`م,العملية,الرقم,التاريخ,وارد,صادر,الرصيد,البيان`).
+  Tests `apps/api/test/treasury-movements.spec.ts` (6) and section 8 of
+  `scripts/verify-treasury.mjs` (13 checks). 494 API tests, 36 staff tests, 71 contract
+  tests. The `🏦 حركة الصندوق` screen sits in a new التقارير group of the الخزينة module;
+  the desktop files it under المحاسبة › تقارير محاسبية, but a safe's statement belongs
+  with the safe now that الخزينة is a module of its own.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the
