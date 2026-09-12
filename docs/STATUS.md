@@ -398,6 +398,42 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   pre-existing `no-restricted-syntax`/`import/order` errors in `sales.service.ts` and
   six test files; it is now green across the repository.
 
+* **المرحلة 07 — المحاسبة، الجزء الأول: 📂 دليل الحسابات**
+  (`Form_WPF/frmAccountsDirectory.xaml` — «دليل الحسابات» — مع
+  `frmAccountsTree.xaml` بطاقة الحساب و`frmAccountSrch` للبحث). **The gap was not the
+  tree, it was the number beside it.** The window binds `trBalance` on every node
+  (`.xaml.cs` L149 `LoadTreeView` / `BuildTreeHierarchy` over `trParentCode`), and the
+  cloud had no balance at all: `GET /accounts` returned a bare chart, and the tree screen
+  showed code, name and type. So the tree and the ledger and the ميزان could each print
+  a different figure for the same account. `GET /accounts` now takes
+  `q` / `type` / `branch_id` / `with_balances` (all optional, all backwards-compatible —
+  without `with_balances` the response is unchanged), and `with_balances=1` adds
+  `parentName` and a `balance` object per row: `ownDebit`/`ownCredit`/`ownBalance` for
+  the account itself and `debit`/`credit`/`balance`/`descendants` for its whole branch,
+  counted **from posted entries only** and rolled up the account's `ltree` `path`, so a
+  parent is exactly the sum of its children and the counting happens once, in the
+  service, not in three browsers. A reversal therefore disappears from the balance, and
+  a draft entry never enters it. Migration `0045` adds the three card fields the window
+  writes and the cloud had nowhere to put — `accounts.opened_at`, `opening_balance`
+  (default 0, so nothing that exists is affected) and `cost_center_id` — and
+  `💰 الرصيد الافتتاحي` is added to the account's own row on its `normalBalance` side and
+  rolled up from there, because it is money on the books *before* the first entry. It is
+  also frozen: patching `openingBalance` once an account carries a posted line is
+  refused with `409 ACCOUNT_POSTED` — an opening balance is set once, not re-written to
+  make a period agree. The directory screen is now the window: four summary tiles, the
+  search sent to the server behind `🚀 عرض البيانات`, `📂 شجرة الحسابات` with the balance
+  on every node and `مستويات التوسعة` `الكل`/0/1/2/3 (`MaxLevel = 3` in the window), and
+  selecting a node fills `📋 تفاصيل الحسابات` with `الحساب الرئيسي · رمز الحساب · اسم
+  الحساب · الفرع · الرصيد · كشف حساب · تعديل` — the parent named, not identified by uuid,
+  and `كشف حساب` opening the ledger for that account. `/accounting/accounts/tree` gained
+  the same balance column and levels, and the account form gained `⚖️ طبيعة الحساب`,
+  `📅 تاريخ فتح الحساب`, `💰 الرصيد الافتتاحي` and `📊 مركز التكلفة`. Tests
+  `apps/api/test/accounting-directory.spec.ts` (8) and the live
+  `scripts/verify-accounting.mjs` (17 checks against the `demo` stack). **545** API
+  tests, 36 staff, 71 contract. **Justified deviations:** `🚀 عرض البيانات` is the
+  execute button of the window's own search form, and the three summary-tile labels are
+  invented (the desktop has no tile row).
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

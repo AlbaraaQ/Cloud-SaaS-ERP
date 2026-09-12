@@ -3,9 +3,26 @@
 import { useMemo, useState } from 'react';
 
 import { Empty, ErrorBox, Forbidden, Loading, Screen } from '../../../../components/screen';
-import { apiData } from '../../../../lib/api';
+import { money } from '../../../../lib/lookups';
 import { useQuery } from '../../../../lib/use-query';
-import { nameOf, parentOf, postableOf, typeOf, type Account } from '../../../../lib/accounts';
+import {
+  ACCOUNT_TYPE_LABELS,
+  balanceOf,
+  listAccountDirectory,
+  nameOf,
+  parentOf,
+  postableOf,
+  typeOf,
+  type Account,
+} from '../../../../lib/accounts';
+
+/** 📂 شجرة الحسابات — `frmAccountsDirectory.xaml`: `MaxLevel = 3`, `ExpandToLevel(0..3)`. */
+const LEVELS = [
+  { id: '0', label: '0' },
+  { id: '1', label: '1' },
+  { id: '2', label: '2' },
+  { id: '3', label: '3' },
+] as const;
 
 type TreeNode = Account & { children: TreeNode[] };
 
@@ -45,9 +62,10 @@ function Node({ node, depth, expanded, toggle }: { node: TreeNode; depth: number
           <span dir="ltr">{node.code}</span>
         </td>
         <td>{nameOf(node)}</td>
-        <td>{typeOf(node)}</td>
+        <td>{ACCOUNT_TYPE_LABELS[typeOf(node)] ?? typeOf(node)}</td>
         <td>{postableOf(node) ? <span className="badge active">ترحيل</span> : <span className="badge">تجميعي</span>}</td>
         <td className="num">{node.children.length || ''}</td>
+        <td className="num" dir="ltr">{money(balanceOf(node).toFixed(4))}</td>
       </tr>
       {open && node.children.map((child) => <Node key={child.id} node={child} depth={depth + 1} expanded={expanded} toggle={toggle} />)}
     </>
@@ -55,8 +73,9 @@ function Node({ node, depth, expanded, toggle }: { node: TreeNode; depth: number
 }
 
 export default function AccountTreePage() {
-  const accounts = useQuery<Account[]>(() => apiData<Account[]>('/accounts'), []);
+  const accounts = useQuery<Account[]>(() => listAccountDirectory(), []);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [level, setLevel] = useState('1');
 
   const tree = useMemo(() => buildTree(accounts.data ?? []), [accounts.data]);
 
@@ -70,10 +89,26 @@ export default function AccountTreePage() {
 
   const expandAll = () => setExpanded(new Set((accounts.data ?? []).map((account) => account.id)));
 
+  /** مستويات التوسعة — open the tree down to the level the desktop caps at (3). */
+  const expandToLevel = (target: number) => {
+    const ids = new Set<string>();
+    const walk = (id: string, depth: number) => {
+      ids.add(id);
+      if (depth >= target) return;
+      for (const child of accounts.data ?? []) {
+        if (parentOf(child) === id) walk(child.id, depth + 1);
+      }
+    };
+    for (const account of accounts.data ?? []) {
+      if (!parentOf(account)) walk(account.id, 0);
+    }
+    setExpanded(ids);
+  };
+
   return (
     <Screen
       title="شجرة الحسابات"
-      subtitle="عرض هرمي لدليل الحسابات بالمستويات."
+      subtitle="عرض هرمي لدليل الحسابات بالمستويات، وكل فرع برصيده من القيود المرحّلة فقط."
       crumbs={['المحاسبة', 'تعاريف']}
       actions={
         <>
@@ -83,6 +118,20 @@ export default function AccountTreePage() {
           <button className="btn" type="button" onClick={() => setExpanded(new Set())}>
             طي الكل
           </button>
+          <span className="muted small" style={{ alignSelf: 'center' }}>مستويات التوسعة:</span>
+          {LEVELS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={`btn sm${level === entry.id ? ' primary' : ''}`}
+              onClick={() => {
+                setLevel(entry.id);
+                expandToLevel(Number(entry.id));
+              }}
+            >
+              {entry.label}
+            </button>
+          ))}
           <button className="btn" type="button" onClick={() => window.print()}>
             طباعة
           </button>
@@ -105,6 +154,7 @@ export default function AccountTreePage() {
                   <th>النوع</th>
                   <th>الحالة</th>
                   <th className="num">فروع</th>
+                  <th className="num">الرصيد</th>
                 </tr>
               </thead>
               <tbody>

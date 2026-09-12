@@ -19,10 +19,29 @@ import {
 export class AccountingController {
   constructor(private readonly accounting: AccountingService) {}
 
+  /**
+   * 📂 شجرة الحسابات و 📋 تفاصيل الحسابات — `frmAccountsDirectory.xaml`. `q` searches
+   * كود/اسم الحساب (the window's 🔍 → `frmAccountSrch`), `type` and `branchId` narrow the
+   * directory, and `withBalances=1` adds the الرصيد each node shows (`trBalance` in the
+   * desktop's tree) — rolled up from **posted** entries only, because a balance that
+   * counts drafts is a number that disappears.
+   */
   @Get('accounts')
   @RequiresPermission('accounting.account.view')
-  async listAccounts() {
-    return { data: await this.accounting.listAccounts(getTenantContext().tenantId) };
+  async listAccounts(
+    @Query('q') q?: string,
+    @Query('type') type?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('with_balances') withBalances?: string,
+  ) {
+    return {
+      data: await this.accounting.listAccounts(getTenantContext().tenantId, {
+        q,
+        type,
+        branchId,
+        withBalances: withBalances === '1' || withBalances === 'true',
+      }),
+    };
   }
 
   @Post('accounts')

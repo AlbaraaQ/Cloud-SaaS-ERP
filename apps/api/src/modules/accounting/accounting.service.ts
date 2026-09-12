@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, isNull, lte, or, sql } from 'drizzle-orm';
 import { DomainError } from '@erp/contracts';
 import {
   accounts,
@@ -32,6 +32,38 @@ export type AccountInput = {
   normalBalance?: 'debit' | 'credit';
   parentId?: string;
   isPostable?: boolean;
+  /** 📅 تاريخ فتح الحساب — `frmAccountsTree`. */
+  openedAt?: string | null;
+  /** 💰 الرصيد الافتتاحي — `frmAccountsTree`. */
+  openingBalance?: string | null;
+  /** 📊 مركز التكلفة — the card's default centre (`frmAccountsTree`). */
+  costCenterId?: string | null;
+};
+
+/**
+ * What `GET /accounts?withBalances=1` adds to every row: the account's own movement and
+ * the rolled-up total that the desktop shows on each node of 📂 شجرة الحسابات
+ * (`frmAccountsDirectory.xaml` binds `trBalance`).
+ */
+export type AccountBalance = {
+  /** حركة الحساب نفسه فقط — بدون الأبناء. */
+  ownDebit: string;
+  ownCredit: string;
+  /** الرصيد = مدين − دائن (موقّع بحسب حركة الحساب لا بطبيعته). */
+  ownBalance: string;
+  /** الرصيد مضافاً إليه أبناءه — ما يعرضه الديسكتوب على العقدة. */
+  debit: string;
+  credit: string;
+  balance: string;
+  /** كم حساباً فرعياً دخل في هذا الرصيد. */
+  descendants: number;
+};
+
+export type AccountQuery = {
+  q?: string;
+  type?: string;
+  branchId?: string;
+  withBalances?: boolean;
 };
 
 export type AccountPatch = Partial<AccountInput> & { allowManual?: boolean };
@@ -62,6 +94,10 @@ export type JournalQuery = {
   limit?: number;
 };
 
+/** Money in this module is a decimal string end to end; `money` is the one conversion. */
+const money = (value: string | number | null | undefined): Decimal =>
+  new Decimal(value === null || value === undefined || value === '' ? '0' : String(value));
+
 /** ACCOUNTING_ARCHITECTURE §2 — the natural side of each account class. */
 export function defaultNormalBalance(type: AccountType): 'debit' | 'credit' {
   return type === 'asset' || type === 'expense' ? 'debit' : 'credit';
@@ -84,10 +120,107 @@ export class AccountingService {
     private readonly sequences: SequencesService,
   ) {}
 
-  async listAccounts(tenantId: string) {
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      tx.select().from(accounts).where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt))),
-    );
+  /**
+   * 📂 شجرة الحسابات و 📋 تفاصيل الحسابات — `frmAccountsDirectory.xaml(.cs)`.
+   *
+   * The desktop's directory is two things at once: a tree whose every node carries
+   * `trBalance`, and a details grid (الحساب الرئيسي · رمز الحساب · اسم الحساب · الفرع ·
+   * الرصيد · كشف حساب · تعديل) filled from the selected node. So the list has to be able
+   * to search (`🔍` → `frmAccountSrch`), to narrow by الفرع, and — the part that was
+   * missing — to return **balances**.
+   *
+   * A balance is read from **posted** entries only: `المسوّدة ليست مالاً`, and a tree
+   * that counts drafts shows an accountant numbers that vanish. The parent's figure is
+   * the sum of its children plus its own movement, rolled up here rather than in the
+   * browser, so a node and the ميزان that contains it can never disagree.
+   */
+  async listAccounts(tenantId: string, query: AccountQuery = {}) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.tenantId, tenantId),
+            isNull(accounts.deletedAt),
+            query.type ? eq(accounts.type, query.type) : undefined,
+            query.branchId ? eq(accounts.branchId, query.branchId) : undefined,
+            query.q
+              ? or(ilike(accounts.code, `%${query.q}%`), ilike(accounts.nameAr, `%${query.q}%`))
+              : undefined,
+          ),
+        )
+        .orderBy(asc(accounts.code));
+      if (!query.withBalances) return rows;
+
+      const movements = await tx
+        .select({
+          accountId: journalEntryLines.accountId,
+          debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+          credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+        })
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .where(
+          and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntries.status, 'posted')),
+        )
+        .groupBy(journalEntryLines.accountId);
+
+      const own = new Map<string, { debit: Decimal; credit: Decimal }>();
+      for (const row of movements)
+        own.set(row.accountId, { debit: money(row.debit), credit: money(row.credit) });
+
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const rolled = new Map<string, { debit: Decimal; credit: Decimal; descendants: number }>();
+      for (const row of rows) {
+        const self = own.get(row.id) ?? { debit: new Decimal(0), credit: new Decimal(0) };
+        rolled.set(row.id, { debit: self.debit, credit: self.credit, descendants: 0 });
+      }
+      // `path` is an ltree of ids, root first (`root.mid.leaf`), so every ancestor of a
+      // row is simply a prefix of its own path.
+      for (const row of rows) {
+        const self = rolled.get(row.id)!;
+        const ancestors = row.path.split('.').slice(0, -1);
+        for (const ancestorId of ancestors) {
+          const target = rolled.get(ancestorId);
+          if (!target) continue;
+          target.debit = target.debit.plus(self.debit);
+          target.credit = target.credit.plus(self.credit);
+          target.descendants += 1;
+        }
+      }
+      /**
+       * 💰 الرصيد الافتتاحي (`frmAccountsTree`) belongs to the account before any entry
+       * was written, so it is added to the account's own row and rolls up from there.
+       */
+      for (const row of rows) {
+        const opening = money(row.openingBalance ?? '0');
+        if (opening.isZero()) continue;
+        const self = rolled.get(row.id)!;
+        const side = row.normalBalance === 'credit' ? 'credit' : 'debit';
+        self[side] = self[side].plus(opening);
+        for (const ancestorId of row.path.split('.').slice(0, -1)) {
+          const target = rolled.get(ancestorId);
+          if (!target) continue;
+          target[side] = target[side].plus(opening);
+        }
+      }
+
+      return rows.map((row) => {
+        const self = own.get(row.id) ?? { debit: new Decimal(0), credit: new Decimal(0) };
+        const subtree = rolled.get(row.id)!;
+        const totals: AccountBalance = {
+          ownDebit: self.debit.toFixed(4),
+          ownCredit: self.credit.toFixed(4),
+          ownBalance: self.debit.minus(self.credit).toFixed(4),
+          debit: subtree.debit.toFixed(4),
+          credit: subtree.credit.toFixed(4),
+          balance: subtree.debit.minus(subtree.credit).toFixed(4),
+          descendants: subtree.descendants,
+        };
+        return { ...row, parentName: row.parentId ? (byId.get(row.parentId)?.nameAr ?? null) : null, balance: totals };
+      });
+    });
   }
 
   async createAccount(tenantId: string, input: AccountInput) {
@@ -115,6 +248,9 @@ export class AccountingService {
         level: parent ? parent.level + 1 : 0,
         path: parent ? `${parent.path}.${id}` : id,
         isPostable: input.isPostable ?? true,
+        openedAt: input.openedAt ?? null,
+        openingBalance: input.openingBalance ?? '0',
+        costCenterId: input.costCenterId ?? null,
       });
     });
     return this.readAccount(tenantId, id);
@@ -185,6 +321,26 @@ export class AccountingService {
           normalBalance: patch.normalBalance ?? current.normalBalance,
           isPostable,
           allowManual: patch.allowManual ?? current.allowManual,
+          /**
+           * 📅 تاريخ فتح الحساب · 💰 الرصيد الافتتاحي · 📊 مركز التكلفة —
+           * `frmAccountsTree`. The opening balance is editable only while the account
+           * carries no posted line: it is the balance *before* the ledger starts, so
+           * changing it after the fact re-states every period that already closed.
+           */
+          openedAt: patch.openedAt === undefined ? current.openedAt : patch.openedAt,
+          openingBalance:
+            patch.openingBalance === undefined
+              ? current.openingBalance
+              : (() => {
+                  if (posted && money(patch.openingBalance).cmp(money(current.openingBalance)) !== 0)
+                    throw new DomainError(
+                      'ACCOUNT_POSTED',
+                      'This account already carries journal entries; its opening balance can no longer be changed',
+                      409,
+                    );
+                  return money(patch.openingBalance).toFixed(4);
+                })(),
+          costCenterId: patch.costCenterId === undefined ? current.costCenterId : patch.costCenterId,
           parentId,
           level,
           path,

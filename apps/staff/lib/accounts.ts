@@ -15,7 +15,33 @@ export type Account = {
   is_postable?: boolean;
   currencyCode?: string | null;
   level?: number;
+  branchId?: string | null;
+  normalBalance?: string | null;
+  /** 📅 تاريخ فتح الحساب · 💰 الرصيد الافتتاحي · 📊 مركز التكلفة — `frmAccountsTree` (migration 0045). */
+  openedAt?: string | null;
+  openingBalance?: string | null;
+  costCenterId?: string | null;
+  /** 📋 تفاصيل الحسابات — the parent's name, not its uuid (`frmAccountsDirectory`). */
+  parentName?: string | null;
+  /**
+   * الرصيد — only present when the directory is read with `with_balances=1`, and only
+   * ever counted from **posted** entries, rolled up the account's `ltree` path.
+   */
+  balance?: {
+    ownDebit?: string;
+    ownCredit?: string;
+    ownBalance?: string;
+    debit?: string;
+    credit?: string;
+    balance?: string;
+    descendants?: number;
+  };
 };
+
+/** الرصيد as a number, or 0 when the row carries none. */
+export function balanceOf(account: Account): number {
+  return Number(account.balance?.balance ?? 0);
+}
 
 /** The API has grown both camelCase DTOs and raw snake_case rows; tolerate both. */
 export function nameOf(account: Account): string {
@@ -39,8 +65,17 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   expense: 'مصروفات',
 };
 
-export function listAccounts(): Promise<Account[]> {
-  return apiData<Account[]>('/accounts');
+export function listAccounts(query = ''): Promise<Account[]> {
+  return apiData<Account[]>(`/accounts${query ? `?${query}` : ''}`);
+}
+
+/** 📂 شجرة الحسابات — the directory read with every node's balance. */
+export function listAccountDirectory(filters: { q?: string; type?: string; branchId?: string } = {}): Promise<Account[]> {
+  const params = new URLSearchParams({ with_balances: '1' });
+  if (filters.q?.trim()) params.set('q', filters.q.trim());
+  if (filters.type) params.set('type', filters.type);
+  if (filters.branchId) params.set('branch_id', filters.branchId);
+  return apiData<Account[]>(`/accounts?${params.toString()}`);
 }
 
 export function accountLabel(account: Account): string {

@@ -38,6 +38,16 @@ export const accounts = pgTable(
     allowManual: boolean('allow_manual').notNull().default(true),
     branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
     currencyCode: text('currency_code'),
+    /**
+     * 📅 تاريخ فتح الحساب — `Form_WPF/frmAccountsTree.xaml` («بطاقة حساب»). Nullable: an
+     * account opened years ago has no recorded date, and a chart imported by
+     * `desktop-coa.ts` must not be forced to invent one (migration 0045).
+     */
+    openedAt: date('opened_at'),
+    /** 💰 الرصيد الافتتاحي — defaults to 0 so a NULL can never break a sum. */
+    openingBalance: numeric('opening_balance', money).notNull().default('0'),
+    /** 📊 مركز التكلفة — the card's default centre, inherited by a line that names none. */
+    costCenterId: uuid('cost_center_id').references(() => costCenters.id),
     ...baseAuditColumns(),
     ...baseSoftDeleteColumns(),
     ...baseLegacyColumns(),
