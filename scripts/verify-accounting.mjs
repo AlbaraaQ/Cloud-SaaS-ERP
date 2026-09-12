@@ -11,6 +11,8 @@
  *   3. 🔍 البحث بالكود وبالاسم، وتضييق النوع والفرع
  *   4. 📋 تفاصيل الحسابات — الحساب الرئيسي مسمّى لا مُعرّفاً
  *   5. بطاقة الحساب — 📅 تاريخ فتح الحساب · 💰 الرصيد الافتتاحي · 📊 مركز التكلفة
+ *   6. 📄 كشف الحساب — الرصيد السابق والرصيد التراكمي (`frmAccountBalance`)
+ *   7. 📊 طريقة العرض · الفترة · الفرع · كشف حساب رئيسي (`frmAccountsStatement`)
  *
  * Usage: node scripts/verify-accounting.mjs
  */
@@ -59,6 +61,25 @@ async function call(method, path, token, body) {
   return parsed.data ?? parsed;
 }
 
+/**
+ * The statement answers `{ data, totals, account }`; `call` unwraps `data`, so this one
+ * keeps the envelope whole.
+ */
+async function callEnvelope(method, path, body) {
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const parsed = JSON.parse(await response.text());
+  if (!response.ok) {
+    const error = new Error(`${method} ${path} → ${response.status} ${parsed.code ?? ''} ${parsed.detail ?? ''}`);
+    error.status = response.status;
+    throw error;
+  }
+  return parsed;
+}
+
 const token = await (
   async () => {
     const data = await call('post', '/auth/login', undefined, { tenantCode, email, password });
@@ -91,6 +112,14 @@ const sisterId = (await account(`9${stamp}2`, `عملاء التحقق ${stamp}`
 const contraId = (await account(`8${stamp}`, `رأس مال التحقق ${stamp}`, 'equity')).id;
 
 const post = (lines) => call('post', '/journal-entries', token, { date: today(), description: `قيد تحقق ${stamp}`, lines });
+const postOn = (date, lines, branchId) =>
+  call('post', '/journal-entries', token, { date, description: `قيد تحقق ${stamp}`, lines, ...(branchId ? { branchId } : {}) });
+const iso = (offsetDays) => {
+  const at = new Date();
+  at.setUTCDate(at.getUTCDate() + offsetDays);
+  return at.toISOString().slice(0, 10);
+};
+const statement = (id, query = '') => callEnvelope('get', `/statements/general-ledger/${id}${query ? `?${query}` : ''}`);
 
 const balanceOf = async (id) => {
   const rows = await directory('with_balances=1');
@@ -171,6 +200,133 @@ try {
 const plain = await directory();
 check('النهاية القائمة بلا أرصدة كما كانت', plain.length > 0 && plain[0].balance === undefined, `${plain.length} حساب`);
 
+console.log('\n6. 📄 كشف الحساب — الرصيد السابق والرصيد التراكمي');
+
+const stmtId = (await account(`9${stamp}4`, `كشف التحقق ${stamp}`, 'asset')).id;
+const stmtChildId = (await account(`9${stamp}41`, `فرع كشف التحقق ${stamp}`, 'asset', { parentId: stmtId })).id;
+
+// قبل الفترة: 400 على الحساب و100 على فرعه. داخلها: 150 + (50 و70 في قيد واحد) − 60،
+// و25 على الفرع نفسه حتى يظهر فرعُه في «كشف حساب رئيسي».
+await postOn(iso(-8), [
+  { accountId: stmtId, debit: '400' },
+  { accountId: contraId, credit: '400' },
+]);
+await postOn(iso(-8), [
+  { accountId: stmtChildId, debit: '100' },
+  { accountId: contraId, credit: '100' },
+]);
+await postOn(iso(-4), [
+  { accountId: stmtId, debit: '150' },
+  { accountId: contraId, credit: '150' },
+]);
+await postOn(iso(-3), [
+  { accountId: stmtId, debit: '50' },
+  { accountId: stmtId, debit: '70' },
+  { accountId: contraId, credit: '120' },
+]);
+await postOn(iso(-3), [
+  { accountId: stmtChildId, debit: '25' },
+  { accountId: contraId, credit: '25' },
+]);
+await postOn(iso(-2), [
+  { accountId: contraId, debit: '60' },
+  { accountId: stmtId, credit: '60' },
+]);
+
+const stmt = await statement(stmtId, `from=${iso(-6)}`);
+const opening = stmt.data.find((row) => row.rank === 0);
+check('رصيد سابق — البيان', opening?.description === 'رصيد مرحل من فترة سابقة', String(opening?.description));
+check('رصيد سابق — النوع', opening?.entryType === 'رصيد سابق', String(opening?.entryType));
+check('رصيد سابق — 400 مدين', near(Number(opening?.debit), 400) && near(Number(opening?.runningBalance), 400), money(opening?.debit));
+
+const movements = stmt.data.filter((row) => row.rank !== 0);
+check('التفصيلي يبقي كل سطر', movements.length === 4, `${movements.length} حركة`);
+const running = stmt.data.map((row) => Number(row.runningBalance));
+check(
+  'الرصيد تراكمي',
+  near(running[0], 400) && near(running[1], 550) && near(running[2], 600) && near(running[3], 670) && near(running.at(-1), 610),
+  running.join(' → '),
+);
+check('الرصيد الختامي 610', near(Number(stmt.totals.closing), 610), money(stmt.totals.closing));
+check('الحالة مدين', stmt.totals.closingStatus === 'مدين', String(stmt.totals.closingStatus));
+
+console.log('\n7. 📊 طريقة العرض · الفترة · الفرع · كشف حساب رئيسي');
+
+const summary = await statement(stmtId, `from=${iso(-6)}&summary=1`);
+check(
+  'تجميعي (ملخص) يجمع سطور القيد',
+  summary.data.filter((row) => row.rank !== 0).length === 3 && summary.data.some((row) => near(Number(row.debit), 120)),
+  `${summary.data.filter((row) => row.rank !== 0).length} حركة`,
+);
+
+const full = await statement(stmtId, 'full_period=1');
+check('فترة كاملة — بلا سطر افتتاح', full.data.every((row) => row.rank !== 0), `${full.data.length} صف`);
+check('فترة كاملة — نفس الرصيد', near(Number(full.totals.closing), 610), money(full.totals.closing));
+
+const hidden = await statement(stmtId, `from=${iso(-6)}&hide_previous_balance=1`);
+check(
+  'عدم إظهار الرصيد السابق — يُخفي السطر ولا يُسقط المال',
+  hidden.data.every((row) => row.rank !== 0) && near(Number(hidden.data[0]?.runningBalance), 550),
+  money(hidden.data[0]?.runningBalance),
+);
+
+const branchList = await call('get', '/branches', token);
+if (branchList.length > 1) {
+  const other = branchList[1];
+  await postOn(iso(-1), [
+    { accountId: stmtId, debit: '90' },
+    { accountId: contraId, credit: '90' },
+  ], other.id);
+  const one = await statement(stmtId, `from=${iso(-6)}&branch_id=${other.id}&hide_previous_balance=1`);
+  check(
+    'الفرع يضيّق الكشف',
+    near(Number(one.totals.debit), 90) && one.data.filter((row) => row.rank !== 0).every((row) => row.branchName === (other.nameAr ?? other.name)),
+    `${one.data.filter((row) => row.rank !== 0).length} حركة`,
+  );
+} else {
+  check('الفرع يضيّق الكشف', true, 'تخطّي: مؤسسة بفرع واحد');
+}
+
+const branch = await statement(stmtId, `from=${iso(-6)}&with_descendants=1`);
+check(
+  'كشف حساب رئيسي — الحساب وفرعه',
+  branch.data.some((row) => row.accountCode === `9${stamp}41`),
+  `${branch.data.length} صف`,
+);
+check('كشف حساب رئيسي — بلا رصيد تراكمي', branch.data.every((row) => row.runningBalance === null), '—');
+check(
+  'كشف حساب رئيسي — رصيده هو رصيد الشجرة',
+  near(Number(branch.totals.closing), Number((await balanceOf(stmtId))?.balance)),
+  `${money(branch.totals.closing)} = ${money((await balanceOf(stmtId))?.balance)}`,
+);
+
+const contra = await statement(contraId, `from=${iso(-6)}`);
+check(
+  'الحالة تقف على جانب المال لا على طبيعة الحساب',
+  contra.totals.closingStatus === 'دائن',
+  String(contra.totals.closingStatus),
+);
+check(
+  'إجمالي مدين ودائن ورصيد الفترة',
+  near(Number(stmt.totals.debit), 270) && near(Number(stmt.totals.credit), 60) && near(Number(stmt.totals.periodDebit), 210),
+  `${money(stmt.totals.debit)} / ${money(stmt.totals.credit)} / ${money(stmt.totals.periodDebit)}`,
+);
+
+const sibling = await statement(stmtId);
+check(
+  'التوافق — بلا معايير يردّ نفس الدفتر القديم',
+  Array.isArray(sibling.data) && sibling.data.length > 0 && 'entryId' in sibling.data[0] && sibling.totals !== undefined,
+  `${sibling.data.length} صف`,
+);
+const drilldown = await call('get', `/journal-entries/${movements[0]?.entryId}`, token);
+check('👁️ تفاصيل — القيد مفتوح من الكشف', Array.isArray(drilldown.lines) && drilldown.lines.length > 0, `${drilldown.lines?.length ?? 0} سطر`);
+
+check('النهاية القائمة بلا أرصدة كما كانت', plain.length > 0 && plain[0].balance === undefined, `${plain.length} حساب`);
+
 console.log('');
-console.log(failures === 0 ? '\n✔ Phase 07 accounting directory verified' : `\n✗ ${failures} check(s) failed`);
+console.log(
+  failures === 0
+    ? '\n✔ Phase 07 — دليل الحسابات وكشف الحساب verified'
+    : `\n✗ ${failures} check(s) failed`,
+);
 process.exit(failures === 0 ? 0 : 1);

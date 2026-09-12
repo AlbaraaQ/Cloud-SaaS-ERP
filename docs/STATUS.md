@@ -398,6 +398,40 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   pre-existing `no-restricted-syntax`/`import/order` errors in `sales.service.ts` and
   six test files; it is now green across the repository.
 
+* **المرحلة 07 — المحاسبة، الجزء الثاني: 📄 كشف الحساب**
+  (`Form_WPF/frmAccountBalance.xaml` «كشف حساب تفصيلي» و
+  `frmAccountsStatement.xaml` «كشف حساب رئيسي»). **The cloud had a ledger, not a
+  statement.** `GET /statements/general-ledger/:accountId` answered with bare posted
+  lines and no period at all, and the screen filtered by date *after* the fact — so a
+  statement for one month started its الرصيد at zero and disagreed with the tree it was
+  opened from. What the desktop does is defined in three places: `.xaml.cs` L216 keeps a
+  running total signed by the account's nature, L351 prepends a row whose البيان is
+  `رصيد مرحل من فترة سابقة` and whose النوع is `رصيد سابق`, and L307 chooses between
+  `تجميعي (ملخص)` (one row per entry, `SUM` + `GROUP BY`) and `تفصيلي (كامل)` (every
+  line). All three now exist in the service: `from`/`to` bound the period, the opening
+  row is everything posted *before* `from` **plus the account's `opening_balance`** — so
+  a كشف and a شجرة cannot print different numbers, which is the invariant the tests
+  assert directly — and `with_descendants=1` reports the account and its branch by
+  walking `path <@ :path::ltree`, the same walk as the desktop's `AccountHierarchy` CTE,
+  with `رمز الحساب`/`الحساب` in place of a running balance (the window has no الرصيد
+  column either: a running total over accounts of different natures is not readable).
+  `النوع` is read from the entry and the voucher behind it and named in the words of the
+  desktop's own `EntryTypes` table — قيد مبيعات · سند قبض · سند صرف · إغلاق اليومية ·
+  قيد اليومية. The response is `{ data, totals, account }`, so a caller that reads
+  `data` — and a request with no parameters at all — still gets exactly the old ledger.
+  **One desktop bug is deliberately not copied:** `الحالة` is derived there from the
+  nature-signed balance (`runningBalance >= 0 ? "مدين" : "دائن"`), which reports a
+  liability sitting on its own credit side as مدين; here الحالة names the side the money
+  is actually on. The screen carries the window's own filters —
+  `اسم الحساب` · `رقم الحساب` · `الفرع`/`كل الفروع` · `من تاريخ`/`إلى تاريخ` ·
+  `🚀 عرض البيانات` · `⚖️ نوع الرصيد` · `📊 طريقة العرض` · `فترة كاملة (من البداية)` ·
+  `عدم إظهار الرصيد السابق` — its four totals, and its twelve columns, and it opens with
+  the account chosen from 📂 دليل الحسابات' `كشف حساب` button; `تفاصيل` (👁️) opens the
+  entry in `القيود اليومية`, which now accepts `?entry=`. Tests
+  `apps/api/test/accounting-statement.spec.ts` (12) and sections 6–7 of
+  `scripts/verify-accounting.mjs` (18 more live checks, 37 in total). **557** API tests,
+  36 staff, 71 contract.
+
 * **المرحلة 07 — المحاسبة، الجزء الأول: 📂 دليل الحسابات**
   (`Form_WPF/frmAccountsDirectory.xaml` — «دليل الحسابات» — مع
   `frmAccountsTree.xaml` بطاقة الحساب و`frmAccountSrch` للبحث). **The gap was not the

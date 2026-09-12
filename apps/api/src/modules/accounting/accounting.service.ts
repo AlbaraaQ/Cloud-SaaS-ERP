@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, desc, eq, gte, ilike, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DomainError } from '@erp/contracts';
 import {
   accounts,
   branches,
+  vouchers,
   costCenters,
   fiscalPeriods,
   fiscalYears,
@@ -66,6 +67,98 @@ export type AccountQuery = {
   withBalances?: boolean;
 };
 
+/**
+ * 📄 كشف الحساب — the filters of `Form_WPF/frmAccountBalance.xaml` («كشف حساب تفصيلي»)
+ * and `frmAccountsStatement.xaml` («كشف حساب رئيسي»). Every default here is the one the
+ * window opens with, except `fullPeriod`, which defaults to *no date filter at all* so
+ * that a caller that sends nothing gets exactly the ledger the old endpoint returned.
+ */
+export type StatementQuery = {
+  from?: string;
+  to?: string;
+  /** `الفرع` — absent means `كل الفروع`, as the checked `chkAllBranches` does. */
+  branchId?: string;
+  /** كشف حساب رئيسي: the account *and* everything beneath it, as the SP's `AccountHierarchy` does. */
+  withDescendants?: boolean;
+  /** 📊 طريقة العرض — `تجميعي (ملخص)` groups the lines of one entry into one row. */
+  summary?: boolean;
+  /** `فترة كاملة (من البداية)` — no `from`, and therefore no رصيد سابق row. */
+  fullPeriod?: boolean;
+  /** `عدم إظهار الرصيد السابق`. */
+  hidePreviousBalance?: boolean;
+};
+
+/**
+ * One row of the statement. `rank` 0 is the `رصيد سابق` row the desktop prepends
+ * (`AddPreviousBalanceRow`); `الرصيد` and `الحالة` are only filled for a single account,
+ * because `كشف حساب رئيسي` has no running-balance column in the desktop either — a
+ * running total over accounts of different natures is not a number anyone can read.
+ */
+export type StatementRow = {
+  rank: number;
+  date: string;
+  /** الرقم العام — `Entry.GlobalID` in the desktop's grid. */
+  entryId: string | null;
+  /** رقم السند. */
+  number: string | null;
+  /** الفرع — named, as the desktop resolves `Entry.branch` through `Branches`. */
+  branchName: string | null;
+  /** النوع — `EntryTypes` (قيد مبيعات، سند قبض، …). */
+  entryType: string;
+  /** البيان — the line's own note when تفصيلي, the entry's when تجميعي. */
+  description: string | null;
+  debit: string;
+  credit: string;
+  /** الرصيد — running, signed by the account's nature. */
+  runningBalance: string | null;
+  /** الحالة — `مدين` / `دائن`. */
+  balanceStatus: string | null;
+  /** رمز الحساب / الحساب — the columns of كشف حساب رئيسي. */
+  accountCode: string | null;
+  accountName: string | null;
+};
+
+export type StatementTotals = {
+  /** إجمالي مدين / إجمالي دائن — over the period's movements, not the رصيد سابق row. */
+  debit: string;
+  credit: string;
+  /** رصيد الفترة (مدين) / رصيد الفترة (دائن) — the two windows split the balance by side. */
+  periodDebit: string;
+  periodCredit: string;
+  /** الرصيد النهائي — what the account closes the period on (`الرصيد` of the last row). */
+  closing: string;
+  closingStatus: string | null;
+};
+
+/**
+ * النوع of an entry, in the words of the desktop's own `EntryTypes` table
+ * (`CrystalLiteDB.txt` L3341–L3360): قيد إفتتاحي · قيد مشتريات · قيد مبيعات ·
+ * قيد نقطة بيع · تسوية جردية · سند قبض من عميل · سند صرف لمورد · سند قبض · سند صرف ·
+ * قيد اليومية · بضاعة أول مدة · قيد إضافات · إغلاق اليومية · مرتجع مبيعات · …
+ */
+const ENTRY_TYPE_LABELS: Record<string, string> = {
+  opening: 'قيد إفتتاحي',
+  purchase_invoice: 'قيد مشتريات',
+  sales_invoice: 'قيد مبيعات',
+  pos_sale: 'قيد نقطة بيع',
+  inventory_adjust: 'تسوية جردية',
+  shift_close: 'إغلاق اليومية',
+  return_sale: 'مرتجع مبيعات',
+  return_purchase: 'مرتجع مشتريات',
+  contract_invoice: 'قيد فاتورة عقد',
+};
+
+function entryTypeOf(row: {
+  kind: string;
+  sourceType: string | null;
+  voucherKind: string | null;
+}): string {
+  if (row.kind === 'reversal') return 'قيد عكسي';
+  if (row.voucherKind === 'receipt') return 'سند قبض';
+  if (row.voucherKind === 'payment') return 'سند صرف';
+  return ENTRY_TYPE_LABELS[row.sourceType ?? ''] ?? 'قيد اليومية';
+}
+
 export type AccountPatch = Partial<AccountInput> & { allowManual?: boolean };
 export type CostCenterPatch = Partial<CostCenterInput>;
 
@@ -97,6 +190,21 @@ export type JournalQuery = {
 /** Money in this module is a decimal string end to end; `money` is the one conversion. */
 const money = (value: string | number | null | undefined): Decimal =>
   new Decimal(value === null || value === undefined || value === '' ? '0' : String(value));
+
+/**
+ * الحالة — which side the money is on: `مدين` / `دائن`, and `رصيد متوازن` when the
+ * account is square (the wording of `frmAccountsStatement.xaml.cs` L346–L352).
+ *
+ * The desktop derives this from a nature-signed running total
+ * (`balanceStatus = runningBalance >= 0 ? "مدين" : "دائن"`), which inverts the answer for
+ * every credit-natured account: a liability sitting on its own credit side is reported
+ * `مدين`. The side is a fact about the balance, not about the account, so here it is read
+ * from the balance itself.
+ */
+function statusOf(natureSigned: Decimal): string {
+  if (natureSigned.isZero()) return 'رصيد متوازن';
+  return natureSigned.isPositive() ? 'مدين' : 'دائن';
+}
 
 /** ACCOUNTING_ARCHITECTURE §2 — the natural side of each account class. */
 export function defaultNormalBalance(type: AccountType): 'debit' | 'credit' {
@@ -463,13 +571,241 @@ export class AccountingService {
     });
   }
 
-  async generalLedger(tenantId: string, accountId: string) {
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      tx.select({ entryId: journalEntries.id, date: journalEntries.date, number: journalEntries.number, description: journalEntries.description, debit: journalEntryLines.debit, credit: journalEntryLines.credit })
+  /**
+   * 📄 كشف الحساب — the two statement windows of the desktop in one endpoint.
+   *
+   * `Form_WPF/frmAccountBalance.xaml` («كشف حساب تفصيلي») is the model: الرصيد is a
+   * running total (`runningBalance += dept - credit`, L216), the opening row is prepended
+   * as `رصيد سابق` / «رصيد مرحل من فترة سابقة» (`AddPreviousBalanceRow`), and
+   * `تجميعي (ملخص)` collapses the lines of one entry into one row while `تفصيلي (كامل)`
+   * keeps every line (`GetAccountMovements`, L307). `frmAccountsStatement.xaml`
+   * («كشف حساب رئيسي») is the same report over an account **and its descendants** —
+   * the stored procedure `GetAccountStatement` walks `AccountHierarchy` — and it shows
+   * `رمز الحساب` and `الحساب` instead of a running balance.
+   *
+   * Only **posted** entries count (`Entry.state = 1` in the desktop). The caller that
+   * sends nothing still gets exactly the ledger this endpoint always returned; every new
+   * column and every new key in the envelope is additive.
+   */
+  async accountStatement(tenantId: string, accountId: string, query: StatementQuery = {}) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [account] = await tx
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.id, accountId), eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)))
+        .limit(1);
+      if (!account) throw new DomainError('NOT_FOUND', 'Account not found', 404);
+
+      const debitNature = (account.normalBalance ?? defaultNormalBalance(account.type as AccountType)) !== 'credit';
+      /**
+       * كشف حساب رئيسي walks the whole branch; `path` is `<root>.<…>.<own id>`, so a
+       * descendant is any account whose path *starts with* this account's path.
+       */
+      const inBranch = query.withDescendants
+        ? sql`${accounts.path} <@ ${account.path}::ltree`
+        : eq(accounts.id, accountId);
+
+      const period = query.fullPeriod
+        ? []
+        : [query.from ? gte(journalEntries.date, query.from) : undefined, query.to ? lte(journalEntries.date, query.to) : undefined].filter(
+            (clause) => clause !== undefined,
+          );
+      const where = and(
+        eq(journalEntryLines.tenantId, tenantId),
+        eq(journalEntries.status, 'posted'),
+        inBranch,
+        query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+        ...period,
+      );
+
+      // ── 1. الرصيد السابق — everything posted before `from`, plus 💰 الرصيد الافتتاحي
+      //      (migration 0045), which is money on the books before any entry at all.
+      /**
+       * With no `from` there is no "before" — `فترة كاملة (من البداية)` starts at zero,
+       * and counting the whole ledger as an opening would count it twice: once here and
+       * once again as the period's movements.
+       */
+      const before = query.from
+        ? await tx
+            .select({
+              debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+              credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+            })
+            .from(journalEntryLines)
+            .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+            .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+            .where(
+              and(
+                eq(journalEntryLines.tenantId, tenantId),
+                eq(journalEntries.status, 'posted'),
+                inBranch,
+                query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+                lt(journalEntries.date, query.from),
+              ),
+            )
+            .then((rows) => rows[0])
+        : undefined;
+      const movedBefore = money(before?.debit).minus(money(before?.credit));
+      const openingSigned = query.withDescendants ? new Decimal(0) : money(account.openingBalance);
+      // Nature-signed: how much the account holds *on its own side* before the period.
+      const opening = debitNature ? movedBefore.plus(openingSigned) : movedBefore.negated().plus(openingSigned);
+
+      // ── 2. حركات الفترة
+      const select = {
+        entryId: journalEntries.id,
+        date: journalEntries.date,
+        number: journalEntries.number,
+        entryDescription: journalEntries.description,
+        // In تجميعي mode one row covers many lines, so the note is aggregated; the row
+        // shows the entry's own البيان anyway.
+        lineDescription: sql<string | null>`MIN(${journalEntryLines.description})`,
+        debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+        credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+        accountCode: accounts.code,
+        accountNameAr: accounts.nameAr,
+        branchName: branches.nameAr,
+        kind: journalEntries.kind,
+        sourceType: journalEntries.sourceType,
+        voucherKind: vouchers.kind,
+      };
+      // 📊 تجميعي (ملخص) — one row per entry (per account); تفصيلي — one row per line.
+      const grouped = query.summary
+        ? [
+            journalEntries.id,
+            journalEntries.date,
+            journalEntries.number,
+            journalEntries.description,
+            accounts.code,
+            accounts.nameAr,
+            branches.nameAr,
+            journalEntries.kind,
+            journalEntries.sourceType,
+            vouchers.kind,
+          ]
+        : [
+            journalEntries.id,
+            journalEntryLines.lineNo,
+            journalEntries.date,
+            journalEntries.number,
+            journalEntries.description,
+            journalEntryLines.description,
+            journalEntryLines.debit,
+            journalEntryLines.credit,
+            accounts.code,
+            accounts.nameAr,
+            branches.nameAr,
+            journalEntries.kind,
+            journalEntries.sourceType,
+            vouchers.kind,
+          ];
+      const movements = await tx
+        .select(select)
         .from(journalEntryLines)
         .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
-        .where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntryLines.accountId, accountId), eq(journalEntries.status, 'posted'))),
-    );
+        .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+        .leftJoin(branches, eq(branches.id, journalEntries.branchId))
+        .leftJoin(vouchers, eq(vouchers.journalEntryId, journalEntries.id))
+        .where(where)
+        .groupBy(...grouped)
+        .orderBy(
+          asc(journalEntries.date),
+          asc(journalEntries.number),
+          ...(query.summary ? [] : [asc(journalEntryLines.lineNo)]),
+        );
+
+      // ── 3. الرصيد المتراكم — signed by the account's nature, as the window does.
+      const rows: StatementRow[] = [];
+      const periodTotals = { debit: new Decimal(0), credit: new Decimal(0) };
+      let running = opening;
+
+      /**
+       * `running` is kept nature-signed so that الرصيد grows on the account's own side,
+       * but `مدين`/`دائن` and the debit/credit columns are facts about the balance, so
+       * the value is flipped back into debit space before it is named or placed.
+       */
+      const toDebitSpace = (natureSigned: Decimal) => (debitNature ? natureSigned : natureSigned.negated());
+
+      const showOpeningRow = !query.fullPeriod && Boolean(query.from) && !query.hidePreviousBalance;
+      if (showOpeningRow) {
+        const side = toDebitSpace(opening);
+        const placed = side.isPositive()
+          ? { debit: side, credit: new Decimal(0) }
+          : { debit: new Decimal(0), credit: side.negated() };
+        rows.push({
+          rank: 0,
+          date: query.from!,
+          entryId: null,
+          number: null,
+          branchName: null,
+          entryType: 'رصيد سابق',
+          description: 'رصيد مرحل من فترة سابقة',
+          debit: placed.debit.toFixed(4),
+          credit: placed.credit.toFixed(4),
+          // كشف حساب رئيسي reports a branch, and a branch has no single running total.
+          runningBalance: query.withDescendants ? null : opening.abs().toFixed(4),
+          balanceStatus: query.withDescendants ? null : statusOf(side),
+          accountCode: account.code,
+          accountName: account.nameAr,
+        });
+      }
+
+      let rank = 1;
+      for (const row of movements) {
+        const debit = money(row.debit);
+        const credit = money(row.credit);
+        periodTotals.debit = periodTotals.debit.plus(debit);
+        periodTotals.credit = periodTotals.credit.plus(credit);
+        running = running.plus(debitNature ? debit.minus(credit) : credit.minus(debit));
+        rows.push({
+          rank: rank++,
+          date: row.date,
+          entryId: row.entryId,
+          number: row.number,
+          branchName: row.branchName ?? null,
+          entryType: entryTypeOf(row),
+          description: (query.summary ? row.entryDescription : row.lineDescription ?? row.entryDescription) ?? null,
+          debit: debit.toFixed(4),
+          credit: credit.toFixed(4),
+          runningBalance: query.withDescendants ? null : running.abs().toFixed(4),
+          balanceStatus: query.withDescendants ? null : statusOf(toDebitSpace(running)),
+          accountCode: row.accountCode,
+          accountName: row.accountNameAr,
+        });
+      }
+
+      const totals: StatementTotals = {
+        debit: periodTotals.debit.toFixed(4),
+        credit: periodTotals.credit.toFixed(4),
+        periodDebit: periodTotals.debit.greaterThan(periodTotals.credit) ? periodTotals.debit.minus(periodTotals.credit).toFixed(4) : '0.0000',
+        periodCredit: periodTotals.credit.greaterThan(periodTotals.debit) ? periodTotals.credit.minus(periodTotals.debit).toFixed(4) : '0.0000',
+        closing: running.abs().toFixed(4),
+        closingStatus: statusOf(toDebitSpace(running)),
+      };
+
+      return {
+        account: {
+          id: account.id,
+          code: account.code,
+          nameAr: account.nameAr,
+          type: account.type,
+          normalBalance: account.normalBalance,
+          openingBalance: account.openingBalance,
+          branchId: account.branchId,
+        },
+        totals,
+        rows,
+      };
+    });
+  }
+
+  /**
+   * The ledger as this endpoint has always returned it: one row per posted line, no
+   * filters. It is `accountStatement` with the desktop's own defaults removed, so the
+   * shape cannot drift between the two.
+   */
+  async generalLedger(tenantId: string, accountId: string) {
+    const statement = await this.accountStatement(tenantId, accountId);
+    return statement.rows;
   }
 
   async postJournal(

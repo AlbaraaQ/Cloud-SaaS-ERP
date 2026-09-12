@@ -14,6 +14,11 @@ import {
   type JournalLineInput,
 } from './accounting.service.js';
 
+/** The desktops sends `1`, `true` and `on` for the same checkbox; accept all three. */
+function on(value?: string): boolean {
+  return value === '1' || value === 'true' || value === 'on';
+}
+
 @ApiTags('accounting')
 @Controller()
 export class AccountingController {
@@ -108,10 +113,42 @@ export class AccountingController {
     return { data: await this.accounting.trialBalance(getTenantContext().tenantId) };
   }
 
+  /**
+   * 📄 كشف الحساب — `Form_WPF/frmAccountBalance.xaml` («كشف حساب تفصيلي») with the
+   * account-hierarchy option of `frmAccountsStatement.xaml` («كشف حساب رئيسي»).
+   *
+   * `from`/`to` bound the period (`من تاريخ` / `إلى تاريخ`), `branch_id` is `الفرع`
+   * (absent = `كل الفروع`), `with_descendants=1` reports the account *and* its branch,
+   * `summary=1` is `تجميعي (ملخص)` and the default is `تفصيلي (كامل)`,
+   * `full_period=1` is `فترة كاملة (من البداية)` and `hide_previous_balance=1` is
+   * `عدم إظهار الرصيد السابق`.
+   *
+   * The row list under `data` is unchanged for a caller that sends nothing; `totals` and
+   * `account` are additions beside it.
+   */
   @Get('statements/general-ledger/:accountId')
   @RequiresPermission('accounting.reports.view')
-  async generalLedger(@Param('accountId') accountId: string) {
-    return { data: await this.accounting.generalLedger(getTenantContext().tenantId, accountId) };
+  async generalLedger(
+    @Param('accountId') accountId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('with_descendants') withDescendants?: string,
+    @Query('summary') summary?: string,
+    @Query('full_period') fullPeriod?: string,
+    @Query('hide_previous_balance') hidePreviousBalance?: string,
+  ) {
+    const statement = await this.accounting.accountStatement(getTenantContext().tenantId, accountId, {
+      from,
+      to,
+      branchId,
+      withDescendants: on(withDescendants),
+      summary: on(summary),
+      // `فترة كاملة (من البداية)` is on until someone names a date.
+      fullPeriod: on(fullPeriod) || !(from || to),
+      hidePreviousBalance: on(hidePreviousBalance),
+    });
+    return { data: statement.rows, totals: statement.totals, account: statement.account };
   }
 
   // ------------------------------------------------------------- cost centres

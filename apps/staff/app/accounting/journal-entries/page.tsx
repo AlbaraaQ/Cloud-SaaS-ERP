@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import { Empty, ErrorBox, Forbidden, Loading, Screen } from '../../../components/screen';
 import { apiData } from '../../../lib/api';
@@ -37,11 +38,36 @@ function money(value: string) {
 export default function JournalRegisterPage() {
   const today = new Date().toISOString().slice(0, 10);
   const monthStart = `${today.slice(0, 7)}-01`;
+  const search = useSearchParams();
+  /**
+   * 📄 كشف الحساب opens a single entry from its `تفاصيل` column (`?entry=<id>`). The
+   * register lists a period, so the entry's own date becomes the period and the row
+   * opens — the cloud has no separate entry window, and the desktop's 👁️ opens a dialog,
+   * not a new screen.
+   */
+  const linked = search.get('entry') ?? '';
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(today);
   const [status, setStatus] = useState('');
   const [applied, setApplied] = useState({ from: monthStart, to: today, status: '' });
-  const [open, setOpen] = useState<string | undefined>();
+  const [open, setOpen] = useState<string | undefined>(linked || undefined);
+
+  useEffect(() => {
+    if (!linked) return;
+    let cancelled = false;
+    void apiData<{ date?: string }>(`/journal-entries/${linked}`)
+      .then((detail) => {
+        const date = String(detail.date ?? '').slice(0, 10);
+        if (cancelled || !date) return;
+        setFrom(date);
+        setTo(date);
+        setApplied({ from: date, to: date, status: '' });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [linked]);
 
   const entries = useQuery<Entry[]>(() => {
     const params = new URLSearchParams();
