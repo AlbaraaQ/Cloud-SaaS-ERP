@@ -16,6 +16,8 @@
  *      التي تُكتب نفسها، وقيد السلفة والمكافأة (`frmEmpSalaryAddSub`)
  *   8. 💵 دفع الرواتب — «رقم الإذن»، الرفوض الثلاثة، «لقد تم دفع راتب الموظف سابقاً»،
  *      «لا يوجد رواتب مستحقة للموظف»، وسند الصرف الذي يُصرف به الراتب (`frmSalaryPay`)
+ *   9. 📄 كشف حساب موظف — «اختر موظف»، الفترة والفرع، «الرصيد السابق»، «تجميعي/تفصيلي»
+ *      والبطاقات الأربع (`frmEmpAccountGet`)
  *
  * The two other refusals («لا يمكن حذف موظف مرتبط بفواتير» and the payroll one) are in
  * `apps/api/test/employee-card.spec.ts`: they leave an invoice and a payroll run behind.
@@ -84,7 +86,13 @@ const del = (path) => call('delete', path, token);
 async function refused(method, path, body) {
   try {
     // Node 22's undici rejects lowercase verbs: `patch` becomes a 405 with an empty body.
-    await (method.toUpperCase() === 'DELETE' ? del(path) : method.toUpperCase() === 'PATCH' ? patch(path, body) : post(path, body));
+    await (method.toUpperCase() === 'DELETE'
+      ? del(path)
+      : method.toUpperCase() === 'PATCH'
+        ? patch(path, body)
+        : method.toUpperCase() === 'GET'
+          ? get(path)
+          : post(path, body));
     return { status: 200, code: '', detail: '' };
   } catch (error) {
     return { status: error.status ?? 0, code: error.code ?? '', detail: error.detail ?? '' };
@@ -418,6 +426,83 @@ check('إذنٌ بلا صرف يبقى بلا سند', draft.voucherId === null 
 removedDrafts.push(draft.id);
 
 // ---------------------------------------------------------------------------
+// 9. 📄 كشف حساب موظف — `Form_WPF/frmEmpAccountGet.xaml` («كشف حساب موظف»). The
+// window's own query (`ShowAccount`, L226) over the employee's account, its four tiles
+// (`UpdateSummary`, L318) and its filters `اسم الموظف` · `الفرع` · `الفترة الزمنية`.
+// Everything here is a read — the movements are the سلفة of section 7 and the إذنات صرف
+// of section 8, so the screen is verified against documents the script already made.
+// ---------------------------------------------------------------------------
+console.log('\n9. 📄 كشف حساب موظف — حركة حساب الموظف');
+
+const statementPath = (query) => `/hrm/employee-statement?${query}`;
+// Section 3 renames the employee and its account follows the name, so the statement is
+// checked against the card as it stands now, not as it was created.
+const currentEmployee = await get(`/hrm/employees/${employee.id}`);
+const full = await get(statementPath(`employee_id=${employee.id}&full_period=1`));
+const movements = (full.rows ?? []).filter((row) => row.entryId !== null);
+
+check('👤 اسم الموظف ورقم حسابه', full.employee?.name === currentEmployee.name && Boolean(full.employee?.accountCode), `${full.employee?.employeeNo} ${full.employee?.accountCode}`);
+check('📊 تفاصيل كشف الحساب — سطرٌ لكل قيد مرحَّل', movements.length >= 3 && movements.every((row) => row.entryNumber), `${movements.length} صف`);
+check('كل سطر يحمل الموظف والفرع', movements.every((row) => row.employee === currentEmployee.name && row.branchName), movements[0]?.branchName ?? '—');
+
+const debitSum = movements.reduce((sum, row) => sum + Number(row.debit), 0);
+const creditSum = movements.reduce((sum, row) => sum + Number(row.credit), 0);
+check('💳 إجمالي المدين = مجموع العمود', Number(full.summary.totalDebit) === debitSum, `${full.summary.totalDebit}`);
+check('💵 إجمالي الدائن = مجموع العمود', Number(full.summary.totalCredit) === creditSum, `${full.summary.totalCredit}`);
+// `UpdateSummary` — |مدين − دائن| على جانبٍ واحد، والآخر صفر.
+const balance = Number(full.summary.balanceDebit) - Number(full.summary.balanceCredit);
+check(
+  '⚖️ الرصيد على جانبٍ واحد',
+  (Number(full.summary.balanceDebit) === 0 || Number(full.summary.balanceCredit) === 0) &&
+    Math.abs(balance) === Math.abs(debitSum - creditSum),
+  `${full.summary.balanceDebit} / ${full.summary.balanceCredit}`,
+);
+const lastRow = movements[movements.length - 1];
+check(
+  'الرصيد المتحرك ينتهي عند الرصيد',
+  Math.abs(Number(lastRow?.runningBalance ?? 0)) === Math.abs(balance),
+  `${lastRow?.runningBalance} ${lastRow?.balanceStatus}`,
+);
+
+const noEmployeeStatement = await refused('get', statementPath('full_period=1'));
+check('اختر موظف.', noEmployeeStatement.status === 422 && noEmployeeStatement.detail === 'اختر موظف', `${noEmployeeStatement.status} ${noEmployeeStatement.code}`);
+const unknownEmployee = await refused('get', statementPath('employee_id=00000000-0000-0000-0000-000000000000&full_period=1'));
+check('موظفٌ من مستأجر آخر — «اختر موظف»', unknownEmployee.status === 422 && unknownEmployee.code === 'EMPLOYEE_STATEMENT_EMPLOYEE_REQUIRED', unknownEmployee.detail);
+
+const emptyPeriod = await get(statementPath(`employee_id=${employee.id}&from=2000-01-01&to=2000-01-31`));
+check('📅 الفترة الزمنية — فترةٌ بلا حركات', (emptyPeriod.rows ?? []).filter((row) => row.entryId !== null).length === 0, `${(emptyPeriod.rows ?? []).length} صف`);
+const todayPeriod = await get(statementPath(`employee_id=${employee.id}&from=${today}&to=${today}`));
+check('اليوم الأخير داخل الفترة', (todayPeriod.rows ?? []).filter((row) => row.entryId !== null).length >= 1, `${(todayPeriod.rows ?? []).length} صف`);
+
+// 🏢 الفرع — `chkAllBranches` off means one branch only. The seeded tenant has a single
+// branch and every حركة here belongs to it, so the check brings a second branch of its
+// own: the screen has to show nothing for it. Section 10 deletes it again.
+const otherBranch = await post('/branches', { code: `VRB${stamp}`, nameAr: `فرع التحقق ${stamp}` });
+const onOtherBranch = await get(statementPath(`employee_id=${employee.id}&branch_id=${otherBranch.id}&full_period=1`));
+check('🏢 الفرع — فرعٌ بلا حركات للموظف', (onOtherBranch.rows ?? []).filter((row) => row.entryId !== null).length === 0, otherBranch.nameAr);
+const onBranch = await get(statementPath(`employee_id=${employee.id}&branch_id=${branchId}&full_period=1`));
+check('كل الفروع يحوي حركات الفرع', (onBranch.rows ?? []).filter((row) => row.entryId !== null).length === movements.length, `${(onBranch.rows ?? []).length} صف`);
+
+const tomorrow = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+const carried = await get(statementPath(`employee_id=${employee.id}&from=${tomorrow}&to=${tomorrow}`));
+check(
+  'الرصيد السابق يُرحَّل عند طلب فترة تبدأ بعد أول حركة',
+  (carried.rows ?? []).length === 1 && (carried.rows ?? [])[0].entryId === null && (carried.rows ?? [])[0].entryType === 'رصيد سابق',
+  (carried.rows ?? [])[0]?.description ?? '—',
+);
+const hidden = await get(statementPath(`employee_id=${employee.id}&from=${tomorrow}&to=${tomorrow}&hide_previous_balance=1`));
+check('عدم إظهار الرصيد السابق', (hidden.rows ?? []).length === 0, `${(hidden.rows ?? []).length} صف`);
+
+const detailed = await get(statementPath(`employee_id=${employee.id}&full_period=1&detailed=1`));
+const detailedRows = detailed.rows ?? [];
+check('📑 تفصيلي — سطرٌ لكل سطر قيد لا لكل قيد', detailedRows.length >= movements.length, `${detailedRows.length} صف مقابل ${movements.length} تجميعي`);
+check(
+  'البيان في التفصيلي من سطر القيد لا من القيد',
+  detailedRows.some((row) => !movements.some((movement) => movement.description === row.description)),
+  detailedRows[0]?.description ?? '—',
+);
+
+// ---------------------------------------------------------------------------
 // Cleanup — what this run created, removed again.
 // ---------------------------------------------------------------------------
 // Only what this run created — the demo tenant's own حوافز must survive a verification.
@@ -428,12 +513,15 @@ for (const id of removedDrafts) await refused('delete', `/hrm/salary-payments/${
 for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo) === `VRP${stamp}`)) await refused('delete', `/hrm/employees/${row.id}`);
 for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'))) await refused('delete', `/hrm/employees/${row.id}`);
 for (const row of (await get('/hrm/departments')).filter((entry) => String(entry.code).startsWith('VR'))) await refused('delete', `/hrm/departments/${row.id}`);
+for (const row of (await get('/branches')).filter((entry) => String(entry.code ?? '').startsWith('VRB'))) await refused('delete', `/branches/${row.id}`);
 const remaining = (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'));
 check('لا يبقى أثر بعد التشغيل', remaining.length === 0, `${remaining.length} صف`);
+const remainingBranches = (await get('/branches')).filter((entry) => String(entry.code ?? '').startsWith('VRB'));
+check('حُذف فرع التحقق', remainingBranches.length === 0, `${remainingBranches.length} صف`);
 const remainingAdjustments = (await get('/hrm/adjustments')).filter((row) => madeAdjustments.includes(row.id));
 check('تبقى الحركات المرحَّلة وحدها', remainingAdjustments.every((row) => row.status === 'approved' && row.journalEntryId), `${remainingAdjustments.length} صف`);
 const remainingDrafts = (await get('/hrm/salary-payments')).filter((row) => removedDrafts.includes(row.id));
 check('حُذف الإذن المسوَّد', remainingDrafts.length === 0, `${remainingDrafts.length} صف`);
 
-console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات · 💵 دفع الرواتب verified' : `\n✗ ${failures} check(s) failed`);
+console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات · 💵 دفع الرواتب · 📄 كشف حساب موظف verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

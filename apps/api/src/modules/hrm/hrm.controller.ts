@@ -20,6 +20,15 @@ import {
   type SalaryPaymentInput,
 } from './hrm.service.js';
 
+/**
+ * The desktop sends `1`, `true` and `on` for the same checkbox (and the accounting
+ * controller accepts all three); `undefined` has to stay `undefined` so the service can
+ * tell «لم يُرسل شيء» from «أُرسل لا» — `فترة كاملة` defaults to whether a `من` was sent.
+ */
+function flag(value?: string): boolean | undefined {
+  return value === undefined ? undefined : value === '1' || value === 'true' || value === 'on';
+}
+
 @Controller('hrm')
 export class HrmController {
   constructor(private readonly hrm: HrmService) {}
@@ -55,6 +64,29 @@ export class HrmController {
   @Get('payroll/runs/:id') @RequiresPermission('hrm.view') readRun(@Param('id') id: string) { return this.hrm.readRun(getTenantContext().tenantId, id); }
   @Post('payroll/runs/:id/post') @RequiresPermission('hrm.payroll.post') postRun(@Param('id') id: string, @Body() body: PostRunInput) { return this.hrm.postRun(getTenantContext().tenantId, id, body); }
   @Post('payroll/runs/:id/pay') @RequiresPermission('hrm.payroll.post') payRun(@Param('id') id: string, @Body() body: PayRunInput) { return this.hrm.payRun(getTenantContext().tenantId, id, body); }
+  /** 📄 كشف حساب موظف — `frmEmpAccountGet` «كشف حساب موظف»: the employee's own account, entry by entry. */
+  @Get('employee-statement')
+  @RequiresPermission('hrm.view')
+  employeeStatement(
+    @Query('employee_id') employeeId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('full_period') fullPeriod?: string,
+    @Query('hide_previous_balance') hidePreviousBalance?: string,
+    @Query('detailed') detailed?: string,
+  ) {
+    return this.hrm.employeeStatement(getTenantContext().tenantId, {
+      employeeId,
+      from,
+      to,
+      branchId,
+      fullPeriod: flag(fullPeriod),
+      hidePreviousBalance: flag(hidePreviousBalance),
+      detailed: flag(detailed),
+    });
+  }
+
   /** 💵 دفع الرواتب — `frmSalaryPay` «إذن صرف راتب»: one document per employee per month. */
   @Get('salary-payments') @RequiresPermission('hrm.view') salaryPayments(
     @Query('employee_id') employeeId?: string,

@@ -664,6 +664,34 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   تُفتح بـ `?id=`، و`⏰ الوقت` على السند كما في المرحلة 07، و`PaySalary.repx` إلى مرحلة
   التقارير.
 
+* **المرحلة 08 — الموظفون والرواتب، الجزء الرابع: 📄 كشف حساب موظف**
+  (`Form_WPF/frmEmpAccountGet.xaml` «كشف حساب موظف»). **لم يكن للموظف كشفٌ في السحابة:
+  السبيل الوحيد `GET /accounting/statements/general-ledger/:accountId`، ومن أراد كشف
+  موظف كان عليه أن يعرف رقم حسابه أولاً؛ وكان في الشجرة صفٌّ باسم «حساب موظف» يشير إلى
+  `/reports/employee-account` — مسارٌ لم يُبنَ قط.** النافذة three regions: الفلاتر
+  `اسم الموظف` («اختر الموظف...») · `🏢 الفرع` + `كل الفروع` · `📅 الفترة الزمنية` +
+  `فترة كاملة` + `من:`/`إلى:` · `🔍 عرض كشف الحساب`؛ والشبكة `📊 تفاصيل كشف الحساب`
+  بـ`م · مدين · دائن · الموظف · رقم القيد · تاريخ القيد · البيان · تفاصيل`
+  (`BuildResultTable` L305)؛ وأربع بطاقات `💳 إجمالي المدين` · `💵 إجمالي الدائن` ·
+  `⚖️ الرصيد المدين` · `⚖️ الرصيد الدائن` (`UpdateSummary` L318 — الرصيد على جانبٍ
+  واحد، والآخر «0»). و`ShowAccount` L226 هو الاستعلام نفسه: `Entry ⋈ Entry_sub` على
+  حساب الموظف، `IS_Deleted=0 AND state=1` (المرحَّل وحده)، والتاريخان `>= @date1 AND
+  <= @date2` حيث `@date2 = txtDateTo.AddHours(24)` — اليوم الأخير داخل الفترة — و
+  `GROUP BY Entry.GlobalID, …`: صفٌّ لكل قيد. و`LoadAccounts` L96
+  (`AccCode <> -1`): **لا يظهر إلا من له حساب**، ومن لا حساب له يُردّ بـ «لا يوجد حساب
+  للموظف في دليل الحسابات». **لا ترحيل ولا SQL جديد**: `HrmService.employeeStatement`
+  يأخذ حساب الموظف (`employeeAccountId ?? salaryPayableAccountId`) ويُفوِّض إلى
+  `AccountingService.accountStatement`، فالرصيد السابق والمتحرّك محسوبان مرّةً واحدة،
+  وكشف الموظف لا يختلف حساباً عن كشف الحساب ولا كشف مركز الكلفة. وصُحِّح عرضاً خللٌ
+  قديم: السلفة المصروفة نقداً كانت تُخصم من الراتب مرّة ثانية، فصارت
+  `adjustmentsForMonth` على صورة `FrmReseved.xaml.cs` L166 (`SubFromSalary = 1`
+  والتاريخ داخل الشهر) — أثرُه في مسيّر الشهر وفي إذن الصرف. ومربّعات «فترة كاملة» و
+  «عدم إظهار الرصيد السابق» و«تفصيلي» تقبل `1` و`true` و`on` كما في المحاسبة، ولم يكن
+  للأولين أثرٌ قبل ذلك. `apps/api/test/employee-statement.spec.ts` (11 اختباراً) و
+  `scripts/verify-hrm.mjs` §9 (**82** نقطة تحقّق حيّة بعد أن كانت 64، ثلاث تشغيلات
+  متتالية خضراء). **652** اختبار API (كان 641) · 36 staff · 71 contract · tsc وlint
+  أخضران. مؤجَّل: `👁️ معاينة` و`PaySalary.repx` إلى مرحلة التقارير.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

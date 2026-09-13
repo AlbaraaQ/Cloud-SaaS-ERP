@@ -896,8 +896,12 @@ const hrm: ModuleNode = {
           'ready',
           { permission: 'reporting.view' },
         ),
-        screen('employee-account', 'حساب موظف', 'Employee account', '/reports/employee-account', 'ready', {
-          permission: 'reporting.view',
+        // 📄 `Form_WPF/frmEmpAccountGet.xaml` «كشف حساب موظف» — the employee's account
+        // statement. It used to sit under `/reports/employee-account`, a route that was
+        // never built; the screen lives with the employees it reports on.
+        screen('employee-account', 'كشف حساب موظف', 'Employee account statement', '/hrm/employee-statement', 'ready', {
+          permission: 'hrm.view',
+          endpoint: '/hrm/employee-statement',
         }),
         screen('user-logs', 'سجلات المستخدمين', 'User logs', '/settings/audit', 'ready', {
           permission: 'tenant.audit.view',

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { alias } from 'drizzle-orm/pg-core';
-import { and, asc, desc, eq, gte, ilike, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   accounts,
@@ -30,7 +30,7 @@ import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService, defaultNormalBalance, type AccountType, type JournalLineInput } from '../accounting/accounting.service.js';
 import { TreasuryService } from '../treasury/treasury.service.js';
 
-import { calculatePayrollLine, monthEnd } from './payroll-calculator.js';
+import { calculatePayrollLine } from './payroll-calculator.js';
 
 export type DepartmentInput = { code: string; name: string; branchId?: string; parentId?: string | null };
 export type JobInput = { code: string; name: string };
@@ -113,6 +113,40 @@ export type AdjustmentQuery = { employeeId?: string; typeCode?: string; status?:
 export type RunInput = { yearMonth: string; periodId?: string; currency?: string; unpaidDaysByEmployee?: Record<string, number> };
 export type PostRunInput = { journalEntryId?: string; branchId?: string; fiscalPeriodId?: string; journalLines?: JournalLineInput[] };
 export type PayRunInput = { branchId: string; cashLocationId: string; method?: 'cash' | 'cheque' | 'bank_transfer' | 'card'; fiscalPeriodId?: string };
+
+/**
+ * 📄 كشف حساب موظف — `frmEmpAccountGet.xaml`. The window's own filters, in its own
+ * words: «اسم الموظف» (required — «اختر موظف»), «🏢 الفرع» with «كل الفروع»,
+ * «📅 الفترة الزمنية» with «فترة كاملة» and `من`/`إلى`.
+ */
+export type EmployeeStatementQuery = {
+  employeeId?: string;
+  from?: string;
+  to?: string;
+  branchId?: string;
+  /** «فترة كاملة» — every posted entry, and therefore no رصيد سابق row. */
+  fullPeriod?: boolean;
+  /** «عدم إظهار الرصيد السابق» — the movements only. */
+  hidePreviousBalance?: boolean;
+  /** 📊 تفصيلي — one row per سطر قيد instead of one row per قيد, as the window groups. */
+  detailed?: boolean;
+};
+
+/** 📄 كشف حساب موظف — one row of `GridControl1` (`م · مدين · دائن · الموظف · رقم القيد · تاريخ القيد · البيان`). */
+export type EmployeeStatementRow = {
+  seq: number;
+  date: string;
+  entryId: string | null;
+  entryNumber: string | null;
+  description: string | null;
+  debit: string;
+  credit: string;
+  employee: string | null;
+  branchName: string | null;
+  entryType: string;
+  runningBalance: string | null;
+  balanceStatus: string | null;
+};
 
 /**
  * 💵 إذن صرف راتب — `frmSalaryPay.xaml` «💰 دفع الرواتب».
@@ -785,6 +819,88 @@ export class HrmService {
   }
 
   /**
+   * 📄 كشف حساب موظف — `Form_WPF/frmEmpAccountGet.xaml` («كشف حساب موظف»).
+   *
+   * The window refuses an empty «اسم الموظف» with **«اختر موظف»** (`ShowAccount`), then
+   * reads the employee's own account — `Employees.AccCode`, the account Part One writes
+   * under «موظفين الفرع الرئيسي» — out of `Entry ⋈ Entry_sub ⋈ Accounts_Index`, grouped
+   * by قيد (`GROUP BY Entry.GlobalID, Entry.date, Entry_sub.notes, Entry_sub.acc_no`)
+   * and restricted to `Entry.IS_Deleted=0 AND Entry.state=1` — posted entries only. The
+   * grid is `م · مدين · دائن · الموظف · رقم القيد · تاريخ القيد · البيان`, and
+   * `UpdateSummary` prints «💳 إجمالي المدين» · «💵 إجمالي الدائن» · «⚖️ الرصيد المدين» ·
+   * «⚖️ الرصيد الدائن» — the balance sitting on one side only, never both.
+   *
+   * The cloud already had the statement itself (`GET
+   * /accounting/statements/general-ledger/:accountId`, Phase 07 part two) with the same
+   * رصيد سابق row and the same running balance; what it did not have was the employee
+   * half of the window — pick a موظف, get their حساب — so this is that half, and the
+   * arithmetic is not recomputed twice.
+   */
+  async employeeStatement(tenantId: string, query: EmployeeStatementQuery = {}) {
+    await this.ensureEnabled(tenantId);
+    const employeeId = query.employeeId;
+    if (!employeeId) throw new DomainError('EMPLOYEE_STATEMENT_EMPLOYEE_REQUIRED', 'اختر موظف', 422);
+    const [employee] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(employees).where(and(eq(employees.tenantId, tenantId), eq(employees.id, employeeId), isNull(employees.deletedAt))).limit(1));
+    if (!employee) throw new DomainError('EMPLOYEE_STATEMENT_EMPLOYEE_REQUIRED', 'اختر موظف', 422);
+
+    // «اسم الموظف» carries `AccCode`, not the id: the statement is the account's, and an
+    // employee without one has nothing to show. Part One creates it on the card.
+    const accountId = employee.employeeAccountId ?? employee.salaryPayableAccountId;
+    if (!accountId) throw new DomainError('EMPLOYEE_STATEMENT_ACCOUNT_REQUIRED', 'لا يوجد حساب للموظف في دليل الحسابات', 422);
+
+    const statement = await this.accounting.accountStatement(tenantId, accountId, {
+      from: query.from,
+      to: query.to,
+      branchId: query.branchId,
+      // «فترة كاملة» is the checked box; with no `من` there is no «before» to carry.
+      fullPeriod: query.fullPeriod ?? !query.from,
+      hidePreviousBalance: query.hidePreviousBalance,
+      // The window groups by قيد, so one row per قيد unless تفصيلي is asked for.
+      summary: !query.detailed,
+    });
+
+    const rows: EmployeeStatementRow[] = statement.rows.map((row, index) => ({
+      seq: index + 1,
+      date: row.date,
+      entryId: row.entryId,
+      entryNumber: row.number,
+      description: row.description,
+      debit: row.debit,
+      credit: row.credit,
+      employee: row.accountName,
+      branchName: row.branchName,
+      entryType: row.entryType,
+      runningBalance: row.runningBalance,
+      balanceStatus: row.balanceStatus,
+    }));
+
+    return {
+      data: {
+        employee: {
+          id: employee.id,
+          employeeNo: employee.employeeNo,
+          name: employee.name,
+          accountId,
+          accountCode: statement.account.code,
+          accountName: statement.account.nameAr,
+        },
+        branchId: query.branchId ?? null,
+        from: query.from ?? null,
+        to: query.to ?? null,
+        fullPeriod: Boolean(query.fullPeriod ?? !query.from),
+        summary: {
+          totalDebit: statement.totals.debit,
+          totalCredit: statement.totals.credit,
+          balanceDebit: statement.totals.periodDebit,
+          balanceCredit: statement.totals.periodCredit,
+        },
+        rows,
+      },
+    };
+  }
+
+  /**
    * 💵 «💾 حفظ» — `btnSave_Click`.
    *
    * The window refuses three things before it writes («يجب اختيار الفرع.» ·
@@ -966,7 +1082,43 @@ export class HrmService {
   async payRun(tenantId: string, id: string, input: PayRunInput) { await this.ensureEnabled(tenantId); const current = await this.readRun(tenantId, id); if (current.data.status !== 'posted') throw new DomainError('PAYROLL_RUN_NOT_POSTED', 'Only posted payroll runs can be paid', 409); const payValue = sumLines(current.data.lines.map((line) => line.net)); const voucher = await this.treasury.createVoucher(tenantId, { branchId: input.branchId, kind: 'payment', subtype: 'salary', date: new Date().toISOString().slice(0, 10), cashLocationId: input.cashLocationId, method: input.method ?? 'cash', amount: payValue, netAmount: payValue, idempotencyKey: `payroll:${id}` }); const posted = voucher?.id ? await this.treasury.postVoucher(tenantId, voucher.id, { fiscalPeriodId: input.fiscalPeriodId }) : undefined; await withTenantTx(this.database.db, tenantId, (tx) => tx.update(payrollRuns).set({ status: 'paid', voucherId: posted?.id, paidAt: new Date(), updatedAt: new Date() }).where(and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.id, id)))); return this.readRun(tenantId, id); }
   async reverseRun(tenantId: string, id: string, reason: string) { await this.ensureEnabled(tenantId); if (!reason.trim()) throw new DomainError('VALIDATION_FAILED', 'Reversal reason is required', 422); const current = await this.readRun(tenantId, id); if (current.data.status !== 'posted' && current.data.status !== 'paid') throw new DomainError('PAYROLL_REVERSAL_INVALID', 'Only posted or paid runs can be reversed', 409); await withTenantTx(this.database.db, tenantId, (tx) => tx.update(payrollRuns).set({ status: 'reversed', reversedAt: new Date(), reversalReason: reason, updatedAt: new Date() }).where(and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.id, id)))); return this.readRun(tenantId, id); }
 
-  private async adjustmentsForMonth(tenantId: string, yearMonth: string) { const start = `${yearMonth}-01`; const end = monthEnd(yearMonth); return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.status, 'approved'), lte(salaryAdjustments.startsOn, end), or(isNull(salaryAdjustments.endsOn), gte(salaryAdjustments.endsOn, start)) ?? sql`true`))); }
+  /**
+   * The حوافز والخصومات a month's مسيّر carries.
+   *
+   * `Form_WPF/FrmReseved.xaml.cs` L166 — «إستحقاق راتب شهر … لسنة …» — sums
+   * `EmpSalaryAddSub` into `addSal`/`SubSal` under three conditions, and they are the
+   * difference between a مسيّر and a mistake:
+   *
+   *   • `ESA.SubFromSalary = 1` — only what «✂️ تخصم من الراتب» / «✅ تضاف على الراتب»
+   *     marked to ride the salary. A سلفة handed over in cash has already left the till
+   *     and already been posted to the employee's account; taking it out of the salary as
+   *     well takes it twice.
+   *   • `ESA.[date] >= @StartDate AND ESA.[date] < @EndDate` — the document belongs to the
+   *     month it is dated in. A window (`startsOn … endsOn`) would keep a one-off خصم in
+   *     every salary that follows it.
+   *   • `ESA.IS_Deleted = 0`.
+   *
+   * The cloud adds one condition the desktop has no column for: `status = 'approved'`.
+   */
+  private async adjustmentsForMonth(tenantId: string, yearMonth: string) {
+    const start = `${yearMonth}-01`;
+    const [yearText, monthText] = yearMonth.split('-');
+    const next = new Date(Date.UTC(Number(yearText), Number(monthText), 1)).toISOString().slice(0, 10);
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(salaryAdjustments)
+        .where(
+          and(
+            eq(salaryAdjustments.tenantId, tenantId),
+            eq(salaryAdjustments.status, 'approved'),
+            isNull(salaryAdjustments.deletedAt),
+            eq(salaryAdjustments.subFromSalary, true),
+            gte(salaryAdjustments.startsOn, start),
+            lt(salaryAdjustments.startsOn, next),
+          ),
+        ));
+  }
 }
 
 /**
