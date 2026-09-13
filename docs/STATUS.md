@@ -576,6 +576,36 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   item group, and there is no general rental module in the standard per-tenant list) and
   the `من وقت`/`إلى وقت` boxes, which cut a day the cloud cuts by date.
 
+* **المرحلة 08 — الموظفون والرواتب، الجزء الأول: 👤 بطاقة الموظف**
+  (`Form_WPF/frmEmployees.xaml` «تعريف موظف» · `frmManagement.xaml` «الإدارات» ·
+  `frmDepartments.xaml` «إدخال بيانات الإدارات والأقسام» · `frmJobs.xaml` «الوظائف»).
+  **حزمة الرواتب كانت قائمة قبل هذه المرحلة — الإدارات والوظائف والموظفون
+  والمسيرات — لكن بطاقة الموظف كانت نصفَ بطاقة.** `GET /hrm/employees` يردّ ثلاثة
+  عشر حقلاً: جانبُ الراتب وما يحيط به، ولا ميلاد، ولا هاتف، ولا هوية، ولا حساب.
+  والديسكتوب لا يحفظ موظفاً بلا حساب: `frmEmployees.xaml.cs` L520 يرفض اسماً فارغاً
+  («يجب إدخال اسم الموظف»)، ثم L600 `SaveAccounts` يكتب شجرة حساب باسم الموظف تحت
+  حساب موظفي الفرع (`Common.CurrentBranch.EmployeeAcc`، وافتراضه 2241 — وهو
+  «موظفين الفرع الرئيسي» في الشجرة المزروعة عندنا)، ويعيد تسميتها إن كان الرمز
+  موجوداً، ويهمل نتيجتها فلا يُسقط فشلُها حفظَ الموظف. وL730 يرفض حذفَ موظفٍ له
+  مستخدم («لا يمكن حذف موظف مرتبط بمستخدم») أو فواتير («لا يمكن حذف موظف مرتبط
+  بفواتير»). ترحيل 0049 يضيف `departments.parent_id` والاثني عشر عموداً — وال
+  `parent_id` وحده هو ما يجعل الإدارة والقسم درجتين لا اسماً واحداً: صفٌّ بلا أبٍ هو
+  إدارة، وصفٌّ بأبٍ هو قسم، فلا تُخزَّن الإدارة مرتين فيمكن أن تختلف عن قسمها.
+  والآن: `رقم الحساب` يُخصَّص تلقائياً (`MaxId` نفسه: الرقم التالي تحت الأب) ويردّ
+  على البطاقة، وتغيير الاسم يغيّر اسم الحساب لأن الحساب هو الموظف داخل الدفتر،
+  و`إجمالي الرواتب والمستحقات` يُحسب من البدلات السبعة كما تفعل
+  `CalculateTotalSalary` — وهي الأرقام نفسها التي تجمعها حاسبة المسير، فلا يمكن أن
+  يختلف ما تراه البطاقة عمّا يراه مسيّر الرواتب. و`GET /hrm/employees?q=` يبحث
+  بالاسم أو بالرقم، وفلتر الإدارة يجلب موظفي أقسامها. **التوافق مصون:** الردّ مصفوفة
+  كما كان وكل مفتاحٍ قديم باقٍ. اختبارات `apps/api/test/employee-card.spec.ts`
+  (16 — أول اختبارات HTTP للوحدة: كانت `hrm` بلا اختبارٍ غير حاسبة الراتب)،
+  و`scripts/verify-hrm.mjs` (27 نقطة تحقّق حيّة، تُعاد ثلاث مرات بلا أثر).
+  **618** اختبار API (كان 602) · 36 staff · 71 contract · lint أخضر. أُجّلت
+  «🖼️ صورة الموظف» (بايتاتٌ في عمود الديسكتوب، وملفات السحابة تحتاج تدفّق
+  presign/finalize في الشاشة) و«🏬 فروع الموظف» (`EmpBranches` — موظفٌ على أكثر من
+  فرع، والسحابة تحمل فرعاً واحداً)، و`frmAttendM.xaml` لأن «تحضير المراكب» حضورُ
+  مراكبَ لا موظفين (مرحلة الوحدات الرأسية).
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

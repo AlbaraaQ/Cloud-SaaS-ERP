@@ -852,10 +852,13 @@ const hrm: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
       items: [
-        screen('departments', 'تعريف الإدارات', 'Departments', '/hrm/departments', 'ready', {
+        // 🏢 `frmManagement.xaml` («الإدارات») + `frmDepartments.xaml`
+        // («إدخال بيانات الإدارات والأقسام») — one window over the two-level unit, and
+        // `frmJobs.xaml` («الوظائف») beside it.
+        screen('departments', 'الإدارات والأقسام', 'Departments & sections', '/hrm/departments', 'ready', {
           endpoint: '/hrm/departments',
         }),
-        screen('sections', 'تعريف الأقسام والوظائف', 'Jobs', '/hrm/jobs', 'ready', { endpoint: '/hrm/jobs' }),
+        screen('jobs', 'الوظائف', 'Jobs', '/hrm/jobs', 'ready', { endpoint: '/hrm/jobs' }),
         screen('employee', 'تعريف موظف', 'Employee', '/hrm/employees', 'ready', {
           endpoint: '/hrm/employees',
         }),

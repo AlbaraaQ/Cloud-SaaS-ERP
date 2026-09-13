@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from 'drizzle-orm/pg-core';
 
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
@@ -11,17 +11,25 @@ import { tenants } from './platform.js';
 
 const cashValue = { precision: 20, scale: 4, mode: 'string' as const };
 
+/**
+ * 🏢 الإدارات والأقسام — `Form_WPF/frmManagement.xaml` («الإدارات») and
+ * `frmDepartments.xaml` («إدخال بيانات الإدارات والأقسام») are two windows over one
+ * parent/child pair: `Managements(id, name)` is the parent of
+ * `Departments(id, manag_id, name)`. One self-referencing table carries both: a row with
+ * no parent *is* an إدارة, a row with one is a قسم, and `الإدارة` on the employee card
+ * is the assigned row's parent rather than a second column that could disagree with it.
+ */
 export const departments = pgTable('departments', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }), code: text('code').notNull(), name: text('name').notNull(), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
-}, (table) => ({ codeKey: uniqueIndex('departments_tenant_code_key').on(table.tenantId, table.code).where(sql`deleted_at IS NULL`), branchIdx: index('departments_branch_idx').on(table.tenantId, table.branchId) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }), code: text('code').notNull(), name: text('name').notNull(), parentId: uuid('parent_id').references((): AnyPgColumn => departments.id, { onDelete: 'restrict' }), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
+}, (table) => ({ codeKey: uniqueIndex('departments_tenant_code_key').on(table.tenantId, table.code).where(sql`deleted_at IS NULL`), branchIdx: index('departments_branch_idx').on(table.tenantId, table.branchId), parentIdx: index('departments_parent_idx').on(table.tenantId, table.parentId) }));
 
 export const jobs = pgTable('jobs', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), code: text('code').notNull(), name: text('name').notNull(), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
 }, (table) => ({ codeKey: uniqueIndex('jobs_tenant_code_key').on(table.tenantId, table.code).where(sql`deleted_at IS NULL`) }));
 
 export const employees = pgTable('employees', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), employeeNo: text('employee_no').notNull(), name: text('name').notNull(), branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }), departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }), jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'set null' }), membershipId: uuid('membership_id').references(() => memberships.id, { onDelete: 'set null' }), status: text('status').notNull().default('active'), hireDate: date('hire_date'), salaryComponents: jsonb('salary_components').$type<Record<string, string>>().notNull().default({}), bank: jsonb('bank').$type<Record<string, string | undefined>>().notNull().default({}), salaryExpenseAccountId: uuid('salary_expense_account_id').references(() => accounts.id, { onDelete: 'restrict' }), salaryPayableAccountId: uuid('salary_payable_account_id').references(() => accounts.id, { onDelete: 'restrict' }), costCenterId: uuid('cost_center_id').references(() => costCenters.id, { onDelete: 'set null' }), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
-}, (table) => ({ noKey: uniqueIndex('employees_tenant_no_key').on(table.tenantId, table.employeeNo).where(sql`deleted_at IS NULL`), branchIdx: index('employees_branch_idx').on(table.tenantId, table.branchId), memberIdx: index('employees_membership_idx').on(table.tenantId, table.membershipId) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), employeeNo: text('employee_no').notNull(), name: text('name').notNull(), branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }), departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }), jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'set null' }), membershipId: uuid('membership_id').references(() => memberships.id, { onDelete: 'set null' }), status: text('status').notNull().default('active'), hireDate: date('hire_date'), birthDate: date('birth_date'), insuranceNo: text('insurance_no'), nationalId: text('national_id'), maritalStatus: text('marital_status'), nationality: text('nationality'), gender: text('gender'), phone: text('phone'), mobile: text('mobile'), email: text('email'), address: text('address'), notes: text('notes'), /** 👤 رقم الحساب — the account `frmEmployees.xaml.cs` L600 writes for the employee. */ employeeAccountId: uuid('employee_account_id').references(() => accounts.id, { onDelete: 'set null' }), salaryComponents: jsonb('salary_components').$type<Record<string, string>>().notNull().default({}), bank: jsonb('bank').$type<Record<string, string | undefined>>().notNull().default({}), salaryExpenseAccountId: uuid('salary_expense_account_id').references(() => accounts.id, { onDelete: 'restrict' }), salaryPayableAccountId: uuid('salary_payable_account_id').references(() => accounts.id, { onDelete: 'restrict' }), costCenterId: uuid('cost_center_id').references(() => costCenters.id, { onDelete: 'set null' }), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
+}, (table) => ({ noKey: uniqueIndex('employees_tenant_no_key').on(table.tenantId, table.employeeNo).where(sql`deleted_at IS NULL`), branchIdx: index('employees_branch_idx').on(table.tenantId, table.branchId), memberIdx: index('employees_membership_idx').on(table.tenantId, table.membershipId), accountIdx: index('employees_account_idx').on(table.tenantId, table.employeeAccountId) }));
 
 export const attendanceLogs = pgTable('attendance_logs', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'cascade' }), machine: text('machine').notNull(), enroll: text('enroll').notNull(), punchAt: timestamp('punch_at', { withTimezone: true }).notNull(), direction: text('direction').notNull(), fingerprint: text('fingerprint').notNull(), payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
