@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { Request } from 'express';
 import { DomainError, errorCodes } from '@erp/contracts';
 import {
+  membershipRoleScopes,
   membershipRoles,
   memberships,
   rolePermissions,
@@ -18,6 +19,7 @@ import {
   getAuthContext,
   setTenantContextValue,
   type AuthContextValue,
+  type RoleScopeValue,
   type TenantContextValue,
 } from '../../../request-context/request-context.js';
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
@@ -79,6 +81,7 @@ export class TenantGuard implements CanActivate {
           status: memberships.status,
           branchScope: memberships.branchScope,
           isOwner: memberships.isOwner,
+          kind: memberships.kind,
         })
         .from(memberships)
         .where(
@@ -112,6 +115,17 @@ export class TenantGuard implements CanActivate {
         .where(and(eq(membershipRoles.membershipId, membership.id), isNull(roles.deletedAt)));
     });
 
+    const scopeRows = await withTenantTx(this.database.db, tenant.id, async (tx) => {
+      return tx
+        .select({
+          roleId: membershipRoleScopes.roleId,
+          scopeType: membershipRoleScopes.scopeType,
+          scopeId: membershipRoleScopes.scopeId,
+        })
+        .from(membershipRoleScopes)
+        .where(eq(membershipRoleScopes.membershipId, membership.id));
+    });
+
     const tenantContext: TenantContextValue = {
       tenantId: tenant.id,
       tenantCode: tenant.code,
@@ -121,6 +135,12 @@ export class TenantGuard implements CanActivate {
       permissions: permissionRows.map((row) => row.code),
       branchScope: (membership.branchScope as string[] | null) ?? null,
       isOwner: membership.isOwner,
+      kind: membership.kind === 'portal' ? 'portal' : 'staff',
+      scopes: scopeRows.map((row) => ({
+        roleId: row.roleId,
+        scopeType: row.scopeType as RoleScopeValue['scopeType'],
+        scopeId: row.scopeId,
+      })),
     };
 
     request.tenant = tenantContext;

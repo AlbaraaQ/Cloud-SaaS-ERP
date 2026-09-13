@@ -1,0 +1,434 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmInvoiceDetails"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تفاصيل الفاتورة"
+    Width="1100" Height="620"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded"
+    KeyDown="Window_KeyDown">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="WarningBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F0A500" Offset="0"/>
+            <GradientStop Color="#C07800" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <Style x:Key="WarningBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GridColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="6,0"/>
+        </Style>
+
+        <Style x:Key="GridRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="30"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+                <Trigger Property="AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="#F8F9FD"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Header ═══ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="12,8"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="btnClose"
+                        Grid.Column="0"
+                        Content="✖"
+                        Style="{StaticResource DangerBtn}"
+                        Width="40" Height="36"
+                        ToolTip="إغلاق"
+                        Click="btnClose_Click"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="📋 تفاصيل الفاتورة"
+                           Foreground="White"
+                           FontSize="14" FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="2"
+                           x:Name="Label5"
+                           Text="🔍 باركود المادة:"
+                           Foreground="White"
+                           FontSize="11" FontWeight="Bold"
+                           VerticalAlignment="Center"/>
+
+                <TextBox x:Name="txtSrchDgv"
+                         Grid.Column="4"
+                         Style="{StaticResource ModernTextBox}"
+                         KeyDown="txtSrchDgv_KeyDown"/>
+
+                <Button x:Name="btnRecalculateCost"
+                        Grid.Column="6"
+                        Content="⟳ إعادة احتساب التكلفة"
+                        Style="{StaticResource WarningBtn}"
+                        Width="160"
+                        Click="btnRecalculateCost_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- ═══ DataGrid ═══ -->
+        <Border Grid.Row="1"
+                Background="White"
+                Margin="8,8,8,0"
+                CornerRadius="10"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Background="{StaticResource HeaderBrush}"
+                        CornerRadius="10,10,0,0">
+                    <TextBlock Text="📦 أصناف الفاتورة"
+                               Foreground="White"
+                               FontSize="13" FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Margin="14,0"/>
+                </Border>
+
+                <DataGrid x:Name="dgvItems"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          ColumnHeaderStyle="{StaticResource GridColHeader}"
+                          RowStyle="{StaticResource GridRow}"
+                          AlternationCount="2"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          FlowDirection="RightToLeft"
+                          Background="White"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E8EBF5"
+                          BorderThickness="0"
+                          RowHeaderWidth="0"
+                          SelectionChanged="dgvItems_SelectionChanged">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="#"
+                                            Binding="{Binding RowNo}"
+                                            Width="40" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="رمز الصنف"
+                                            Binding="{Binding ItemCode}"
+                                            Width="80" IsReadOnly="True"
+                                            Visibility="Collapsed"/>
+
+                        <DataGridTextColumn Header="رقم الصنف"
+                                            Binding="{Binding ItemId}"
+                                            Width="80" IsReadOnly="True"
+                                            Visibility="Collapsed"/>
+
+                        <DataGridTextColumn Header="الصنف"
+                                            Binding="{Binding ItemName}"
+                                            Width="180" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="الوحدة"
+                                            Binding="{Binding UnitName}"
+                                            Width="70" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="الكمية"
+                                            Binding="{Binding ItemQty, StringFormat=N2}"
+                                            Width="70" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="إجمالي الكمية"
+                                            Binding="{Binding TotalQty}"
+                                            Width="90" IsReadOnly="True"
+                                            Visibility="Collapsed"/>
+
+                        <DataGridTextColumn Header="الكمية الحالية"
+                                            Binding="{Binding CurrentQty, StringFormat=N2}"
+                                            Width="90" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="متوسط التكلفة"
+                                            Binding="{Binding AvgCost, StringFormat=N2}"
+                                            Width="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="السعر"
+                                            Binding="{Binding ItemPrice, StringFormat=N2}"
+                                            Width="80" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="المجموع"
+                                            Binding="{Binding SubTotal, StringFormat=N2}"
+                                            Width="80" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="الخصم"
+                                            Binding="{Binding Discount, StringFormat=N2}"
+                                            Width="60" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="الإجمالي"
+                                            Binding="{Binding NetTotal, StringFormat=N2}"
+                                            Width="80" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="الضريبة"
+                                            Binding="{Binding TaxValue, StringFormat=N2}"
+                                            Width="80" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="الصافي"
+                                            Binding="{Binding NetWithVAT, StringFormat=N2}"
+                                            Width="80" IsReadOnly="True"
+                                            Visibility="Collapsed"/>
+
+                        <DataGridTextColumn Header="الربح"
+                                            Binding="{Binding Profit, StringFormat=N2}"
+                                            Width="80" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="نسبة الربح"
+                                            Binding="{Binding ProfitRatio}"
+                                            Width="80" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridCheckBoxColumn Header="✓"
+                                                Binding="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="44"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- ═══ Footer ═══ -->
+        <Border Grid.Row="2"
+                Background="{StaticResource FooterBrush}"
+                Padding="12,6">
+            <TextBlock x:Name="lblStatusBar"
+                       Text=""
+                       Foreground="#B0C4F0"
+                       FontSize="12"
+                       VerticalAlignment="Center"/>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

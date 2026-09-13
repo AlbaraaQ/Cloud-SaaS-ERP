@@ -71,14 +71,20 @@ export async function createTenantFixture(
 
 export async function createUserFixture(
   ownerUrl: string,
-  options: { email: string; passwordHash?: string | null; fullName?: string; status?: string },
+  options: {
+    email: string;
+    passwordHash?: string | null;
+    fullName?: string;
+    status?: string;
+    isPlatformAdmin?: boolean;
+  },
 ): Promise<UserFixture> {
   const id = newId();
   const fullName = options.fullName ?? options.email.split('@')[0] ?? 'Test User';
   await withOwnerClient(ownerUrl, async (client) => {
     await client.query(
-      `INSERT INTO users (id, email, full_name, status, password_hash, must_change_password, password_changed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5::text IS NULL THEN NULL ELSE now() END)`,
+      `INSERT INTO users (id, email, full_name, status, password_hash, must_change_password, password_changed_at, is_platform_admin)
+       VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5::text IS NULL THEN NULL ELSE now() END, $7)`,
       [
         id,
         options.email,
@@ -86,10 +92,26 @@ export async function createUserFixture(
         options.status ?? (options.passwordHash ? 'active' : 'invited'),
         options.passwordHash ?? null,
         !options.passwordHash,
+        options.isPlatformAdmin ?? false,
       ],
     );
   });
   return { id, email: options.email, fullName };
+}
+
+/** Grants a family-A platform role to a user (2026-09 RBAC reorganisation). */
+export async function grantPlatformRoleFixture(
+  ownerUrl: string,
+  options: { userId: string; roleCode: string },
+): Promise<void> {
+  await withOwnerClient(ownerUrl, async (client) => {
+    await client.query(
+      `INSERT INTO platform_memberships (id, user_id, role_code)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, role_code) DO UPDATE SET revoked_at = NULL`,
+      [newId(), options.userId, options.roleCode],
+    );
+  });
 }
 
 export async function createMembershipFixture(
@@ -101,13 +123,14 @@ export async function createMembershipFixture(
     status?: string;
     isOwner?: boolean;
     branchScope?: string[] | null;
+    kind?: 'staff' | 'portal';
   },
 ): Promise<MembershipFixture> {
   const id = newId();
   await withOwnerClient(ownerUrl, async (client) => {
     await client.query(
-      `INSERT INTO memberships (id, tenant_id, user_id, display_name, status, is_owner, branch_scope)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      `INSERT INTO memberships (id, tenant_id, user_id, display_name, status, is_owner, branch_scope, kind)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
       [
         id,
         options.tenantId,
@@ -116,6 +139,7 @@ export async function createMembershipFixture(
         options.status ?? 'active',
         options.isOwner ?? false,
         options.branchScope === undefined ? null : JSON.stringify(options.branchScope),
+        options.kind ?? 'staff',
       ],
     );
   });

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { decodeQrPayload } from '../src/modules/einvoicing/zatca/qr.js';
 import { GENESIS_PIH } from '../src/modules/einvoicing/zatca/ubl.js';
+import { OrgProvisioningService } from '../src/modules/organization/provisioning/org-provisioning.service.js';
 
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
 import { api } from './http.js';
@@ -55,13 +56,23 @@ describe('zatca e-invoicing', () => {
         'sales.view',
         'sales.invoice.create',
         'sales.invoice.post',
+        'accounting.period.close',
         'einvoice.view',
         'einvoice.submit',
         'einvoice.credentials.manage',
       ],
     });
 
-    branchId = body(await api(ctx.server, 'post', '/api/v1/branches', { token: actor.token, body: { code: 'MAIN', nameAr: 'الفرع الرئيسي' } })).id;
+
+    const defaults = await ctx.app.get(OrgProvisioningService).provisionOrgDefaults(actor.tenantId);
+    branchId = defaults.branchId;
+
+    const year = new Date().getUTCFullYear();
+    const fiscal = await api(ctx.server, 'post', '/api/v1/fiscal-years', {
+      token: actor.token,
+      body: { name: `FY${year}`, startDate: `${year}-01-01`, endDate: `${year}-12-31` },
+    });
+    expect(fiscal.status).toBe(201);
     warehouseId = body(await api(ctx.server, 'post', '/api/v1/warehouses', { token: actor.token, body: { branchId, code: 'WH1', name: 'المستودع' } })).id;
     const unitId = body(await api(ctx.server, 'post', '/api/v1/organization/catalog/units', { token: actor.token, body: { code: 'PCE', nameAr: 'حبة' } })).id;
     const categoryId = body(await api(ctx.server, 'post', '/api/v1/organization/catalog/categories', { token: actor.token, body: { code: 'GEN', nameAr: 'عام' } })).id;

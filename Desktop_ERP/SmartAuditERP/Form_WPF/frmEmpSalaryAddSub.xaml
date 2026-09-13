@@ -1,0 +1,712 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmEmpSalaryAddSub"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="🎁 الحوافز والجزاءات"
+    Width="660" Height="450"
+    MinWidth="620" MinHeight="420"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    ShowIcon="False">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══════════════════════ Brushes ═══════════════════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <!-- ═══════════════════════ Effects ═══════════════════════ -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"/>
+
+        <!-- ═══════════════════════ Styles ═══════════════════════ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize"   Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin"     Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height"              Value="30"/>
+            <Setter Property="FontSize"            Value="12"/>
+            <Setter Property="Background"          Value="White"/>
+            <Setter Property="BorderBrush"         Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness"     Value="1"/>
+            <Setter Property="Padding"             Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ReadOnlyTextBox" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="IsReadOnly"  Value="True"/>
+            <Setter Property="Background"  Value="#F7F9FC"/>
+            <Setter Property="Foreground"  Value="#37474F"/>
+        </Style>
+
+        <Style x:Key="ModernCombo" TargetType="dxe:ComboBoxEdit">
+            <Setter Property="Height"         Value="30"/>
+            <Setter Property="FontSize"       Value="12"/>
+            <Setter Property="Background"     Value="White"/>
+            <Setter Property="BorderBrush"    Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="ModernDate" TargetType="dxe:DateEdit">
+            <Setter Property="Height"         Value="30"/>
+            <Setter Property="FontSize"       Value="12"/>
+            <Setter Property="Background"     Value="White"/>
+            <Setter Property="BorderBrush"    Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="ModernTime" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="TextAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernRadioButton" TargetType="RadioButton">
+            <Setter Property="FontSize"   Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="Cursor"     Value="Hand"/>
+            <Setter Property="Margin"     Value="0,0,12,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernCheckBox" TargetType="CheckBox">
+            <Setter Property="FontSize"   Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="Cursor"     Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height"          Value="44"/>
+            <Setter Property="MinWidth"        Value="52"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="FontSize"        Value="10"/>
+            <Setter Property="FontWeight"      Value="Bold"/>
+            <Setter Property="Background"      Value="#283593"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding"         Value="4,0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Margin"          Value="2,0"/>
+            <Setter Property="Effect"          Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="7">
+                            <StackPanel VerticalAlignment="Center"
+                                        HorizontalAlignment="Center">
+                                <TextBlock Text="{TemplateBinding Tag}"
+                                           FontSize="16"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="{TemplateBinding Content}"
+                                           FontFamily="Tahoma"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.70"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize"   Value="12"/>
+            <Setter Property="Height"     Value="34"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding"    Value="8,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="30"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="58"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════ Header ═══════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="15,0">
+                    <TextBlock Text="🎁" FontSize="20"
+                               Foreground="White" VerticalAlignment="Center"
+                               Margin="0,0,10,0"/>
+                    <TextBlock Text="الحوافز والجزاءات"
+                               Foreground="White" FontSize="15"
+                               FontWeight="Bold" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        Background="#1565C0" CornerRadius="10"
+                        Padding="12,4" VerticalAlignment="Center"
+                        Margin="0,0,15,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="رقم السند: "
+                                   Foreground="#B3E5FC" FontFamily="Tahoma"
+                                   FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="txtNo"
+                                   Text="--"
+                                   Foreground="White" FontFamily="Tahoma"
+                                   FontSize="12" FontWeight="Bold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════════════════ Toolbar ═══════════════════════ -->
+        <Border Grid.Row="1"
+                Background="{StaticResource FooterBrush}"
+                BorderBrush="#1A237E" BorderThickness="0,0,0,2">
+            <StackPanel x:Name="pnlOperBtns"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="8,0">
+
+                <Button x:Name="IconButton7"
+                        Content="خروج" Tag="❌"
+                        Background="#C62828"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="إغلاق"/>
+
+                <Separator Background="#455A64" Width="1" Margin="5,5"/>
+
+                <Button x:Name="IconButton1"
+                        Content="أول" Tag="⏮"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="الأول" Width="48"/>
+
+                <Button x:Name="IconButton3"
+                        Content="سابق" Tag="◀"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="السابق" Width="48"/>
+
+                <Button x:Name="IconButton2"
+                        Content="تالي" Tag="▶"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="التالي" Width="48"/>
+
+                <Button x:Name="IconButton5"
+                        Content="أخير" Tag="⏭"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="الأخير" Width="48"/>
+
+                <Separator Background="#455A64" Width="1" Margin="5,5"/>
+
+                <Button x:Name="IconButton6"
+                        Content="حفظ" Tag="💾"
+                        Background="#2E7D32"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="حفظ"/>
+
+                <Button x:Name="IconButton4"
+                        Content="جديد" Tag="➕"
+                        Background="#2E7D32"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="جديد"/>
+
+                <Button x:Name="IconButton9"
+                        Content="حذف" Tag="🗑️"
+                        Background="#E65100"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="حذف"/>
+
+                <Button x:Name="IconButton8"
+                        Content="طباعة" Tag="🖨️"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="طباعة"/>
+
+                <Button x:Name="btnView"
+                        Content="معاينة" Tag="👁️"
+                        Style="{StaticResource ActionBtn}"
+                        ToolTip="معاينة"/>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════════════════ Tab Control ═══════════════════ -->
+        <dx:DXTabControl x:Name="TabControl1"
+                         Grid.Row="2"
+                         Margin="6,6,6,6">
+
+            <!-- ─────────────── Tab 1: Data Entry ─────────────── -->
+            <dx:DXTabItem Header="🎁 الحوافز والجزاءات">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border x:Name="GroupBox2"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1" CornerRadius="12"
+                            Padding="14,12" Margin="8"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+
+                            <!-- Title -->
+                            <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="8" Padding="8,6"
+                                    Margin="0,0,0,14">
+                                <TextBlock Text="📋 إدخال الحوافز والخصومات للموظفين"
+                                           Foreground="White" FontSize="12"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <!-- Row 1: Employee + Type -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="👤 الموظف"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <dxe:ComboBoxEdit x:Name="cmbEmp"
+                                                      Style="{StaticResource ModernCombo}"
+                                                      AutoComplete="True"
+                                                      NullText="اختر الموظف..."/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="📌 النوع"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <dxe:ComboBoxEdit x:Name="cmbType"
+                                                      Style="{StaticResource ModernCombo}"
+                                                      AutoComplete="True"
+                                                      NullText="اختر النوع..."/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row 2: Amount + Date + Time -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="130"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="💵 المبلغ"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="txtVal"
+                                             Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="📅 التاريخ"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <dxe:DateEdit x:Name="txtDate"
+                                                  Style="{StaticResource ModernDate}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="🕐 الوقت"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="txtTime"
+         Style="{StaticResource ModernTime}"
+         Text="00:00"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row 3: Payment Type + Deposit To -->
+                            <Border Background="#F8FAFF"
+                                    BorderBrush="{StaticResource BorderLight}"
+                                    BorderThickness="1" CornerRadius="8"
+                                    Padding="12,8" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Payment Type -->
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="💳 طريقة الدفع"
+                                                   Style="{StaticResource FieldLabel}"
+                                                   Margin="0,0,0,6"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rdCash"
+                                                         Content="🏦 نقدي"
+                                                         IsChecked="True"
+                                                         Style="{StaticResource ModernRadioButton}"/>
+                                            <RadioButton x:Name="rdCheck"
+                                                         Content="🏧 بنكي"
+                                                         Style="{StaticResource ModernRadioButton}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Deposit To -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock x:Name="lblEda3"
+                                                   Text="💰 يصرف من حساب"
+                                                   Style="{StaticResource FieldLabel}"
+                                                   Margin="0,0,0,6"/>
+                                        <dxe:ComboBoxEdit x:Name="cmbDepositTo"
+                                                          Style="{StaticResource ModernCombo}"
+                                                          AutoComplete="True"
+                                                          NullText="اختر الحساب..."/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Row 4: Sub Salary + Account Code -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox x:Name="ChkSubSalary"
+                                          Grid.Column="0"
+                                          Content="✂️ تخصم من الراتب"
+                                          Style="{StaticResource ModernCheckBox}"/>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="🔢 رقم الحساب"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="txtAccCode"
+                                             Style="{StaticResource ReadOnlyTextBox}"
+                                             TextAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Notes -->
+                            <StackPanel>
+                                <TextBlock Text="📝 ملاحظات"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="txtNotes"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Height="52"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalContentAlignment="Top"
+                                         Padding="6,4"/>
+                            </StackPanel>
+
+                            <!-- Hidden Fields -->
+                            <TextBox x:Name="TxtGlobalID"
+                                     Visibility="Collapsed"/>
+                            <TextBox x:Name="txtEntryGlobalId"
+                                     Visibility="Collapsed"/>
+
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </dx:DXTabItem>
+
+            <!-- ─────────────── Tab 2: Search ─────────────── -->
+            <dx:DXTabItem Header="🔍 البحث">
+                <Grid Background="#F5F7FA" Margin="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Search Filters -->
+                    <Border Grid.Row="0"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1" CornerRadius="12"
+                            Padding="14,10" Margin="0,0,0,8"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid x:Name="GroupBox6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Employee Filter -->
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="👤 الموظف"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <dxe:ComboBoxEdit x:Name="cmbEmpSrch"
+                                                  Style="{StaticResource ModernCombo}"
+                                                  Width="160"
+                                                  AutoComplete="True"
+                                                  NullText="اختر الموظف..."/>
+                            </StackPanel>
+
+                            <!-- All Employees -->
+                            <CheckBox x:Name="chkAllEmp"
+                                      Grid.Column="2"
+                                      Content="الكل"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      VerticalAlignment="Bottom"
+                                      Margin="0,0,0,4"/>
+
+                            <!-- From Date -->
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="📅 من تاريخ"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <dxe:DateEdit x:Name="txtFromDate"
+                                              Style="{StaticResource ModernDate}"
+                                              Width="130"/>
+                            </StackPanel>
+
+                            <!-- To Date -->
+                            <StackPanel Grid.Column="6">
+                                <TextBlock Text="📅 إلى تاريخ"
+                                           Style="{StaticResource FieldLabel}"/>
+                                <dxe:DateEdit x:Name="txtToDate"
+                                              Style="{StaticResource ModernDate}"
+                                              Width="130"/>
+                            </StackPanel>
+
+                            <!-- Search Button -->
+                            <Button x:Name="btnSearch"
+                                    Grid.Column="8"
+                                    Content="🔍 بحث"
+                                    VerticalAlignment="Bottom">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Height"          Value="32"/>
+                                        <Setter Property="MinWidth"        Value="80"/>
+                                        <Setter Property="Foreground"      Value="White"/>
+                                        <Setter Property="FontSize"        Value="12"/>
+                                        <Setter Property="FontWeight"      Value="Bold"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding"         Value="10,0"/>
+                                        <Setter Property="Cursor"          Value="Hand"/>
+                                        <Setter Property="Effect"          Value="{StaticResource BtnShadow}"/>
+                                        <Setter Property="Background">
+                                            <Setter.Value>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#1976D2" Offset="0"/>
+                                                    <GradientStop Color="#0D47A1" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Bd"
+                                                            Background="{TemplateBinding Background}"
+                                                            CornerRadius="8">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsPressed" Value="True">
+                                                            <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                        </Grid>
+                    </Border>
+
+                    <!-- Results Grid -->
+                    <Border Grid.Row="1"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1" CornerRadius="12"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid x:Name="GroupBox4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="44"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="12,12,0,0">
+                                <TextBlock Text="📊 نتائج البحث"
+                                           Foreground="White" FontSize="14"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           Margin="14,0"/>
+                            </Border>
+
+                            <DataGrid x:Name="dgvSrch"
+                                      Grid.Row="1"
+                                      AutoGenerateColumns="False"
+                                      ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                                      RowStyle="{StaticResource DgvRow}"
+                                      IsReadOnly="True"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      SelectionMode="Single"
+                                      SelectionUnit="FullRow"
+                                      CanUserReorderColumns="True"
+                                      FlowDirection="RightToLeft"
+                                      Background="White"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#E8EBF5"
+                                      AlternatingRowBackground="#F8F9FD"
+                                      MouseLeftButtonUp="DgvSrch_MouseLeftButtonUp">
+                                <DataGrid.Columns>
+
+                                    <DataGridTextColumn Header="الرقم"
+                                                        Binding="{Binding RecordId}"
+                                                        Visibility="Collapsed"/>
+
+                                    <DataGridTextColumn Header="رقم الموظف"
+                                                        Binding="{Binding EmpId}"
+                                                        Visibility="Collapsed"/>
+
+                                    <DataGridTextColumn Header="👤 اسم الموظف"
+                                                        Binding="{Binding EmpName}"
+                                                        Width="180">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment"   Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="💵 القيمة"
+                                                        Binding="{Binding Value}"
+                                                        Width="100">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment"   Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="📌 النوع"
+                                                        Binding="{Binding TypeName}"
+                                                        Width="120">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment"   Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="📅 التاريخ"
+                                                        Binding="{Binding RecordDate}"
+                                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment"   Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                        </Grid>
+                    </Border>
+
+                </Grid>
+            </dx:DXTabItem>
+
+        </dx:DXTabControl>
+
+    </Grid>
+</dx:ThemedWindow>

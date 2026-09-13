@@ -35,13 +35,17 @@ export class AuthGuard implements CanActivate {
     }
 
     const claims = await this.tokens.verifyAccessToken(header.slice('bearer '.length).trim());
+    const platformRoles = claims.proles ?? [];
     const auth: AuthContextValue = {
       userId: claims.sub,
       claimedTenantId: claims.tid,
       membershipId: claims.mid,
       scope: claims.scope,
       tokenId: claims.jti,
-      isPlatformAdmin: claims.pam === true,
+      // Effective platform access: explicit `pam` claim (set at login from the flag
+      // OR the role model) or any platform role carried by the token.
+      isPlatformAdmin: claims.pam === true || platformRoles.length > 0,
+      platformRoles,
     };
 
     request.auth = auth;

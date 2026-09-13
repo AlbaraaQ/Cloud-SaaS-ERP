@@ -1,0 +1,188 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmSelectClient"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="اختر عميل أو مورد"
+    Width="620" Height="450"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="White"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="ModernRadioBtn" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+            <Setter Property="BorderBrush" Value="#3A63C3"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#D6E4FF"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF3FF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CenterCell" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- عنوان -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="12,8">
+            <TextBlock Text="👥 اختر عميل أو مورد"
+                       Foreground="White"
+                       FontSize="14" FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- فلاتر النوع -->
+        <Border Grid.Row="1"
+                Background="#F5F6FA"
+                BorderBrush="#E0E0E0"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center">
+                <RadioButton x:Name="rdAll"
+                             Content="الكل" IsChecked="True"
+                             GroupName="TypeGroup"
+                             Style="{StaticResource ModernRadioBtn}"
+                             Checked="TypeFilter_Changed"/>
+                <RadioButton x:Name="rdClient"
+                             Content="عميل"
+                             GroupName="TypeGroup"
+                             Style="{StaticResource ModernRadioBtn}"
+                             Checked="TypeFilter_Changed"/>
+                <RadioButton x:Name="rdSupplier"
+                             Content="مورد"
+                             GroupName="TypeGroup"
+                             Style="{StaticResource ModernRadioBtn}"
+                             Checked="TypeFilter_Changed"/>
+                <RadioButton x:Name="rdOwner"
+                             Content="المالك"
+                             GroupName="TypeGroup"
+                             Style="{StaticResource ModernRadioBtn}"
+                             Checked="TypeFilter_Changed"/>
+            </StackPanel>
+        </Border>
+
+        <!-- DataGrid -->
+        <DataGrid x:Name="dgvData" Grid.Row="2"
+                  AutoGenerateColumns="False"
+                  ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                  RowStyle="{StaticResource DgvRow}"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow"
+                  
+                  FlowDirection="RightToLeft"
+                  Background="White"
+                  GridLinesVisibility="Horizontal"
+                  HorizontalGridLinesBrush="#E8EBF5"
+                  AlternatingRowBackground="#F8F9FD"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto"
+                  MouseDoubleClick="dgvData_MouseDoubleClick">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="id"
+                                    Binding="{Binding CustomerId}"
+                                    Visibility="Collapsed"/>
+                <DataGridTextColumn Header="النوع"
+                                    Binding="{Binding TypeName}"
+                                    Width="80">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource CenterCell}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="رقم الحساب"
+                                    Binding="{Binding AccountNo}"
+                                    Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource CenterCell}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="🏢 الإسم"
+                                    Binding="{Binding CustomerName}"
+                                    Width="*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock"
+                               BasedOn="{StaticResource CenterCell}"/>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTemplateColumn Header="✅ اختر" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="✅ اختر"
+                                    Tag="{Binding}"
+                                    Height="22" FontSize="10"
+                                    FontWeight="Bold"
+                                    Foreground="White"
+                                    Background="#2E4E9E"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Click="btnSelect_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="5" Padding="4,2">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+    </Grid>
+</dx:ThemedWindow>

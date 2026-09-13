@@ -26,6 +26,8 @@
 | PHASE_22 | 2026-09-07 | COMPLETE | Niche verticals and Salla integration completed: optics prescriptions, tailoring measurements, marina vessels/bookings/rental invoices, vehicle fitment and Salla OAuth/sync/webhook tables under FORCE RLS; feature-flagged `/optics`, `/tailoring`, `/marina`, `/fitment`, `/integrations/salla` APIs, encrypted Salla tokens, HMAC webhook verification, admin pages, docs, tests and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_22_IMPLEMENTATION_REPORT.md`. |
 | PHASE_23 | 2026-09-07 | COMPLETE (READINESS PACK) | Hardening and go-live readiness artifacts completed: `/metrics`, deeper readiness checks, retention-plan service/tests, dependency/secret security sweep with ADR-021 waivers, operations runbooks, backup/restore drill template, perf report, endpoint inventory, UAT pack, program acceptance matrix and `RELEASE_NOTES.md` v1.0.0. Repository verification exits 0, but staging, real API DB/E2E evidence, backup/PITR drill, performance numbers and UAT signatures remain environment-owner gates; this is not production sign-off. See `PHASE_23_IMPLEMENTATION_REPORT.md` and `POST_PHASE_23_GAPS_AND_NOTES.md`. |
 
+| RBAC-REORG | 2026-09-10 | COMPLETE | Surface + RBAC reorganisation on `arena/01a0889e-cloud-saas-erp`: Family-A platform roles (`platform_memberships`, `pam` claim) replacing the blanket `is_platform_admin`; canonical `tenant.*` permissions with legacy `platform.*` aliases; `memberships.kind` (staff/buyer/api); standalone devices registry. Four separately-deployable surfaces on one API/DB: `apps/marketing` (:3002), `apps/staff` (:3001), `apps/platform-admin` (:3003), `apps/customer-portal` (:3004) — all build + tests green (staff 35, marketing 6, platform-admin 3, portal 6). New real screens: platform roles grant/revoke, licence activation requests, tenant audit log, smart login with `?token=` bridge. Docs: `docs/architecture-rbac/01–06`. See final report in PR. |
+
 ## Admin web UI — desktop menu coverage (2026-09-08)
 
 `apps/admin/lib/navigation.ts` is the single source of truth for the screen tree that
@@ -165,9 +167,414 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   because inventory value is conserved, so it raises no journal entry. The output item may
   not be one of its own components, a component may not repeat (combine the quantities),
   and completion fails on `STOCK_INSUFFICIENT` rather than driving stock negative. The
+  components are **optional**: when none are typed they are read from the item card's bill of
+  materials (`item_components`, `GET/POST/DELETE /organization/catalog/items/:id/components`)
+  and scaled by the produced quantity, each in the unit the card named — the desktop's
+  `Qty = qty × BaseQty × UnitEquality`. An item with no recipe and an order with no typed
+  components is refused `PRODUCTION_COMPONENTS_REQUIRED`. A component's unit must be its own
+  base unit or one defined on its card, and a recipe may not form a loop
+  (`CATALOG_COMPONENT_CYCLE`). The
+  `unit_id` (0038) holds the unit the produced quantity was counted in, so `2 علب` of a
+  six-piece box puts twelve pieces on the shelf. The
   `line_id` of each stock movement is the item id, so the existing
   `(tenant, doc_type, doc_id, line_id)` unique index enforces one movement per item per
   order. Screen `/inventory/production`, report key `production-orders`.
+
+* **الأرقام التسلسلية والدفعات** — `item_serials` + `item_lots`. A serial is a state machine
+  (`available → reserved → sold → available`) driven from `/inventory/serials` the way
+  `frmItemSerialNo` drives it: two grids (`📋 الأرقام المتاحة` / `📤 الأرقام المباعة`), a
+  generator that makes a batch off one prefix (`POST /inventory/serials/generate`,
+  all-or-nothing, `409 SERIAL_DUPLICATE` on a clash), and `DELETE /inventory/serials/:id`
+  for a number that never left the shelf — a sold one is refused `422 SERIAL_INVALID_STATE`,
+  because deleting it is how a stock count stops adding up. A lot carrying serials answers
+  `409 LOT_IN_USE`. Screens `/inventory/serials`, `/inventory/lots`, report keys
+  `serial-tracking`, `expiry-report`.
+* **الرقم التسلسلي على سطر المستند** (`InvoiceItemDetail.ItemSerialNo`,
+  `Class/InvoiceOper.cs:1635`) — migration `0039` puts `serial_nos` on the voucher,
+  adjustment and transfer line tables and adds `stock_document_serials`, so a document says
+  *which piece* it moved and a number can be traced back to the documents that moved it
+  (`GET /inventory/serials/:id/documents`, permission `inventory.view`). The numbers are
+  resolved at posting, not at saving: a draft invents no pieces for stock that has not
+  arrived, a count that disagrees with the quantity is `422 SERIAL_COUNT_MISMATCH`, a number
+  in another warehouse is `422 SERIAL_WRONG_WAREHOUSE`, and selling a number twice is
+  `422 SERIAL_INVALID_STATE`. إلغاء is the mirror image and deliberately asymmetric: a
+  receipt's numbers are withdrawn only while they are still on the shelf, an issue's numbers
+  go back on it. A مناقلة contributes two legs — the send that reserves the piece and the
+  receipt that releases it. Screens: the four stock document grids gained a
+  `🔢 الأرقام التسلسلية` column and a paste-box with a live count; the serials screen gained
+  a `🔍` trace per row.
+
+* **المرحلة 06 — الخزينة، الجزء الأول: سند القبض وسند الصرف** (`frmSandQ` / `frmSandD` /
+  `frmSandVAT` / `frmPaymentVoucher`، و`Class/ReceiptOper.cs` L21 `BindReceiptToEntry`).
+  Migration `0040` puts the document's context on the row — `description` (📝 البيان، وهو
+  نفسه بيان القيد كما في `entry.Note = Receipt.Notes`), `voucher_time` (⏰ الوقت، فكشف
+  الصندوق يُرشَّح بالساعة), `salesman_id → employees` (👔 المندوب) و`foreign_amount`
+  (💲 قيمة السند بعملتها) — and the engine now builds the entry a voucher writes instead
+  of waiting for the caller to supply lines: the cash location's own account against the
+  party's receivable/payable account, then the posting profile. Callers who forgot — HRM's
+  `payRun` chief among them — used to move cash out of the safe with **no entry at all**.
+  A cheque is a promise, not money: `chequesInHandAccountId` (أوراق القبض) holds it until
+  clearance, which now posts its own entry (`مدين الصندوق / دائن أوراق القبض`), and a
+  bounced cheque puts the debt back on the customer and is terminal
+  (`422 CHEQUE_INVALID_STATE`). `PATCH /vouchers/:id` edits a whole draft the way
+  `frmSandQ.xaml.cs:903` does and seals a posted one (`409 VOUCHER_IMMUTABLE`);
+  `GET /vouchers?from=&to=&q=` is the 🔍 panel of `frmSandQD`/`frmSandSD`. Screen
+  `/treasury/vouchers` rebuilt as a document: tabs 📥 سند قبض / 📤 سند صرف, a search panel,
+  a document header, `💼 تفاصيل الدفع` with the cheque block behind the bankish methods,
+  and a grid with `🔢 الرقم · 📅 التاريخ · ⏰ الوقت · الطرف · 📝 البيان · 🏦 الصندوق ·
+  💳 نوع الدفع · 💰 المبلغ · 📋 الحالة`. New profile key `chequesInHandAccountId`. Tests
+  `apps/api/test/treasury-vouchers.spec.ts` (7) and `scripts/verify-treasury.mjs`
+  (6 sections against the live stack).
+
+* **المرحلة 06 — الخزينة، الجزء الثاني: تعريف الخزن والبنوك** (`frmTreasury.xaml` +
+  `.xaml.cs` L87 grid / L222 «يجب اختيار موظف مسئول»، و`frmBanks.xaml`). Migration `0041`
+  is additive: `cash_locations.notes` for 📝 ملاحظات, and a real `cash_location_custodians`
+  table for the desktop's `Stock_Emps` — one row per (tenant, safe, employee), unique so an
+  employee cannot be signed twice onto the same safe, indexed by employee, RLS like the rest.
+  The desktop deletes `Stock_Emps` first and inserts after, so a typed typo leaves a safe
+  with no custodian on the way to failing; here the employees are validated **before any
+  write**, and emptying a safe of its custodians is refused with the same
+  «يجب اختيار موظف مسئول» rather than performed. Banks keep the full `frmBanks` card —
+  🌍 الدولة، 🏙️ المدينة، 📍 المنطقة، تليفون، موبايل، 💰 نسبة الاقتطاع — carried in the
+  `bank` JSON block, so no column touches half a table that is safes. Screens
+  `/treasury/safes` and `/treasury/banks` are one component with the desktop's three tabs
+  (📋 بيانات · 👤 مسئولي الصندوق · 📝 ملاحظات), and الخزينة became its own `🏦` module in
+  the staff navigation as it is in `Desktop_ERP`, taking 📄 سند قبض / 📄 سند صرف /
+  📒 بطاقة حساب المصاريف / 📊 إغلاق اليومية home from المحاسبة › العمليات — routes
+  untouched, endpoints untouched, duplicates removed. Tests
+  `apps/api/test/treasury-custody.spec.ts` (6) and section 7 of
+  `scripts/verify-treasury.mjs`. 488 API tests, 36 staff tests, 71 contract tests.
+
+* **المرحلة 06 — الخزينة، الجزء الثالث: حركة الصندوق** (`Form_WPF/frmRptKhzna.xaml` +
+  `.xaml.cs` L156–L260، والتقرير `Reports/RptKhzna.repx`). The decisive thing the desktop
+  does here is that the statement is read from the **ledger**, not from the receipts: it
+  resolves the safe's account and groups `Entry_sub` by entry, so a sale, a salary and a
+  transfer are movements of the same safe. The cloud's `cash-movement` report summed
+  receipts and payments per box, which silently omitted every movement the treasury screen
+  had not created. `GET /cash-locations/:id/movements` now returns the statement:
+  `رصيد سابق` opening row (only when a period is chosen, dated `من تاريخ − يوم` as at
+  L200), a running `⚖️ الرصيد`, and the two cards `⚖️ الرصيد الإجمالي` /
+  `📅 رصيد الفترة المحددة` (L482/L502) — with `من وقت / إلى وقت`, and only posted entries,
+  so a draft never moves a safe on paper. No migration: `vouchers.voucher_time` came with
+  part one. **One justified deviation:** the desktop's `Entry.date` carries the time, ours
+  carries it on the voucher, so a movement with no recorded time is never hidden and never
+  pushed into the opening balance — hiding a real entry from a statement is the worse
+  error — while timed movements obey the window exactly and the totals stay continuous.
+  Screen `/treasury/movements` with the desktop's filter panel, its eight columns, six
+  cards and its CSV header verbatim (`م,العملية,الرقم,التاريخ,وارد,صادر,الرصيد,البيان`).
+  Tests `apps/api/test/treasury-movements.spec.ts` (6) and section 8 of
+  `scripts/verify-treasury.mjs` (13 checks). 494 API tests, 36 staff tests, 71 contract
+  tests. The `🏦 حركة الصندوق` screen sits in a new التقارير group of the الخزينة module;
+  the desktop files it under المحاسبة › تقارير محاسبية, but a safe's statement belongs
+  with the safe now that الخزينة is a module of its own.
+
+* **المرحلة 06 — الخزينة، الجزء الرابع: إغلاقات اليومية** (`Form_WPF/frmCloseShift.xaml`
+  + `.xaml.cs` L214/L270/L330/L676/L735، `frmCloseShiftDetails.xaml`،
+  `frmCloseShiftInv.xaml`، والمحرك الحقيقي في `Form_WPF/ClosShiftAndroid.xaml.cs`
+  L592 وL780–L930). The grid's first column is `🔢 الرقم`, and in the desktop that is
+  `CasherClosed.ClosedID` — **a close is a document the cashier signs**, and
+  `BindCloseShiftToEntry1` builds a journal entry around it. The cloud created its
+  `shift_closes` row when the drawer was *opened* and gave it no number at all, so
+  "which close was Tuesday's?" had a uuid for an answer. Migration `0042` adds
+  `shift_closes.number` with a partial unique index, **nullable on purpose**: an open
+  shift is a draft, and the number is allocated at close from `document_sequences`
+  (`CS-`, padding 6) exactly as a voucher is numbered on posting. No renumbering, no
+  backfill: old rows keep their emptiness until a new shift is closed.
+  `GET /shift-closes/day-closes` (filters `from`/`to`/`branch_id`/`membership_id`/
+  `user_id`) is the list; `GET /shift-closes/:id` is one close with its two children —
+  🧾 الملاحظات المعدودة and the summary lines — and answers `404 SHIFT_NOT_FOUND` for an
+  unknown *or non-uuid* id. Three decisions carry the desktop's intent: **a draft is not
+  cash** (📤 المصاريف و💵 النقدي read *posted* vouchers, so an unposted expense never
+  shrinks a drawer on paper); **🏦 رصيد الصندوق is what was counted, 💵 النقدي is what
+  was expected**, and 📉 الفرق is between them — which is why an open row's safe balance
+  is empty rather than wrong; and **a close is a snapshot**, frozen into `summary` so a
+  voucher posted afterwards cannot rewrite a signed sheet. 🚗 توصيل · ☕ ضيافة · 🛒
+  المشتريات · 🛡️ تأمين come from the *name* of the expense type whose account the voucher
+  points at, because the desktop reads columns our invoices do not carry and a tenant that
+  names its types in Arabic gets the split for free. Filtering by 👤 الموظف resolves the
+  membership to its users, and an id that is nobody's returns an **empty list, not the
+  whole book** — a silently dropped filter is worse than a missing one. Screen
+  `/treasury/day-close`: six cards, a 🏦 الوردية الحالية card with nine denominations and
+  a live 📉 الفرق, a filter panel, and a grid whose eighteen headers are `frmCloseShift`'s
+  own labels with a totals footer and an expandable detail per row. Tests
+  `apps/api/test/treasury-dayclose.spec.ts` (8) and section 9 of
+  `scripts/verify-treasury.mjs` (23 checks, and it closes a drawer left open by an earlier
+  run so it stays re-runnable). 502 API tests, 36 staff tests, 71 contract tests.
+  **Deferred with a reason:** the close's journal entry (`BindCloseShiftToEntry1`) waits
+  for the accounting part of this phase, so entries come from one engine and not two, and
+  the printed reports (`Reports/rptCloseShift.repx`, `rptCloseday.repx`,
+  `rptClosedayCust.repx`) wait for the reporting phase — `printShiftData` only prepares
+  their data.
+
+* **المرحلة 06 — الخزينة، الجزء الخامس: التحويل البنكي والعميل النقدي**
+  (`Form_WPF/frmPayBank.xaml` + `.xaml.cs` `LoadBanks`/`BankTile_Click`،
+  `Form_WPF/frmCashCustomer.xaml` + `.xaml.cs` `SearchCustomers`، والقاعدة في
+  `Class/EntryOper.cs` L493/L537/L620). Two small windows with one idea each.
+  **🏦 التحويل البنكي** is a chooser, and its answer decides an *account*: the desktop
+  refuses a transfer with no bank («يرجى اختيار بنك أولًا») because `EntryOper.cs` keeps
+  a named transfer out of the generic شبكة bucket and, at close, debits **that bank's own
+  account** instead of `1221001`. The cloud could already route a transfer to a bank, but
+  nothing read the choice back: `shiftTakings` now groups bank payments **per bank**,
+  `closeShift` writes one signed `bank-transfer` line per bank, and every day-close row
+  carries `banks[]` — live while the drawer is open, frozen in `summary` once it is
+  counted. The bank rides in `metadata`, because `party_id` is a foreign key to `parties`
+  and a bank is not a party. 🌐 الشبكة still carries the full amount: the breakdown is a
+  detail *inside* it, not a subtraction from it, or 💰 مجموع الشبكة والنقدي would stop
+  adding up. **👤 العميل النقدي** is the opposite kind of answer: `SearchCustomers` does
+  not open a customer table, it reads the invoices — `SELECT CashCustomerName,
+  CashCustomerMobile FROM inv WHERE … AND CashCustomerName <> ''` — because a walk-in is
+  a name and a mobile **written on the sale**, which is why a till can produce one
+  without opening a ledger account. `GET /sales/cash-customers?name=&mobile=` is that
+  query: exact on mobile, partial on name, grouped so a name is one answer with an
+  invoice count. **No migration — deliberately**: `invoice_payments.cash_location_id`
+  and `sales_invoices.cash_customer_name/mobile` already existed; what was missing was
+  the rule that reads them, not a column. Screens: a `🏦 اختر البنك` window wired into
+  `/sales/pos` (replacing a dropdown a cashier clicks past) and `/treasury/vouchers`, and
+  a `👤 عميل نقدي` picker plus its own page `/sales/cash-customers`. Tests
+  `apps/api/test/treasury-bank-transfer.spec.ts` (8) and
+  `apps/api/test/sales-cash-customer.spec.ts` (7), and section 10 of
+  `scripts/verify-treasury.mjs` (12 checks). **517** API tests, 36 staff tests,
+  71 contract tests. **One justified deviation:** the desktop's cash-customer grid starts
+  empty and fills only on a keystroke; a list screen that opens empty looks broken, so
+  with no search term the API returns the most recently served names.
+
+* **المرحلة 06 — الخزينة، الجزء السادس: مناقلة الخزن**
+  (`Form_WPF/frmSafesTransfer.xaml` + `.xaml.cs` L690/L863/L872،
+  `Reports/rptSafeTransfer.repx`، والجدولان في `CrystalLiteDB.txt` L1620 `SafesTransfer`
+  وL1642 `SafesTransfer_Sub`). **The decisive finding came before the code**: the
+  desktop's `SafesTransfer` table has **no amount column** — its sub-table carries *items*
+  (`ItemId`, `value` = quantity, `AvrgCost`, `ReceivedValue`, `Diff`) and
+  `rptSafeTransfer.repx` prints الصنف / الفئة / المستودع / الباركود / الكمية. So
+  `frmSafesTransfer` is a **مناقلة أصناف بين المخازن**, and moving *money* between safes
+  is done in the desktop with a سند صرف and a سند قبض. The cloud therefore needed both
+  halves: a new money screen `/treasury/transfers` on `/cash-transfers` carrying the
+  window's own three tabs (📦 التحويل · 📥 استلام تحويل · 🔍 البحث) and its state machine
+  (draft → sent → received, with `🗑️ حذف` for drafts only), and the missing 🔍 tab on the
+  item screen `/inventory/transfers` (`🔢 رقم التحويل` · `📅 من تاريخ` · `📅 إلى تاريخ` ·
+  `📋 كل الفترة` · `🔍 بحث`). `transfers()` now returns `fromName`/`toName` resolved
+  server-side by joining `cash_locations` twice under aliases, so the grid never shows a
+  raw uuid where the desktop shows a name; `cancelTransfer` writes `voided`, the terminal
+  state migration `0011` already allows, rather than inventing `cancelled` and a migration
+  to go with it. **No migration — again deliberately.** Screens gated by
+  `treasury.view`, actions by `treasury.transfer.manage`; 📦 استلام الكل shows a live
+  count of what is on the road. Tests `apps/api/test/treasury-transfers.spec.ts` (9) and
+  section 11 of `scripts/verify-treasury.mjs` (19 checks, walking the whole lifecycle
+  against the live stack). **526** API tests, 36 staff tests, 71 contract tests.
+  **Two justified deviations:** `🏦 من خزنة` / `🏦 إلى خزنة` are the window's
+  `🏪 من مخزن` / `🏪 إلى مخزن` with the store replaced by the safe — this module moves
+  cash, not stock; and `📋 الحالة` names a column the desktop grid leaves unheaded.
+
+* **المرحلة 06 — الخزينة، الجزء السابع: 📒 قيد الإغلاق** (`Class/EntryOper.cs`
+  `BindCloseShiftToEntry` L404–L830، `Form_WPF/ClosShiftAndroid.xaml.cs:925`
+  `BindCloseShiftToEntry1`، و`EntryOper.cs` L620 للتحويل البنكي). **The entry was not
+  copied, and that is the finding.** The desktop builds one big entry at close — Dr
+  treasury, Dr `1221001` شبكة, Dr each named bank's own account, Cr `4100001` sales,
+  Cr `2222001` VAT, Dr `1211002` عهدة الإغلاق, and `3110004` فرق بالصندوق for the
+  difference — because in the desktop *nothing is posted when an invoice is saved*; the
+  close is the whole accounting event. The cloud is the mirror image: every posted
+  invoice already wrote its own entry (sales, VAT, discount, and the debit to the till's
+  or the **bank's own** account — `pos.service.ts` resolves a named bank cash location's
+  `accountId`, which is what `bank.AccCode` is in L620, and a live test asserts the sale
+  entry debits the bank and *not* the generic drawer). Copying the desktop's entry would
+  therefore post the day twice. What no other document can know is the **count**: the
+  drawer was counted by hand and it disagreed with the books, so 📉 الفرق is what the
+  close posts — Dr فرق الصندوق / Cr الصندوق for a shortage, mirrored for an overage, and
+  **nothing at all** for a balanced drawer (`422 SHIFT_BALANCED`, because a two-line
+  zero entry is not evidence). عهدة الإغلاق is deliberately *not* reproduced: it parks
+  the counted cash on the cashier's custody account until a deposit clears it, and there
+  is no deposit step yet. Migrations `0043` (additive `shift_closes.journal_entry_id` /
+  `posted_at`) and `0044`, which fixes a **real bug found on the way**: `0042` made
+  `number` unique per *tenant* but allocated it per *branch*, so two branches both
+  issued `CS-000001` and the second close died on a duplicate-key 500 — numbering is now
+  tenant-wide (as the desktop's global `ClosedID` is) and the migration seeds the
+  counter from the highest number each tenant already printed. New
+  `POST /shift-closes/:id/post` behind a new permission `treasury.shift.post` (counting
+  a drawer and posting its entry are different decisions — the cashier role gets the
+  first, not the second), new posting-profile key `cashDifferenceAccountId`, and every
+  day-close row now reports `journalEntryId` / `postable`. Screen `/treasury/day-close`
+  gained a 📒 القيد column. Tests `apps/api/test/treasury-shift-entry.spec.ts` (11) and
+  section 12 of `scripts/verify-treasury.mjs` (12 checks). **537** API tests, 36 staff,
+  71 contract. Side effect worth recording: `pnpm -r run lint` was **red** on
+  pre-existing `no-restricted-syntax`/`import/order` errors in `sales.service.ts` and
+  six test files; it is now green across the repository.
+
+* **المرحلة 07 — المحاسبة، الجزء الثاني: 📄 كشف الحساب**
+  (`Form_WPF/frmAccountBalance.xaml` «كشف حساب تفصيلي» و
+  `frmAccountsStatement.xaml` «كشف حساب رئيسي»). **The cloud had a ledger, not a
+  statement.** `GET /statements/general-ledger/:accountId` answered with bare posted
+  lines and no period at all, and the screen filtered by date *after* the fact — so a
+  statement for one month started its الرصيد at zero and disagreed with the tree it was
+  opened from. What the desktop does is defined in three places: `.xaml.cs` L216 keeps a
+  running total signed by the account's nature, L351 prepends a row whose البيان is
+  `رصيد مرحل من فترة سابقة` and whose النوع is `رصيد سابق`, and L307 chooses between
+  `تجميعي (ملخص)` (one row per entry, `SUM` + `GROUP BY`) and `تفصيلي (كامل)` (every
+  line). All three now exist in the service: `from`/`to` bound the period, the opening
+  row is everything posted *before* `from` **plus the account's `opening_balance`** — so
+  a كشف and a شجرة cannot print different numbers, which is the invariant the tests
+  assert directly — and `with_descendants=1` reports the account and its branch by
+  walking `path <@ :path::ltree`, the same walk as the desktop's `AccountHierarchy` CTE,
+  with `رمز الحساب`/`الحساب` in place of a running balance (the window has no الرصيد
+  column either: a running total over accounts of different natures is not readable).
+  `النوع` is read from the entry and the voucher behind it and named in the words of the
+  desktop's own `EntryTypes` table — قيد مبيعات · سند قبض · سند صرف · إغلاق اليومية ·
+  قيد اليومية. The response is `{ data, totals, account }`, so a caller that reads
+  `data` — and a request with no parameters at all — still gets exactly the old ledger.
+  **One desktop bug is deliberately not copied:** `الحالة` is derived there from the
+  nature-signed balance (`runningBalance >= 0 ? "مدين" : "دائن"`), which reports a
+  liability sitting on its own credit side as مدين; here الحالة names the side the money
+  is actually on. The screen carries the window's own filters —
+  `اسم الحساب` · `رقم الحساب` · `الفرع`/`كل الفروع` · `من تاريخ`/`إلى تاريخ` ·
+  `🚀 عرض البيانات` · `⚖️ نوع الرصيد` · `📊 طريقة العرض` · `فترة كاملة (من البداية)` ·
+  `عدم إظهار الرصيد السابق` — its four totals, and its twelve columns, and it opens with
+  the account chosen from 📂 دليل الحسابات' `كشف حساب` button; `تفاصيل` (👁️) opens the
+  entry in `القيود اليومية`, which now accepts `?entry=`. Tests
+  `apps/api/test/accounting-statement.spec.ts` (12) and sections 6–7 of
+  `scripts/verify-accounting.mjs` (18 more live checks, 37 in total). **557** API tests,
+  36 staff, 71 contract.
+
+* **المرحلة 07 — المحاسبة، الجزء الأول: 📂 دليل الحسابات**
+  (`Form_WPF/frmAccountsDirectory.xaml` — «دليل الحسابات» — مع
+  `frmAccountsTree.xaml` بطاقة الحساب و`frmAccountSrch` للبحث). **The gap was not the
+  tree, it was the number beside it.** The window binds `trBalance` on every node
+  (`.xaml.cs` L149 `LoadTreeView` / `BuildTreeHierarchy` over `trParentCode`), and the
+  cloud had no balance at all: `GET /accounts` returned a bare chart, and the tree screen
+  showed code, name and type. So the tree and the ledger and the ميزان could each print
+  a different figure for the same account. `GET /accounts` now takes
+  `q` / `type` / `branch_id` / `with_balances` (all optional, all backwards-compatible —
+  without `with_balances` the response is unchanged), and `with_balances=1` adds
+  `parentName` and a `balance` object per row: `ownDebit`/`ownCredit`/`ownBalance` for
+  the account itself and `debit`/`credit`/`balance`/`descendants` for its whole branch,
+  counted **from posted entries only** and rolled up the account's `ltree` `path`, so a
+  parent is exactly the sum of its children and the counting happens once, in the
+  service, not in three browsers. A reversal therefore disappears from the balance, and
+  a draft entry never enters it. Migration `0045` adds the three card fields the window
+  writes and the cloud had nowhere to put — `accounts.opened_at`, `opening_balance`
+  (default 0, so nothing that exists is affected) and `cost_center_id` — and
+  `💰 الرصيد الافتتاحي` is added to the account's own row on its `normalBalance` side and
+  rolled up from there, because it is money on the books *before* the first entry. It is
+  also frozen: patching `openingBalance` once an account carries a posted line is
+  refused with `409 ACCOUNT_POSTED` — an opening balance is set once, not re-written to
+  make a period agree. The directory screen is now the window: four summary tiles, the
+  search sent to the server behind `🚀 عرض البيانات`, `📂 شجرة الحسابات` with the balance
+  on every node and `مستويات التوسعة` `الكل`/0/1/2/3 (`MaxLevel = 3` in the window), and
+  selecting a node fills `📋 تفاصيل الحسابات` with `الحساب الرئيسي · رمز الحساب · اسم
+  الحساب · الفرع · الرصيد · كشف حساب · تعديل` — the parent named, not identified by uuid,
+  and `كشف حساب` opening the ledger for that account. `/accounting/accounts/tree` gained
+  the same balance column and levels, and the account form gained `⚖️ طبيعة الحساب`,
+  `📅 تاريخ فتح الحساب`, `💰 الرصيد الافتتاحي` and `📊 مركز التكلفة`. Tests
+  `apps/api/test/accounting-directory.spec.ts` (8) and the live
+  `scripts/verify-accounting.mjs` (17 checks against the `demo` stack). **545** API
+  tests, 36 staff, 71 contract. **Justified deviations:** `🚀 عرض البيانات` is the
+  execute button of the window's own search form, and the three summary-tile labels are
+  invented (the desktop has no tile row).
+
+* **المرحلة 07 — المحاسبة، الجزء الثالث: 📒 إنشاء قيد يومية**
+  (`Form_WPF/FrmNewEntry.xaml` «إنشاء قيد يومية»). **Two of the window's six card
+  fields did not exist in the data model.** `⏰ الوقت` matters more than it looks: the
+  desktop stores a *timestamp*, so two entries written on the same day keep the order
+  they were written in and حركة الصندوق filters by date and time, while the cloud stored
+  a date alone and could not tell 09:00 from 21:00. Migration `0046` adds
+  `journal_entries.entry_time`, `journal_entries.is_vat` (`✅ قيد ضريبي`, `Entry.IsVAT`)
+  and `journal_entry_lines.salesman_id` (`المندوب`, `Entry_sub.salesman`) — all three
+  nullable or false by default, so every entry already on the books and every caller
+  that sends none of them is untouched. The third thing the window does is fill in what
+  the clerk leaves empty, and that is not decoration: `Save()` writes
+  `سند قيد يومية رقم: {EntryNo} بتاريخ {date}` when الملاحظة is blank and names each
+  unnamed line after the account it settles, because an entry with no note is unfindable
+  a year later. Both defaults now live in the service — the note after the number has
+  been allocated, since the number is what the note quotes — and what the clerk *did*
+  write is kept, trimmed, never replaced. The screen is the window: the six card fields
+  (with `رقم القيد` and `🔑 الرقم العام` read-only, because both are allocated by the
+  server when the entry posts), `📋 تفاصيل القيد` with its nine columns,
+  `الفرق=` in the grid's header — green when the two sides agree, as the window colours
+  it — `مجموع المدين:` / `مجموع الدائن:` in its footer, `رمز الحساب` resolved to a name
+  as it is typed, and the four refusals in the window's own words (`لا يوجد بيانات` ·
+  `يجب إدخال اسم ورقم الحساب` · `يوجد بند رقم … بدون قيمة` ·
+  `لا يمكن حفظ قيد غير متوازن`) before the question `هل أنت متأكد من حفظ القيد؟` —
+  because a posted entry is not edited, only reversed. Tests
+  `apps/api/test/journal-entry-card.spec.ts` (9) and section 8 of
+  `scripts/verify-accounting.mjs` (11 more live checks, 48 in total). **566** API tests,
+  36 staff, 71 contract. Deferred on purpose: `🖨️ طباعة`/`👁️ معاينة` of the entry
+  document and the ⏮◀▶⏭ navigator, both of which belong to the reporting phase.
+
+* **المرحلة 07 — المحاسبة، الجزء الرابع: 🌳 مراكز التكلفة**
+  (`Form_WPF/frmCostCenter.xaml` «مركز التكلفة 🏢» و`frmCostCenterBalance.xaml`
+  «تقرير مركز كلفة»). **The cost-centre tree had no numbers on it.** `GET /cost-centers`
+  answered with a flat table of centres and no balance at all, so a centre could not be
+  asked what it had spent; the window's tree and its report were both missing. No
+  migration was needed for the tree itself — `cost_centers` already carried `parent_id`
+  and `branch_id`; what was missing was the figure, so it is now computed exactly as the
+  chart of accounts computes it: posted entries only, rolled up through `parent_id`, with
+  `parentName`, `level` and `🏷️ النوع` (`🟢 رئيسي`/`🔵 فرعي`) beside it, and a caller
+  that sends nothing still gets the old list. The report is new:
+  `GET /statements/cost-center/:id` is the account statement pointed at a centre — the
+  same `رصيد سابق` row, the same running الرصيد, the same totals — plus the window's own
+  `اسم الحساب` and `🌿 الفرع` filters, and `📑 نوع التقرير` (`تجميعي`/`تفصيلي`). One
+  deliberate difference: the window guesses a centre's nature from the first character of
+  its code, as it does for accounts; a cost centre accumulates costs, so الرصيد grows on
+  the debit side and `📌 الحالة` names the side the money is on. **Giving the centre a
+  balance is what exposed two defects that had nothing to do with cost centres.**
+  `prevent_posted_journal_mutation()` — installed by `0004_accounting.sql` L115 — allows
+  exactly one mutation of a posted entry (`status = 'void'`) and then returns `OLD`,
+  discarding the value it just allowed. Every `void` since then was silently thrown away:
+  a cancelled sale kept its revenue, a cancelled purchase kept its cost, and a reversal
+  left its original `posted`. No balance ever drifted, because a reversal also posts a
+  mirrored entry that cancels the original — which is exactly why no test had caught it.
+  And the mirrored lines carried only `partyId` and `description`, so every report scoped
+  to a dimension — cost centre, branch, or the `المندوب` of part three — kept an amount
+  the ledger had already released. Migration `0047` fixes the trigger's return value, the
+  mirror now carries its dimensions, and `reverseJournal` no longer asks for the `void`
+  at all: the mirror *is* the reversal, and voiding the original as well subtracts the
+  amount twice when every balance counts `posted` only. Tests
+  `apps/api/test/cost-centers.spec.ts` (9) and `reversal-and-void.spec.ts` (4, including
+  a direct regression test that the guard now applies the void it allows and still
+  refuses everything else), plus sections 9–10 of `scripts/verify-accounting.mjs`
+  (12 more live checks, 60 in total). **579** API tests, 36 staff, 71 contract. Two
+  navigation rows pointed at `/reports/cost-center-balances` and
+  `/reports/cost-center-report`, routes that had never been built; they are now one real
+  screen under `/accounting/cost-center-statement`, next to `كشف حساب`.
+
+* **المرحلة 07 — المحاسبة، الجزء الخامس: الفترات والميزان وقائمة الدخل**
+  (`Form_WPF/FrmAccountingPeriods.xaml` «إدارة الفترات المحاسبية» ·
+  `frmRptBalances.xaml` «أرصدة الحسابات» · `frmRptIncomeStatement.xaml`
+  «أرباح وخسائر حسابات رئيسية»). **Three things the cloud did not have: a period you can
+  write, a ميزان with a period, and an income statement at all.** `GET /fiscal-periods`
+  answered with rows that could be read, closed and reopened and nothing else — no name,
+  no dates, no active flag, no delete — so `🗂️ إدارة الفترات المحاسبية` had no card to
+  put on the screen. Migration `0048` adds the two columns the card carries
+  (`notes`, `is_active`) with a partial unique index that enforces `⚡ تفعيل` — one active
+  period, never a closed one — and `listPeriods` now returns the row the window binds:
+  `الرقم` (the period's ordinal in its year, which is what a read-only `PeriodID` is),
+  `yearName`, `isActive`, `notes` and `أغلقت بواسطة` **named** rather than a bare id (the
+  desktop writes `Environment.UserName`). `POST`/`PATCH`/`DELETE` and
+  `POST /fiscal-periods/:id/activate` follow `Class/AccountingPeriodManager.cs`
+  statement for statement, including its five refusals in its own words — «يوجد تداخل في
+  التواريخ مع فترة محاسبية أخرى» (409), «لا يمكن تفعيل فترة محاسبية مغلقة» (409),
+  «لا يمكن تعديل فترة مغلقة. يرجى إعادة فتحها أولاً» (409), «لا يمكن حذف فترة مغلقة»
+  (409) and the two 422s before any of them. The desktop has no fiscal years, so a period
+  resolves (or opens) the year covering its dates — otherwise `➕ إضافة` would be unusable
+  on an empty tenant. `GET /statements/trial-balance` was `accountId`/`debit`/`credit`
+  over the whole ledger; it now takes `من`/`إلى`/`الفرع`/`المندوب`/`الحساب الرئيسي` and
+  returns the window's ten columns — `افتتاحي · خلال الفترة المحددة · الرصيد · ختامي`,
+  each on its مدين ودائن side, with `الحالة` — computed by the window's own `ShowResult`
+  arithmetic, plus the account's `💰 الرصيد الافتتاحي`, and with `code`/`name` beside
+  `accountId` so the ميزان no longer has to be assembled in the browser from two
+  endpoints. A caller that sends nothing — and a row's four old keys — is unchanged, and
+  `totals` is an addition beside `data`. `GET /statements/income-statement` is new: the
+  accounts the desktop marks `FinalAcc = 2` (a code beginning `3` or `4`, written by
+  `DetermineFinalAccount()` — the cloud calls them `revenue` and `expense`), carried up
+  to their parents as the window does, then `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ`
+  on the credit side and `صافي أرباح العام` as the plug that makes the columns meet.
+  Tests `apps/api/test/fiscal-periods.spec.ts` (8), `trial-balance.spec.ts` (8) and
+  `income-statement.spec.ts` (7, including a stock row backed by a real
+  `inventory_transactions` line rather than a fixture), plus sections 11–13 of
+  `scripts/verify-accounting.mjs` (23 more live checks, 83 in total — one of them checks
+  the closing-balance formula itself). **602** API tests, 36 staff, 71 contract. The
+  `قائمة الدخل التحليلية` navigation row pointed at `/reports/income-statement`, a
+  report-engine key; it now names the desktop window and opens the real screen.
+  Deferred: `Form_WPF/frmAddPeriod.xaml` (⏰ إدارة فترات التأجير — rental pricing per
+  item group, and there is no general rental module in the standard per-tenant list) and
+  the `من وقت`/`إلى وقت` boxes, which cut a day the cloud cuts by date.
 
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.

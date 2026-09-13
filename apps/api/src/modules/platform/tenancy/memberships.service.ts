@@ -15,6 +15,7 @@ import {
   type PaginationQuery,
 } from '@erp/contracts';
 import {
+  membershipRoleScopes,
   membershipRoles,
   memberships,
   newId,
@@ -92,6 +93,7 @@ export class MembershipsService {
           status: memberships.status,
           isOwner: memberships.isOwner,
           branchScope: memberships.branchScope,
+          kind: memberships.kind,
           email: users.email,
         })
         .from(memberships)
@@ -118,6 +120,7 @@ export class MembershipsService {
             status: row.status,
             isOwner: row.isOwner,
             branchScope: row.branchScope,
+            kind: row.kind,
           }),
         );
       }
@@ -222,6 +225,19 @@ export class MembershipsService {
         for (const roleId of roleIds) {
           await tx.insert(membershipRoles).values({ membershipId, roleId });
         }
+        // Drop scope rows of roles the membership no longer holds: a dangling scope
+        // must never silently re-apply if the role is re-granted later.
+        await tx
+          .delete(membershipRoleScopes)
+          .where(
+            and(
+              eq(membershipRoleScopes.membershipId, membershipId),
+              sql`${membershipRoleScopes.roleId} NOT IN (${sql.join(
+                roleIds.map((roleId) => sql`${roleId}::uuid`),
+                sql`, `,
+              )})`,
+            ),
+          );
       }
 
       const updates: Record<string, unknown> = { updatedAt: new Date(), updatedBy: actorUserId };
@@ -257,6 +273,49 @@ export class MembershipsService {
   /** Isolation harness helper: reads a membership inside the caller's tenant only. */
   async read(tenantId: string, membershipId: string): Promise<MembershipDto> {
     return withTenantTx(this.database.db, tenantId, async (tx) => this.readOne(tx, membershipId));
+  }
+
+  /**
+   * Per-role scope restrictions (2026-09 RBAC reorganisation).
+   * Replace-all semantics: the submitted list becomes the membership's scopes.
+   * Every scope must reference a role the membership actually holds.
+   */
+  async replaceScopes(
+    tenantId: string,
+    actorUserId: string,
+    membershipId: string,
+    scopes: ReadonlyArray<{ roleId: string; scopeType: string; scopeId: string }>,
+  ): Promise<MembershipDto> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.mustFind(tx, tenantId, membershipId);
+      const held = await tx
+        .select({ roleId: membershipRoles.roleId })
+        .from(membershipRoles)
+        .where(eq(membershipRoles.membershipId, membershipId));
+      const heldIds = new Set(held.map((row) => row.roleId));
+      for (const scope of scopes) {
+        if (!heldIds.has(scope.roleId)) {
+          throw new DomainError(
+            errorCodes.VALIDATION_FAILED,
+            'Scopes can only restrict roles the membership holds',
+            422,
+            { field: 'scopes' },
+          );
+        }
+      }
+      await tx.delete(membershipRoleScopes).where(eq(membershipRoleScopes.membershipId, membershipId));
+      for (const scope of scopes) {
+        await tx.insert(membershipRoleScopes).values({
+          membershipId,
+          roleId: scope.roleId,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+          createdAt: new Date(),
+          createdBy: actorUserId,
+        });
+      }
+      return this.readOne(tx, membershipId);
+    });
   }
 
   // --- internals ---------------------------------------------------------------
@@ -303,6 +362,7 @@ export class MembershipsService {
         status: memberships.status,
         isOwner: memberships.isOwner,
         branchScope: memberships.branchScope,
+        kind: memberships.kind,
       })
       .from(memberships)
       // A soft-deleted membership must read as missing, exactly like a foreign tenant's

@@ -111,6 +111,34 @@ export const roleDetailDtoSchema = z.object({
 
 export type RoleDetailDto = z.infer<typeof roleDetailDtoSchema>;
 
+/**
+ * Per-role scope restrictions (2026-09 RBAC reorganisation).
+ *
+ * A `(membership, role)` grant can be restricted to one branch, warehouse, cash
+ * location or POS terminal. No rows = the grant is tenant-wide. Branch scoping
+ * keeps its dedicated `branchScope` + `X-Branch-Id` mechanism; these rows cover
+ * the finer warehouse / cash / terminal restrictions.
+ */
+export const membershipScopeTypeSchema = z.enum(['branch', 'warehouse', 'cash_location', 'pos_terminal']);
+
+export type MembershipScopeType = z.infer<typeof membershipScopeTypeSchema>;
+
+export const membershipScopesSchema = z
+  .object({
+    scopes: z.array(
+      z
+        .object({
+          roleId: uuidSchema,
+          scopeType: membershipScopeTypeSchema,
+          scopeId: uuidSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export type MembershipScopesRequest = z.infer<typeof membershipScopesSchema>;
+
 /** Allow-listed query filters per resource (API_ARCHITECTURE §3). */
 export const MEMBERSHIP_FILTERS = ['status', 'roleId'] as const;
 export const ROLE_FILTERS = ['isSystem'] as const;

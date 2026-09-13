@@ -1,0 +1,128 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmSelectInv"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="أنواع الفواتير"
+    Width="380" Height="540"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="InvBtn" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Margin" Value="20,4,20,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#213A7A"/>
+            <Setter Property="BorderBrush" Value="#B0C4DE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="#EEF3FF"/>
+                                <Setter TargetName="Bd" Property="BorderBrush"
+                                        Value="#3A63C3"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="#D6E4FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ExitBtn" TargetType="Button" BasedOn="{StaticResource InvBtn}">
+            <Setter Property="Background" Value="#E35656"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#B92F2F"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="20,8,20,8"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- عنوان -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="12,10">
+            <TextBlock Text="📋 اختر نوع الفاتورة"
+                       Foreground="White"
+                       FontSize="15" FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- أزرار الفواتير -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,10,0,10">
+
+                <Button x:Name="BtnQutation"   Content="💬 عرض سعر"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnQutation_Click"/>
+                <Button x:Name="BtnSale"        Content="🛒 فاتورة مبيعات"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnSale_Click"/>
+                <Button x:Name="BtnReturnSale"  Content="↩️ مرتجع مبيعات"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnReturnSale_Click"/>
+                <Button x:Name="BtnPurchase"    Content="📦 فاتورة مشتريات"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnPurchase_Click"/>
+                <Button x:Name="BtnReturnPurch" Content="↩️ مرتجع مشتريات"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnReturnPurch_Click"/>
+                <Button x:Name="BtnInventory"   Content="🏪 بضاعة أول مدة"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnInventory_Click"/>
+                <Button x:Name="BtnInputInv"    Content="📥 فاتورة إدخال"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnInputInv_Click"/>
+                <Button x:Name="BtnOutputInv"   Content="📤 فاتورة إخراج"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnOutputInv_Click"/>
+                <Button x:Name="BtnPOS"         Content="🖥️ نقطة بيع"
+                        Style="{StaticResource InvBtn}"
+                        Click="BtnPOS_Click"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- زر الخروج -->
+        <Button x:Name="BtnExit" Grid.Row="2"
+                Content="✖ خروج"
+                Style="{StaticResource ExitBtn}"
+                Click="BtnExit_Click"/>
+    </Grid>
+</dx:ThemedWindow>

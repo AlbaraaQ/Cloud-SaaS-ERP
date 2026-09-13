@@ -1,0 +1,606 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.FrmRptSalesChart"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="تقرير بياني للمبيعات"
+    WindowState="Maximized"
+    MinWidth="1100" MinHeight="700"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="LeftToRight"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SearchBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F5A623" Offset="0"/>
+            <GradientStop Color="#D4891A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+        <SolidColorBrush x:Key="SidebarBg"  Color="#F0F3F8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15" Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6"  ShadowDepth="1"
+                          Direction="270" Opacity="0.20" Color="#000000"/>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="ModernCheck" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="QuickBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="#F5A623"/>
+            <Setter Property="Width" Value="110"/>
+        </Style>
+
+        <Style x:Key="SearchBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SearchBrush}"/>
+        </Style>
+
+        <!-- بطاقة الرسم البياني -->
+        <Style x:Key="ChartCard" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+
+        <Style x:Key="ChartTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- منطقة الرسوم البيانية -->
+            <ColumnDefinition Width="*"/>
+            <!-- Sidebar التحكم -->
+            <ColumnDefinition Width="260"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ════════════════════════════════════
+             منطقة الرسوم البيانية (4 دوناتس + خط)
+        ════════════════════════════════════ -->
+        <Grid Grid.Column="0" FlowDirection="RightToLeft">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <!-- صف الدوناتس العلوي -->
+                <RowDefinition Height="Auto"/>
+                <!-- زر التفاصيل -->
+                <RowDefinition Height="*"/>
+                <!-- صف الدوناتس السفلي -->
+                <RowDefinition Height="*"/>
+                <!-- الرسم البياني الخطي -->
+            </Grid.RowDefinitions>
+
+            <!-- ─── الصف الأول: دوناتس ─── -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- مبيعات حسب طريقة الدفع -->
+                <Border Grid.Column="0" Style="{StaticResource ChartCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" CornerRadius="10,10,0,0">
+                            <TextBlock Text="💳 المبيعات حسب طريقة الدفع"
+                                       Style="{StaticResource ChartTitle}"/>
+                        </Border>
+                        <!-- منطقة الرسم البياني - دوناتس دفع -->
+                        <ItemsControl x:Name="ChartSalesByPayments"
+                                      Grid.Row="1"
+                                      Margin="10">
+                            <ItemsControl.Template>
+                                <ControlTemplate TargetType="ItemsControl">
+                                    <ScrollViewer>
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="White" CornerRadius="6" Margin="4"
+                                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                                            Padding="8,4" MinWidth="100">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding PayMethod}"
+                                                       FontWeight="Bold" FontSize="11"
+                                                       Foreground="#1B2642"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding SaleNet, StringFormat=N2}"
+                                                       FontSize="13" FontWeight="Bold"
+                                                       Foreground="#3A63C3"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+
+                <!-- أفضل المنتجات مبيعًا -->
+                <Border Grid.Column="1" Style="{StaticResource ChartCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" CornerRadius="10,10,0,0">
+                            <TextBlock Text="🏆 أفضل المنتجات مبيعًا"
+                                       Style="{StaticResource ChartTitle}"/>
+                        </Border>
+                        <ItemsControl x:Name="SalesByItems"
+                                      Grid.Row="1" Margin="10">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="White" CornerRadius="6" Margin="3"
+                                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                                            Padding="6,3" MinWidth="90">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding ItemName}"
+                                                       FontWeight="Bold" FontSize="10"
+                                                       Foreground="#1B2642" TextWrapping="Wrap"
+                                                       HorizontalAlignment="Center" MaxWidth="100"/>
+                                            <TextBlock Text="{Binding SaleNet, StringFormat=N2}"
+                                                       FontSize="12" FontWeight="Bold"
+                                                       Foreground="#1B8E4A"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ─── أزرار التفاصيل ─── -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="btnItemsDetails"
+                        Grid.Column="0"
+                        Content="📋 تفاصيل المبيعات"
+                        Style="{StaticResource ActionBtn}"
+                        Height="40" Margin="4,2"
+                        Click="btnItemsDetails_Click"/>
+
+                <Button x:Name="BtnSalesByPayType"
+                        Grid.Column="1"
+                        Content="📊 تفاصيل الأصناف"
+                        Style="{StaticResource ActionBtn}"
+                        Height="40" Margin="4,2"
+                        Click="BtnSalesByPayType_Click"/>
+            </Grid>
+
+            <!-- ─── الصف الثاني: دوناتس ─── -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- أفضل الأقسام مبيعًا -->
+                <Border Grid.Column="0" Style="{StaticResource ChartCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" CornerRadius="10,10,0,0">
+                            <TextBlock Text="🗂️ أفضل الأقسام مبيعًا"
+                                       Style="{StaticResource ChartTitle}"/>
+                        </Border>
+                        <ItemsControl x:Name="SalesByCategory"
+                                      Grid.Row="1" Margin="10">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="White" CornerRadius="6" Margin="3"
+                                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                                            Padding="6,3" MinWidth="90">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding CategoryName}"
+                                                       FontWeight="Bold" FontSize="10"
+                                                       Foreground="#1B2642" TextWrapping="Wrap"
+                                                       HorizontalAlignment="Center" MaxWidth="100"/>
+                                            <TextBlock Text="{Binding SaleNet, StringFormat=N2}"
+                                                       FontSize="12" FontWeight="Bold"
+                                                       Foreground="#D4891A"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+
+                <!-- المبيعات حسب نوع الطلب -->
+                <Border Grid.Column="1" Style="{StaticResource ChartCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" CornerRadius="10,10,0,0">
+                            <TextBlock Text="📦 المبيعات حسب نوع الطلب"
+                                       Style="{StaticResource ChartTitle}"/>
+                        </Border>
+                        <ItemsControl x:Name="SalesByOrderType"
+                                      Grid.Row="1" Margin="10">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="White" CornerRadius="6" Margin="3"
+                                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                                            Padding="6,3" MinWidth="90">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding OrderTypeName}"
+                                                       FontWeight="Bold" FontSize="10"
+                                                       Foreground="#1B2642" TextWrapping="Wrap"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding SaleNet, StringFormat=N2}"
+                                                       FontSize="12" FontWeight="Bold"
+                                                       Foreground="#B92F2F"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ─── المبيعات الشهرية (خط بياني بـ ItemsControl) ─── -->
+            <Border Grid.Row="3" Style="{StaticResource ChartCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="36"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" CornerRadius="10,10,0,0">
+                        <TextBlock Text="📈 صافي المبيعات الشهرية | Monthly Sales"
+                                   Style="{StaticResource ChartTitle}"/>
+                    </Border>
+
+                    <!-- جدول بيانات المبيعات الشهرية -->
+                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Orientation="Horizontal" Margin="10,8">
+
+                            <!-- Legend -->
+                            <StackPanel VerticalAlignment="Top" Margin="0,0,16,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Border Width="18" Height="12" Background="#3A63C3"
+                                            CornerRadius="3" Margin="0,0,4,0"/>
+                                    <TextBlock Text="المبيعات" FontSize="10" FontWeight="Bold"
+                                               Foreground="#1B2642" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="18" Height="12" Background="#E35656"
+                                            CornerRadius="3" Margin="0,0,4,0"/>
+                                    <TextBlock Text="مرتجع المبيعات" FontSize="10" FontWeight="Bold"
+                                               Foreground="#1B2642" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- بيانات الشهور -->
+                            <ItemsControl x:Name="ManthlySales">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="3,0" MinWidth="70"
+                                                BorderBrush="{StaticResource BorderLight}"
+                                                BorderThickness="0,0,1,0">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding InvDate}"
+                                                           FontSize="9" FontWeight="Bold"
+                                                           Foreground="#555"
+                                                           HorizontalAlignment="Center"
+                                                           TextWrapping="Wrap" MaxWidth="65"/>
+                                                <TextBlock Text="{Binding InvTotal, StringFormat=N2}"
+                                                           FontSize="11" FontWeight="Bold"
+                                                           Foreground="#3A63C3"
+                                                           HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ReturnTotal, StringFormat=N2}"
+                                                           FontSize="10"
+                                                           Foreground="#E35656"
+                                                           HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ════════════════════════════════════
+             SIDEBAR - التحكم
+        ════════════════════════════════════ -->
+        <Border Grid.Column="1"
+                Background="{StaticResource SidebarBg}"
+                BorderBrush="{StaticResource BorderLight}"
+                FlowDirection="RightToLeft"
+                BorderThickness="1,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="10,10,10,10">
+
+                    <!-- عنوان -->
+                    <Border Background="{StaticResource HeaderBrush}"
+                            CornerRadius="8" Padding="8,7" Margin="0,0,0,10">
+                        <TextBlock Text="🔧 خيارات العرض"
+                                   Foreground="White" FontWeight="Bold" FontSize="12"
+                                   HorizontalAlignment="Center"/>
+                    </Border>
+
+                    <!-- نوع الفاتورة -->
+                    <Border Background="White" CornerRadius="8" Padding="8,8"
+                            Margin="0,0,0,8"
+                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="6" Padding="6,4" Margin="0,0,0,6">
+                                <TextBlock Text="🧾 نوع الفاتورة" Foreground="White"
+                                           FontWeight="Bold" FontSize="11"/>
+                            </Border>
+                            <ComboBox x:Name="cmbInvType"
+                                      Style="{StaticResource ModernComboBox}">
+                                <ComboBoxItem Content="نقطة بيع"/>
+                                <ComboBoxItem Content="فاتورة مبيعات"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- الفرع -->
+                    <Border Background="White" CornerRadius="8" Padding="8,8"
+                            Margin="0,0,0,8"
+                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="6" Padding="6,4" Margin="0,0,0,6">
+                                <TextBlock Text="🏢 الفرع" Foreground="White"
+                                           FontWeight="Bold" FontSize="11"/>
+                            </Border>
+                            <CheckBox x:Name="chkAllBranches"
+                                      Content="الكل"
+                                      IsChecked="True"
+                                      FontSize="11" FontWeight="Bold"
+                                      Foreground="#1B2642"
+                                      Checked="chkAllBranches_CheckedChanged"
+                                      Unchecked="chkAllBranches_CheckedChanged"/>
+                            <ComboBox x:Name="cmbBranches"
+                                      Style="{StaticResource ModernComboBox}"
+                                      Margin="0,4,0,0"
+                                      IsEnabled="False"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- الفترة الزمنية -->
+                    <Border Background="White" CornerRadius="8" Padding="8,8"
+                            Margin="0,0,0,8"
+                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="6" Padding="6,4" Margin="0,0,0,6">
+                                <TextBlock Text="📅 الفترة الزمنية" Foreground="White"
+                                           FontWeight="Bold" FontSize="11"/>
+                            </Border>
+                            <CheckBox x:Name="chkAllPeriod"
+                                      Content="كل الفترة"
+                                      IsChecked="True"
+                                      FontSize="11" FontWeight="Bold"
+                                      Foreground="#1B2642"
+                                      Checked="chkAllPeriod_CheckedChanged"
+                                      Unchecked="chkAllPeriod_CheckedChanged"/>
+
+                            <TextBlock Text="من تاريخ" FontSize="10" FontWeight="Bold"
+                                       Foreground="#555" Margin="0,6,0,2"/>
+                            <dxe:DateEdit x:Name="txtFromDate"
+                                          Height="30" FontSize="11"
+                                          IsEnabled="False" Margin="0,0,0,4"/>
+                            <TextBlock Text="وقت البدء" FontSize="10" FontWeight="Bold"
+                                       Foreground="#555" Margin="0,0,0,2"/>
+                            <TextBox x:Name="txtStartTime"
+                                     Height="28" FontSize="11"
+                                     Text="00:00" IsEnabled="False"
+                                     BorderBrush="{StaticResource BorderLight}"
+                                     BorderThickness="1"
+                                     Padding="4,0"
+                                     VerticalContentAlignment="Center"
+                                     Margin="0,0,0,6"/>
+
+                            <TextBlock Text="إلى تاريخ" FontSize="10" FontWeight="Bold"
+                                       Foreground="#555" Margin="0,0,0,2"/>
+                            <dxe:DateEdit x:Name="txtToDate"
+                                          Height="30" FontSize="11"
+                                          IsEnabled="False" Margin="0,0,0,4"/>
+                            <TextBlock Text="وقت الانتهاء" FontSize="10" FontWeight="Bold"
+                                       Foreground="#555" Margin="0,0,0,2"/>
+                            <TextBox x:Name="txtEndTime"
+                                     Height="28" FontSize="11"
+                                     Text="23:59" IsEnabled="False"
+                                     BorderBrush="{StaticResource BorderLight}"
+                                     BorderThickness="1"
+                                     Padding="4,0"
+                                     VerticalContentAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- أزرار الفترة السريعة -->
+                    <Border Background="White" CornerRadius="8" Padding="8,8"
+                            Margin="0,0,0,8"
+                            BorderBrush="{StaticResource BorderLight}" BorderThickness="1"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="6" Padding="6,4" Margin="0,0,0,8">
+                                <TextBlock Text="⚡ فترة سريعة" Foreground="White"
+                                           FontWeight="Bold" FontSize="11"/>
+                            </Border>
+                            <UniformGrid Rows="2" Columns="2">
+                                <Button x:Name="btnToday"
+                                        Content="📅 اليوم"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="#1DB954"
+                                        Margin="2"
+                                        Click="btnToday_Click"/>
+                                <Button x:Name="btnYest"
+                                        Content="📅 أمس"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="#4A90D9"
+                                        Margin="2"
+                                        Click="btnYest_Click"/>
+                                <Button x:Name="btnWeek"
+                                        Content="📅 الأسبوع"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="#F5A623"
+                                        Margin="2"
+                                        Click="btnWeek_Click"/>
+                                <Button x:Name="btnMonth"
+                                        Content="📅 الشهر"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="#9B59B6"
+                                        Margin="2"
+                                        Click="btnMonth_Click"/>
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- زر العرض الرئيسي -->
+                    <Button x:Name="btnShowData"
+                            Content="🔍 عرض البيانات"
+                            Style="{StaticResource SearchBtn}"
+                            Height="42" Margin="0,4,0,0"
+                            Click="btnShowData_Click"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

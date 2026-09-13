@@ -27,6 +27,12 @@ export class SalesController {
   @Get('sales/offers') @RequiresPermission('sales.view') offers() { return this.sales.listOffers(getTenantContext().tenantId); }
   @Post('sales/offers') @RequiresPermission('sales.offer.manage') createOffer(@Body() body: Parameters<SalesService['createOffer']>[1]) { return this.sales.createOffer(getTenantContext().tenantId, body); }
   @Get('sales/salesmen') @RequiresPermission('sales.view') salesmen() { return this.sales.listSalesmen(getTenantContext().tenantId); }
+  /** 👤 عميل نقدي — the desktop searches the invoices themselves, not a customer table. */
+  @Get('sales/cash-customers')
+  @RequiresPermission('sales.view')
+  cashCustomers(@Query('name') name?: string, @Query('mobile') mobile?: string) {
+    return this.sales.cashCustomers(getTenantContext().tenantId, { name, mobile });
+  }
   @Post('sales/salesmen') @RequiresPermission('sales.salesman.manage') createSalesman(@Body() body: { name: string; employeeRef?: string; active?: boolean }) { return this.sales.createSalesman(getTenantContext().tenantId, body); }
   @Patch('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') updateSalesman(@Param('id') id: string, @Body() body: { name?: string; employeeRef?: string | null; active?: boolean }) { return this.sales.updateSalesman(getTenantContext().tenantId, id, body); }
   @Delete('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') deleteSalesman(@Param('id') id: string) { return this.sales.deleteSalesman(getTenantContext().tenantId, id); }

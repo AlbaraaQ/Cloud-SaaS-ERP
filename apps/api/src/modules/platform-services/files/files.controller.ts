@@ -39,7 +39,7 @@ export class FilesController {
   constructor(private readonly files: FilesService) {}
 
   @Post('presign')
-  @RequiresPermission('platform.file.upload')
+  @RequiresPermission('tenant.file.upload')
   @zodApiBody(filePresignSchema)
   @ApiOperation({ summary: 'Reserve a file row and return a pre-signed upload URL' })
   @ApiResponse({ status: 201, description: 'Upload URL issued' })
@@ -53,7 +53,7 @@ export class FilesController {
   }
 
   @Post(':id/finalize')
-  @RequiresPermission('platform.file.upload')
+  @RequiresPermission('tenant.file.upload')
   @zodApiBody(fileFinalizeSchema)
   @ApiOperation({ summary: 'Mark an upload complete and attach it to an entity' })
   @ApiResponse({ status: 201, description: 'File finalized' })
@@ -71,7 +71,7 @@ export class FilesController {
   }
 
   @Get()
-  @RequiresPermission('platform.file.upload')
+  @RequiresPermission('tenant.file.upload')
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   @ApiQuery({ name: 'q', required: false })
@@ -86,7 +86,7 @@ export class FilesController {
   }
 
   @Get(':id')
-  @RequiresPermission('platform.file.upload')
+  @RequiresPermission('tenant.file.upload')
   @ApiOperation({ summary: 'Read one file (404 across tenants)' })
   @ApiResponse({ status: 200, description: 'File' })
   @ApiResponse({ status: 404, description: 'Not found in this tenant' })
@@ -95,7 +95,7 @@ export class FilesController {
   }
 
   @Get(':id/download')
-  @RequiresPermission('platform.file.upload')
+  @RequiresPermission('tenant.file.upload')
   @ApiOperation({ summary: 'Mint a short-lived, app-signed download URL' })
   @ApiResponse({ status: 200, description: 'Signed URL' })
   @ApiResponse({ status: 404, description: 'Not found in this tenant' })

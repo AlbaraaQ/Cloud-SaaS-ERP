@@ -1,0 +1,120 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.FrmSallah"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تكامل Salla API"
+    Width="700" Height="200"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- لون Salla أخضر -->
+        <LinearGradientBrush x:Key="SallaBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#00A651" Offset="0"/>
+            <GradientStop Color="#007A3D" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <DropShadowEffect x:Key="BtnShadow" BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20" Color="#000000"/>
+
+        <Style x:Key="SallaBtn" TargetType="Button">
+            <Setter Property="Height" Value="50"/>
+            <Setter Property="MinWidth" Value="160"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource SallaBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="10,0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BlueBtn" TargetType="Button" BasedOn="{StaticResource SallaBtn}">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Border Background="White" Margin="16" CornerRadius="12">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+
+            <!-- عنوان -->
+            <Border Background="{StaticResource SallaBrush}"
+                    CornerRadius="8" Padding="16,8" Margin="0,0,0,20">
+                <TextBlock Text="🛒 تكامل منصة Salla"
+                           Foreground="White" FontSize="16"
+                           FontWeight="Bold" HorizontalAlignment="Center"/>
+            </Border>
+
+            <!-- أزرار العمليات -->
+            <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,10">
+
+                <Button x:Name="btnGetProducts"
+                        Content="📦 جلب المنتجات"
+                        Style="{StaticResource SallaBtn}"
+                        Margin="8,0"
+                        Click="btnGetProducts_Click"/>
+
+                <Button x:Name="btnGetOrders"
+                        Content="📋 جلب الطلبات"
+                        Style="{StaticResource BlueBtn}"
+                        Margin="8,0"
+                        Click="btnGetOrders_Click"/>
+
+                <Button x:Name="btnAddProduct"
+                        Content="➕ إضافة منتج"
+                        Style="{StaticResource SallaBtn}"
+                        Margin="8,0"
+                        Click="btnAddProduct_Click"/>
+
+                <Button x:Name="Button3"
+                        Content="📥 جلب الطلبات (2)"
+                        Style="{StaticResource BlueBtn}"
+                        Margin="8,0"
+                        Click="Button3_Click"/>
+
+            </WrapPanel>
+
+        </StackPanel>
+    </Border>
+</dx:ThemedWindow>

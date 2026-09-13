@@ -1,0 +1,171 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmSerial"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تفعيل البرنامج"
+    Width="500" Height="220"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="White"
+    FontFamily="Cairo, Tahoma, Arial"
+    ResizeMode="NoResize"
+    Loaded="Window_Loaded"
+    KeyDown="Window_KeyDown">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="SerialBox" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#D0D7E8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="100"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- عنوان -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="12,8">
+            <TextBlock Text="🔑 تفعيل البرنامج — Enter Serial"
+                       Foreground="White" FontSize="14" FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- حقول السيريال -->
+        <StackPanel Grid.Row="1"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Margin="20">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,12">
+                <TextBox x:Name="txt1" Style="{StaticResource SerialBox}"
+                         MaxLength="4" Margin="4"
+                         TextChanged="txt1_TextChanged"
+                         KeyDown="SerialBox_KeyDown"/>
+                <TextBlock Text=" - " FontSize="18" FontWeight="Bold"
+                           VerticalAlignment="Center" Foreground="#555"/>
+                <TextBox x:Name="txt2" Style="{StaticResource SerialBox}"
+                         MaxLength="4" Margin="4"
+                         TextChanged="txt2_TextChanged"
+                         KeyDown="SerialBox_KeyDown"/>
+                <TextBlock Text=" - " FontSize="18" FontWeight="Bold"
+                           VerticalAlignment="Center" Foreground="#555"/>
+                <TextBox x:Name="txt3" Style="{StaticResource SerialBox}"
+                         MaxLength="4" Margin="4"
+                         TextChanged="txt3_TextChanged"
+                         KeyDown="SerialBox_KeyDown"/>
+                <TextBlock Text=" - " FontSize="18" FontWeight="Bold"
+                           VerticalAlignment="Center" Foreground="#555"/>
+                <TextBox x:Name="txt4" Style="{StaticResource SerialBox}"
+                         MaxLength="4" Margin="4"
+                         TextChanged="txt4_TextChanged"
+                         KeyDown="SerialBox_KeyDown"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- أزرار + شراء البرنامج -->
+        <Grid Grid.Row="2" Margin="16,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       x:Name="LinkLabel1"
+                       Text="🛒 شراء البرنامج"
+                       Foreground="#3A63C3"
+                       FontSize="11" FontWeight="Bold"
+                       TextDecorations="Underline"
+                       Cursor="Hand"
+                       VerticalAlignment="Center"
+                       MouseLeftButtonDown="LinkLabel1_Click"/>
+
+            <Button Grid.Column="2"
+                    x:Name="Button3"
+                    Content="✖ خروج"
+                    Style="{StaticResource ActionBtn}"
+                    Background="#E35656"
+                    Click="Button3_Click"/>
+
+            <Button Grid.Column="4"
+                    x:Name="btnActivate"
+                    Content="✅ تفعيـل"
+                    Style="{StaticResource ActionBtn}"
+                    Click="btnActivate_Click"/>
+        </Grid>
+    </Grid>
+</dx:ThemedWindow>

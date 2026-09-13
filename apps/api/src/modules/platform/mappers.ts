@@ -1,7 +1,13 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { MembershipDto, RoleDto, TenantDto, UserDto } from '@erp/contracts';
 import { resolveTenantSettings } from '@erp/config';
-import { membershipRoles, roles, tenantSettings, type DrizzleTx } from '@erp/database';
+import {
+  membershipRoleScopes,
+  membershipRoles,
+  roles,
+  tenantSettings,
+  type DrizzleTx,
+} from '@erp/database';
 
 /** Row → DTO mapping. Column names stay snake_case in SQL and camelCase on the wire. */
 
@@ -18,6 +24,8 @@ export type UserRow = {
   isPlatformAdmin: boolean;
   mustChangePassword: boolean;
   lastLoginAt: Date | null;
+  /** Effective platform role codes (resolved at login / /me time). */
+  platformRoles?: string[];
 };
 
 export function toUserDto(row: UserRow): UserDto {
@@ -28,6 +36,7 @@ export function toUserDto(row: UserRow): UserDto {
     phone: row.phone,
     status: row.status as UserDto['status'],
     isPlatformAdmin: row.isPlatformAdmin,
+    platformRoles: row.platformRoles ?? [],
     mustChangePassword: row.mustChangePassword,
     lastLoginAt: toIso(row.lastLoginAt),
   };
@@ -57,9 +66,19 @@ export type MembershipRow = {
   status: string;
   isOwner: boolean;
   branchScope: unknown;
+  kind?: string;
 };
 
 export async function toMembershipDto(tx: DrizzleTx, row: MembershipRow): Promise<MembershipDto> {
+  const scopeRows = await tx
+    .select({
+      roleId: membershipRoleScopes.roleId,
+      scopeType: membershipRoleScopes.scopeType,
+      scopeId: membershipRoleScopes.scopeId,
+    })
+    .from(membershipRoleScopes)
+    .where(eq(membershipRoleScopes.membershipId, row.id));
+
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -70,6 +89,12 @@ export async function toMembershipDto(tx: DrizzleTx, row: MembershipRow): Promis
     isOwner: row.isOwner,
     branchScope: (row.branchScope as string[] | null) ?? null,
     roles: await loadRolesForMembership(tx, row.id),
+    kind: row.kind === 'portal' ? 'portal' : 'staff',
+    scopes: scopeRows.map((scope) => ({
+      roleId: scope.roleId,
+      scopeType: scope.scopeType as MembershipDto['scopes'][number]['scopeType'],
+      scopeId: scope.scopeId,
+    })),
   };
 }
 

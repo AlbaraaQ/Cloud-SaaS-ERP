@@ -1,0 +1,494 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmCloudPaymentSetting"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="⚙️ إعدادات طرق الدفع"
+        Width="540"
+        Height="460"
+        MaxWidth="540"
+        MaxHeight="460"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        FlowDirection="RightToLeft"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+
+        <!-- ═══════════ GRADIENTS ═══════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#004D40" Offset="0"/>
+            <GradientStop Color="#00695C" Offset="0.5"/>
+            <GradientStop Color="#26A69A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="CardBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFF" Offset="0"/>
+            <GradientStop Color="#F4FFFD" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- ═══════════ SHADOWS ═══════════ -->
+        <DropShadowEffect x:Key="WindowShadow"
+                          BlurRadius="18" ShadowDepth="3"
+                          Direction="270" Opacity="0.28"
+                          Color="#44000000"/>
+
+        <DropShadowEffect x:Key="FieldShadow"
+                          BlurRadius="5" ShadowDepth="1"
+                          Direction="270" Opacity="0.08"
+                          Color="#44000000"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="8" ShadowDepth="2"
+                          Direction="270" Opacity="0.12"
+                          Color="#44000000"/>
+
+        <!-- ═══════════ LABEL ═══════════ -->
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Droid Arabic Kufi"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#37474F"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══════════ COMBOBOX ═══════════ -->
+        <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#80CBC4"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Style>
+
+        <!-- ═══════════ WIN CLOSE ═══════════ -->
+        <Style x:Key="WinCloseStyle" TargetType="Button">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="#22FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#55FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ SAVE BUTTON ═══════════ -->
+        <Style x:Key="SaveButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#00695C"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Droid Arabic Kufi"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Effect="{StaticResource FieldShadow}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ DELETE BUTTON ═══════════ -->
+        <Style x:Key="DeleteButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#C62828"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#B71C1C"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ ADD ROW BUTTON ═══════════ -->
+        <Style x:Key="AddRowButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#00897B"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#00695C"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ DATAGRID ═══════════ -->
+        <Style x:Key="ModernDataGridStyle" TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#80CBC4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E0F2F1"/>
+            <Setter Property="RowHeight" Value="34"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="ColumnHeaderHeight" Value="34"/>
+            <Setter Property="AlternationCount" Value="2"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#00695C"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+
+        <Style TargetType="DataGridRow">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E0F2F1"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#B2DFDB"/>
+                    <Setter Property="Foreground" Value="#004D40"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self},
+                             Path=AlternationIndex}" Value="1">
+                    <Setter Property="Background" Value="#F5FFFE"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Border CornerRadius="16"
+            Background="{StaticResource CardBrush}"
+            BorderBrush="#80CBC4"
+            BorderThickness="1.5"
+            Effect="{StaticResource WindowShadow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ─── HEADER ─── -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource HeaderBrush}"
+                    CornerRadius="16,16,0,0"
+                    MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="⚙️" FontSize="22" Margin="8,0,0,0"/>
+                        <StackPanel Margin="8,0,0,0">
+                            <TextBlock Text="إعدادات طرق الدفع"
+                                       Foreground="White"
+                                       FontFamily="Tahoma"
+                                       FontSize="15"
+                                       FontWeight="Bold"/>
+                            <TextBlock Text="إعدادات طرق الدفع الخاصة للمدقق السحابي"
+                                       Foreground="#B2DFDB"
+                                       FontFamily="Droid Arabic Kufi"
+                                       FontSize="10"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource WinCloseStyle}"
+                            Click="Window_Close_Click">
+                        <TextBlock Text="✖"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- ─── CONTENT ─── -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="16,14">
+                <StackPanel>
+
+                    <!-- ─── حقول طرق الدفع ─── -->
+                    <Border Background="#E0F2F1"
+                            BorderBrush="#80CBC4"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,12"
+                            Margin="0,0,0,12"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,0,10">
+                                <TextBlock Text="💳" FontSize="14" Margin="6,0,0,0"/>
+                                <TextBlock Text="ربط طرق الدفع"
+                                           FontFamily="Tahoma"
+                                           FontSize="12"
+                                           FontWeight="Bold"
+                                           Foreground="#004D40"/>
+                            </StackPanel>
+
+                            <!-- أجل -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbCredit"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBoxStyle}"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="📋 أجل"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                            </Grid>
+
+                            <!-- نقدي -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbCash"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBoxStyle}"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="💵 نقدي"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                            </Grid>
+
+                            <!-- شبكة -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbCreditCard"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBoxStyle}"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="🌐 شبكة"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ─── جدول البنوك ─── -->
+                    <Border Background="White"
+                            BorderBrush="#80CBC4"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="0"
+                            Margin="0,0,0,12"
+                            ClipToBounds="True"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+
+                            <!-- Header الجدول -->
+                            <Grid Background="#00695C" Margin="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="🏛️ ربط البنوك بطرق الدفع"
+                                           Foreground="White"
+                                           FontFamily="Tahoma"
+                                           FontSize="12"
+                                           FontWeight="Bold"
+                                           Margin="12,8"
+                                           HorizontalAlignment="Right"/>
+
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource AddRowButtonStyle}"
+                                        Margin="8,6"
+                                        Click="btnAddBankRow_Click"
+                                        ToolTip="إضافة صف">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="➕" FontSize="12" Margin="0,0,4,0"/>
+                                        <TextBlock Text="إضافة"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <!-- DataGrid -->
+                            <DataGrid x:Name="GridControl1"
+                                      Style="{StaticResource ModernDataGridStyle}"
+                                      Height="160">
+                                <DataGrid.Columns>
+
+                                    <!-- البنك -->
+                                    <DataGridTemplateColumn Header="🏛️ البنك" Width="*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding BankName}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                        <DataGridTemplateColumn.CellEditingTemplate>
+                                            <DataTemplate>
+                                                <ComboBox x:Name="cmbBankInGrid"
+                                                          ItemsSource="{Binding RelativeSource=
+                                                              {RelativeSource AncestorType=Window},
+                                                              Path=DataContext}"
+                                                          SelectedValue="{Binding BankId,
+                                                              UpdateSourceTrigger=PropertyChanged}"
+                                                          Height="30"
+                                                          Loaded="BankComboInGrid_Loaded"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellEditingTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- طريقة الدفع -->
+                                    <DataGridTemplateColumn Header="💳 طريقة الدفع" Width="*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding PayTypeName}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                        <DataGridTemplateColumn.CellEditingTemplate>
+                                            <DataTemplate>
+                                                <ComboBox x:Name="cmbPayTypeInGrid"
+                                                          SelectedValue="{Binding PayTypeId,
+                                                              UpdateSourceTrigger=PropertyChanged}"
+                                                          Height="30"
+                                                          Loaded="PayTypeComboInGrid_Loaded"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellEditingTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- حذف -->
+                                    <DataGridTemplateColumn Header="🗑️ حذف" Width="70">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="🗑️ حذف"
+                                                        Style="{StaticResource DeleteButtonStyle}"
+                                                        Tag="{Binding}"
+                                                        Click="BtnDeleteRow_Click"
+                                                        HorizontalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ─── زر الحفظ ─── -->
+                    <Button x:Name="btnSave"
+                            Style="{StaticResource SaveButtonStyle}"
+                            Click="btnSave_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💾" FontSize="16" Margin="0,0,8,0"/>
+                            <TextBlock Text="حفظ الإعدادات"/>
+                        </StackPanel>
+                    </Button>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

@@ -54,7 +54,13 @@ export const userDtoSchema = z.object({
   fullName: z.string(),
   phone: z.string().nullable(),
   status: userStatusSchema,
+  /** Effective platform access (legacy flag OR any platform_memberships row). */
   isPlatformAdmin: z.boolean(),
+  /**
+   * Platform role codes (2026-09). Empty for tenant-only users. Surfaced so the
+   * platform console can render role badges without an extra round-trip.
+   */
+  platformRoles: z.array(z.string()).default([]),
   mustChangePassword: z.boolean(),
   lastLoginAt: z.string().nullable(),
 });
@@ -73,6 +79,14 @@ export const roleDtoSchema = z.object({
 
 export type RoleDto = z.infer<typeof roleDtoSchema>;
 
+export const membershipScopeDtoSchema = z.object({
+  roleId: uuidSchema,
+  scopeType: z.enum(['branch', 'warehouse', 'cash_location', 'pos_terminal']),
+  scopeId: uuidSchema,
+});
+
+export type MembershipScopeDto = z.infer<typeof membershipScopeDtoSchema>;
+
 export const membershipDtoSchema = z.object({
   id: uuidSchema,
   tenantId: uuidSchema,
@@ -83,6 +97,10 @@ export const membershipDtoSchema = z.object({
   isOwner: z.boolean(),
   branchScope: z.array(uuidSchema).nullable(),
   roles: z.array(roleDtoSchema),
+  /** Audience of the membership (2026-09): staff vs external portal customer. */
+  kind: z.enum(['staff', 'portal']).default('staff'),
+  /** Per-role scope restrictions (empty = tenant-wide). */
+  scopes: z.array(membershipScopeDtoSchema).default([]),
 });
 
 export type MembershipDto = z.infer<typeof membershipDtoSchema>;

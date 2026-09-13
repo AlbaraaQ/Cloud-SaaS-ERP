@@ -63,6 +63,13 @@ describe('organization provisioning and default flags (PHASE_05 §5.7, §11)', (
         'SELECT kind, is_default, account_id FROM cash_locations WHERE id = $1',
         [defaults.cashLocationId],
       );
+      const chart = await client.query<{ total: string; roots: string; cashbox: string | null }>(
+        `SELECT count(*) AS total,
+                count(*) FILTER (WHERE parent_id IS NULL) AS roots,
+                max(code) FILTER (WHERE code = '1211001') AS cashbox
+         FROM accounts WHERE tenant_id = $1 AND deleted_at IS NULL`,
+        [admin.tenantId],
+      );
       const balances = await client.query<{ currency_code: string; balance: string }>(
         'SELECT currency_code, balance FROM cash_location_balances WHERE cash_location_id = $1',
         [defaults.cashLocationId],
@@ -75,14 +82,24 @@ describe('organization provisioning and default flags (PHASE_05 §5.7, §11)', (
         'SELECT code, is_base FROM currencies WHERE tenant_id = $1',
         [admin.tenantId],
       );
-      return { branch, warehouse, cash, balances, priceList, currency };
+      return { branch, warehouse, cash, balances, priceList, currency, chart };
     });
 
     expect(rows.branch.rows[0]).toMatchObject({ code: 'MAIN', is_default: true });
     expect(rows.warehouse.rows[0]).toMatchObject({ is_default: true });
     expect(rows.cash.rows[0]).toMatchObject({ kind: 'safe', is_default: true });
-    // CR-006: the COA does not exist until PHASE_07, so the account stays unset.
-    expect(rows.cash.rows[0]?.account_id).toBeNull();
+    // The desktop chart is seeded in the same transaction, so the safe posts to
+    // 1211001 (الصندوق الرئيسي) from day one — CR-006 is closed. The count is the
+    // desktop chart (113) plus the two leaves Phase 05 added to it: 1270003
+    // (بضاعة تحت التحويل) and 3121004 (تسويات المخزون).
+    expect(rows.chart.rows[0]).toMatchObject({ total: '115', roots: '4', cashbox: '1211001' });
+    const linked = await withClient(async (client) => {
+      const byId = await client.query<{ code: string }>('SELECT code FROM accounts WHERE id = $1', [
+        rows.cash.rows[0]?.account_id,
+      ]);
+      return byId.rows[0]?.code;
+    });
+    expect(linked).toBe('1211001');
     expect(rows.balances.rows).toHaveLength(1);
     expect(rows.balances.rows[0]?.currency_code.trim()).toBe('SAR');
     expect(Number(rows.balances.rows[0]?.balance)).toBe(0);

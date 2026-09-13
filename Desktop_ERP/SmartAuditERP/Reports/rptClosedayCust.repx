@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<XtraReportsLayoutSerializer SerializerVersion="18.2.7.0" Ref="0" ControlType="DevExpress.XtraReports.UI.XtraReport, DevExpress.XtraReports.v18.2, Version=18.2.7.0, Culture=neutral, PublicKeyToken=b88d1754d700e49a" Name="Report1" RollPaper="true" Margins="0, 0, 0, 0" PrinterName="ZDesigner GK420t (Copy 1)" PaperKind="Custom" PageWidth="321" PageHeight="1100" Version="18.2" ShowPrintStatusDialog="false" ShowPrintMarginsWarning="false" Font="Arial, 9.75pt">
+  <Bands>
+    <Item1 Ref="1" ControlType="TopMarginBand" Name="TopMargin" SnapLinePadding="0,0,0,0,100" HeightF="0" />
+    <Item2 Ref="2" ControlType="DetailBand" Name="CustRpt" HeightF="23.0000153">
+      <Controls>
+        <Item1 Ref="3" ControlType="XRLabel" Name="label5" Multiline="true" TextAlignment="MiddleCenter" SizeF="143.560669,23" LocationFloat="124.375, 0" Font="Arial, 10pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="4" Expression="[Name]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="5" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item1>
+        <Item2 Ref="6" ControlType="XRLabel" Name="label26" Multiline="true" Text="الرقم" TextAlignment="MiddleCenter" SizeF="124.375,23.0000153" LocationFloat="0, 0" Font="Arial, 9.75pt, style=Bold" Padding="2,2,0,0,100" Borders="All">
+          <ExpressionBindings>
+            <Item1 Ref="7" Expression="[Amount]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="8" UseFont="false" UseBorders="false" UseTextAlignment="false" />
+        </Item2>
+      </Controls>
+    </Item2>
+    <Item3 Ref="9" ControlType="BottomMarginBand" Name="BottomMargin" HeightF="0" />
+    <Item4 Ref="10" ControlType="GroupFooterBand" Name="GroupFooter1" Expanded="false" HeightF="408.792236" />
+    <Item5 Ref="11" ControlType="PageHeaderBand" Name="PageHeader" HeightF="0" />
+    <Item6 Ref="12" ControlType="ReportHeaderBand" Name="ReportHeader" HeightF="1.45804083" />
+  </Bands>
+</XtraReportsLayoutSerializer>

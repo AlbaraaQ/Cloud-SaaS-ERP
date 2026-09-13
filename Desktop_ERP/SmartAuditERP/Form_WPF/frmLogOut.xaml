@@ -1,0 +1,111 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmLogOut"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تسجيل الخروج"
+    Width="440"
+    Height="190"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    FlowDirection="RightToLeft"
+    Background="#F5F5F5"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="frmLogOut_Load">
+
+    <dx:ThemedWindow.Resources>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.18"
+                          Color="#000000"/>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Width" Value="130"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Info message -->
+        <Border Grid.Row="0"
+                Background="#FFF8E1"
+                BorderBrush="#FFB300"
+                BorderThickness="0,0,0,2"
+                Padding="16,14">
+            <TextBlock x:Name="Label1"
+                       Text="⚠️ الخروج أو تبديل المستخدم يتطلب إغلاق الصندوق أولًا"
+                       FontSize="13"
+                       FontWeight="Bold"
+                       Foreground="#5D4037"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Border>
+
+        <!-- Buttons -->
+        <Border Grid.Row="1"
+                Background="White"
+                BorderBrush="#E0E0E0"
+                BorderThickness="0,1,0,0"
+                Padding="14,12">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center">
+
+                <Button x:Name="btnLock"
+                        Content="🔒 قفل البرنامج"
+                        Background="#5C7CCC"
+                        Margin="0,0,12,0"
+                        Style="{StaticResource ActionBtn}"
+                        Click="btnLock_Click"/>
+
+                <Button x:Name="btnOut"
+                        Content="🚪 خروج"
+                        Background="#8B0000"
+                        Margin="0,0,12,0"
+                        Style="{StaticResource ActionBtn}"
+                        Click="btnOut_Click"/>
+
+                <Button x:Name="btnExUser"
+                        Content="🔄 تبديل مستخدم"
+                        Background="#2E8B57"
+                        Style="{StaticResource ActionBtn}"
+                        Click="btnExUser_Click"/>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>

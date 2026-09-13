@@ -162,6 +162,8 @@ export const cashLocations = pgTable(
     bank: jsonb('bank').$type<Record<string, unknown>>(),
     /** Legacy `Banks.ChangeInPOS`: this location may give change at the POS. */
     changeInPos: boolean('change_in_pos').notNull().default(false),
+    /** 📝 ملاحظات — the note `frmTreasury.xaml` keeps in its own group box. */
+    notes: text('notes'),
     isActive: boolean('is_active').notNull().default(true),
     ...baseAuditColumns(),
     ...baseSoftDeleteColumns(),

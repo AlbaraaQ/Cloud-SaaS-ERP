@@ -133,6 +133,47 @@ export const mfaRecoveryCodes = pgTable(
 export type MfaRecoveryCode = typeof mfaRecoveryCodes.$inferSelect;
 export type NewMfaRecoveryCode = typeof mfaRecoveryCodes.$inferInsert;
 
+/**
+ * Platform roles — 2026-09 architecture/RBAC reorganisation (migration 0032).
+ *
+ * Family A of the role catalogue (`@erp/contracts` `platformRoleCatalog`).
+ * Platform tables: no `tenant_id`, no RLS — a platform operator is a person, not a
+ * membership, exactly like `users`. This replaces the `users.is_platform_admin`
+ * boolean with a real role model; the flag stays as a deprecated equivalent of
+ * `platform_owner` (see `AuthService.resolvePlatformRoles`) and migration 0032
+ * backfills it into `platform_memberships`, so nothing is lost in either direction.
+ */
+export const platformRoles = pgTable('platform_roles', {
+  /** `platform_owner`, `platform_operations`, … — see `platformRoleCatalog`. */
+  code: text('code').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  ...baseAuditColumns(),
+});
+
+export const platformMemberships = pgTable(
+  'platform_memberships',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    roleCode: text('role_code')
+      .notNull()
+      .references(() => platformRoles.code, { onDelete: 'restrict' }),
+    grantedAt: timestamp('granted_at', { withTimezone: true }).notNull().defaultNow(),
+    grantedBy: uuid('granted_by'),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => ({
+    platformMembershipsUserRoleUnique: uniqueIndex('platform_memberships_user_role_key').on(
+      table.userId,
+      table.roleCode,
+    ),
+    platformMembershipsUserIdx: index('platform_memberships_user_idx').on(table.userId),
+  }),
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -140,3 +181,7 @@ export type NewUser = typeof users.$inferInsert;
 export type Permission = typeof permissions.$inferSelect;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
+export type PlatformRole = typeof platformRoles.$inferSelect;
+export type NewPlatformRole = typeof platformRoles.$inferInsert;
+export type PlatformMembership = typeof platformMemberships.$inferSelect;
+export type NewPlatformMembership = typeof platformMemberships.$inferInsert;

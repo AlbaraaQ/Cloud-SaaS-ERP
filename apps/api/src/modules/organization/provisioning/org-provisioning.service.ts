@@ -1,10 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import {
+  accounts,
   branches,
+  branchPostingProfiles,
   cashLocationBalances,
   cashLocations,
   currencies,
+  DEMO_CHART_OF_ACCOUNTS,
+  DEMO_POSTING_PROFILE,
   newId,
   priceLists,
   tenants,
@@ -60,17 +64,11 @@ export class OrgProvisioningService {
   constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
 
   async provisionOrgDefaults(tenantId: string, options: ProvisionOptions = {}): Promise<OrgDefaults> {
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      this.provisionInTx(tx, tenantId, options),
-    );
+    return withTenantTx(this.database.db, tenantId, (tx) => this.provisionInTx(tx, tenantId, options));
   }
 
   /** Same work inside a caller's transaction — the tenant factory creates both at once. */
-  async provisionInTx(
-    tx: DrizzleTx,
-    tenantId: string,
-    options: ProvisionOptions = {},
-  ): Promise<OrgDefaults> {
+  async provisionInTx(tx: DrizzleTx, tenantId: string, options: ProvisionOptions = {}): Promise<OrgDefaults> {
     const actorUserId = options.actorUserId ?? null;
     const now = new Date();
     const code = (options.code ?? DEFAULT_CODE).toUpperCase();
@@ -79,6 +77,9 @@ export class OrgProvisioningService {
     let created = false;
 
     const currencyCode = await this.ensureBaseCurrency(tx, tenantId, actorUserId, now);
+    const mainCashAccountId = await this.ensureChartOfAccounts(tx, tenantId, actorUserId, now);
+    if (mainCashAccountId) created = true;
+    if (await this.ensurePostingProfile(tx, tenantId, actorUserId, now)) created = true;
 
     let branchId = await firstId(
       tx
@@ -154,8 +155,8 @@ export class OrgProvisioningService {
         branchId,
         kind: 'safe',
         name: 'Main safe',
-        // account_id stays NULL until PHASE_07 creates the chart of accounts (CR-006).
-        accountId: null,
+        // The desktop chart is seeded above, so the safe posts to 1211001 from day one.
+        accountId: mainCashAccountId,
         currencyCode: null,
         isDefault: true,
         isActive: true,
@@ -200,10 +201,165 @@ export class OrgProvisioningService {
     }
 
     if (created) {
-      this.logger.log({ tenantId, branchId, warehouseId, cashLocationId }, 'organization defaults provisioned');
+      this.logger.log(
+        { tenantId, branchId, warehouseId, cashLocationId },
+        'organization defaults provisioned',
+      );
     }
 
     return { tenantId, branchId, warehouseId, cashLocationId, priceListId, currencyCode, created };
+  }
+
+  /**
+   * Seeds the desktop default chart of accounts (`Accounts_Index`, 112 accounts + the
+   * cloud COGS extension) for a tenant that has none yet.
+   *
+   * Idempotent: a tenant with any live account is left untouched, so re-running
+   * provisioning never duplicates or renames the accountant's chart. Parents precede
+   * children in `DEMO_CHART_OF_ACCOUNTS`, so one ordered pass resolves every `parent_id`,
+   * `level` and ltree `path` exactly the way `AccountingService.create` would.
+   *
+   * Returns the id of 1211001 (الصندوق الرئيسي) so the main safe can post to it —
+   * or `null` when the chart already existed (the safe keeps whatever link it has).
+   */
+  private async ensureChartOfAccounts(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<string | null> {
+    /**
+     * An existing chart is *completed*, never rewritten. Later phases add leaves to
+     * `DEMO_CHART_OF_ACCOUNTS` (بضاعة تحت التحويل، تسويات المخزون …) and a tenant
+     * provisioned before them would otherwise post every new document straight into
+     * `ACCOUNT_PROFILE_MISSING` — with no way out short of hand-editing the chart.
+     * Inserting the codes that are missing, and only those, keeps an accountant's
+     * own edits intact while letting an old tenant use new features.
+     */
+    const existingRows = await tx
+      .select({ id: accounts.id, code: accounts.code, path: accounts.path, level: accounts.level })
+      .from(accounts)
+      .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)));
+    const idByCode = new Map(existingRows.map((row) => [row.code.trim(), row.id]));
+    const pathByCode = new Map(existingRows.map((row) => [row.code.trim(), row.path]));
+    const levelByCode = new Map(existingRows.map((row) => [row.code.trim(), row.level]));
+
+    let inserted = 0;
+    for (const account of DEMO_CHART_OF_ACCOUNTS) {
+      if (idByCode.has(account.code)) continue;
+      const id = newId();
+      const parentId = account.parent ? idByCode.get(account.parent) : undefined;
+      const parentPath = account.parent ? pathByCode.get(account.parent) : undefined;
+      const level = account.parent ? (levelByCode.get(account.parent) ?? 0) + 1 : 0;
+      const path = parentPath ? `${parentPath}.${id}` : id;
+      await tx.insert(accounts).values({
+        id,
+        tenantId,
+        code: account.code,
+        nameAr: account.nameAr,
+        nameEn: account.nameEn ?? null,
+        parentId: parentId ?? null,
+        level,
+        path,
+        type: account.type,
+        normalBalance:
+          account.normalBalance ??
+          (account.type === 'asset' || account.type === 'expense' ? 'debit' : 'credit'),
+        isPostable: account.postable !== false,
+        allowManual: true,
+        createdAt: now,
+        createdBy: actorUserId,
+        legacySource: 'desktop-erp',
+        legacyId: `Accounts_Index:${account.code}`,
+      });
+      idByCode.set(account.code, id);
+      pathByCode.set(account.code, path);
+      levelByCode.set(account.code, level);
+      inserted += 1;
+    }
+
+    if (inserted > 0) {
+      this.logger.log({ tenantId, inserted, total: idByCode.size }, 'desktop chart of accounts seeded');
+    }
+    // A chart that already existed keeps whatever account its main safe is linked to.
+    return existingRows.length > 0 ? null : (idByCode.get('1211001') ?? null);
+  }
+
+  /**
+   * Seeds the tenant-wide posting profile (`branch NULL`, doc `*`) that every
+   * auto-posting engine resolves through `PostingProfilesService` — the cloud heir
+   * of the desktop `SettingGeneral.*Acc` defaults.
+   *
+   * Idempotent: an existing `*` profile is left untouched (the accountant may have
+   * customised it). Codes that resolve to no account are omitted rather than
+   * guessed — posting then fails with a named key error instead of corrupting the
+   * ledger. Returns whether a profile was created.
+   */
+  private async ensurePostingProfile(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<boolean> {
+    const [existing] = await tx
+      .select({ id: branchPostingProfiles.id, mapping: branchPostingProfiles.mapping })
+      .from(branchPostingProfiles)
+      .where(
+        and(
+          eq(branchPostingProfiles.tenantId, tenantId),
+          isNull(branchPostingProfiles.branchId),
+          eq(branchPostingProfiles.docType, '*'),
+        ),
+      )
+      .limit(1);
+    const codes = [...new Set(Object.values(DEMO_POSTING_PROFILE))];
+    const rows = await tx
+      .select({ id: accounts.id, code: accounts.code })
+      .from(accounts)
+      .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt), inArray(accounts.code, codes)));
+    const byCode = new Map(rows.map((row) => [row.code.trim(), row.id]));
+    const mapping: Record<string, string | number> = { version: 1 };
+    for (const [key, code] of Object.entries(DEMO_POSTING_PROFILE)) {
+      const accountId = byCode.get(code);
+      if (accountId) mapping[key] = accountId;
+    }
+
+    /**
+     * The same reasoning as the chart: when a later phase adds a key
+     * (`stockInTransitAccountId` …) an already-provisioned tenant would never see it.
+     * Keys the accountant has *cleared* stay cleared — we only fill ones that are
+     * absent, never overwrite ones she changed.
+     */
+    if (existing) {
+      const current = (existing.mapping ?? {}) as Record<string, unknown>;
+      const missing = Object.entries(mapping).filter(
+        ([key, value]) => key !== 'version' && typeof value === 'string' && !(key in current),
+      );
+      if (!missing.length) return false;
+      const nextMapping: Record<string, unknown> = {
+        ...current,
+        ...Object.fromEntries(missing),
+        version: Number(current.version ?? 1) + 1,
+      };
+      await tx
+        .update(branchPostingProfiles)
+        .set({ mapping: nextMapping, updatedAt: now, updatedBy: actorUserId })
+        .where(eq(branchPostingProfiles.id, existing.id));
+      this.logger.log({ tenantId, added: missing.map(([key]) => key) }, 'tenant posting profile completed');
+      return true;
+    }
+
+    await tx.insert(branchPostingProfiles).values({
+      id: newId(),
+      tenantId,
+      branchId: null,
+      docType: '*',
+      mapping,
+      createdAt: now,
+      createdBy: actorUserId,
+    });
+    this.logger.log({ tenantId, keys: Object.keys(mapping).length - 1 }, 'tenant posting profile seeded');
+    return true;
   }
 
   /**

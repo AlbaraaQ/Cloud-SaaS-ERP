@@ -20,7 +20,7 @@ export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
   @Get()
-  @RequiresPermission('platform.audit.view')
+  @RequiresPermission('tenant.audit.view')
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   @ApiQuery({ name: 'filter[entity]', required: false })

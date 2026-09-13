@@ -26,6 +26,7 @@ export const docTypeSchema = z.enum([
   'payment_voucher',
   'journal_entry',
   'stock_adjustment',
+  'stock_voucher',
   'stock_transfer',
   'cash_transfer',
   'payroll_run',
@@ -58,12 +59,38 @@ export const POST_PROFILE_ACCOUNT_KEYS = [
   'discountReceivedAccountId',
   'vatOutputAccountId',
   'vatInputAccountId',
+  'exciseTaxAccountId',
   'inventoryAccountId',
   'cogsAccountId',
+  /**
+   * Phase 05 — the three accounts the stock ledger needs besides `inventory`:
+   *
+   * - `openingBalanceAccountId`: the other side of بضاعة أول المدة (opening stock).
+   * - `inventoryAdjustmentAccountId`: variance — shortage and overage found by a count.
+   * - `stockInTransitAccountId`: goods on the road between two warehouses, so a
+   *   transfer in transit belongs to neither warehouse's balance.
+   */
+  'openingBalanceAccountId',
+  'inventoryAdjustmentAccountId',
+  'stockInTransitAccountId',
   'cashAccountId',
   'bankAccountId',
   'receivableAccountId',
   'payableAccountId',
+  /**
+   * Phase 06 — أوراق القبض: where a cheque sits between being taken and being honoured.
+   * A pending cheque is a promise, not money, so neither the safe nor the bank has moved
+   * yet; the account is what keeps the promise visible in the ledger until clearance.
+   */
+  'chequesInHandAccountId',
+  /**
+   * Phase 06 — فرق الصندوق: where the counted drawer and the books disagree.
+   * The desktop posts the difference to `3110004` («فرق بالصندوق») when it closes a
+   * shift (`Class/EntryOper.cs`, `BindCloseShiftToEntry`). Everything else in that
+   * entry — sales, VAT, discount, the bank legs — the cloud already posted when each
+   * invoice was posted, so the close only ever moves the difference.
+   */
+  'cashDifferenceAccountId',
 ] as const;
 
 export type PostProfileAccountKey = (typeof POST_PROFILE_ACCOUNT_KEYS)[number];

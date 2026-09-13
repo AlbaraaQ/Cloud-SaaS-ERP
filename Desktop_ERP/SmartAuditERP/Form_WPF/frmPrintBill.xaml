@@ -1,0 +1,1066 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmPrintBill"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="طباعة الفاتورة"
+    Width="720" Height="900"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══ Brushes ═══ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SectionBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#2E4E9E" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+        <SolidColorBrush x:Key="SeparatorBrush" Color="#A0A0A0"/>
+
+        <!-- ═══ Effects ═══ -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══ Styles: Labels ═══ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#555"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══ Styles: TextBox ReadOnly ═══ -->
+        <Style x:Key="ReadOnlyTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="IsEnabled" Value="False"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ReadOnlyTextBoxRight" TargetType="TextBox"
+               BasedOn="{StaticResource ReadOnlyTextBox}">
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+
+        <Style x:Key="ReadOnlyMultiLineTextBox" TargetType="TextBox"
+               BasedOn="{StaticResource ReadOnlyTextBox}">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="MinHeight" Value="54"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+
+        <!-- ═══ Styles: Buttons ═══ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SaveBtn" TargetType="Button"
+               BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+        </Style>
+
+        <Style x:Key="PrintBtn" TargetType="Button"
+               BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Height" Value="34"/>
+        </Style>
+
+        <!-- ═══ CheckBox Style ═══ -->
+        <Style x:Key="ModernCheckBox" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="IsEnabled" Value="False"/>
+        </Style>
+
+        <!-- ═══ Section Header ═══ -->
+        <Style x:Key="SectionHeader" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SectionBrush}"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <!-- ═══ Separator Style ═══ -->
+        <Style x:Key="HorizSeparator" TargetType="Border">
+            <Setter Property="Height" Value="2"/>
+            <Setter Property="Background" Value="{StaticResource SeparatorBrush}"/>
+            <Setter Property="Margin" Value="0,8,0,8"/>
+        </Style>
+
+        <!-- ═══ Card Style ═══ -->
+        <Style x:Key="CardBorder" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+        </Style>
+
+        <!-- ═══ Info Label (header text in sections) ═══ -->
+        <Style x:Key="HeaderTextBlock" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!--                 Main Layout                 -->
+    <!-- ═══════════════════════════════════════════ -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Scrollable Content ═══ -->
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="10,10,10,4">
+            <StackPanel>
+
+                <!-- ═══════════════════════════════ -->
+                <!--   Panel1 - Header Info          -->
+                <!-- ═══════════════════════════════ -->
+                <Border Style="{StaticResource CardBorder}" Padding="12,10">
+                    <StackPanel>
+
+                        <!-- Company Title -->
+                        <Border Style="{StaticResource SectionHeader}">
+                            <TextBlock Text="🧵 أرض الجنادرية للخياطة الرجالية"
+                                       Style="{StaticResource HeaderTextBlock}"/>
+                        </Border>
+
+                        <!-- Panel3: Code + Date -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- الرقم -->
+                            <TextBlock Grid.Column="0"
+                                       Text="الرقم:"
+                                       Style="{StaticResource FieldLabel}"
+                                       HorizontalAlignment="Right"/>
+                            <TextBox x:Name="lblCode"
+                                     Grid.Column="1"
+                                     Grid.ColumnSpan="2"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,8,0"/>
+
+                            <!-- التاريخ -->
+                            <TextBlock Grid.Column="3"
+                                       Grid.ColumnSpan="1"
+                                       Text="التاريخ:"
+                                       Style="{StaticResource FieldLabel}"
+                                       HorizontalAlignment="Right"
+                                       Margin="8,0,4,0"/>
+                            <TextBox x:Name="txtDate"
+                                     Grid.Column="4"
+                                     Grid.ColumnSpan="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"/>
+                        </Grid>
+
+                        <!-- Label18: مقاس جديد -->
+                        <TextBlock x:Name="Label18"
+                                   Text="مقاس جديد"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="#213A7A"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,8"/>
+
+                        <!-- Panel2: Price + Quantity + Total -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Headers -->
+                            <TextBlock Grid.Column="0" Grid.Row="0"
+                                       Text="السعر"
+                                       Style="{StaticResource SectionLabel}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock Grid.Column="1" Grid.Row="0"
+                                       Text="العدد"
+                                       Style="{StaticResource SectionLabel}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock Grid.Column="2" Grid.Row="0"
+                                       Text="الأجمالي"
+                                       Style="{StaticResource SectionLabel}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4"/>
+
+                            <!-- Values -->
+                            <TextBox x:Name="txtPrice"
+                                     Grid.Column="0" Grid.Row="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="4,0"/>
+                            <TextBox x:Name="txtQuantity"
+                                     Grid.Column="1" Grid.Row="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="4,0"/>
+                            <TextBox x:Name="txtPrice_sale"
+                                     Grid.Column="2" Grid.Row="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="4,0"/>
+                        </Grid>
+
+                        <!-- Client Info -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- إسم العميل -->
+                            <TextBlock Grid.Column="0"
+                                       Text="إسم العميل:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="txtName"
+                                     Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,12,0"/>
+
+                            <!-- رقم الجوال -->
+                            <TextBlock Grid.Column="2"
+                                       Text="رقم الجوال:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="txtPhoneNum"
+                                     Grid.Column="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,12,0"/>
+
+                            <!-- نوع الثوب -->
+                            <TextBlock Grid.Column="4"
+                                       Text="نوع الثوب:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="typeCB"
+                                     Grid.Column="5"
+                                     Style="{StaticResource ReadOnlyTextBox}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ═══ Separator Panel8 ═══ -->
+                <Border Style="{StaticResource HorizSeparator}" x:Name="Panel8"/>
+
+                <!-- ═══════════════════════════════ -->
+                <!--   Panel4 - Measurements         -->
+                <!-- ═══════════════════════════════ -->
+                <Border x:Name="Panel4" Style="{StaticResource CardBorder}" Padding="12,10">
+                    <StackPanel>
+
+                        <!-- Panel5: Measurements Table -->
+                        <Border Background="{StaticResource SectionBrush}"
+                                CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
+                            <TextBlock Text="📐 المقاسات"
+                                       Style="{StaticResource HeaderTextBlock}"/>
+                        </Border>
+
+                        <!-- Measurements Grid -->
+                        <Grid x:Name="Panel5" Margin="0,0,0,8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Row 0: Section Headers -->
+                            <Border Grid.Row="0" Grid.Column="0"
+                                    Background="#EEF2FB" CornerRadius="4" Margin="2">
+                                <TextBlock x:Name="TextBox18"
+                                           Text="وسع الكم"
+                                           Style="{StaticResource SectionLabel}"
+                                           HorizontalAlignment="Center"
+                                           Padding="4,4"/>
+                            </Border>
+                            <Border Grid.Row="0" Grid.Column="1"
+                                    Background="#EEF2FB" CornerRadius="4" Margin="2">
+                                <TextBlock x:Name="TextBox32"
+                                           Text="الوسع"
+                                           Style="{StaticResource SectionLabel}"
+                                           HorizontalAlignment="Center"
+                                           Padding="4,4"/>
+                            </Border>
+                            <Border Grid.Row="0" Grid.Column="2"
+                                    Background="#EEF2FB" CornerRadius="4" Margin="2">
+                                <TextBlock x:Name="TextBox16"
+                                           Text="الرقبة"
+                                           Style="{StaticResource SectionLabel}"
+                                           HorizontalAlignment="Center"
+                                           Padding="4,4"/>
+                            </Border>
+                            <Border Grid.Row="0" Grid.Column="3"
+                                    Background="#EEF2FB" CornerRadius="4" Margin="2">
+                                <TextBlock x:Name="TextBox19"
+                                           Text="اليد"
+                                           Style="{StaticResource SectionLabel}"
+                                           HorizontalAlignment="Center"
+                                           Padding="4,4"/>
+                            </Border>
+                            <Border Grid.Row="0" Grid.Column="4"
+                                    Background="#EEF2FB" CornerRadius="4" Margin="2">
+                                <TextBlock x:Name="TextBox15"
+                                           Text="الكتف"
+                                           Style="{StaticResource SectionLabel}"
+                                           HorizontalAlignment="Center"
+                                           Padding="4,4"/>
+                            </Border>
+                            <Border Grid.Row="0" Grid.Column="5"
+                                    Background="#EEF2FB" CornerRadius="4" Margin="2">
+                                <TextBlock x:Name="TextBox17"
+                                           Text="الطول"
+                                           Style="{StaticResource SectionLabel}"
+                                           HorizontalAlignment="Center"
+                                           Padding="4,4"/>
+                            </Border>
+
+                            <!-- Row 1: Labels (ص/س/ك markers) -->
+                            <TextBox x:Name="TextBox10"
+                                     Grid.Row="1" Grid.Column="1"
+                                     Text="س"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="TextBox11"
+                                     Grid.Row="1" Grid.Column="2"
+                                     Text="ص"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txthand242"
+                                     Grid.Row="1" Grid.Column="3"
+                                     Text="ك"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txthand1447"
+                                     Grid.Row="1" Grid.Column="3"
+                                     Text="س"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"
+                                     Visibility="Collapsed"/>
+
+                            <!-- Row 2: expand values row 1 -->
+                            <TextBox x:Name="txtexpandHand2"
+                                     Grid.Row="2" Grid.Column="0"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtexpand1"
+                                     Grid.Row="2" Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtneck1"
+                                     Grid.Row="2" Grid.Column="2"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txthand1"
+                                     Grid.Row="2" Grid.Column="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtshoulder"
+                                     Grid.Row="2" Grid.Column="4"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtheight1"
+                                     Grid.Row="2" Grid.Column="5"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+
+                            <!-- Row 3: expand values row 2 -->
+                            <TextBox x:Name="txtexpandHand1"
+                                     Grid.Row="3" Grid.Column="0"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtexpand2"
+                                     Grid.Row="3" Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtneck2"
+                                     Grid.Row="3" Grid.Column="2"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txthand2"
+                                     Grid.Row="3" Grid.Column="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                            <TextBox x:Name="txtheight2"
+                                     Grid.Row="3" Grid.Column="5"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="2"/>
+                        </Grid>
+
+                        <!-- expand3 separate row -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="وسع 3:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,8,0"/>
+                            <TextBox x:Name="txtexpand3"
+                                     Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"/>
+                        </Grid>
+
+                        <!-- ═══ Separator ═══ -->
+                        <Border Style="{StaticResource HorizSeparator}"/>
+
+                        <!-- ═══ Shape Info Section ═══ -->
+                        <Border Background="{StaticResource SectionBrush}"
+                                CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
+                            <TextBlock Text="👕 بيانات الشكل والتصميم"
+                                       Style="{StaticResource HeaderTextBlock}"/>
+                        </Border>
+
+                        <!-- Row 1: Char Shape -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="6"
+                                       Text="شكل الجبزور:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="cmbCharShape"
+                                     Grid.Column="5"
+                                     Grid.ColumnSpan="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,8,0"/>
+                            <TextBox x:Name="txtCahrSize"
+                                     Grid.Column="4"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Width="60"
+                                     Margin="0,0,8,0"/>
+                            <!-- squareRB / tranRB -->
+                            <CheckBox x:Name="squareRB"
+                                      Grid.Column="3"
+                                      Content="مربع"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      Margin="0,0,8,0"/>
+                            <CheckBox x:Name="tranRB"
+                                      Grid.Column="2"
+                                      Content="مثلث"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      Margin="0,0,8,0"/>
+                            <TextBox x:Name="shoulderCB"
+                                     Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,4,0"/>
+                            <TextBlock Grid.Column="0"
+                                       Text="الكتف:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                        </Grid>
+
+                        <!-- Row 2: Pocket -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="4"
+                                       Text="الجيب:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="PocketCB"
+                                     Grid.Column="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,8,0"/>
+                            <TextBox x:Name="pocketCheck"
+                                     Grid.Column="2"
+                                     Width="50"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="0"
+                                       Text="مقاس الجيب:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <!-- Pocket sizes -->
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal">
+                                <TextBox x:Name="txtPoketSize1"
+                                         Width="50"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Margin="0,0,2,0"/>
+                                <TextBlock Text="x"
+                                           VerticalAlignment="Center"
+                                           FontWeight="Bold"
+                                           Margin="2,0"/>
+                                <TextBox x:Name="txtPoketSize2"
+                                         Width="50"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Margin="2,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Pocket Long -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="بعد الجيب:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,8,0"/>
+                            <TextBox x:Name="txtPoketLong"
+                                     Grid.Column="1"
+                                     Text="0"
+                                     Style="{StaticResource ReadOnlyTextBox}"/>
+                        </Grid>
+
+                        <!-- Row 3: Hand Shape -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="6"
+                                       Text="شكل اليد:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="cmbHandShape"
+                                     Grid.Column="5"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="4"
+                                       Text="x"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Margin="4,0"/>
+                            <TextBox x:Name="txtHandShape1"
+                                     Grid.Column="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,4,0"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="x"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Margin="4,0"/>
+                            <TextBox x:Name="txtHandShape2"
+                                     Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,4,0"/>
+                            <TextBox x:Name="handShapeCB"
+                                     Grid.Column="0"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Width="120"
+                                     Margin="0,0,4,0"/>
+                        </Grid>
+
+                        <!-- Row 4: Neck Shape -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="6"
+                                       Text="شكل الرقبة:"
+                                       Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,6,0"/>
+                            <TextBox x:Name="cmbNeckShape"
+                                     Grid.Column="5"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="4"
+                                       Text="x"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Margin="4,0"/>
+                            <TextBox x:Name="txtNeckShape1"
+                                     Grid.Column="3"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,4,0"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="x"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Margin="4,0"/>
+                            <TextBox x:Name="txtNeckShape2"
+                                     Grid.Column="1"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Margin="0,0,4,0"/>
+                            <TextBox x:Name="nickShapeCB"
+                                     Grid.Column="0"
+                                     Style="{StaticResource ReadOnlyTextBox}"
+                                     Width="120"
+                                     Margin="0,0,4,0"/>
+                        </Grid>
+
+                        <!-- ═══ Separator Panel9 ═══ -->
+                        <Border Style="{StaticResource HorizSeparator}" x:Name="Panel9"/>
+
+                        <!-- CheckBoxes Row -->
+                        <WrapPanel Margin="0,0,0,8" HorizontalAlignment="Right">
+                            <CheckBox x:Name="pocketPenCB"
+                                      Content="جيب قلم"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      Margin="16,0,0,0"/>
+                            <CheckBox x:Name="disappearCB"
+                                      Content="جيب مخفي"
+                                      Style="{StaticResource ModernCheckBox}"
+                                      Margin="16,0,0,0"/>
+                        </WrapPanel>
+
+                        <!-- Bottom Section: Sizes summary -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- أسفل -->
+                            <TextBlock Grid.Column="7" Text="أسفل:"
+                                       Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                            <TextBox x:Name="down"
+                                     Grid.Column="6" Text="0"
+                                     Style="{StaticResource ReadOnlyTextBox}" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="5"
+                                       Text="سم" Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,8,0"/>
+
+                            <!-- كفة تحت -->
+                            <TextBlock Grid.Column="4" Text="كفة تحت:"
+                                       Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                            <TextBox x:Name="handDownTB"
+                                     Grid.Column="3" Text="0"
+                                     Style="{StaticResource ReadOnlyTextBox}" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="سم" Style="{StaticResource FieldLabel}"
+                                       Margin="0,0,8,0"/>
+
+                            <!-- pho / save -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBox x:Name="pho2"
+                                         Width="60"
+                                         Text="0"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Margin="0,0,2,0"/>
+                                <TextBlock Text="x" VerticalAlignment="Center"
+                                           FontWeight="Bold" Margin="2,0"/>
+                                <TextBox x:Name="pho1"
+                                         Width="60"
+                                         Text="0"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Margin="2,0,0,0"/>
+                            </StackPanel>
+                            <TextBlock Grid.Column="0" Text="محفظة:"
+                                       Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                        </Grid>
+
+                        <!-- save1 / save2 -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="3" Text="جوال:"
+                                       Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <TextBox x:Name="save2"
+                                         Width="60"
+                                         Text="0"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Margin="0,0,2,0"/>
+                                <TextBlock Text="x" VerticalAlignment="Center"
+                                           FontWeight="Bold" Margin="2,0"/>
+                                <TextBox x:Name="save1"
+                                         Width="60"
+                                         Text="0"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Margin="2,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- PictureBox1 + title (Notes) -->
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="130"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Notes -->
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="ملاحظات:"
+                                           Style="{StaticResource FieldLabel}"
+                                           Margin="0,0,0,4"/>
+                                <TextBox x:Name="title"
+                                         Style="{StaticResource ReadOnlyMultiLineTextBox}"/>
+                            </StackPanel>
+
+                            <!-- PictureBox1 placeholder -->
+                            <Border Grid.Column="1"
+                                    BorderBrush="{StaticResource BorderLight}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Background="#F5F7FA"
+                                    Height="90"
+                                    VerticalAlignment="Top">
+                                <Image x:Name="PictureBox1"
+                                       Stretch="Uniform"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                            </Border>
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ═══ Separator Panel7 ═══ -->
+                <Border Style="{StaticResource HorizSeparator}" x:Name="Panel7"/>
+
+                <!-- ═══════════════════════════════ -->
+                <!--   Panel6 - Invoice Summary      -->
+                <!-- ═══════════════════════════════ -->
+                <Border x:Name="Panel6" Style="{StaticResource CardBorder}" Padding="12,10">
+                    <StackPanel>
+
+                        <!-- Section Header -->
+                        <Border Background="{StaticResource SectionBrush}"
+                                CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
+                            <TextBlock Text="💰 ملخص الفاتورة"
+                                       Style="{StaticResource HeaderTextBlock}"/>
+                        </Border>
+
+                        <!-- Label19: Company -->
+                        <TextBlock x:Name="Label19"
+                                   Text="أرض الجنادرية للخياطة الرجالية"
+                                   FontSize="13"
+                                   FontWeight="Bold"
+                                   Foreground="#213A7A"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,10"/>
+
+                        <!-- Invoice Details Grid -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="200"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: Financial -->
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+
+                                <!-- العدد -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="العدد:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="txtQuantity2"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+
+                                <!-- إجمالي -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="إجمالي:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="txtPriceWithTax"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+
+                                <!-- المدفوع -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="المدفوع:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="txtPaid"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+
+                                <!-- الباقي -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="الباقي:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="txtRest"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Right: Client Info + Image Button -->
+                            <StackPanel Grid.Column="1">
+
+                                <!-- الرقم -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="الرقم:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="lblCode2"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+
+                                <!-- الأسم -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="الأسم:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="name2"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+
+                                <!-- الجوال -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="الجوال:"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox x:Name="phone2"
+                                             Grid.Column="1"
+                                             Style="{StaticResource ReadOnlyTextBox}"/>
+                                </Grid>
+
+                                <!-- Button2: Image Button -->
+                                <Button x:Name="Button2"
+                                        Style="{StaticResource ActionBtn}"
+                                        Content="🖼️ صورة"
+                                        Height="38"
+                                        Margin="0,4,0,0"
+                                        Click="Button2_Click"/>
+
+                                <!-- TextBox1 hidden -->
+                                <TextBox x:Name="TextBox1"
+                                         Style="{StaticResource ReadOnlyTextBox}"
+                                         Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- Label3: Footer Address -->
+                <Border Background="{StaticResource FooterBrush}"
+                        CornerRadius="6"
+                        Padding="10,6"
+                        Margin="0,6,0,4">
+                    <TextBlock x:Name="Label3"
+                               Text="جدة مركز السليمانية بوابة رقم 2 جوال 0554732446"
+                               Foreground="White"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ═══ Footer: Button1 (Print) ═══ -->
+        <Border Grid.Row="1"
+                Background="{StaticResource FooterBrush}"
+                Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="Button1"
+                        Grid.Column="1"
+                        Content="🖨️ طباعة"
+                        Style="{StaticResource SaveBtn}"
+                        Width="120"
+                        Height="38"
+                        Click="Button1_Click"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

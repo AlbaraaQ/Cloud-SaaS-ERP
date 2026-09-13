@@ -13,6 +13,7 @@ export * from './treasury.js';
 export * from './einvoicing.js';
 export * from './migration.js';
 export * from './compat.js';
+export * from './devices.js';
 export * from './pos.js';
 export * from './hrm.js';
 export * from './projects.js';

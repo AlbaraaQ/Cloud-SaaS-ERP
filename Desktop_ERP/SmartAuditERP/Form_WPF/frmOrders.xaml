@@ -1,0 +1,238 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmOrders"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="إدارة طلبات التفصيل"
+    Width="1190"
+    Height="620"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="frmOrders_Load">
+
+    <dx:ThemedWindow.Resources>
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="ActionBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#4F7CF7" Offset="0"/>
+            <GradientStop Color="#305EDB" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="10" ShadowDepth="2" Direction="270" Opacity="0.13" Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow" BlurRadius="6" ShadowDepth="1" Direction="270" Opacity="0.18" Color="#000000"/>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style x:Key="ModernDatePicker" TargetType="DatePicker">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource ActionBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.9"/></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Opacity" Value="0.75"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SaveBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+        </Style>
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <Style x:Key="GridHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="GridCellText" TargetType="TextBlock">
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="GridRowStyle" TargetType="DataGridRow">
+            <Setter Property="Height" Value="30"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#DCE7FF"/></Trigger>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#F0F4FF"/></Trigger>
+            </Style.Triggers>
+        </Style>
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" Padding="14,10">
+            <TextBlock Text="🧵 إدارة طلبات التفصيل" Foreground="White" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- Filter Panel -->
+        <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource BorderLight}" BorderThickness="0,0,0,1" Padding="14,10" Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="lblSearch" Grid.Column="0" Text="🔍 البحث (رقم/اسم):" Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                <TextBox x:Name="txtSearch" Grid.Column="1" Style="{StaticResource ModernTextBox}"/>
+
+                <TextBlock x:Name="lblStatus" Grid.Column="3" Text="الحالة:" Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                <ComboBox x:Name="cmbStatus" Grid.Column="4" Style="{StaticResource ModernComboBox}" DisplayMemberPath="StatusName" SelectedValuePath="StatusID" SelectionChanged="cmbStatus_SelectionChanged"/>
+
+                <TextBlock x:Name="lblFrom" Grid.Column="6" Text="من:" Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                <DatePicker x:Name="dtFrom" Grid.Column="7" Style="{StaticResource ModernDatePicker}" SelectedDateFormat="Short"/>
+
+                <TextBlock x:Name="lblTo" Grid.Column="9" Text="إلى:" Style="{StaticResource FieldLabel}" Margin="0,0,6,0"/>
+                <DatePicker x:Name="dtTo" Grid.Column="10" Style="{StaticResource ModernDatePicker}" SelectedDateFormat="Short"/>
+
+                <Button x:Name="btnSearch" Grid.Column="12" Content="🔍 بحث" Style="{StaticResource ActionBtn}" Width="90" Click="btnSearch_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- DataGrid -->
+        <Border Grid.Row="2" Margin="8,6,8,4" Background="White" CornerRadius="10" Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="36"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="{StaticResource HeaderBrush}" CornerRadius="10,10,0,0">
+                    <Grid Margin="12,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="📋 قائمة الطلبات" Foreground="White" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="lblRowCount" Grid.Column="1" Text="عدد السجلات: 0" Foreground="#DCE7FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" FlowDirection="LeftToRight"/>
+                    </Grid>
+                </Border>
+
+                <DataGrid x:Name="gridOrders"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          HeadersVisibility="Column"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          RowStyle="{StaticResource GridRowStyle}"
+                          ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                          AlternatingRowBackground="#F5F8FF"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E7ECF5"
+                          Background="White"
+                          MouseDoubleClick="gridOrders_MouseDoubleClick">
+
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="OrderID" Binding="{Binding OrderID}" Width="80" Visibility="Collapsed"/>
+                        <DataGridTextColumn Header="رقم الطلب" Binding="{Binding OrderNumber}" Width="110" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="👤 العميل" Binding="{Binding CustomerName}" Width="*" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="📞 الجوال" Binding="{Binding CustomerPhone}" Width="110" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="القياس" Binding="{Binding MeasurementName}" Width="120" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="نوع التفصيل" Binding="{Binding TypeName}" Width="120" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="⚙️ الحالة" Binding="{Binding StatusName}" Width="100" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="📅 تاريخ الطلب" Binding="{Binding OrderDate}" Width="110" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="📅 موعد التسليم" Binding="{Binding DeliveryDate}" Width="120" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="💰 السعر" Binding="{Binding Price, StringFormat=N2}" Width="90" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="💵 المدفوع" Binding="{Binding PaidAmount, StringFormat=N2}" Width="90" ElementStyle="{StaticResource GridCellText}"/>
+                        <DataGridTextColumn Header="⌛ المتبقي" Binding="{Binding RemainingAmount, StringFormat=N2}" Width="90" ElementStyle="{StaticResource GridCellText}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="3" Background="{StaticResource FooterBrush}" Padding="10,8" FlowDirection="LeftToRight">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="btnClose" Content="✖ إغلاق" Style="{StaticResource DangerBtn}" Width="90" Click="btnClose_Click"/>
+                <Button x:Name="btnAdd" Content="➕ إضافة طلب جديد" Style="{StaticResource SaveBtn}" Width="150" Click="btnAdd_Click"/>
+                <Button x:Name="btnEdit" Content="✏️ تعديل" Style="{StaticResource ActionBtn}" Width="90" Click="btnEdit_Click"/>
+                <Button x:Name="btnDelete" Content="🗑️ حذف" Style="{StaticResource DangerBtn}" Width="90" Click="btnDelete_Click"/>
+                <Button x:Name="btnChangeStatus" Content="🔄 تغيير الحالة" Style="{StaticResource ActionBtn}" Width="130" Click="btnChangeStatus_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>

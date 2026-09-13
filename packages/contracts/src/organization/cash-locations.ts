@@ -57,6 +57,25 @@ export function maskIban(iban: string): string {
 export const bankDetailsSchema = z
   .object({
     bankName: z.string().trim().min(1).max(200),
+    /**
+     * Phase 06 — the rest of `frmBanks.xaml`'s card: 🌍 الدولة، 🏙️ المدينة، 📍 المنطقة،
+     * تليفون، موبايل، 💰 نسبة الاقتطاع %. They live in this block rather than in six
+     * columns because they are meaningless for a safe, which is half the table.
+     */
+    country: z.string().trim().max(100).optional(),
+    city: z.string().trim().max(100).optional(),
+    region: z.string().trim().max(100).optional(),
+    phone: z.string().trim().max(40).optional(),
+    mobile: z.string().trim().max(40).optional(),
+    /** 💰 نسبة الاقتطاع % — what the bank keeps; `0` … `100` as text. */
+    deductionPct: z
+      .string()
+      .trim()
+      .max(10)
+      .refine((value) => /^\d{1,3}(\.\d{1,4})?$/.test(value) && Number(value) >= 0 && Number(value) <= 100, {
+        message: 'Deduction percentage must be between 0 and 100',
+      })
+      .optional(),
     iban: z
       .string()
       .trim()
@@ -90,6 +109,10 @@ export const cashLocationDtoSchema = orgAuditDtoSchema.extend({
   bank: bankDetailsSchema.nullable(),
   changeInPos: z.boolean(),
   isActive: z.boolean(),
+  /** 📝 ملاحظات */
+  notes: z.string().nullable(),
+  /** 👤 مسئولي الصندوق — employee ids, in the order they were saved. */
+  custodianIds: z.array(uuidSchema),
 });
 
 export type CashLocationDto = z.infer<typeof cashLocationDtoSchema>;
@@ -110,6 +133,14 @@ export const cashLocationCreateSchema = z
     changeInPos: z.boolean().optional(),
     isDefault: z.boolean().optional(),
     isActive: z.boolean().optional(),
+    /** 📝 ملاحظات */
+    notes: z.string().trim().max(2000).nullable().optional(),
+    /**
+     * 👤 مسئولي الصندوق — replaced wholesale on every save, the way
+     * `frmTreasury.xaml.cs` deletes `Stock_Emps` and re-inserts it. A صندوق must name at
+     * least one; a bank account may be signed for by nobody.
+     */
+    custodianIds: z.array(uuidSchema).max(50).optional(),
   })
   .strict();
 

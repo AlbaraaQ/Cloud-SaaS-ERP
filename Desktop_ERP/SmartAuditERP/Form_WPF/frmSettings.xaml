@@ -1,0 +1,2365 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmSettings"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="الإعدادات"
+    Width="1100"
+    Height="750"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial">
+
+    <!-- ==================== Resources ==================== -->
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12"
+                          ShadowDepth="2"
+                          Direction="270"
+                          Opacity="0.15"/>
+
+        <!-- Button Style -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern GroupBox -->
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ==================== Main Layout ==================== -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Background="{StaticResource HeaderBrush}"
+                Padding="15"
+                Grid.Row="0">
+            <TextBlock Text="⚙️ إعدادات النظام"
+                       Foreground="White"
+                       FontSize="18"
+                       FontWeight="Bold"/>
+        </Border>
+
+        <!-- ==================== TabControl1 ==================== -->
+        <TabControl x:Name="TabControl1"
+                    Grid.Row="1"
+                    Margin="10"
+                    Background="White">
+
+            <!-- ==================== TabPage1 ==================== -->
+            <TabItem x:Name="TabPage1" Header="عـــــام">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="10">
+                        <GroupBox x:Name="GroupBox7"
+                      Header="🧾 إعدادات الفواتير"
+                      Background="White"
+                      BorderBrush="#D9E2F2"
+                      BorderThickness="1"
+                      Padding="12">
+
+                            <GroupBox.Resources>
+
+                                <Style x:Key="FieldLabelStyle" TargetType="Label">
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Foreground" Value="#1B2642"/>
+                                    <Setter Property="Margin" Value="0,0,0,6"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+
+                                <Style x:Key="ModernTextBoxStyle" TargetType="TextBox">
+                                    <Setter Property="Height" Value="34"/>
+                                    <Setter Property="Padding" Value="8,4"/>
+                                    <Setter Property="Margin" Value="0,0,0,10"/>
+                                    <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Setter Property="Background" Value="White"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                </Style>
+
+                                <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
+                                    <Setter Property="Height" Value="34"/>
+                                    <Setter Property="Margin" Value="0,0,0,10"/>
+                                    <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Setter Property="Background" Value="White"/>
+                                    <Setter Property="Padding" Value="6,2"/>
+                                </Style>
+
+                                <Style x:Key="ModernCheckBoxStyle" TargetType="CheckBox">
+                                    <Setter Property="Margin" Value="0,4,14,4"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Foreground" Value="#1F2D4D"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+
+                                <Style x:Key="ModernRadioButtonStyle" TargetType="RadioButton">
+                                    <Setter Property="Margin" Value="0,5,0,5"/>
+                                    <Setter Property="Foreground" Value="#1F2D4D"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+
+                                <Style x:Key="CardBorderStyle" TargetType="Border">
+                                    <Setter Property="Background" Value="#FAFBFE"/>
+                                    <Setter Property="BorderBrush" Value="#D9E2F2"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Setter Property="CornerRadius" Value="12"/>
+                                    <Setter Property="Padding" Value="12"/>
+                                    <Setter Property="Margin" Value="0,0,0,12"/>
+                                    <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+                                </Style>
+
+                            </GroupBox.Resources>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="230"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- ======================== Main Content ======================== -->
+                                <StackPanel Grid.Column="0">
+
+                                    <!-- Card 1 : Basic Info -->
+                                    <Border Style="{StaticResource CardBorderStyle}">
+                                        <StackPanel>
+                                            <Border Background="{StaticResource HeaderBrush}"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,0,0,12">
+                                                <TextBlock Text="📋 البيانات الأساسية"
+                                               Foreground="White"
+                                               FontWeight="Bold"
+                                               FontSize="14"/>
+                                            </Border>
+
+                                            <WrapPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblVatPer" Content="نسبة الضريبة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtVatPer" Text="0" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblAdditionalVAT" Content="ضريبة إضافية" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtAdditionalVAT" Text="0" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblInsure" Content="قيمة التأمين" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtInsure" Text="0" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblDevM" Content="قيمة التوصيل" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtDevM" Text="0" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblUnit" Content="الوحدة الافتراضية" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbUnits" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblTreasury" Content="الخزينة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbTreasury" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblnvCode" Content="كود الفاتورة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtInvCode" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblDigitsNo" Content="عدد الكسور" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtDigitsNo" Text="2" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblPrefixe" Content="البادئة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtPrefixe" Text="1" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblDefaultCust" Content="العميل الافتراضي" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="CmbDefaultCust" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblCloudSerial" Content="Cloud Serial" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtCloudSerial" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblReInvCloudSerial" Content="Re-Inv Cloud Serial" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <TextBox x:Name="txtReInvCloudSerial" Style="{StaticResource ModernTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="Label25" Content="طريقة الدفع الافتراضية" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbPayTypeDefault" Style="{StaticResource ModernComboBoxStyle}">
+                                                        <ComboBoxItem Content="اجل"/>
+                                                        <ComboBoxItem Content="نقدي"/>
+                                                        <ComboBoxItem Content="بنك"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblCurrency" Content="العملة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbCurrency" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="Label60" Content="" Style="{StaticResource FieldLabelStyle}" Visibility="Collapsed"/>
+                                                    <Button x:Name="AddColumnAdd"
+                                                Content="➕ إضافة عمود إضافي"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"
+                                                Margin="0,24,0,10"/>
+                                                </StackPanel>
+
+                                            </WrapPanel>
+
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <CheckBox x:Name="chkValueHaveTax" Content="السعر شامل الضريبة" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="AutoCheck" Content="الباركود اتوماتك" Style="{StaticResource ModernCheckBoxStyle}" Visibility="Collapsed"/>
+                                                <CheckBox x:Name="cksaleByMinus" Content="البيع بالسالب" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="CkHasEntry" Content="توليد قيد" Style="{StaticResource ModernCheckBoxStyle}" IsChecked="True"/>
+                                                <CheckBox x:Name="ckShowPayForm" Content="إظهار شاشة الدفع" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="ckSyncInv" Content="مزامنة الفواتير" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="ckSyncEntry" Content="مزامنة القيود" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="ckLinkedReturn" Content="مرتجع مرتبط" Style="{StaticResource ModernCheckBoxStyle}" IsChecked="True"/>
+                                                <CheckBox x:Name="ckUnlinkedReturn" Content="مرتجع غير مرتبط" Style="{StaticResource ModernCheckBoxStyle}" IsChecked="True"/>
+                                                <CheckBox x:Name="ckShowPayfrmReturn" Content="إظهار الدفع في المرتجع" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="ckProcessFlow" Content="تدفق العمليات" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="ckPaymentStatus" Content="حالة الدفع" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="ckCashCustRequire" Content="المطالبة بالعميل النقدي" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="chkDetailedItemEntry" Content="قيد تفصيلي للمواد" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="CheckOperSale" Content="تشغيل عملية البيع" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="chkSalesmanRequired" Content="إلزام المندوب" Style="{StaticResource ModernCheckBoxStyle}"/>
+                                                <CheckBox x:Name="chkAtiveCustMeasur" Content="تفعيل مقياس عميل مخصص" Style="{StaticResource ModernCheckBoxStyle}" Visibility="Collapsed"/>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Card 2 : Accounts -->
+                                    <Border Style="{StaticResource CardBorderStyle}">
+                                        <StackPanel>
+                                            <Border Background="{StaticResource HeaderBrush}"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,0,0,12">
+                                                <TextBlock Text="🏦 الحسابات والربط المحاسبي"
+                                               Foreground="White"
+                                               FontWeight="Bold"
+                                               FontSize="14"/>
+                                            </Border>
+
+                                            <WrapPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblAccDiscount" Content="حساب الخصم" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccDiscount" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblAccAdditions" Content="حساب الإضافات" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccAdditions" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblAccInsurance" Content="حساب التأمين" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccInsurance" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblAccStore" Content="حساب المخزون" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccStore" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblAccItems" Content="حساب الأصناف" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccItems" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblAccVAT" Content="حساب الضريبة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccVAT" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Width="220" Margin="0,0,12,0">
+                                                    <Label x:Name="lblAccReturnItems" Content="حساب أصناف المرتجع" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbAccReturnItems" Style="{StaticResource ModernComboBoxStyle}"/>
+                                                </StackPanel>
+
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Card 3 : Pricing -->
+                                    <Border Style="{StaticResource CardBorderStyle}">
+                                        <StackPanel>
+                                            <Border Background="{StaticResource HeaderBrush}"
+                                        CornerRadius="8"
+                                        Padding="10"
+                                        Margin="0,0,0,12">
+                                                <TextBlock Text="💰 التسعير والتكلفة"
+                                               Foreground="White"
+                                               FontWeight="Bold"
+                                               FontSize="14"/>
+                                            </Border>
+
+                                            <WrapPanel>
+                                                <StackPanel Width="320" Margin="0,0,12,0">
+                                                    <Label x:Name="lblCosts" Content="التكلفة" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbCosts" Style="{StaticResource ModernComboBoxStyle}">
+                                                        <ComboBoxItem Content="لا يوجد"/>
+                                                        <ComboBoxItem Content="متوسط التكلفة"/>
+                                                        <ComboBoxItem Content="سعر الشراء"/>
+                                                        <ComboBoxItem Content="اخر سعر شراء"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+
+                                                <StackPanel Width="320">
+                                                    <Label x:Name="lblPricing" Content="التسعير" Style="{StaticResource FieldLabelStyle}"/>
+                                                    <ComboBox x:Name="cmbPricing" Style="{StaticResource ModernComboBoxStyle}">
+                                                        <ComboBoxItem Content="لا يوجد"/>
+                                                        <ComboBoxItem Content="سعر البيع"/>
+                                                        <ComboBoxItem Content="سعر الشراء"/>
+                                                        <ComboBoxItem Content="سعر اخر شراء"/>
+                                                        <ComboBoxItem Content="سعر التكلفة"/>
+                                                        <ComboBoxItem Content="السعر المنافس"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Footer Buttons -->
+                                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+                                        <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center">
+                                            <Button x:Name="btnSaveGen"
+                                        Content="💾 حفظ الإعدادات"
+                                        Width="240"
+                                        Margin="0,0,10,0"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource SaveBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                </StackPanel>
+
+                                <!-- ======================== Invoice Types ======================== -->
+                                <GroupBox x:Name="GrpInvGen"
+                              Grid.Column="2"
+                              Header="📄 الفواتير"
+                              Background="#FAFBFE"
+                              BorderBrush="#D9E2F2"
+                              BorderThickness="1"
+                              Padding="10">
+
+                                    <StackPanel>
+
+                                        <RadioButton x:Name="cbPurchInv"
+                                         Content="مشتريات"
+                                         IsChecked="True"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="cbSalesInv"
+                                         Content="مبيعات"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="cbPOS"
+                                         Content="نقطة بيع"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="cbRentInv"
+                                         Content="تأجير"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="ckProjcMng"
+                                         Content="عقود المشاريع"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbProduction"
+                                         Content="إنتاج"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbPricingInv"
+                                         Content="تسعير"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbTransfarInvertory"
+                                         Content="تحويل مخزني"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbInvertoryCorrection"
+                                         Content="تصحيح مخزني"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbInvertoryOut"
+                                         Content="صرف مخزني"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbInvertoryIn"
+                                         Content="استلام مخزني"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbFirstInvrtory"
+                                         Content="جرد افتتاحي"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rbRecieptVAT"
+                                         Content="فاتورة ضريبة"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="btnInventoryOrder"
+                                         Content="أمر مخزني"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="rdsalcontract"
+                                         Content="عقد بيع"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <RadioButton x:Name="ckAllInvs"
+                                         Content="الكل"
+                                         Visibility="Collapsed"
+                                         Style="{StaticResource ModernRadioButtonStyle}"/>
+
+                                        <CheckBox x:Name="chkTouch"
+                                      Content="الشاشة تدعم التاتش اسكرين"
+                                      Visibility="Collapsed"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <Label x:Name="Label59"
+                                   Content=""
+                                   Style="{StaticResource FieldLabelStyle}"
+                                   Visibility="Collapsed"/>
+
+                                    </StackPanel>
+                                </GroupBox>
+
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ==================== TabPage2 ==================== -->
+            <TabItem x:Name="TabPage2" Header="نقطة البيع">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid x:Name="Panel1" Margin="10" Background="Transparent">
+
+                        <Grid.Resources>
+
+                            <Style x:Key="FieldLabelStyle" TargetType="Label">
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Foreground" Value="#1B2642"/>
+                                <Setter Property="Margin" Value="0,0,0,6"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="ModernTextBoxStyle" TargetType="TextBox">
+                                <Setter Property="Height" Value="34"/>
+                                <Setter Property="Padding" Value="8,4"/>
+                                <Setter Property="Margin" Value="0,0,0,10"/>
+                                <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Background" Value="White"/>
+                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
+                                <Setter Property="Height" Value="34"/>
+                                <Setter Property="Margin" Value="0,0,0,10"/>
+                                <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Background" Value="White"/>
+                                <Setter Property="Padding" Value="6,2"/>
+                            </Style>
+
+                            <Style x:Key="ModernCheckBoxStyle" TargetType="CheckBox">
+                                <Setter Property="Margin" Value="0,4,18,4"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#1F2D4D"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Style>
+
+                            <Style x:Key="ModernRadioButtonStyle" TargetType="RadioButton">
+                                <Setter Property="Margin" Value="0,4,18,4"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#1F2D4D"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Style>
+
+                            <Style x:Key="CardBorderStyle" TargetType="Border">
+                                <Setter Property="Background" Value="#FAFBFE"/>
+                                <Setter Property="BorderBrush" Value="#D9E2F2"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="CornerRadius" Value="12"/>
+                                <Setter Property="Padding" Value="12"/>
+                                <Setter Property="Margin" Value="0,0,0,12"/>
+                                <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+                            </Style>
+
+                        </Grid.Resources>
+
+                        <StackPanel>
+
+                            <!-- ======================== Global Option ======================== -->
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="🛒 إعدادات نقطة البيع"
+                                   FontSize="15"
+                                   FontWeight="Bold"
+                                   Foreground="#203864"
+                                   VerticalAlignment="Center"
+                                   DockPanel.Dock="Right"/>
+                                    <CheckBox x:Name="ckDefaultSettings"
+                                  Content="الإعدادات الإفتراضية"
+                                  Style="{StaticResource ModernCheckBoxStyle}"
+                                  Margin="0,0,20,0"
+                                  VerticalAlignment="Center"
+                                  DockPanel.Dock="Left"/>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- ======================== GroupBox5 ======================== -->
+                            <GroupBox x:Name="GroupBox5"
+                          Header="عام"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+
+                                    <CheckBox x:Name="ckShowDelivery"
+                                  Content="عرض خدمة التوصيل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckEditDelivery"
+                                  Content="قيمة التوصيل قابلة التعديل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowInsure"
+                                  Content="عرض حقل التأمين"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckEditInsure"
+                                  Content="قيمة التأمين قابلة التعديل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowDiscountVal"
+                                  Content="خصم قيمة"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowDiscountPer"
+                                  Content="خصم نسبة"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckSaleMan"
+                                  Content="إضافة المندوب للفاتورة إجباري"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="chkPoleDisplay"
+                                  Content="تفعيل Pole Display"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="chkDigitalDisplay"
+                                  Content="تفعيل الشاشة الرقمية"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                        <Label x:Name="lblDisplayPort" Content="منفذ الشاشة" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="txtDisplayPort" Style="{StaticResource ModernTextBoxStyle}"/>
+                                    </StackPanel>
+
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ======================== GroupBox12 ======================== -->
+                            <GroupBox x:Name="GroupBox12"
+                          Header="المجموعات"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+
+                                    <CheckBox x:Name="ckShowGrps"
+                                  Content="عرض عمود المجموعات"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowGroupsImages"
+                                  Content="عرض صور المجموعات"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <StackPanel Width="180" Margin="0,0,12,0">
+                                        <Label x:Name="Label22" Content="عدد الأعمدة" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="GrpsColmNo" Text="1" Style="{StaticResource ModernTextBoxStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Width="180" Margin="0,0,12,0">
+                                        <Label x:Name="Label21" Content="عدد الصفوف" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="GrpRowsNo" Text="4" Style="{StaticResource ModernTextBoxStyle}"/>
+                                    </StackPanel>
+
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ======================== GroupBox11 ======================== -->
+                            <GroupBox x:Name="GroupBox11"
+                          Header="الأصناف"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+
+                                    <CheckBox x:Name="ckShowItemsPage"
+                                  Content="عرض صفحة الأصناف"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowItemsImages"
+                                  Content="عرض صور الأصناف"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="chkRepeatItem"
+                                  Content="تكرار الصنف"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <StackPanel Width="180" Margin="0,0,12,0">
+                                        <Label x:Name="Label16" Content="عدد الأعمدة" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="ItemsColNo" Text="4" Style="{StaticResource ModernTextBoxStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Width="180" Margin="0,0,12,0">
+                                        <Label x:Name="Label18" Content="عدد الصفوف" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="ItemsRowsNo" Text="4" Style="{StaticResource ModernTextBoxStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Width="200" Margin="0,0,12,0">
+                                        <Label x:Name="Label20" Content="عدد الأصناف في الصفحة" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="txtItemsInPage" Style="{StaticResource ModernTextBoxStyle}"/>
+                                    </StackPanel>
+
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ======================== GroupBox3 ======================== -->
+                            <GroupBox x:Name="GroupBox3"
+                          Header="عرض طرق الدفع"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+
+                                    <CheckBox x:Name="ckAllpayMethods"
+                                  Content="الكل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowCashMeth"
+                                  Content="كاش"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowNetwork"
+                                  Content="شبكة"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowVisa"
+                                  Content="فيزا"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckATM"
+                                  Content="ATM"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowMulti"
+                                  Content="متعدد"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowBankPaytype"
+                                  Content="بنك"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckShowCreditMulti"
+                                  Content="متعدد آجل"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ======================== GroupBox6 ======================== -->
+                            <GroupBox x:Name="GroupBox6"
+                          Header="عرض نوع الدفع"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+
+                                    <CheckBox x:Name="ckAllPayType"
+                                  Content="الكل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckCashType"
+                                  Content="نقدي"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                    <CheckBox x:Name="ckPostpon"
+                                  Content="آجل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ======================== GroupBox4 ======================== -->
+                            <GroupBox x:Name="GroupBox4"
+                          Header="عرض نوع الطلب"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <StackPanel>
+
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <CheckBox x:Name="ckShowAllOrders"
+                                      Content="الكل"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="ckShowlocal"
+                                      Content="محلي"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="ckShowtakeaway"
+                                      Content="سفري"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="cbfamilyOrder"
+                                      Content="عائلي"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="ckTableOrder"
+                                      Content="طاولة"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="ckCarOrder"
+                                      Content="سيارة"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="chShowHosting"
+                                      Content="ضيافة"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+
+                                        <CheckBox x:Name="ChkTableSystem"
+                                      Content="تفعيل نظام الطاولات"
+                                      IsChecked="True"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+                                    </WrapPanel>
+
+                                    <WrapPanel>
+                                        <StackPanel Width="260">
+                                            <Label x:Name="lblDefaultOrderType" Content="نوع الطلب الافتراضي" Style="{StaticResource FieldLabelStyle}"/>
+                                            <ComboBox x:Name="cmbDefaultOrderType" Style="{StaticResource ModernComboBoxStyle}">
+                                                <ComboBoxItem Content="محلي"/>
+                                                <ComboBoxItem Content="سفري"/>
+                                                <ComboBoxItem Content="عائلي"/>
+                                                <ComboBoxItem Content="طاولة"/>
+                                                <ComboBoxItem Content="سيارة"/>
+                                                <ComboBoxItem Content="ضيافة"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </WrapPanel>
+
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- ======================== GroupBox2 ======================== -->
+                            <GroupBox x:Name="GroupBox2"
+                          Header="العملات"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+                                    <RadioButton x:Name="rbCoinImages"
+                                     Content="صور"
+                                     IsChecked="True"
+                                     Style="{StaticResource ModernRadioButtonStyle}"/>
+                                    <RadioButton x:Name="rbCoinNum"
+                                     Content="أرقام"
+                                     Style="{StaticResource ModernRadioButtonStyle}"/>
+                                    <RadioButton x:Name="rbCoinHiden"
+                                     Content="عدم إظهار"
+                                     Style="{StaticResource ModernRadioButtonStyle}"/>
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ======================== Save Button ======================== -->
+                            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Button x:Name="btnSavePOSetting"
+                                Content="💾 حفظ إعدادات نقطة البيع"
+                                Width="280"
+                                Style="{StaticResource ActionBtn}"
+                                Background="{StaticResource SaveBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ==================== TabPage4 ==================== -->
+            <TabItem x:Name="TabPage4" Header="خيارات الطباعة">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="10">
+
+                        <Grid.Resources>
+
+                            <Style x:Key="FieldLabelStyle_Tab4" TargetType="Label">
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Foreground" Value="#1B2642"/>
+                                <Setter Property="Margin" Value="0,0,0,6"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="ModernTextBoxStyle_Tab4" TargetType="TextBox">
+                                <Setter Property="Height" Value="34"/>
+                                <Setter Property="Padding" Value="8,4"/>
+                                <Setter Property="Margin" Value="0,0,0,10"/>
+                                <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Background" Value="White"/>
+                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="ModernComboBoxStyle_Tab4" TargetType="ComboBox">
+                                <Setter Property="Height" Value="34"/>
+                                <Setter Property="Margin" Value="0,0,0,10"/>
+                                <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Background" Value="White"/>
+                                <Setter Property="Padding" Value="6,2"/>
+                            </Style>
+
+                            <Style x:Key="ModernCheckBoxStyle_Tab4" TargetType="CheckBox">
+                                <Setter Property="Margin" Value="0,4,14,4"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#1F2D4D"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Style>
+
+                            <Style x:Key="ModernRadioButtonStyle_Tab4" TargetType="RadioButton">
+                                <Setter Property="Margin" Value="0,4,14,4"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#1F2D4D"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Style>
+
+                            <Style x:Key="CardBorderStyle_Tab4" TargetType="Border">
+                                <Setter Property="Background" Value="#FAFBFE"/>
+                                <Setter Property="BorderBrush" Value="#D9E2F2"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="CornerRadius" Value="12"/>
+                                <Setter Property="Padding" Value="12"/>
+                                <Setter Property="Margin" Value="0,0,0,12"/>
+                                <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+                            </Style>
+
+                            <Style x:Key="LinkTextStyle_Tab4" TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#2B57C6"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="TextDecorations" Value="Underline"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Margin" Value="0,6,10,0"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="DgvColHeader_Tab4" TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Height" Value="36"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="DgvRow_Tab4" TargetType="DataGridRow">
+                                <Setter Property="Height" Value="34"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#E7EEFF"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+
+                        </Grid.Resources>
+
+                        <StackPanel>
+
+                            <!-- ==================== GrpPrintImages ==================== -->
+                            <GroupBox x:Name="GrpPrintImages"
+                          Header="🖼️ صور الطباعة"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+
+                                <StackPanel>
+
+                                    <WrapPanel Margin="0,0,0,10" Visibility="Collapsed">
+                                        <Label x:Name="Label27" Content="" Style="{StaticResource FieldLabelStyle_Tab4}" Visibility="Collapsed"/>
+                                        <ComboBox x:Name="cmbReportType"
+                                      Width="220"
+                                      Style="{StaticResource ModernComboBoxStyle_Tab4}"
+                                      Visibility="Collapsed">
+                                            <ComboBoxItem Content="إغلاق اليومية"/>
+                                            <ComboBoxItem Content="الأصناف المباعة"/>
+                                            <ComboBoxItem Content="مجموعات الأصناف المُباعة"/>
+                                            <ComboBoxItem Content="القيد"/>
+                                            <ComboBoxItem Content="سند صرف"/>
+                                            <ComboBoxItem Content="سند قبض"/>
+                                            <ComboBoxItem Content="كشف حساب"/>
+                                            <ComboBoxItem Content="باركود"/>
+                                            <ComboBoxItem Content="تقرير فواتير التأجير"/>
+                                        </ComboBox>
+                                    </WrapPanel>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="12"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="12"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Header -->
+                                        <Border Grid.Column="0" Style="{StaticResource CardBorderStyle_Tab4}">
+                                            <StackPanel>
+                                                <Label x:Name="Label28" Content="الترويـسة" HorizontalContentAlignment="Center" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                <Border BorderBrush="#C8D2E8" BorderThickness="1" CornerRadius="8" Height="140" Background="#F8FAFF">
+                                                    <Image x:Name="HeaderImg" Stretch="Uniform"/>
+                                                </Border>
+                                                <WrapPanel HorizontalAlignment="Center">
+                                                    <TextBlock x:Name="lnkImgAdd1" Text="📂 رفع" Style="{StaticResource LinkTextStyle_Tab4}"/>
+                                                    <TextBlock x:Name="lnkImgClr1" Text="🗑️ حذف" Style="{StaticResource LinkTextStyle_Tab4}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Footer -->
+                                        <Border Grid.Column="2" Style="{StaticResource CardBorderStyle_Tab4}">
+                                            <StackPanel>
+                                                <Label x:Name="Label29" Content="التـذيـيـل" HorizontalContentAlignment="Center" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                <Border BorderBrush="#C8D2E8" BorderThickness="1" CornerRadius="8" Height="140" Background="#F8FAFF">
+                                                    <Image x:Name="FooterImg" Stretch="Uniform"/>
+                                                </Border>
+                                                <WrapPanel HorizontalAlignment="Center">
+                                                    <TextBlock x:Name="lnkImgAdd2" Text="📂 رفع" Style="{StaticResource LinkTextStyle_Tab4}"/>
+                                                    <TextBlock x:Name="lnkImgClr2" Text="🗑️ حذف" Style="{StaticResource LinkTextStyle_Tab4}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Stamp -->
+                                        <Border Grid.Column="4" Style="{StaticResource CardBorderStyle_Tab4}">
+                                            <StackPanel>
+                                                <Label x:Name="Label30" Content="الخــتـم" HorizontalContentAlignment="Center" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                <Border BorderBrush="#C8D2E8" BorderThickness="1" CornerRadius="8" Height="140" Background="#F8FAFF">
+                                                    <Image x:Name="StampImg" Stretch="Uniform"/>
+                                                </Border>
+                                                <WrapPanel HorizontalAlignment="Center">
+                                                    <TextBlock x:Name="lnkImgAdd3" Text="📂 رفع" Style="{StaticResource LinkTextStyle_Tab4}"/>
+                                                    <TextBlock x:Name="lnkImgClr3" Text="🗑️ حذف" Style="{StaticResource LinkTextStyle_Tab4}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- ==================== GroupBox13 ==================== -->
+                            <GroupBox x:Name="GroupBox13"
+                          Header="🧩 تفعيل إعدادات الطباعة"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+                                <WrapPanel>
+                                    <RadioButton x:Name="ckAll" Content="الإفتراضي" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                    <RadioButton x:Name="ckPurchInv" Content="مشتريات" IsChecked="True" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                    <RadioButton x:Name="ckSaleInv" Content="مبيعات" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                    <RadioButton x:Name="ckPOSInv" Content="نقطة بيع" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                    <RadioButton x:Name="ckRentInv" Content="تأجير" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                    <RadioButton x:Name="ckContracts" Content="عقود" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                    <RadioButton x:Name="ckReports" Content="تقارير" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                </WrapPanel>
+                            </GroupBox>
+
+                            <!-- ==================== GroupBox15 ==================== -->
+                            <GroupBox x:Name="GroupBox15"
+                          Header="🖨️ إعدادات الطباعة"
+                          Background="White"
+                          BorderBrush="#D9E2F2"
+                          BorderThickness="1"
+                          Padding="12">
+
+                                <StackPanel>
+
+                                    <!-- printers and report -->
+                                    <Border Style="{StaticResource CardBorderStyle_Tab4}">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <Label x:Name="lblCashPrinter" Content="طابعة الكاشير" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                    <ComboBox x:Name="cmbCashPrinter" Style="{StaticResource ModernComboBoxStyle_Tab4}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2">
+                                                    <Label x:Name="lblKitchenprinter" Content="طابعة المطبخ" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                    <ComboBox x:Name="cmbKitchenprinter" Style="{StaticResource ModernComboBoxStyle_Tab4}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="4">
+                                                    <Label x:Name="lblPrintNo" Content="عدد النسخ" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                    <TextBox x:Name="cmbPrintNo" Text="1" Style="{StaticResource ModernTextBoxStyle_Tab4}"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <Label x:Name="lblRptName" Content="اسم التقرير" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                    <TextBox x:Name="txtRptName" Style="{StaticResource ModernTextBoxStyle_Tab4}"/>
+                                                </StackPanel>
+
+                                                <Button x:Name="Button1"
+                                            Grid.Column="2"
+                                            Width="120"
+                                            Height="34"
+                                            Margin="0,28,0,0"
+                                            Content="👁️ تصميم فاتورة"
+                                            Style="{StaticResource ActionBtn}"
+                                            Background="{StaticResource HeaderBrush}"/>
+                                            </Grid>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <Label x:Name="lblRptPath" Content="مسار التقرير" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                                    <TextBox x:Name="txtRptPath" Style="{StaticResource ModernTextBoxStyle_Tab4}"/>
+                                                </StackPanel>
+
+                                                <Button x:Name="btnSelectPath"
+                                            Grid.Column="2"
+                                            Width="120"
+                                            Height="34"
+                                            Margin="0,28,0,0"
+                                            Content="📂 اختيار ملف"
+                                            Style="{StaticResource ActionBtn}"
+                                            Background="{StaticResource HeaderBrush}"/>
+                                            </Grid>
+
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <CheckBox x:Name="chkInvHeader" Content="طباعة ترويسة الفاتورة" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab4}"/>
+                                                <CheckBox x:Name="chkInvFooter" Content="طباعة تذييل الفاتورة" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab4}"/>
+                                                <CheckBox x:Name="ckPrintStamp" Content="طباعة الختم" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab4}"/>
+                                                <CheckBox x:Name="ckPrintItems" Content="طباعة تفاصيل الأصناف" Style="{StaticResource ModernCheckBoxStyle_Tab4}"/>
+                                                <CheckBox x:Name="printmakpay" Content="طباعة make pay" Style="{StaticResource ModernCheckBoxStyle_Tab4}"/>
+                                                <CheckBox x:Name="chkPrintComponentsItemsIndividually"
+                                              Content="طباعة مكونات الأصناف المركبة بشكل منفرد"
+                                              Style="{StaticResource ModernCheckBoxStyle_Tab4}"/>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Note -->
+                                    <Border Style="{StaticResource CardBorderStyle_Tab4}">
+                                        <StackPanel>
+                                            <Label x:Name="lblNote" Content="ملاحظات التقرير" Style="{StaticResource FieldLabelStyle_Tab4}"/>
+                                            <TextBox x:Name="txtNote"
+                                         Height="100"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         TextWrapping="Wrap"
+                                         Style="{StaticResource ModernTextBoxStyle_Tab4}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- GridControl1 Replacement -->
+                                    <Border Style="{StaticResource CardBorderStyle_Tab4}">
+                                        <StackPanel>
+                                            <TextBlock Text="📑 ربط الطابعات بالتقارير"
+                                           FontWeight="Bold"
+                                           Foreground="#203864"
+                                           Margin="0,0,0,10"/>
+
+                                            <Grid x:Name="GridView1">
+                                                <DataGrid x:Name="GridControl1"
+                                              AutoGenerateColumns="False"
+                                              CanUserAddRows="True"
+                                              CanUserDeleteRows="False"
+                                              IsReadOnly="False"
+                                              ColumnHeaderStyle="{StaticResource DgvColHeader_Tab4}"
+                                              RowStyle="{StaticResource DgvRow_Tab4}"
+                                              GridLinesVisibility="Horizontal"
+                                              HorizontalGridLinesBrush="#E8EBF5"
+                                              AlternatingRowBackground="#F8F9FD"
+                                              HeadersVisibility="Column"
+                                              MinHeight="220">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn x:Name="DgvName"
+                                                                Header="الاسم"
+                                                                Binding="{Binding DgvName, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="*"/>
+                                                        <DataGridTextColumn x:Name="DgvPrinterName"
+                                                                Header="الطابعة"
+                                                                Binding="{Binding DgvPrinterName, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="*"/>
+                                                        <DataGridTemplateColumn x:Name="DgvReport" Header="التقرير" Width="180">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                        <TextBlock Text="{Binding DgvReport}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                                        <Button Content="📂 اختيار"
+                                                                    Padding="8,3"
+                                                                    Background="{StaticResource HeaderBrush}"
+                                                                    Foreground="White"
+                                                                    BorderThickness="0"/>
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                        <DataGridTemplateColumn x:Name="DgvDelete" Header="حذف" Width="100">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <Button Content="🗑️ حذف"
+                                                                Padding="8,3"
+                                                                Background="{StaticResource DangerBrush}"
+                                                                Foreground="White"
+                                                                BorderThickness="0"/>
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Documents -->
+                                    <Border Style="{StaticResource CardBorderStyle_Tab4}">
+                                        <StackPanel>
+                                            <TextBlock Text="📂 مسار المستندات"
+                                           FontWeight="Bold"
+                                           Foreground="#203864"
+                                           Margin="0,0,0,10"/>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBox x:Name="txtdocuments"
+                                             Grid.Column="0"
+                                             Style="{StaticResource ModernTextBoxStyle_Tab4}"/>
+
+                                                <Button x:Name="Button5"
+                                            Grid.Column="2"
+                                            Width="110"
+                                            Height="34"
+                                            Content="📂 اختيار"
+                                            Style="{StaticResource ActionBtn}"
+                                            Background="{StaticResource HeaderBrush}"/>
+
+                                                <Button x:Name="Button6"
+                                            Grid.Column="4"
+                                            Width="110"
+                                            Height="34"
+                                            Content="💾 حفظ"
+                                            Style="{StaticResource ActionBtn}"
+                                            Background="{StaticResource SaveBrush}"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Hidden legacy controls -->
+                                    <GroupBox x:Name="GroupBox14"
+                                  Header="نوع التقرير"
+                                  Visibility="Collapsed"
+                                  Padding="8">
+                                        <StackPanel>
+                                            <RadioButton x:Name="rbCashier" Content="ورق كاشير" IsChecked="True" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                            <RadioButton x:Name="rbA4" Content="طباعة A4" Style="{StaticResource ModernRadioButtonStyle_Tab4}"/>
+                                        </StackPanel>
+                                    </GroupBox>
+
+                                    <Label x:Name="Label19" Content="Pole device connection" Visibility="Collapsed"/>
+                                    <ComboBox x:Name="cmbPorts" Visibility="Collapsed"/>
+                                    <Button x:Name="btnprintsettings"
+                                Content="💾 حفظ إعدادات الطباعة"
+                                Width="260"
+                                Height="40"
+                                HorizontalAlignment="Center"
+                                Style="{StaticResource ActionBtn}"
+                                Background="{StaticResource SaveBrush}"/>
+
+                                </StackPanel>
+                            </GroupBox>
+
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ==================== TabPage3 ==================== -->
+            <TabItem x:Name="TabPage3" Header="اخــــرى">
+                <Grid Margin="10">
+
+                    <Grid.Resources>
+
+                        <Style x:Key="FieldLabelStyle_Tab3" TargetType="Label">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="#1B2642"/>
+                            <Setter Property="Margin" Value="0,0,0,6"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+
+                        <Style x:Key="ModernTextBoxStyle_Tab3" TargetType="TextBox">
+                            <Setter Property="Height" Value="34"/>
+                            <Setter Property="Padding" Value="8,4"/>
+                            <Setter Property="Margin" Value="0,0,0,10"/>
+                            <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="Background" Value="White"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        </Style>
+
+                        <Style x:Key="ModernComboBoxStyle_Tab3" TargetType="ComboBox">
+                            <Setter Property="Height" Value="34"/>
+                            <Setter Property="Margin" Value="0,0,0,10"/>
+                            <Setter Property="BorderBrush" Value="#CCD6EA"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="Background" Value="White"/>
+                            <Setter Property="Padding" Value="6,2"/>
+                        </Style>
+
+                        <Style x:Key="ModernCheckBoxStyle_Tab3" TargetType="CheckBox">
+                            <Setter Property="Margin" Value="0,4,14,4"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Foreground" Value="#1F2D4D"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+
+                        <Style x:Key="ModernRadioButtonStyle_Tab3" TargetType="RadioButton">
+                            <Setter Property="Margin" Value="0,4,14,4"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Foreground" Value="#1F2D4D"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+
+                        <Style x:Key="CardBorderStyle_Tab3" TargetType="Border">
+                            <Setter Property="Background" Value="#FAFBFE"/>
+                            <Setter Property="BorderBrush" Value="#D9E2F2"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="12"/>
+                            <Setter Property="Padding" Value="12"/>
+                            <Setter Property="Margin" Value="0,0,0,12"/>
+                            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+                        </Style>
+
+                    </Grid.Resources>
+
+                    <TabControl x:Name="TabOtherSetting">
+
+                        <!-- ==================== TabPage7 ==================== -->
+                        <TabItem x:Name="TabPage7" Header="إدارة البريد الإلكتروني">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid x:Name="Panel3" Margin="10">
+                                    <Border Style="{StaticResource CardBorderStyle_Tab3}">
+                                        <StackPanel>
+                                            <TextBlock Text="📧 إعدادات البريد الإلكتروني"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Foreground="#203864"
+                                           Margin="0,0,0,10"/>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <Label x:Name="lblServers" Content="الخادم" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <ComboBox x:Name="cmbServers" Style="{StaticResource ModernComboBoxStyle_Tab3}">
+                                                        <ComboBoxItem Content="smtp.gmail.com"/>
+                                                        <ComboBoxItem Content="smtp-mail.outlook.com"/>
+                                                    </ComboBox>
+
+                                                    <Label x:Name="lblSenderEm" Content="إيميل المرسل" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtSenderEm" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="lblSenderPwd" Content="كلمة المرور" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtSenderPwd" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="lblReceiverEm" Content="إيميل المستلم" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtReceiverEm" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="lblPort" Content="المنفذ" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtPort" Text="587" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <WrapPanel>
+                                                        <CheckBox x:Name="ckSSL" Content="SSL / TLS" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckactive" Content="تفعيل الإرسال التلقائي" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ChkSendInv" Content="إرسال الفواتير" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2">
+                                                    <Label x:Name="lblBodyMsg" Content="نص الرسالة" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtBodyMsg"
+                                                 Height="220"
+                                                 AcceptsReturn="True"
+                                                 VerticalScrollBarVisibility="Auto"
+                                                 TextWrapping="Wrap"
+                                                 Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Button x:Name="btnSaveEmail"
+                                                Content="💾 حفظ الإعدادات"
+                                                Width="220"
+                                                Height="40"
+                                                HorizontalAlignment="Center"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource SaveBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ==================== TabPage8 ==================== -->
+                        <TabItem x:Name="TabPage8" Header="الصلاحيات">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid x:Name="Panel4" Margin="10">
+                                    <Border Style="{StaticResource CardBorderStyle_Tab3}">
+                                        <StackPanel>
+                                            <TextBlock Text="🔐 إعدادات الصلاحيات"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Foreground="#203864"
+                                           Margin="0,0,0,10"/>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <Label x:Name="lblUser" Content="المستخدم" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtUser" Visibility="Collapsed" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="lblPass" Content="كلمة المرور" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtPass" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <DatePicker x:Name="txtDate" Visibility="Collapsed" SelectedDate="{x:Static sys:DateTime.Now}" xmlns:sys="clr-namespace:System;assembly=mscorlib"/>
+                                                </StackPanel>
+
+                                                <GroupBox x:Name="group" Grid.Column="2" Header="العمليات" Padding="10">
+                                                    <WrapPanel>
+                                                        <CheckBox x:Name="ckshiftClose" Content="إغلاق اليومية" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckReturn" Content="المرتجع" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckHosting" Content="الضيافة" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckDiscount" Content="الخصم" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckAbsent" Content="إستبعاد مركب" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckExpention1" Content="إستثناء" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                        <CheckBox x:Name="ckRestOperPeriod" Content="إعادة إحتساب الرحلات" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    </WrapPanel>
+                                                </GroupBox>
+                                            </Grid>
+
+                                            <Button x:Name="btnOperPermiss"
+                                        Content="💾 حفظ إعدادات الصلاحيات"
+                                        Width="260"
+                                        Height="40"
+                                        HorizontalAlignment="Center"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource SaveBrush}"
+                                        Margin="0,10,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ==================== TabPageSyncSetting ==================== -->
+                        <TabItem x:Name="TabPageSyncSetting" Header="إعدادت المزامنة">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid x:Name="Panel5" Margin="10">
+                                    <StackPanel>
+
+                                        <Border Style="{StaticResource CardBorderStyle_Tab3}">
+                                            <StackPanel>
+                                                <TextBlock Text="🌐 بيانات الاتصال بالمزامنة"
+                                               FontSize="15"
+                                               FontWeight="Bold"
+                                               Foreground="#203864"
+                                               Margin="0,0,0,10"/>
+
+                                                <WrapPanel>
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="lblClientCode" Content="Client Code" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtClientCode" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="lblAPIUrl" Content="API URL" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtAPIUrl" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="lblSyncUser" Content="User" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtSyncUser" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="lblPassword" Content="Password" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtPassword" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="lblReadingInterval" Content="Reading Interval" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtReadingInterval" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="lblPostInterval" Content="Post Interval" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtPostInterval" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="lblInvCountToSync" Content="Invoice Count To Sync" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtInvCountToSync" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+                                                </WrapPanel>
+
+                                                <WrapPanel>
+                                                    <Button x:Name="btnGetClientCode"
+                                                Content="🔍 Get Client Code"
+                                                Width="150"
+                                                Height="38"
+                                                Margin="0,0,10,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+
+                                                    <Button x:Name="btnGetBranches"
+                                                Content="🌿 Get Branches"
+                                                Width="150"
+                                                Height="38"
+                                                Margin="0,0,10,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+
+                                                    <Button x:Name="btnSyncCards"
+                                                Content="🔄 Sync Cards"
+                                                Width="150"
+                                                Height="38"
+                                                Margin="0,0,10,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+
+                                                    <Button x:Name="btnSyncSave"
+                                                Content="💾 حفظ إعدادات المزامنة"
+                                                Width="200"
+                                                Height="38"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource SaveBrush}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- GbCosts -->
+                                            <GroupBox x:Name="GbCosts"
+                                          Grid.Column="0"
+                                          Header="الفروع ونوع الفرع"
+                                          Background="White"
+                                          BorderBrush="#D9E2F2"
+                                          BorderThickness="1"
+                                          Padding="12">
+                                                <StackPanel>
+                                                    <WrapPanel>
+                                                        <RadioButton x:Name="rbDataCenterBranch" Content="Data Center Branch" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                        <RadioButton x:Name="rbSecondaryBranch" Content="Secondary Branch" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                        <RadioButton x:Name="rbMiddleBranch" Content="Middle Branch" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                        <RadioButton x:Name="ckSyncCloud" Content="Sync Cloud" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                    </WrapPanel>
+
+                                                    <CheckBox x:Name="chkSyncCloudFirst"
+                                                  Content="Sync Cloud First"
+                                                  Visibility="Collapsed"
+                                                  Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+
+                                                    <WrapPanel>
+                                                        <StackPanel Width="220" Margin="0,0,12,0">
+                                                            <Label x:Name="lblSrcBranches" Content="Source Branch" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                            <ComboBox x:Name="cmbSrcBranches" Style="{StaticResource ModernComboBoxStyle_Tab3}"/>
+                                                        </StackPanel>
+
+                                                        <StackPanel Width="220">
+                                                            <Label x:Name="lblDistBranch" Content="Destination Branch" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                            <ComboBox x:Name="cmbDistBranch" Style="{StaticResource ModernComboBoxStyle_Tab3}"/>
+                                                        </StackPanel>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </GroupBox>
+
+                                            <!-- GroupBox9 -->
+                                            <GroupBox x:Name="GroupBox9"
+                                          Grid.Column="2"
+                                          Header="نوع المزامنة"
+                                          Background="White"
+                                          BorderBrush="#D9E2F2"
+                                          BorderThickness="1"
+                                          Padding="12">
+                                                <StackPanel>
+                                                    <RadioButton x:Name="rbAutoSync" Content="Auto Sync" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                    <RadioButton x:Name="rbPeriodicSync" Content="Periodic Sync" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                    <RadioButton x:Name="rbEndDay" Content="End Day" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                    <RadioButton x:Name="rbEndShift" Content="End Shift" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                    <RadioButton x:Name="rbInactiveSync" Content="Inactive Sync" IsChecked="True" Style="{StaticResource ModernRadioButtonStyle_Tab3}"/>
+                                                </StackPanel>
+                                            </GroupBox>
+                                        </Grid>
+
+                                        <!-- GroupBox8 -->
+                                        <GroupBox x:Name="GroupBox8"
+                                      Header="خيارات إضافية"
+                                      Background="White"
+                                      BorderBrush="#D9E2F2"
+                                      BorderThickness="1"
+                                      Padding="12">
+                                            <WrapPanel>
+                                                <CheckBox x:Name="ChkBranchSpecialSalePrice" Content="Branch Special Sale Price" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="ChkSyncQuantity" Content="Sync Quantity" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="CheckBox2" Content="تفعيل شاشة السداد" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="CheckBox3" Content="توليد قيد" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="CheckBox4" Content="خيار إضافي 1" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="CheckBox5" Content="خيار إضافي 2" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="CheckBox6" Content="خيار إضافي 3" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                            </WrapPanel>
+                                        </GroupBox>
+
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ==================== TabPage10 ==================== -->
+                        <TabItem x:Name="TabPage10" Header="إغلاق اليومية">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid Margin="10">
+                                    <StackPanel>
+
+                                        <Border Style="{StaticResource CardBorderStyle_Tab3}">
+                                            <StackPanel>
+                                                <TextBlock Text="📅 إعدادات إغلاق اليومية"
+                                               FontSize="15"
+                                               FontWeight="Bold"
+                                               Foreground="#203864"
+                                               Margin="0,0,0,10"/>
+
+                                                <WrapPanel>
+                                                    <CheckBox x:Name="ckQuantPrint" Content="طباعة تفاصيل الأصناف مع إغلاق اليومية" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ckPrintGroups" Content="طباعة مجموعات الأصناف مع إغلاق اليومية" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ckSendEmail" Content="إرسال بريد إلكتروني" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ckBalanceRequired" Content="الرصيد مطلوب" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="chkShowCloseDetails" Content="إظهار تفاصيل الإغلاق" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                </WrapPanel>
+
+                                                <StackPanel Width="220">
+                                                    <Label x:Name="lblclosesNo" Content="عدد النسخ" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="closesNo" Text="1" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <GroupBox x:Name="GroupBox16"
+                                      Header="العناصر المشمولة بالإغلاق"
+                                      Background="White"
+                                      BorderBrush="#D9E2F2"
+                                      BorderThickness="1"
+                                      Padding="12">
+                                            <WrapPanel>
+                                                <CheckBox x:Name="SaleInv" Content="مبيعات" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="PurchaseInv" Content="مشتريات" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="ckPOS" Content="نقطة بيع" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="ckReceipts" Content="سندات" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="ckExpenses" Content="مصروفات" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                <CheckBox x:Name="CheckBox11" Content="خيار إضافي" Visibility="Collapsed" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                            </WrapPanel>
+                                        </GroupBox>
+
+                                        <Button x:Name="btnCloseShiftSetting"
+                                    Content="💾 حفظ إعدادات الإغلاق"
+                                    Width="240"
+                                    Height="40"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource ActionBtn}"
+                                    Background="{StaticResource SaveBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ==================== GediaSetting ==================== -->
+                        <TabItem x:Name="GediaSetting" Header="إعدادات جيديا">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid Margin="10">
+                                    <StackPanel>
+
+                                        <Border Style="{StaticResource CardBorderStyle_Tab3}">
+                                            <StackPanel>
+                                                <TextBlock Text="💳 إعدادات جيديا"
+                                               FontSize="15"
+                                               FontWeight="Bold"
+                                               Foreground="#203864"
+                                               Margin="0,0,0,10"/>
+
+                                                <WrapPanel>
+                                                    <CheckBox x:Name="CheckGedia" Content="تفعيل الدفع عن طريق جيديا" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ChkGediaReceiptPrint" Content="طباعة ايصال" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                </WrapPanel>
+
+                                                <WrapPanel>
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="lblGediaPort" Content="المنفذ" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtGediaPort" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="lblAmount" Content="المبلغ" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtAmount" Text="0.01" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+                                                </WrapPanel>
+
+                                                <WrapPanel>
+                                                    <Button x:Name="BtnTestGedia"
+                                                Content="🧪 TEST"
+                                                Width="120"
+                                                Height="38"
+                                                Margin="0,0,10,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+                                                    <Button x:Name="BtnSaveGedia"
+                                                Content="💾 حفظ"
+                                                Width="120"
+                                                Height="38"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource SaveBrush}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <GroupBox x:Name="GroupBox22"
+                                      Header="NeoLeap"
+                                      Background="#EEF3FF"
+                                      BorderBrush="#D9E2F2"
+                                      BorderThickness="1"
+                                      Padding="12">
+                                            <StackPanel>
+                                                <WrapPanel>
+                                                    <CheckBox x:Name="chkActivneoleap" Content="تفعيل NeoLeap" IsChecked="True" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ChkNeoLeapEnableReceiptPrint" Content="طباعة إيصال NeoLeap" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                </WrapPanel>
+
+                                                <WrapPanel>
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="Label32" Content="المنفذ" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtportneoleap" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="Label33" Content="المبلغ" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtAmountneoleap" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="Label31" Content="Token" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtTokenneoleap" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+                                                </WrapPanel>
+
+                                                <Label Content="Logging" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                <TextBox x:Name="txtLogging"
+                                             Height="140"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto"
+                                             Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                <WrapPanel>
+                                                    <Button x:Name="Btntestneoleap"
+                                                Content="🧪 Test"
+                                                Width="120"
+                                                Height="38"
+                                                Margin="0,0,10,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+                                                    <Button x:Name="Btnsavneoleap"
+                                                Content="💾 حفظ"
+                                                Width="120"
+                                                Height="38"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource SaveBrush}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </GroupBox>
+
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ==================== TabPage5 ==================== -->
+                        <TabItem x:Name="TabPage5" Header="إعادة الضبط">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid Margin="10">
+                                    <GroupBox x:Name="GroupBoxReset"
+                                  Header="🗑️ حذف البيانات"
+                                  Background="White"
+                                  BorderBrush="#D9E2F2"
+                                  BorderThickness="1"
+                                  Padding="12">
+                                        <StackPanel HorizontalAlignment="Center" Width="300">
+                                            <Button x:Name="btnDeleteInv"
+                                        Content="🗑️ حذف الفواتير"
+                                        Height="40"
+                                        Margin="0,0,0,10"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource DangerBrush}"/>
+
+                                            <Button x:Name="BtnDeleteEntry"
+                                        Content="🗑️ حذف القيود"
+                                        Height="40"
+                                        Margin="0,0,0,10"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource DangerBrush}"/>
+
+                                            <Button x:Name="BtndeleteRecept"
+                                        Content="🗑️ حذف السندات"
+                                        Height="40"
+                                        Margin="0,0,0,10"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource DangerBrush}"/>
+
+                                            <Button x:Name="BtnDeleteItems"
+                                        Content="🗑️ حذف الأصناف"
+                                        Height="40"
+                                        Margin="0,0,0,10"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource DangerBrush}"/>
+
+                                            <Button x:Name="btnDeleteCat"
+                                        Content="🗑️ حذف المجموعات"
+                                        Height="40"
+                                        Margin="0,0,0,10"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource DangerBrush}"/>
+
+                                            <Button x:Name="BtnResetData"
+                                        Content="⚠️ حذف جميع العمليات"
+                                        Height="40"
+                                        Style="{StaticResource ActionBtn}"
+                                        Background="{StaticResource DangerBrush}"/>
+                                        </StackPanel>
+                                    </GroupBox>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ==================== SettingNotify ==================== -->
+                        <TabItem x:Name="SettingNotify" Header="الإشعارات والربط">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid x:Name="Panelnot1" Margin="10">
+                                    <StackPanel>
+
+                                        <GroupBox x:Name="GroupBox10"
+                                      Header="🌐 إعدادات الاتصال"
+                                      Background="White"
+                                      BorderBrush="#D9E2F2"
+                                      BorderThickness="1"
+                                      Padding="12">
+                                            <StackPanel>
+                                                <WrapPanel>
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="Label13" Content="Client ID" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtclientid" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="Label26" Content="Branch" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <ComboBox x:Name="CmbBranchMqtt" Style="{StaticResource ModernComboBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="Label11" Content="Frequency" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtfrequency" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="Label6" Content="Server Name" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <ComboBox x:Name="Cmbservername" Style="{StaticResource ModernComboBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="Label5" Content="Database" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <ComboBox x:Name="CmbTxtDataBase" Style="{StaticResource ModernComboBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Width="220">
+                                                        <Label x:Name="Label12" Content="Pass Code" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtpasscode" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+                                                </WrapPanel>
+
+                                                <WrapPanel>
+                                                    <CheckBox x:Name="chkis_active" Content="تفعيل الاتصال" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="chsyncItems" Content="مزامنة الأصناف" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ChksyncDefinitions" Content="مزامنة التعاريف" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                    <CheckBox x:Name="ChksyncOper" Content="مزامنة العمليات" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                </WrapPanel>
+
+                                                <WrapPanel>
+                                                    <StackPanel Width="220" Margin="0,0,12,0">
+                                                        <Label x:Name="LblIpServer" Content="IP Server" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="TxtIpserver" Style="{StaticResource ModernTextBoxStyle_Tab3}" Visibility="Collapsed"/>
+                                                    </StackPanel>
+
+                                                    <Button x:Name="btnconnectit"
+                                                Content="🔌 اتصال"
+                                                Width="140"
+                                                Height="38"
+                                                Margin="0,28,0,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </GroupBox>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- GroupBox18 -->
+                                            <GroupBox x:Name="GroupBox18"
+                                          Grid.Column="0"
+                                          Header="Node Info"
+                                          Background="White"
+                                          BorderBrush="#D9E2F2"
+                                          BorderThickness="1"
+                                          Padding="12">
+                                                <StackPanel>
+                                                    <Label x:Name="Label8" Content="Node ID" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtnodeid" IsReadOnly="True" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label10" Content="Extra" Style="{StaticResource FieldLabelStyle_Tab3}" Visibility="Collapsed"/>
+                                                    <TextBox x:Name="TextBox11" Visibility="Collapsed" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                </StackPanel>
+                                            </GroupBox>
+
+                                            <!-- GroupBox1 -->
+                                            <GroupBox x:Name="GroupBox1"
+                                          Grid.Column="2"
+                                          Header="Credentials"
+                                          Background="White"
+                                          BorderBrush="#D9E2F2"
+                                          BorderThickness="1"
+                                          Padding="12">
+                                                <StackPanel>
+                                                    <Label x:Name="Label9" Content="User Name" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="usrname" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label14" Content="Password" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="pwdtxt" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <CheckBox x:Name="ChkIs_Play" Content="Play Notification" Style="{StaticResource ModernCheckBoxStyle_Tab3}"/>
+                                                </StackPanel>
+                                            </GroupBox>
+                                        </Grid>
+
+                                        <!-- panelnot2 -->
+                                        <GroupBox Header="تفاصيل الربط"
+                                      Background="White"
+                                      BorderBrush="#D9E2F2"
+                                      BorderThickness="1"
+                                      Padding="12">
+                                            <Grid x:Name="panelnot2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="12"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0">
+                                                    <Label x:Name="Label7" Content="Sale" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtsale" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label4" Content="Receipt" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtreceipt" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label3" Content="Item" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtitem" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2">
+                                                    <Label x:Name="Label24" Content="Income" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtincome" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label17" Content="Private Key" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtprivatekey" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label15" Content="Finance" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtfinance" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="4">
+                                                    <Label x:Name="Label1" Content="Public Key" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="txtpublickey" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Label x:Name="Label2" Content="Extra" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                    <TextBox x:Name="TextBox10" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+
+                                                    <Button x:Name="Button2"
+                                                Content="💾 حفظ"
+                                                Width="120"
+                                                Height="38"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource SaveBrush}"/>
+                                                </StackPanel>
+
+                                                <Label x:Name="Label23" Content="" Visibility="Collapsed"/>
+                                            </Grid>
+                                        </GroupBox>
+
+                                        <!-- GroupBox17 -->
+                                        <GroupBox x:Name="GroupBox17"
+                                      Header="العقد المرتبطة"
+                                      Background="White"
+                                      BorderBrush="#D9E2F2"
+                                      BorderThickness="1"
+                                      Padding="12">
+                                            <StackPanel>
+                                                <WrapPanel>
+                                                    <StackPanel Width="240" Margin="0,0,12,0">
+                                                        <Label Content="My Node" Style="{StaticResource FieldLabelStyle_Tab3}"/>
+                                                        <TextBox x:Name="txtmynode" Style="{StaticResource ModernTextBoxStyle_Tab3}"/>
+                                                    </StackPanel>
+
+                                                    <Button x:Name="Button3"
+                                                Content="➕ إضافة جهازي"
+                                                Width="130"
+                                                Height="34"
+                                                Margin="0,28,10,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+
+                                                    <Button x:Name="Button4"
+                                                Content="➕ إضافة طرفية"
+                                                Width="130"
+                                                Height="34"
+                                                Margin="0,28,0,0"
+                                                Style="{StaticResource ActionBtn}"
+                                                Background="{StaticResource HeaderBrush}"/>
+                                                </WrapPanel>
+
+                                                <ListBox x:Name="ListBoxNodes" Height="160"/>
+                                            </StackPanel>
+                                        </GroupBox>
+
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                    </TabControl>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== TabPage6 ==================== -->
+            <!-- ==================== TabPage6 ==================== -->
+            <TabItem x:Name="TabPage6" Header="قواعد البيانات">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="10">
+
+                        <Grid.Resources>
+
+                            <Style x:Key="FieldLabelStyle_Tab6" TargetType="Label">
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Foreground" Value="#1B2642"/>
+                                <Setter Property="Margin" Value="0,0,0,6"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+
+                            <Style x:Key="CardBorderStyle_Tab6" TargetType="Border">
+                                <Setter Property="Background" Value="#FAFBFE"/>
+                                <Setter Property="BorderBrush" Value="#D9E2F2"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="CornerRadius" Value="12"/>
+                                <Setter Property="Padding" Value="12"/>
+                                <Setter Property="Margin" Value="0,0,0,12"/>
+                                <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+                            </Style>
+
+                            <Style x:Key="DgvColHeader_Tab6" TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="FontSize" Value="12"/>
+                                <Setter Property="Height" Value="36"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                <Setter Property="Padding" Value="8,0"/>
+                            </Style>
+
+                            <Style x:Key="DgvRow_Tab6" TargetType="DataGridRow">
+                                <Setter Property="Height" Value="34"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#E3EAF8"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#EEF1FA"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+
+                            <Style x:Key="GridActionBtn_Tab6" TargetType="Button">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Padding" Value="10,4"/>
+                                <Setter Property="Margin" Value="2"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                        CornerRadius="8"
+                                        Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+
+                        </Grid.Resources>
+
+                        <GroupBox x:Name="GroupBox19"
+                      Header="🗂️ إدارة قواعد البيانات والسنوات"
+                      Background="White"
+                      BorderBrush="#D9E2F2"
+                      BorderThickness="1"
+                      Padding="12">
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- ==================== GroupBox20 ==================== -->
+                                <GroupBox x:Name="GroupBox20"
+                              Grid.Column="0"
+                              Header="📌 السنوات المضافة"
+                              Background="#FAFBFE"
+                              BorderBrush="#D9E2F2"
+                              BorderThickness="1"
+                              Padding="10"
+                              Margin="0">
+
+                                    <StackPanel>
+
+                                        <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,10">
+                                            <TextBlock Text="📋 قواعد البيانات الموجودة في Year_Previews"
+                                           Foreground="White"
+                                           FontWeight="Bold"
+                                           FontSize="13"
+                                           HorizontalAlignment="Center"/>
+                                        </Border>
+
+                                        <Grid x:Name="GridView3">
+                                            <DataGrid x:Name="GridControl3"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          IsReadOnly="True"
+                                          SelectionMode="Single"
+                                          SelectionUnit="FullRow"
+                                          ColumnHeaderStyle="{StaticResource DgvColHeader_Tab6}"
+                                          RowStyle="{StaticResource DgvRow_Tab6}"
+                                          GridLinesVisibility="Horizontal"
+                                          HorizontalGridLinesBrush="#E8EBF5"
+                                          AlternatingRowBackground="#F8F9FD"
+                                          HeadersVisibility="Column"
+                                          MinHeight="320"
+                                          Background="White">
+                                                <DataGrid.Columns>
+
+                                                    <DataGridTextColumn x:Name="GridColumn1"
+                                                            Header="اسم قاعدة البيانات"
+                                                            Binding="{Binding Dbname}"
+                                                            Width="*">
+                                                        <DataGridTextColumn.ElementStyle>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                                <Setter Property="TextAlignment" Value="Center"/>
+                                                            </Style>
+                                                        </DataGridTextColumn.ElementStyle>
+                                                    </DataGridTextColumn>
+
+                                                    <DataGridTemplateColumn x:Name="Delete"
+                                                                Header="حذف"
+                                                                Width="120">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="🗑️ حذف"
+                                                            Background="{StaticResource DangerBrush}"
+                                                            Style="{StaticResource GridActionBtn_Tab6}"/>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
+
+                                        <!-- Placeholder للحفاظ على الاسم -->
+                                        <Button x:Name="BtnDeleteData"
+                                    Visibility="Collapsed"
+                                    Width="0"
+                                    Height="0"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- ==================== GroupBox21 ==================== -->
+                                <GroupBox x:Name="GroupBox21"
+                              Grid.Column="2"
+                              Header="➕ قواعد البيانات المتاحة للإضافة"
+                              Background="#FAFBFE"
+                              BorderBrush="#D9E2F2"
+                              BorderThickness="1"
+                              Padding="10"
+                              Margin="0">
+
+                                    <StackPanel>
+
+                                        <Border Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,0,0,10">
+                                            <TextBlock Text="🧾 قواعد البيانات النشطة"
+                                           Foreground="White"
+                                           FontWeight="Bold"
+                                           FontSize="13"
+                                           HorizontalAlignment="Center"/>
+                                        </Border>
+
+                                        <Grid x:Name="GridView2">
+                                            <DataGrid x:Name="GridControl2"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          IsReadOnly="True"
+                                          SelectionMode="Single"
+                                          SelectionUnit="FullRow"
+                                          ColumnHeaderStyle="{StaticResource DgvColHeader_Tab6}"
+                                          RowStyle="{StaticResource DgvRow_Tab6}"
+                                          GridLinesVisibility="Horizontal"
+                                          HorizontalGridLinesBrush="#E8EBF5"
+                                          AlternatingRowBackground="#F8F9FD"
+                                          HeadersVisibility="Column"
+                                          MinHeight="320"
+                                          Background="White">
+                                                <DataGrid.Columns>
+
+                                                    <DataGridTextColumn x:Name="DbName"
+                                                            Header="اسم قاعدة البيانات"
+                                                            Binding="{Binding DbName}"
+                                                            Width="*">
+                                                        <DataGridTextColumn.ElementStyle>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                                <Setter Property="TextAlignment" Value="Center"/>
+                                                            </Style>
+                                                        </DataGridTextColumn.ElementStyle>
+                                                    </DataGridTextColumn>
+
+                                                    <DataGridTextColumn x:Name="AutoName"
+                                                            Header="الاسم التلقائي"
+                                                            Binding="{Binding DbAutoName}"
+                                                            Width="*">
+                                                        <DataGridTextColumn.ElementStyle>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                                <Setter Property="TextAlignment" Value="Center"/>
+                                                            </Style>
+                                                        </DataGridTextColumn.ElementStyle>
+                                                    </DataGridTextColumn>
+
+                                                    <DataGridTemplateColumn x:Name="GridColumn4"
+                                                                Header="إضافة"
+                                                                Width="120">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="➕ إضافة"
+                                                            Background="{StaticResource SaveBrush}"
+                                                            Style="{StaticResource GridActionBtn_Tab6}"/>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
+
+                                        <!-- Placeholder للحفاظ على الاسم -->
+                                        <Button x:Name="RepositoryItemButtonEdit2"
+                                    Visibility="Collapsed"
+                                    Width="0"
+                                    Height="0"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</dx:ThemedWindow>
