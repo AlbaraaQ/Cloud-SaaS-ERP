@@ -175,11 +175,11 @@ const accounting: ModuleNode = {
         }),
         screen(
           'income-statement',
-          'قائمة الدخل التحليلية',
-          'Analytical income statement',
-          '/reports/income-statement',
+          'أرباح وخسائر حسابات رئيسية',
+          'Income statement',
+          '/accounting/income-statement',
           'ready',
-          { permission: 'reporting.view' },
+          { permission: 'accounting.reports.view', endpoint: '/statements/income-statement' },
         ),
         screen(
           'balance-sheet',

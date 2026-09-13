@@ -13,6 +13,12 @@
  *   5. بطاقة الحساب — 📅 تاريخ فتح الحساب · 💰 الرصيد الافتتاحي · 📊 مركز التكلفة
  *   6. 📄 كشف الحساب — الرصيد السابق والرصيد التراكمي (`frmAccountBalance`)
  *   7. 📊 طريقة العرض · الفترة · الفرع · كشف حساب رئيسي (`frmAccountsStatement`)
+ *   8. 📒 إنشاء قيد يومية — ⏰ الوقت · ✅ قيد ضريبي · 🔑 الرقم العام · المندوب
+ *   9. 🌳 مراكز التكلفة — الشجرة بالأرصدة · 📊 كشف مركز الكلفة
+ *  10. العكس — القيد المعكوس يصفّر الأثر ويحمل أبعاده
+ *  11. 🗂️ إدارة الفترات المحاسبية — ➕ إضافة · ✏️ تعديل · ⚡ تفعيل · 🔒 إغلاق · 🗑️ حذف
+ *  12. ⚖️ ميزان المراجعة — افتتاحي · خلال الفترة المحددة · ختامي · الحالة
+ *  13. 📊 أرباح وخسائر حسابات رئيسية — المخزون آخر المدة · صافي أرباح العام
  *
  * Usage: node scripts/verify-accounting.mjs
  */
@@ -489,10 +495,211 @@ const mirrorLines = (await call('get', `/journal-entries/${reversal.reversalOf ?
 const mirrored = mirrorLines.find((line) => line.accountId === ccExpense.id);
 check('المرآة تحمل مركز التكلفة', mirrored?.costCenterId === leafCentre.id, String(mirrored?.costCenterId ?? '—'));
 
+
+console.log('\n11. 🗂️ إدارة الفترات المحاسبية — ➕ إضافة · ✏️ تعديل · ⚡ تفعيل · 🔒 إغلاق · 🗑️ حذف');
+
+const farYear = new Date().getUTCFullYear() + 5;
+
+/**
+ * Every run adds a period in the same future year, so an earlier run's period would
+ * overlap this one's — and the script has to be re-runnable. The stale ones go first.
+ */
+for (const stale of (await call('get', '/fiscal-periods', token)).filter((row) => String(row.name).startsWith('فترة تحقق'))) {
+  if (stale.status === 'closed') {
+    await call('post', `/fiscal-periods/${stale.id}/reopen`, token, { reason: `تنظيف تحقق ${stamp}` });
+  }
+  await fetch(`${base}/fiscal-periods/${stale.id}`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } });
+}
+
+const periodsBefore = await call('get', '/fiscal-periods', token);
+check(
+  'القائمة تردّ الرقم واسم السنة والحالة',
+  periodsBefore.length > 0 &&
+    typeof periodsBefore[0]?.number === 'number' &&
+    'isActive' in periodsBefore[0] &&
+    'notes' in periodsBefore[0],
+  `${periodsBefore.length} فترة، أولاها رقم ${periodsBefore[0]?.number}`,
+);
+
+const newPeriod = await call('post', '/fiscal-periods', token, {
+  name: `فترة تحقق ${stamp}`,
+  startDate: `${farYear}-01-01`,
+  endDate: `${farYear}-06-30`,
+  isActive: true,
+  notes: `ملاحظة ${stamp}`,
+});
+check('➕ إضافة — الاسم والتاريخان و✔️ نشطة وملاحظات', newPeriod.isActive === true && newPeriod.notes === `ملاحظة ${stamp}`, `${newPeriod.name} رقم ${newPeriod.number}`);
+check('رقم الفترة مشتقّ من ترتيبها في سنتها', Number(newPeriod.number) === 1, String(newPeriod.number));
+check(
+  'السنة تُفتح وحدها إن لم تكن',
+  (await call('get', '/fiscal-years', token)).some((row) => row.name === String(farYear)),
+  String(farYear),
+);
+check(
+  '⚡ تفعيل — فترة نشطة واحدة لا اثنتان',
+  (await call('get', '/fiscal-periods', token)).filter((row) => row.isActive === true).length === 1,
+  (await call('get', '/fiscal-periods', token)).filter((row) => row.isActive).map((row) => row.name).join('، '),
+);
+
+const overlap = await fetch(`${base}/fiscal-periods`, {
+  method: 'post',
+  headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+  body: JSON.stringify({ name: `متداخلة ${stamp}`, startDate: `${farYear}-02-01`, endDate: `${farYear}-08-31` }),
+});
+const overlapBody = await overlap.json();
+check(
+  '«يوجد تداخل في التواريخ مع فترة محاسبية أخرى»',
+  overlap.status === 409 && overlapBody.code === 'PERIOD_OVERLAP',
+  `${overlap.status} ${overlapBody.code ?? ''}`,
+);
+
+await call('post', `/fiscal-periods/${newPeriod.id}/close`, token, {});
+const closedRow = (await call('get', '/fiscal-periods', token)).find((row) => row.id === newPeriod.id);
+check('🔒 إغلاق الفترة — أغلقت بواسطة وتاريخ الإغلاق', closedRow?.status === 'closed' && Boolean(closedRow?.closedAt), String(closedRow?.closedByName ?? closedRow?.closedBy ?? '—'));
+check('المغلقة تخرج من النشطة', closedRow?.isActive === false, String(closedRow?.isActive));
+
+const refuseActivate = await fetch(`${base}/fiscal-periods/${newPeriod.id}/activate`, {
+  method: 'post',
+  headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+  body: JSON.stringify({}),
+});
+check('«لا يمكن تفعيل فترة محاسبية مغلقة»', refuseActivate.status === 409, String(refuseActivate.status));
+
+const refuseEdit = await fetch(`${base}/fiscal-periods/${newPeriod.id}`, {
+  method: 'PATCH',
+  headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+  body: JSON.stringify({ name: 'معدّلة' }),
+});
+const refuseEditBody = await refuseEdit.json();
+check(
+  '«لا يمكن تعديل فترة مغلقة. يرجى إعادة فتحها أولاً»',
+  refuseEdit.status === 409 && String(refuseEditBody.detail ?? '').includes('لا يمكن تعديل فترة مغلقة'),
+  `${refuseEdit.status} ${refuseEditBody.detail ?? ''}`,
+);
+
+await call('post', `/fiscal-periods/${newPeriod.id}/reopen`, token, { reason: `تحقق ${stamp}` });
+const reopened = (await call('get', '/fiscal-periods', token)).find((row) => row.id === newPeriod.id);
+check('🔓 إعادة فتح — يزيل من أغلقها ومتى', reopened?.status === 'open' && reopened?.closedAt === null, String(reopened?.status));
+
+await fetch(`${base}/fiscal-periods/${newPeriod.id}`, {
+  method: 'DELETE',
+  headers: { authorization: `Bearer ${token}` },
+});
+check(
+  '🗑️ حذف — الفترة تزول من القائمة',
+  !(await call('get', '/fiscal-periods', token)).some((row) => row.id === newPeriod.id),
+  `${(await call('get', '/fiscal-periods', token)).length} فترة`,
+);
+
+console.log('\n12. ⚖️ ميزان المراجعة — افتتاحي · خلال الفترة المحددة · ختامي · الحالة');
+
+const mizan = await callEnvelope('get', '/statements/trial-balance');
+const mizanRow = mizan.data.find((row) => row.accountId === leafId);
+check(
+  'الأعمدة العشرة واسم الحساب',
+  Boolean(mizanRow?.code) &&
+    Boolean(mizanRow?.name) &&
+    'openingDebit' in mizanRow &&
+    'balanceDebit' in mizanRow &&
+    'closingDebit' in mizanRow,
+  `${mizanRow?.code} ${mizanRow?.name}`,
+);
+check('الحركة متوازنة — مدين = دائن', mizan.totals.balanced === true, `${money(mizan.totals.debit)} = ${money(mizan.totals.credit)}`);
+
+const mizanPeriod = await callEnvelope('get', `/statements/trial-balance?from=${today()}`);
+const mizanLeaf = mizanPeriod.data.find((row) => row.accountId === leafId);
+const mizanClosed =
+  Number(mizanLeaf?.openingDebit ?? 0) -
+  Number(mizanLeaf?.openingCredit ?? 0) +
+  Number(mizanLeaf?.debit ?? 0) -
+  Number(mizanLeaf?.credit ?? 0);
+check(
+  'الختامي = الافتتاحي + حركة الفترة — صيغة `ShowResult`',
+  near(Number(mizanLeaf?.closingDebit ?? 0) - Number(mizanLeaf?.closingCredit ?? 0), mizanClosed),
+  `${money(mizanLeaf?.closingDebit)} − ${money(mizanLeaf?.closingCredit)} = ${money(mizanClosed)}`,
+);
+check(
+  'الرصيد والحالة — كما يطبعها الديسكتوب',
+  typeof mizanPeriod.totals.balance === 'string' && typeof mizanPeriod.totals.status === 'string',
+  `${money(mizanPeriod.totals.balance)} ${mizanPeriod.totals.status || 'متوازن'}`,
+);
+const mizanBranch = await callEnvelope('get', `/statements/trial-balance?parent_id=${rootId}`);
+check(
+  'الحساب الرئيسي — الميزان على فرعٍ واحد من الشجرة',
+  mizanBranch.data.length > 0 && mizanBranch.data.every((row) => String(row.code).startsWith(String(9) + stamp)),
+  `${mizanBranch.data.length} صف: ${mizanBranch.data.map((row) => row.code).join('، ')}`,
+);
+
+console.log('\n13. 📊 أرباح وخسائر حسابات رئيسية — المخزون آخر المدة · صافي أرباح العام');
+
+const incomeRevenue = await account(`7${stamp}`, `إيرادات التحقق ${stamp}`, 'revenue');
+const incomeExpense = await account(`6${stamp}`, `مصروفات التحقق ${stamp}`, 'expense');
+await post([
+  { accountId: incomeRevenue.id, credit: '900' },
+  { accountId: leafId, debit: '900' },
+]);
+await post([
+  { accountId: incomeExpense.id, debit: '350' },
+  { accountId: leafId, credit: '350' },
+]);
+
+const income = await callEnvelope('get', `/statements/income-statement?from=${iso(-1)}&to=${iso(1)}`);
+const incomeAccounts = income.data.filter((row) => row.kind === 'account');
+check(
+  'الإيرادات والمصروفات وحدها — حساب الميزانية لا يظهر',
+  incomeAccounts.some((row) => row.code === `7${stamp}`) &&
+    incomeAccounts.some((row) => row.code === `6${stamp}`) &&
+    !incomeAccounts.some((row) => row.code === mizanRow?.code),
+  incomeAccounts.map((row) => row.code).join(' · '),
+);
+check(
+  'رصيد مدين / رصيد دائن — كلٌّ على جانبه',
+  near(Number(incomeAccounts.find((row) => row.code === `7${stamp}`)?.balanceCredit), 900) &&
+    near(Number(incomeAccounts.find((row) => row.code === `6${stamp}`)?.balanceDebit), 350),
+  `إيرادات ${money(incomeAccounts.find((row) => row.code === `7${stamp}`)?.balanceCredit)} · مصروفات ${money(incomeAccounts.find((row) => row.code === `6${stamp}`)?.balanceDebit)}`,
+);
+const incomeSides = incomeAccounts.reduce(
+  (sum, row) => ({
+    debit: sum.debit + Number(row.balanceDebit),
+    credit: sum.credit + Number(row.balanceCredit),
+  }),
+  { debit: 0, credit: 0 },
+);
+const incomeStock = Number(income.totals.stock);
+const incomeExpected = Math.abs(incomeSides.credit + incomeStock - incomeSides.debit);
+check(
+  'صافي أرباح العام — ما يزيد به الدائن على المدين',
+  near(Number(income.totals.profit), incomeExpected) &&
+    income.totals.profitLabel === (incomeSides.credit + incomeStock >= incomeSides.debit ? 'صافي أرباح العام' : 'صافي خسائر العام'),
+  `${money(income.totals.profit)} ${income.totals.profitLabel} — ${money(incomeSides.credit + incomeStock)} مقابل ${money(incomeSides.debit)}`,
+);
+check(
+  'إيرادات التحقق ومصروفاتها على القائمة — 900 مقابل 350',
+  near(Number(incomeAccounts.find((row) => row.code === `7${stamp}`)?.balanceCredit), 900) &&
+    near(Number(incomeAccounts.find((row) => row.code === `6${stamp}`)?.balanceDebit), 350),
+  `${money(incomeAccounts.find((row) => row.code === `7${stamp}`)?.balanceCredit)} مقابل ${money(incomeAccounts.find((row) => row.code === `6${stamp}`)?.balanceDebit)}`,
+);
+check(
+  '«✅ الحسابات متوازنة» — العمودان يلتقيان',
+  income.totals.balanced === true && near(Number(income.totals.debit), Number(income.totals.credit)),
+  `${money(income.totals.debit)} = ${money(income.totals.credit)}`,
+);
+check(
+  'قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ',
+  income.data.some((row) => row.kind === 'stock' && row.name.includes('قيمة مخزون')),
+  money(income.totals.stock),
+);
+const incomeDetail = await callEnvelope('get', `/statements/income-statement?from=${iso(-1)}&to=${iso(1)}&summary=0`);
+check(
+  '📑 تفصيلي — صفّ لكل حساب',
+  incomeDetail.data.filter((row) => row.kind === 'account').length >= incomeAccounts.length,
+  `${incomeDetail.data.filter((row) => row.kind === 'account').length} مقابل ${incomeAccounts.length}`,
+);
+
 console.log('');
 console.log(
   failures === 0
-    ? '\n✔ Phase 07 — دليل الحسابات وكشف الحساب verified'
+    ? '\n✔ Phase 07 — دليل الحسابات · كشف الحساب · الفترات والميزان verified'
     : `\n✗ ${failures} check(s) failed`,
 );
 process.exit(failures === 0 ? 0 : 1);

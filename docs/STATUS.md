@@ -534,6 +534,48 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `/reports/cost-center-report`, routes that had never been built; they are now one real
   screen under `/accounting/cost-center-statement`, next to `كشف حساب`.
 
+* **المرحلة 07 — المحاسبة، الجزء الخامس: الفترات والميزان وقائمة الدخل**
+  (`Form_WPF/FrmAccountingPeriods.xaml` «إدارة الفترات المحاسبية» ·
+  `frmRptBalances.xaml` «أرصدة الحسابات» · `frmRptIncomeStatement.xaml`
+  «أرباح وخسائر حسابات رئيسية»). **Three things the cloud did not have: a period you can
+  write, a ميزان with a period, and an income statement at all.** `GET /fiscal-periods`
+  answered with rows that could be read, closed and reopened and nothing else — no name,
+  no dates, no active flag, no delete — so `🗂️ إدارة الفترات المحاسبية` had no card to
+  put on the screen. Migration `0048` adds the two columns the card carries
+  (`notes`, `is_active`) with a partial unique index that enforces `⚡ تفعيل` — one active
+  period, never a closed one — and `listPeriods` now returns the row the window binds:
+  `الرقم` (the period's ordinal in its year, which is what a read-only `PeriodID` is),
+  `yearName`, `isActive`, `notes` and `أغلقت بواسطة` **named** rather than a bare id (the
+  desktop writes `Environment.UserName`). `POST`/`PATCH`/`DELETE` and
+  `POST /fiscal-periods/:id/activate` follow `Class/AccountingPeriodManager.cs`
+  statement for statement, including its five refusals in its own words — «يوجد تداخل في
+  التواريخ مع فترة محاسبية أخرى» (409), «لا يمكن تفعيل فترة محاسبية مغلقة» (409),
+  «لا يمكن تعديل فترة مغلقة. يرجى إعادة فتحها أولاً» (409), «لا يمكن حذف فترة مغلقة»
+  (409) and the two 422s before any of them. The desktop has no fiscal years, so a period
+  resolves (or opens) the year covering its dates — otherwise `➕ إضافة` would be unusable
+  on an empty tenant. `GET /statements/trial-balance` was `accountId`/`debit`/`credit`
+  over the whole ledger; it now takes `من`/`إلى`/`الفرع`/`المندوب`/`الحساب الرئيسي` and
+  returns the window's ten columns — `افتتاحي · خلال الفترة المحددة · الرصيد · ختامي`,
+  each on its مدين ودائن side, with `الحالة` — computed by the window's own `ShowResult`
+  arithmetic, plus the account's `💰 الرصيد الافتتاحي`, and with `code`/`name` beside
+  `accountId` so the ميزان no longer has to be assembled in the browser from two
+  endpoints. A caller that sends nothing — and a row's four old keys — is unchanged, and
+  `totals` is an addition beside `data`. `GET /statements/income-statement` is new: the
+  accounts the desktop marks `FinalAcc = 2` (a code beginning `3` or `4`, written by
+  `DetermineFinalAccount()` — the cloud calls them `revenue` and `expense`), carried up
+  to their parents as the window does, then `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ`
+  on the credit side and `صافي أرباح العام` as the plug that makes the columns meet.
+  Tests `apps/api/test/fiscal-periods.spec.ts` (8), `trial-balance.spec.ts` (8) and
+  `income-statement.spec.ts` (7, including a stock row backed by a real
+  `inventory_transactions` line rather than a fixture), plus sections 11–13 of
+  `scripts/verify-accounting.mjs` (23 more live checks, 83 in total — one of them checks
+  the closing-balance formula itself). **602** API tests, 36 staff, 71 contract. The
+  `قائمة الدخل التحليلية` navigation row pointed at `/reports/income-statement`, a
+  report-engine key; it now names the desktop window and opens the real screen.
+  Deferred: `Form_WPF/frmAddPeriod.xaml` (⏰ إدارة فترات التأجير — rental pricing per
+  item group, and there is no general rental module in the standard per-tenant list) and
+  the `من وقت`/`إلى وقت` boxes, which cut a day the cloud cuts by date.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

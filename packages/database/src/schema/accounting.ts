@@ -89,11 +89,16 @@ export const fiscalPeriods = pgTable(
     status: text('status').notNull().default('open'),
     closedBy: uuid('closed_by'),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** ✔️ فترة نشطة حالياً — `FrmAccountingPeriods.xaml` `ChkIsActive` (migration 0048). */
+    isActive: boolean('is_active').notNull().default(false),
+    /** ملاحظات — `FrmAccountingPeriods.xaml` `TxtNotes` (migration 0048). */
+    notes: text('notes'),
     ...baseAuditColumns(),
   },
   (table) => ({
     periodsYearDatesIdx: index('fiscal_periods_year_dates_idx').on(table.fiscalYearId, table.startDate, table.endDate),
     periodsTenantStatusIdx: index('fiscal_periods_tenant_status_idx').on(table.tenantId, table.status),
+    periodsOneActiveIdx: uniqueIndex('fiscal_periods_one_active_idx').on(table.tenantId).where(sql`${table.isActive}`),
   }),
 );
 

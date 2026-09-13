@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { getTenantContext } from '../platform/context/tenant-context.js';
+import { getTenantContext, tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
 import {
@@ -10,6 +10,8 @@ import {
   type AccountPatch,
   type CostCenterInput,
   type CostCenterPatch,
+  type FiscalPeriodInput,
+  type FiscalPeriodPatch,
   type FiscalYearInput,
   type JournalLineInput,
 } from './accounting.service.js';
@@ -75,16 +77,54 @@ export class AccountingController {
     return { data: await this.accounting.readAccount(getTenantContext().tenantId, id) };
   }
 
+  /**
+   * 🗂️ إدارة الفترات المحاسبية — the grid of `Form_WPF/FrmAccountingPeriods.xaml`
+   * (`الرقم · اسم الفترة · تاريخ البداية · تاريخ النهاية · نشطة · مغلقة · أغلقت بواسطة ·
+   * تاريخ الإغلاق · ملاحظات`), newest period first, as `GetAllPeriods` orders it.
+   */
   @Get('fiscal-periods')
   @RequiresPermission('accounting.period.view')
+  @ApiOperation({ summary: 'List fiscal periods with their card fields' })
   async listPeriods() {
     return { data: await this.accounting.listPeriods(getTenantContext().tenantId) };
+  }
+
+  /** ➕ إضافة — the period card of `FrmAccountingPeriods`. */
+  @Post('fiscal-periods')
+  @RequiresPermission('accounting.period.close')
+  @ApiOperation({ summary: 'Add an accounting period (اسم الفترة · تاريخ من · تاريخ إلى · نشطة · ملاحظات)' })
+  async createPeriod(@Body() body: FiscalPeriodInput) {
+    return { data: await this.accounting.createPeriod(getTenantContext().tenantId, body, tryGetAuthContext()?.userId) };
+  }
+
+  /** ✏️ تعديل — a closed period is refused with «لا يمكن تعديل فترة مغلقة…». */
+  @Patch('fiscal-periods/:id')
+  @RequiresPermission('accounting.period.close')
+  @ApiOperation({ summary: 'Edit an open accounting period' })
+  async updatePeriod(@Param('id') id: string, @Body() body: FiscalPeriodPatch) {
+    return { data: await this.accounting.updatePeriod(getTenantContext().tenantId, id, body, tryGetAuthContext()?.userId) };
+  }
+
+  /** 🗑️ حذف — a closed period, or one with entries on it, is refused. */
+  @Delete('fiscal-periods/:id')
+  @RequiresPermission('accounting.period.close')
+  @ApiOperation({ summary: 'Delete an open accounting period that has no journal entries' })
+  async deletePeriod(@Param('id') id: string) {
+    return { data: await this.accounting.deletePeriod(getTenantContext().tenantId, id) };
+  }
+
+  /** ⚡ تفعيل — one active period per tenant; a closed one is refused. */
+  @Post('fiscal-periods/:id/activate')
+  @RequiresPermission('accounting.period.close')
+  @ApiOperation({ summary: 'Make a period the active one (فترة نشطة حالياً)' })
+  async activatePeriod(@Param('id') id: string) {
+    return { data: await this.accounting.activatePeriod(getTenantContext().tenantId, id) };
   }
 
   @Post('fiscal-periods/:id/close')
   @RequiresPermission('accounting.period.close')
   async closePeriod(@Param('id') id: string) {
-    await this.accounting.closePeriod(getTenantContext().tenantId, id);
+    await this.accounting.closePeriod(getTenantContext().tenantId, id, tryGetAuthContext()?.userId);
     return { data: { id, status: 'closed' } };
   }
 
@@ -107,10 +147,68 @@ export class AccountingController {
     return { data: await this.accounting.unlockModule(getTenantContext().tenantId, id, module) };
   }
 
+  /**
+   * ⚖️ ميزان المراجعة — `Form_WPF/frmRptBalances.xaml` («أرصدة الحسابات») printing
+   * `Reports/rptAccountBalance.repx`. The window's filter panel is
+   * `الفروع (كل الفروع) · الحساب الرئيسي · المندوب · الفترة (كل الفترة / من / إلى)` with
+   * `عرض`, and the report's columns are
+   * `رقم الحساب · اسم الحساب · افتتاحي (مدين/دائن) · خلال الفترة المحددة (مدين/دائن) ·
+   * ختامي (مدين/دائن) · الحالة`.
+   *
+   * With no `from` there is no `افتتاحي` and the whole ledger is the period — which is
+   * what this endpoint returned before it took a period at all, and every row still
+   * carries its `accountId` / `debit` / `credit` / `balance`.
+   */
   @Get('statements/trial-balance')
   @RequiresPermission('accounting.reports.view')
-  async trialBalance() {
-    return { data: await this.accounting.trialBalance(getTenantContext().tenantId) };
+  @ApiOperation({ summary: 'Trial balance (ميزان المراجعة) with opening, movement and closing columns' })
+  async trialBalance(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('fiscal_period_id') fiscalPeriodId?: string,
+    @Query('salesman_id') salesmanId?: string,
+    @Query('parent_id') parentId?: string,
+  ) {
+    const mizan = await this.accounting.trialBalance(getTenantContext().tenantId, {
+      from,
+      to,
+      branchId,
+      fiscalPeriodId,
+      salesmanId,
+      parentId,
+    });
+    return { data: mizan.rows, totals: mizan.totals };
+  }
+
+  /**
+   * 📊 أرباح وخسائر حسابات رئيسية — `Form_WPF/frmRptIncomeStatement.xaml` over
+   * `Reports/RptIncomeStatement.repx`: the revenue and expense accounts
+   * (`Accounts_Index.FinalAcc = 2`, i.e. codes beginning `3` or `4`), each carried up to
+   * its parent account, then `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ` and
+   * `صافي أرباح العام` / `صافي خسائر العام` under them.
+   *
+   * `summary=0` keeps one row per account instead of one per parent, and
+   * `with_stock=0` drops the stock row.
+   */
+  @Get('statements/income-statement')
+  @RequiresPermission('accounting.reports.view')
+  @ApiOperation({ summary: 'Income statement (أرباح وخسائر حسابات رئيسية)' })
+  async incomeStatement(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('summary') summary?: string,
+    @Query('with_stock') withStock?: string,
+  ) {
+    const statement = await this.accounting.incomeStatement(getTenantContext().tenantId, {
+      from,
+      to,
+      branchId,
+      summary: summary === undefined ? undefined : on(summary),
+      withStock: withStock === undefined ? undefined : on(withStock),
+    });
+    return { data: statement.rows, totals: statement.totals };
   }
 
   /**

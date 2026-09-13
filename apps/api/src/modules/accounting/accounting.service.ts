@@ -9,10 +9,13 @@ import {
   costCenters,
   fiscalPeriods,
   fiscalYears,
+  inventoryTransactions,
   journalEntries,
   journalEntryLines,
   newId,
   periodModuleLocks,
+  users,
+  warehouses,
   withTenantTx,
   type DatabaseHandle,
   type DrizzleTx,
@@ -86,6 +89,154 @@ export type StatementQuery = {
   fullPeriod?: boolean;
   /** `عدم إظهار الرصيد السابق`. */
   hidePreviousBalance?: boolean;
+};
+
+/**
+ * 🗂️ إدارة الفترات المحاسبية — the card of `Form_WPF/FrmAccountingPeriods.xaml`, whose
+ * row type is `Class/AccountingPeriod.cs`:
+ * `PeriodID · PeriodName · StartDate · EndDate · IsActive · IsClosed · ClosedBy ·
+ * ClosedDate · Notes · CreatedDate`. Every refused case below is the window's own wording,
+ * quoted from `Class/AccountingPeriodManager.cs`.
+ */
+export type FiscalPeriodInput = {
+  /** `اسم الفترة:` — `TxtPeriodName`; empty is «يرجى إدخال اسم الفترة المحاسبية». */
+  name: string;
+  startDate: string;
+  endDate: string;
+  /** Absent = take (or open) the fiscal year that covers the dates. */
+  fiscalYearId?: string;
+  isActive?: boolean;
+  notes?: string | null;
+};
+
+export type FiscalPeriodPatch = {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
+  notes?: string | null;
+};
+
+export type FiscalPeriodRow = {
+  id: string;
+  tenantId: string;
+  fiscalYearId: string;
+  yearName: string | null;
+  /**
+   * `الرقم` — the desktop's `PeriodID`, read-only in `TxtPeriodID`. It is an identity
+   * there and an ordinal here: which period of its fiscal year this one is, by date.
+   */
+  number: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  isActive: boolean;
+  notes: string | null;
+  closedBy: string | null;
+  /** `أغلقت بواسطة` — named, not a bare id (the desktop writes `Environment.UserName`). */
+  closedByName: string | null;
+  closedAt: Date | null;
+  createdAt: Date;
+};
+
+/** ⚖️ ميزان المراجعة — the filter panel of `Form_WPF/frmRptBalances.xaml` («أرصدة الحسابات»). */
+export type TrialBalanceQuery = {
+  /** `من:` — before it is `رصيد افتتاحي`; absent means there is no opening at all. */
+  from?: string;
+  /** `إلى:` */
+  to?: string;
+  /** `الفرع:` — absent is the checked `كل الفروع`. */
+  branchId?: string;
+  fiscalPeriodId?: string;
+  /** `المندوب:` */
+  salesmanId?: string;
+  /** `الحساب الرئيسي:` — the report over one branch of the tree, as the window does. */
+  parentId?: string;
+};
+
+/**
+ * One line of ⚖️ ميزان المراجعة: the ten columns `frmRptBalances.xaml` prints —
+ * `الحساب · اسم الحساب · رصيد افتتاحي مدين · رصيد افتتاحي دائن · حركة مدين · حركة دائن ·
+ * رصيد مدين · رصيد دائن · رصيد ختامي مدين · رصيد ختامي دائن` — plus the `الحالة` column
+ * of `Reports/rptAccountBalance.repx`.
+ */
+export type TrialBalanceRow = {
+  accountId: string;
+  code: string;
+  name: string;
+  type: string;
+  normalBalance: string | null;
+  openingDebit: string;
+  openingCredit: string;
+  debit: string;
+  credit: string;
+  balanceDebit: string;
+  balanceCredit: string;
+  closingDebit: string;
+  closingCredit: string;
+  /** Signed `debit − credit` of the period movement — what this endpoint always returned. */
+  balance: string;
+  /** Signed closing balance, in debit space. */
+  closing: string;
+  /** `الحالة` — which side the closing balance is on. */
+  status: string;
+};
+
+export type TrialBalanceTotals = {
+  openingDebit: string;
+  openingCredit: string;
+  debit: string;
+  credit: string;
+  balanceDebit: string;
+  balanceCredit: string;
+  closingDebit: string;
+  closingCredit: string;
+  /** `الرصيد:` — the difference the window prints under the grid. */
+  balance: string;
+  /** `الحالة:` — `مدين` / `دائن`, empty when the two sides are square. */
+  status: string;
+  /** Whether the period's gross movement balances — the proof a trial balance is for. */
+  balanced: boolean;
+};
+
+/** 📊 أرباح وخسائر حسابات رئيسية — `Form_WPF/frmRptIncomeStatement.xaml`. */
+export type IncomeStatementQuery = {
+  from?: string;
+  to?: string;
+  branchId?: string;
+  /**
+   * `تجميعي` — one row per *parent* account, the way the window joins
+   * `Accounts_Index AS Parent` (`_Type == 1`, its default, and its title says
+   * «حسابات رئيسية»). `summary=0` keeps one row per account.
+   */
+  summary?: boolean;
+  /** `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ` — on by default, as in the window. */
+  withStock?: boolean;
+};
+
+export type IncomeStatementRow = {
+  kind: 'account' | 'stock' | 'profit';
+  code: string | null;
+  name: string;
+  debit: string;
+  credit: string;
+  /** `رصيد مدين` / `رصيد دائن` — the netted side, as the window places it. */
+  balanceDebit: string;
+  balanceCredit: string;
+  status: string;
+};
+
+export type IncomeStatementTotals = {
+  debit: string;
+  credit: string;
+  stock: string;
+  profit: string;
+  /** `صافي أرباح العام` or `صافي خسائر العام` — the window swaps the label, not the row. */
+  profitLabel: string;
+  balanced: boolean;
+  /** «✅ الحسابات متوازنة» — the window's own strap under the grid. */
+  balancedLabel: string;
 };
 
 /**
@@ -575,20 +726,186 @@ export class AccountingService {
     });
   }
 
-  async listPeriods(tenantId: string) {
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      tx.select().from(fiscalPeriods).where(eq(fiscalPeriods.tenantId, tenantId)),
-    );
+  /**
+   * 🗂️ إدارة الفترات المحاسبية — the grid of `Form_WPF/FrmAccountingPeriods.xaml`
+   * (`الرقم · اسم الفترة · تاريخ البداية · تاريخ النهاية · نشطة · مغلقة · أغلقت بواسطة ·
+   * تاريخ الإغلاق · ملاحظات`). `AccountingPeriodManager.GetAllPeriods` orders by
+   * `StartDate DESC`, and so does this.
+   */
+  async listPeriods(tenantId: string): Promise<FiscalPeriodRow[]> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
+        .select({
+          id: fiscalPeriods.id,
+          tenantId: fiscalPeriods.tenantId,
+          fiscalYearId: fiscalPeriods.fiscalYearId,
+          yearName: fiscalYears.name,
+          name: fiscalPeriods.name,
+          startDate: fiscalPeriods.startDate,
+          endDate: fiscalPeriods.endDate,
+          status: fiscalPeriods.status,
+          isActive: fiscalPeriods.isActive,
+          notes: fiscalPeriods.notes,
+          closedBy: fiscalPeriods.closedBy,
+          closedByName: users.fullName,
+          closedAt: fiscalPeriods.closedAt,
+          createdAt: fiscalPeriods.createdAt,
+        })
+        .from(fiscalPeriods)
+        .innerJoin(fiscalYears, eq(fiscalYears.id, fiscalPeriods.fiscalYearId))
+        .leftJoin(users, eq(users.id, fiscalPeriods.closedBy))
+        .where(eq(fiscalPeriods.tenantId, tenantId))
+        .orderBy(desc(fiscalPeriods.startDate), desc(fiscalPeriods.endDate));
+
+      /**
+       * `الرقم` — the window's `PeriodID` is an identity the operator never types, and the
+       * ordinal of the period inside its own fiscal year is the same promise: read-only,
+       * and stable as long as no date moves.
+       */
+      const byYear = new Map<string, string[]>();
+      for (const row of rows) byYear.set(row.fiscalYearId, [...(byYear.get(row.fiscalYearId) ?? []), row.id]);
+      const ordinal = new Map<string, number>();
+      for (const ids of byYear.values()) {
+        ids.reverse();
+        ids.forEach((id, index) => ordinal.set(id, index + 1));
+      }
+
+      return rows.map((row) => ({ ...row, number: ordinal.get(row.id) ?? 0 }));
+    });
   }
 
-  async closePeriod(tenantId: string, periodId: string) {
+  /**
+   * ➕ إضافة — `AccountingPeriodManager.AddPeriod`. Three refusals, all the window's own:
+   * an unnamed period («يرجى إدخال اسم الفترة المحاسبية»), an end that does not follow its
+   * start («تاريخ النهاية يجب أن يكون بعد تاريخ البداية») and a range another period
+   * already covers («يوجد تداخل في التواريخ مع فترة محاسبية أخرى»).
+   *
+   * The desktop has no fiscal years at all, so a year that covers the dates is resolved
+   * here — and opened when the tenant has none, because `fiscal_periods.fiscal_year_id` is
+   * not nullable and a first period must be addable on its own.
+   */
+  async createPeriod(tenantId: string, input: FiscalPeriodInput, actorId?: string): Promise<FiscalPeriodRow> {
+    const name = input.name?.trim();
+    if (!name) throw new DomainError('PERIOD_NAME_REQUIRED', 'يرجى إدخال اسم الفترة المحاسبية', 422);
+    if (!input.startDate || !input.endDate) {
+      throw new DomainError('PERIOD_DATES_REQUIRED', 'يرجى تحديد تاريخ البداية والنهاية', 422);
+    }
+    if (input.endDate <= input.startDate) {
+      throw new DomainError('PERIOD_DATES_INVALID', 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية', 422);
+    }
+
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      await this.assertNoOverlap(tx, tenantId, input.startDate, input.endDate);
+      const fiscalYearId = await this.resolveFiscalYearId(tx, tenantId, input.fiscalYearId, input.startDate, input.endDate);
+
+      if (input.isActive) await this.deactivateAll(tx, tenantId);
+
+      const id = newId();
+      await tx.insert(fiscalPeriods).values({
+        id,
+        tenantId,
+        fiscalYearId,
+        name,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        status: 'open',
+        isActive: input.isActive ?? false,
+        notes: input.notes?.trim() ? input.notes.trim() : null,
+        createdBy: actorId ?? null,
+      });
+      return this.periodCard(tx, tenantId, id);
+    });
+  }
+
+  /** ✏️ تعديل — «لا يمكن تعديل فترة مغلقة. يرجى إعادة فتحها أولاً». */
+  async updatePeriod(tenantId: string, periodId: string, patch: FiscalPeriodPatch, actorId?: string): Promise<FiscalPeriodRow> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)));
+      if (!period) throw new DomainError('NOT_FOUND', 'Fiscal period not found', 404);
+      if (period.status === 'closed') {
+        throw new DomainError('PERIOD_CLOSED', 'لا يمكن تعديل فترة مغلقة. يرجى إعادة فتحها أولاً', 409);
+      }
+
+      const name = patch.name?.trim() || period.name;
+      if (patch.name !== undefined && !patch.name.trim()) {
+        throw new DomainError('PERIOD_NAME_REQUIRED', 'يرجى إدخال اسم الفترة المحاسبية', 422);
+      }
+      const startDate = patch.startDate ?? period.startDate;
+      const endDate = patch.endDate ?? period.endDate;
+      if (!startDate || !endDate) throw new DomainError('PERIOD_DATES_REQUIRED', 'يرجى تحديد تاريخ البداية والنهاية', 422);
+      if (endDate <= startDate) {
+        throw new DomainError('PERIOD_DATES_INVALID', 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية', 422);
+      }
+      await this.assertNoOverlap(tx, tenantId, startDate, endDate, periodId);
+
+      if (patch.isActive === true) await this.deactivateAll(tx, tenantId);
+
+      await tx
+        .update(fiscalPeriods)
+        .set({
+          name,
+          startDate,
+          endDate,
+          isActive: patch.isActive ?? period.isActive,
+          notes: patch.notes === undefined ? period.notes : patch.notes?.trim() ? patch.notes.trim() : null,
+          updatedAt: new Date(),
+          updatedBy: actorId ?? null,
+        })
+        .where(eq(fiscalPeriods.id, periodId));
+      return this.periodCard(tx, tenantId, periodId);
+    });
+  }
+
+  /**
+   * 🗑️ حذف — «لا يمكن حذف فترة مغلقة». The desktop deletes the row and leaves its
+   * entries orphaned; here `journal_entries.fiscal_period_id` is `ON DELETE RESTRICT`, so
+   * a period with entries is refused with a sentence rather than a constraint violation.
+   */
+  async deletePeriod(tenantId: string, periodId: string): Promise<{ id: string; deleted: true }> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)));
+      if (!period) throw new DomainError('NOT_FOUND', 'Fiscal period not found', 404);
+      if (period.status === 'closed') throw new DomainError('PERIOD_CLOSED', 'لا يمكن حذف فترة مغلقة', 409);
+
+      const [entry] = await tx.select({ id: journalEntries.id }).from(journalEntries).where(and(eq(journalEntries.tenantId, tenantId), eq(journalEntries.fiscalPeriodId, periodId))).limit(1);
+      if (entry) throw new DomainError('PERIOD_IN_USE', 'لا يمكن حذف فترة لها قيود — ألغِ قيودها أولاً', 409);
+
+      await tx.delete(fiscalPeriods).where(eq(fiscalPeriods.id, periodId));
+      return { id: periodId, deleted: true } as const;
+    });
+  }
+
+  /** ⚡ تفعيل — «لا يمكن تفعيل فترة محاسبية مغلقة»; activating one deactivates the rest. */
+  async activatePeriod(tenantId: string, periodId: string): Promise<FiscalPeriodRow> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)));
+      if (!period) throw new DomainError('NOT_FOUND', 'Fiscal period not found', 404);
+      if (period.status === 'closed') {
+        throw new DomainError('PERIOD_CLOSED', 'لا يمكن تفعيل فترة محاسبية مغلقة', 409);
+      }
+      await this.deactivateAll(tx, tenantId);
+      await tx.update(fiscalPeriods).set({ isActive: true, updatedAt: new Date() }).where(eq(fiscalPeriods.id, periodId));
+      return this.periodCard(tx, tenantId, periodId);
+    });
+  }
+
+  async closePeriod(tenantId: string, periodId: string, actorId?: string) {
     await withTenantTx(this.database.db, tenantId, async (tx) => {
       const [period] = await tx.select().from(fiscalPeriods).where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)));
       if (!period) throw new Error('Fiscal period not found');
       if (period.status === 'closed') return;
       const [draft] = await tx.select({ id: journalEntries.id }).from(journalEntries).where(and(eq(journalEntries.tenantId, tenantId), eq(journalEntries.fiscalPeriodId, periodId), eq(journalEntries.status, 'draft'))).limit(1);
       if (draft) throw new Error('Fiscal period contains draft journals');
-      await tx.update(fiscalPeriods).set({ status: 'closed', closedAt: new Date() }).where(eq(fiscalPeriods.id, periodId));
+      /**
+       * 🔒 إغلاق الفترة — `AccountingPeriodManager.ClosePeriod` sets
+       * `IsClosed = 1, ClosedBy = @User, ClosedDate = @Date, IsActive = 0`: a closed period
+       * is never the active one, which is what the window assumes and the partial unique
+       * index on `is_active` cannot say on its own.
+       */
+      await tx
+        .update(fiscalPeriods)
+        .set({ status: 'closed', closedAt: new Date(), closedBy: actorId ?? null, isActive: false })
+        .where(eq(fiscalPeriods.id, periodId));
     });
   }
 
@@ -599,6 +916,112 @@ export class AccountingService {
       if (!period) throw new Error('Fiscal period not found');
       await tx.update(fiscalPeriods).set({ status: 'open', closedAt: null, closedBy: null }).where(eq(fiscalPeriods.id, periodId));
     });
+  }
+
+  private async periodCard(tx: DrizzleTx, tenantId: string, periodId: string): Promise<FiscalPeriodRow> {
+    const rows = await tx
+      .select({
+        id: fiscalPeriods.id,
+        tenantId: fiscalPeriods.tenantId,
+        fiscalYearId: fiscalPeriods.fiscalYearId,
+        yearName: fiscalYears.name,
+        name: fiscalPeriods.name,
+        startDate: fiscalPeriods.startDate,
+        endDate: fiscalPeriods.endDate,
+        status: fiscalPeriods.status,
+        isActive: fiscalPeriods.isActive,
+        notes: fiscalPeriods.notes,
+        closedBy: fiscalPeriods.closedBy,
+        closedByName: users.fullName,
+        closedAt: fiscalPeriods.closedAt,
+        createdAt: fiscalPeriods.createdAt,
+      })
+      .from(fiscalPeriods)
+      .innerJoin(fiscalYears, eq(fiscalYears.id, fiscalPeriods.fiscalYearId))
+      .leftJoin(users, eq(users.id, fiscalPeriods.closedBy))
+      .where(and(eq(fiscalPeriods.id, periodId), eq(fiscalPeriods.tenantId, tenantId)))
+      .limit(1);
+    const [row] = rows;
+    if (!row) throw new DomainError('NOT_FOUND', 'Fiscal period not found', 404);
+
+    const siblings = await tx
+      .select({ id: fiscalPeriods.id })
+      .from(fiscalPeriods)
+      .where(and(eq(fiscalPeriods.tenantId, tenantId), eq(fiscalPeriods.fiscalYearId, row.fiscalYearId)))
+      .orderBy(asc(fiscalPeriods.startDate), asc(fiscalPeriods.endDate));
+    return { ...row, number: siblings.findIndex((sibling) => sibling.id === row.id) + 1 };
+  }
+
+  /** «يوجد تداخل في التواريخ مع فترة محاسبية أخرى» — `CheckDateOverlap`. */
+  private async assertNoOverlap(tx: DrizzleTx, tenantId: string, startDate: string, endDate: string, excludeId?: string): Promise<void> {
+    const [clash] = await tx
+      .select({ id: fiscalPeriods.id })
+      .from(fiscalPeriods)
+      .where(
+        and(
+          eq(fiscalPeriods.tenantId, tenantId),
+          excludeId ? sql`${fiscalPeriods.id} <> ${excludeId}` : undefined,
+          lte(fiscalPeriods.startDate, endDate),
+          gte(fiscalPeriods.endDate, startDate),
+        ),
+      )
+      .limit(1);
+    if (clash) {
+      throw new DomainError('PERIOD_OVERLAP', 'يوجد تداخل في التواريخ مع فترة محاسبية أخرى', 409);
+    }
+  }
+
+  private async deactivateAll(tx: DrizzleTx, tenantId: string): Promise<void> {
+    await tx.update(fiscalPeriods).set({ isActive: false }).where(eq(fiscalPeriods.tenantId, tenantId));
+  }
+
+  /**
+   * The desktop stores periods with no year at all. Here a period belongs to one, so the
+   * year is found — or opened for the period's own calendar year, which is what makes
+   * ➕ إضافة usable before anyone has thought about a fiscal year.
+   */
+  private async resolveFiscalYearId(
+    tx: DrizzleTx,
+    tenantId: string,
+    fiscalYearId: string | undefined,
+    startDate: string,
+    endDate: string,
+  ): Promise<string> {
+    if (fiscalYearId) {
+      const [year] = await tx.select().from(fiscalYears).where(and(eq(fiscalYears.id, fiscalYearId), eq(fiscalYears.tenantId, tenantId))).limit(1);
+      if (!year) throw new DomainError('FISCAL_YEAR_NOT_FOUND', 'السنة المالية غير موجودة', 404);
+      if (year.startDate > startDate || year.endDate < endDate) {
+        throw new DomainError('PERIOD_OUTSIDE_YEAR', `الفترة خارج نطاق السنة المالية «${year.name}»`, 422);
+      }
+      return year.id;
+    }
+
+    const [covering] = await tx
+      .select({ id: fiscalYears.id })
+      .from(fiscalYears)
+      .where(and(eq(fiscalYears.tenantId, tenantId), lte(fiscalYears.startDate, startDate), gte(fiscalYears.endDate, endDate)))
+      .orderBy(desc(fiscalYears.startDate))
+      .limit(1);
+    if (covering) return covering.id;
+
+    const year = startDate.slice(0, 4);
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+    if (yearEnd < endDate) {
+      throw new DomainError('FISCAL_YEAR_NOT_FOUND', 'لا توجد سنة مالية تغطي هذه الفترة — أنشئ سنة مالية أولاً', 422);
+    }
+    const [clash] = await tx
+      .select({ id: fiscalYears.id })
+      .from(fiscalYears)
+      .where(and(eq(fiscalYears.tenantId, tenantId), lte(fiscalYears.startDate, yearEnd), gte(fiscalYears.endDate, yearStart)))
+      .limit(1);
+    if (clash) {
+      throw new DomainError('FISCAL_YEAR_NOT_FOUND', 'لا توجد سنة مالية تغطي هذه الفترة — أنشئ سنة مالية أولاً', 422);
+    }
+
+    const id = newId();
+    await tx.insert(fiscalYears).values({ id, tenantId, name: year, startDate: yearStart, endDate: yearEnd, status: 'open' });
+    return id;
   }
 
   async reverseJournal(tenantId: string, entryId: string, input: { branchId: string; fiscalPeriodId: string; date: string; reason: string }) {
@@ -652,22 +1075,350 @@ export class AccountingService {
     });
   }
 
-  async trialBalance(tenantId: string) {
+  /**
+   * ⚖️ ميزان المراجعة — `Form_WPF/frmRptBalances.xaml` («أرصدة الحسابات») printing
+   * `Reports/rptAccountBalance.repx`, whose columns are `رقم الحساب · اسم الحساب ·
+   * افتتاحي (مدين/دائن) · خلال الفترة المحددة (مدين/دائن) · ختامي (مدين/دائن) · الحالة`.
+   *
+   * The window runs two queries — movements over the period, and the opening entries
+   * (`Entry.type = 0`) — then builds each row with `ShowResult`:
+   *
+   *     deptBlc     = max(dept − credit, 0)          — the period's own net, on its side
+   *     creditBlc   = max(credit − dept, 0)
+   *     deptFinal   = deptInit + deptBlc             — and the same again for the closing
+   *     creditFinal = creditInit + creditBlc
+   *
+   * — each of the last two netted once more before it is placed. This is the arithmetic
+   * the cloud now runs too, so the number under `رصيد ختامي مدين` here is the number the
+   * desktop prints.
+   *
+   * `رصيد افتتاحي` is what is on the books before `من`: the posted movement before that
+   * date **plus** 💰 الرصيد الافتتاحي of the account card (migration 0045), which is money
+   * recorded before the first entry. With no `من` there is no "before", so everything is
+   * movement — which is also exactly what this endpoint returned when it took no period.
+   *
+   * Only posted entries count (`Entry.state = 1`), as everywhere else in this module.
+   */
+  async trialBalance(tenantId: string, query: TrialBalanceQuery = {}): Promise<{ rows: TrialBalanceRow[]; totals: TrialBalanceTotals }> {
     return withTenantTx(this.database.db, tenantId, async (tx) => {
-      const rows = await tx.select({ accountId: journalEntryLines.accountId, debit: journalEntryLines.debit, credit: journalEntryLines.credit })
+      /** No `from` means there is nothing before the period; no `to` means it never ends. */
+      const from = query.from ?? '0001-01-01';
+      const to = query.to ?? '9999-12-31';
+
+      let inBranch;
+      if (query.parentId) {
+        const [parent] = await tx
+          .select({ path: accounts.path })
+          .from(accounts)
+          .where(and(eq(accounts.id, query.parentId), eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)))
+          .limit(1);
+        if (!parent) throw new DomainError('NOT_FOUND', 'Account not found', 404);
+        inBranch = sql`${accounts.path} <@ ${parent.path}::ltree`;
+      }
+
+      const movement = await tx
+        .select({
+          accountId: journalEntryLines.accountId,
+          openingDebit: sql<string>`COALESCE(SUM(CASE WHEN ${journalEntries.date} < ${from} THEN ${journalEntryLines.debit} ELSE 0 END), 0)::text`,
+          openingCredit: sql<string>`COALESCE(SUM(CASE WHEN ${journalEntries.date} < ${from} THEN ${journalEntryLines.credit} ELSE 0 END), 0)::text`,
+          debit: sql<string>`COALESCE(SUM(CASE WHEN ${journalEntries.date} >= ${from} AND ${journalEntries.date} <= ${to} THEN ${journalEntryLines.debit} ELSE 0 END), 0)::text`,
+          credit: sql<string>`COALESCE(SUM(CASE WHEN ${journalEntries.date} >= ${from} AND ${journalEntries.date} <= ${to} THEN ${journalEntryLines.credit} ELSE 0 END), 0)::text`,
+        })
         .from(journalEntryLines)
         .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
-        .where(and(eq(journalEntryLines.tenantId, tenantId), eq(journalEntries.status, 'posted')));
-      const totals = new Map<string, { debit: Decimal; credit: Decimal }>();
-      for (const row of rows) {
-        const current = totals.get(row.accountId) ?? { debit: new Decimal(0), credit: new Decimal(0) };
-        current.debit = current.debit.plus(row.debit);
-        current.credit = current.credit.plus(row.credit);
-        totals.set(row.accountId, current);
+        .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+        .where(
+          and(
+            eq(journalEntryLines.tenantId, tenantId),
+            eq(journalEntries.status, 'posted'),
+            query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+            query.fiscalPeriodId ? eq(journalEntries.fiscalPeriodId, query.fiscalPeriodId) : undefined,
+            query.salesmanId ? eq(journalEntryLines.salesmanId, query.salesmanId) : undefined,
+            inBranch,
+          ),
+        )
+        .groupBy(journalEntryLines.accountId);
+
+      const cards = await tx
+        .select({
+          id: accounts.id,
+          code: accounts.code,
+          nameAr: accounts.nameAr,
+          type: accounts.type,
+          normalBalance: accounts.normalBalance,
+          openingBalance: accounts.openingBalance,
+        })
+        .from(accounts)
+        .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt), inBranch));
+      const card = new Map(cards.map((row) => [row.id, row]));
+
+      /**
+       * An account with 💰 الرصيد الافتتاحي and no entry yet has money nobody can see; a
+       * ميزان that leaves it out does not balance. So the opening alone is enough to put a
+       * row on the report.
+       */
+      const openingOnly = cards
+        .filter((row) => money(row.openingBalance).isZero() === false && !movement.some((line) => line.accountId === row.id))
+        .map((row) => ({ accountId: row.id, openingDebit: '0', openingCredit: '0', debit: '0', credit: '0' }));
+
+      const rows: TrialBalanceRow[] = [];
+      const totals = {
+        openingDebit: new Decimal(0),
+        openingCredit: new Decimal(0),
+        debit: new Decimal(0),
+        credit: new Decimal(0),
+        balanceDebit: new Decimal(0),
+        balanceCredit: new Decimal(0),
+        closingDebit: new Decimal(0),
+        closingCredit: new Decimal(0),
+      };
+
+      for (const line of [...movement, ...openingOnly]) {
+        const account = card.get(line.accountId);
+        if (!account) continue;
+        const debitNature = (account.normalBalance ?? defaultNormalBalance(account.type as AccountType)) !== 'credit';
+
+        const openingDebit = money(line.openingDebit).plus(debitNature ? money(account.openingBalance) : 0);
+        const openingCredit = money(line.openingCredit).plus(debitNature ? 0 : money(account.openingBalance));
+        const debit = money(line.debit);
+        const credit = money(line.credit);
+
+        const moved = debit.minus(credit);
+        const balanceDebit = moved.isPositive() ? moved : new Decimal(0);
+        const balanceCredit = moved.isNegative() ? moved.negated() : new Decimal(0);
+
+        const closed = openingDebit.minus(openingCredit).plus(moved);
+        const closingDebit = closed.isPositive() ? closed : new Decimal(0);
+        const closingCredit = closed.isNegative() ? closed.negated() : new Decimal(0);
+
+        rows.push({
+          accountId: line.accountId,
+          code: account.code,
+          name: account.nameAr,
+          type: account.type,
+          normalBalance: account.normalBalance ?? null,
+          openingDebit: openingDebit.toFixed(4),
+          openingCredit: openingCredit.toFixed(4),
+          debit: debit.toFixed(4),
+          credit: credit.toFixed(4),
+          balanceDebit: balanceDebit.toFixed(4),
+          balanceCredit: balanceCredit.toFixed(4),
+          closingDebit: closingDebit.toFixed(4),
+          closingCredit: closingCredit.toFixed(4),
+          balance: moved.toFixed(4),
+          closing: closed.toFixed(4),
+          status: statusOf(closed),
+        });
+
+        totals.openingDebit = totals.openingDebit.plus(openingDebit);
+        totals.openingCredit = totals.openingCredit.plus(openingCredit);
+        totals.debit = totals.debit.plus(debit);
+        totals.credit = totals.credit.plus(credit);
+        totals.balanceDebit = totals.balanceDebit.plus(balanceDebit);
+        totals.balanceCredit = totals.balanceCredit.plus(balanceCredit);
+        totals.closingDebit = totals.closingDebit.plus(closingDebit);
+        totals.closingCredit = totals.closingCredit.plus(closingCredit);
       }
-      // eslint-disable-next-line no-restricted-syntax
-      return [...totals.entries()].map(([accountId, total]) => ({ accountId, debit: total.debit.toFixed(4), credit: total.credit.toFixed(4), balance: total.debit.minus(total.credit).toFixed(4) }));
+
+      rows.sort((left, right) => left.code.localeCompare(right.code));
+
+      const net = totals.closingDebit.minus(totals.closingCredit);
+      return {
+        rows,
+        totals: {
+          openingDebit: totals.openingDebit.toFixed(4),
+          openingCredit: totals.openingCredit.toFixed(4),
+          debit: totals.debit.toFixed(4),
+          credit: totals.credit.toFixed(4),
+          balanceDebit: totals.balanceDebit.toFixed(4),
+          balanceCredit: totals.balanceCredit.toFixed(4),
+          closingDebit: totals.closingDebit.toFixed(4),
+          closingCredit: totals.closingCredit.toFixed(4),
+          /** `الرصيد:` — what the two closing columns differ by, never negative. */
+          balance: net.abs().toFixed(4),
+          status: net.isZero() ? '' : statusOf(net),
+          /**
+           * The point of a ميزان: every entry is balanced, so the period's gross movement
+           * must balance too. A netted total does not — that number is `balance` above.
+           */
+          balanced: totals.debit.minus(totals.credit).abs().lessThan(0.005),
+        },
+      };
     });
+  }
+
+  /**
+   * 📊 أرباح وخسائر حسابات رئيسية — `Form_WPF/frmRptIncomeStatement.xaml` over
+   * `Reports/RptIncomeStatement.repx`. Its grid is
+   * `الحساب · اسم الحساب · رصيد مدين · رصيد دائن`, and under it three rows:
+   * `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ`, `صافي أرباح العام` (or `صافي خسائر
+   * العام`) and «✅ الحسابات متوازنة».
+   *
+   * Which accounts? `ShowResult` filters `Accounts_Index.FinalAcc = 2`, and
+   * `frmAccountsTree.xaml.cs` `DetermineFinalAccount()` is what writes that column:
+   * a code starting `1` or `2` is ميزانية, `3` or `4` is قائمة الدخل. The cloud names the
+   * same two classes `revenue` and `expense`, so that is the filter here.
+   *
+   * Then the window walks each account up to its parent (`_Type == 1`, the default, and
+   * the title says «حسابات رئيسية») and merges rows with the same parent, which is what
+   * `summary` does. `رصيد مدين`/`رصيد دائن` are the raw net of the movement, on whichever
+   * side it lands — an expense is debit, revenue is credit, and no nature is assumed.
+   *
+   * Closing stock is added to the **credit** side (`CalcStockCost`, `_FormType == 1`) and
+   * the profit is the plug that makes the two columns meet.
+   */
+  async incomeStatement(tenantId: string, query: IncomeStatementQuery = {}): Promise<{ rows: IncomeStatementRow[]; totals: IncomeStatementTotals }> {
+    const summary = query.summary !== false;
+    const withStock = query.withStock !== false;
+
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const from = query.from ?? '0001-01-01';
+      const to = query.to ?? '9999-12-31';
+
+      const movements = await tx
+        .select({
+          accountId: journalEntryLines.accountId,
+          debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+          credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+        })
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+        .where(
+          and(
+            eq(journalEntryLines.tenantId, tenantId),
+            eq(journalEntries.status, 'posted'),
+            gte(journalEntries.date, from),
+            lte(journalEntries.date, to),
+            query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+            inArray(accounts.type, ['revenue', 'expense']),
+          ),
+        )
+        .groupBy(journalEntryLines.accountId);
+
+      const cards = await tx
+        .select({
+          id: accounts.id,
+          code: accounts.code,
+          nameAr: accounts.nameAr,
+          parentId: accounts.parentId,
+          type: accounts.type,
+        })
+        .from(accounts)
+        .where(and(eq(accounts.tenantId, tenantId), isNull(accounts.deletedAt)));
+      const card = new Map(cards.map((row) => [row.id, row]));
+
+      /** تجميعي — the parent account, exactly the `JOIN Accounts_Index AS Parent` of the window. */
+      type IncomeHead = { code: string; name: string; debit: Decimal; credit: Decimal };
+      const head = new Map<string, IncomeHead>();
+      for (const line of movements) {
+        const account = card.get(line.accountId);
+        if (!account) continue;
+        const parent = summary && account.parentId ? card.get(account.parentId) : undefined;
+        const shown = parent ?? account;
+        const current = head.get(shown.id) ?? { code: shown.code, name: shown.nameAr, debit: new Decimal(0), credit: new Decimal(0) };
+        current.debit = current.debit.plus(money(line.debit));
+        current.credit = current.credit.plus(money(line.credit));
+        head.set(shown.id, current);
+      }
+
+      const rows: IncomeStatementRow[] = [];
+      let totalDebit = new Decimal(0);
+      let totalCredit = new Decimal(0);
+
+      for (const line of [...head.values()].sort((left, right) => left.code.localeCompare(right.code))) {
+        const net = line.debit.minus(line.credit);
+        const balanceDebit = net.isPositive() ? net : new Decimal(0);
+        const balanceCredit = net.isNegative() ? net.negated() : new Decimal(0);
+        totalDebit = totalDebit.plus(balanceDebit);
+        totalCredit = totalCredit.plus(balanceCredit);
+        rows.push({
+          kind: 'account',
+          code: line.code,
+          name: line.name,
+          debit: line.debit.toFixed(4),
+          credit: line.credit.toFixed(4),
+          balanceDebit: balanceDebit.toFixed(4),
+          balanceCredit: balanceCredit.toFixed(4),
+          status: statusOf(net),
+        });
+      }
+
+      /**
+       * `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ` — `Inventory.InventoryCost(branch, date)`
+       * in the desktop. Here it is the same sum over `inventory_transactions`: everything
+       * in, minus everything out, up to the end of the period.
+       */
+      const stock = withStock ? await this.stockValueAt(tx, tenantId, to, query.branchId) : new Decimal(0);
+      if (withStock) {
+        const onDebit = stock.isNegative();
+        rows.push({
+          kind: 'stock',
+          code: null,
+          name: 'قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ',
+          debit: onDebit ? stock.abs().toFixed(4) : '0.0000',
+          credit: onDebit ? '0.0000' : stock.toFixed(4),
+          balanceDebit: onDebit ? stock.abs().toFixed(4) : '0.0000',
+          balanceCredit: onDebit ? '0.0000' : stock.toFixed(4),
+          status: statusOf(stock),
+        });
+        if (onDebit) totalDebit = totalDebit.plus(stock.abs());
+        else totalCredit = totalCredit.plus(stock);
+      }
+
+      const profitIsCredit = totalCredit.greaterThanOrEqualTo(totalDebit);
+      const profit = profitIsCredit ? totalCredit.minus(totalDebit) : totalDebit.minus(totalCredit);
+      const profitLabel = profitIsCredit ? 'صافي أرباح العام' : 'صافي خسائر العام';
+      rows.push({
+        kind: 'profit',
+        code: null,
+        name: profitLabel,
+        debit: profitIsCredit ? profit.toFixed(4) : '0.0000',
+        credit: profitIsCredit ? '0.0000' : profit.toFixed(4),
+        balanceDebit: profitIsCredit ? profit.toFixed(4) : '0.0000',
+        balanceCredit: profitIsCredit ? '0.0000' : profit.toFixed(4),
+        status: statusOf(profitIsCredit ? profit : profit.negated()),
+      });
+      if (profitIsCredit) totalDebit = totalDebit.plus(profit);
+      else totalCredit = totalCredit.plus(profit);
+
+      return {
+        rows,
+        totals: {
+          debit: totalDebit.toFixed(4),
+          credit: totalCredit.toFixed(4),
+          stock: stock.toFixed(4),
+          profit: profit.toFixed(4),
+          profitLabel,
+          balanced: totalDebit.minus(totalCredit).abs().lessThan(0.005),
+          balancedLabel: '✅ الحسابات متوازنة',
+        },
+      };
+    });
+  }
+
+  /**
+   * `Inventory.InventoryCost(branch, date)` — the stock on hand at the end of the period,
+   * valued at what it cost to put there. Kept here rather than borrowed from
+   * `InventoryService` because that service depends on this one; the sum is the same four
+   * lines either way.
+   */
+  private async stockValueAt(tx: DrizzleTx, tenantId: string, to: string, branchId?: string): Promise<Decimal> {
+    const asOf = to >= '9999-12-31' ? new Date().toISOString() : `${to}T23:59:59.999Z`;
+    const [row] = await tx
+      .select({
+        value: sql<string>`COALESCE(SUM(CASE WHEN ${inventoryTransactions.direction} = 'in' THEN ${inventoryTransactions.totalCost} ELSE ${inventoryTransactions.totalCost} * -1 END), 0)::text`,
+      })
+      .from(inventoryTransactions)
+      .innerJoin(warehouses, eq(warehouses.id, inventoryTransactions.warehouseId))
+      .where(
+        and(
+          eq(inventoryTransactions.tenantId, tenantId),
+          lte(inventoryTransactions.occurredAt, new Date(asOf)),
+          branchId ? eq(warehouses.branchId, branchId) : undefined,
+        ),
+      );
+    return money(row?.value);
   }
 
   /**
