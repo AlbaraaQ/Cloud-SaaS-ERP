@@ -17,6 +17,7 @@ import {
   type PayRunInput,
   type PostRunInput,
   type RunInput,
+  type SalaryPaymentInput,
 } from './hrm.service.js';
 
 @Controller('hrm')
@@ -54,5 +55,18 @@ export class HrmController {
   @Get('payroll/runs/:id') @RequiresPermission('hrm.view') readRun(@Param('id') id: string) { return this.hrm.readRun(getTenantContext().tenantId, id); }
   @Post('payroll/runs/:id/post') @RequiresPermission('hrm.payroll.post') postRun(@Param('id') id: string, @Body() body: PostRunInput) { return this.hrm.postRun(getTenantContext().tenantId, id, body); }
   @Post('payroll/runs/:id/pay') @RequiresPermission('hrm.payroll.post') payRun(@Param('id') id: string, @Body() body: PayRunInput) { return this.hrm.payRun(getTenantContext().tenantId, id, body); }
+  /** 💵 دفع الرواتب — `frmSalaryPay` «إذن صرف راتب»: one document per employee per month. */
+  @Get('salary-payments') @RequiresPermission('hrm.view') salaryPayments(
+    @Query('employee_id') employeeId?: string,
+    @Query('year_month') yearMonth?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('method') method?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('number') number?: string,
+  ) { return this.hrm.listSalaryPayments(getTenantContext().tenantId, { employeeId, yearMonth, branchId, method, from, to, number }); }
+  @Get('salary-payments/:id') @RequiresPermission('hrm.view') readSalaryPayment(@Param('id') id: string) { return this.hrm.readSalaryPayment(getTenantContext().tenantId, id); }
+  @Post('salary-payments') @RequiresPermission('hrm.payroll.post') createSalaryPayment(@Body() body: SalaryPaymentInput) { return this.hrm.createSalaryPayment(getTenantContext().tenantId, body); }
+  @Delete('salary-payments/:id') @RequiresPermission('hrm.payroll.post') deleteSalaryPayment(@Param('id') id: string) { return this.hrm.deleteSalaryPayment(getTenantContext().tenantId, id); }
   @Post('payroll/runs/:id/reverse') @RequiresPermission('hrm.payroll.post') reverseRun(@Param('id') id: string, @Body() body: { reason: string }) { return this.hrm.reverseRun(getTenantContext().tenantId, id, body.reason); }
 }

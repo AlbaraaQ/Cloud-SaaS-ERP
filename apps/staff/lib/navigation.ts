@@ -875,6 +875,12 @@ const hrm: ModuleNode = {
         screen('payroll-run', 'إستحقاق وصرف الرواتب', 'Payroll run and payment', '/hrm/payroll', 'ready', {
           endpoint: '/hrm/payroll/runs',
         }),
+        // 💵 `Form_WPF/frmSalaryPay.xaml` «دفع الرواتب» — one إذن صرف per employee per
+        // month. The row under «التقارير» with the same name is the report
+        // (`frmRptSalary`); the window itself belongs here, next to the مسيّر it pays.
+        screen('salary-payments', 'دفع الرواتب', 'Salary payment', '/hrm/salary-payments', 'ready', {
+          endpoint: '/hrm/salary-payments',
+        }),
       ],
     },
     {
@@ -884,8 +890,8 @@ const hrm: ModuleNode = {
       items: [
         screen(
           'salary-payments-report',
-          'دفع الرواتب',
-          'Salary payments',
+          'تقرير الرواتب',
+          'Payroll report',
           '/reports/payroll-payments',
           'ready',
           { permission: 'reporting.view' },

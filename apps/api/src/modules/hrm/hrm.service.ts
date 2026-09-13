@@ -8,6 +8,7 @@ import { DomainError, newId } from '@erp/contracts';
 import {
   accounts,
   attendanceLogs,
+  branches,
   cashLocations,
   departments,
   employees,
@@ -16,6 +17,8 @@ import {
   payrollRuns,
   salaryAdjustments,
   salaryAdjustmentTypes,
+  salaryPayments,
+  vouchers,
   tenantSettings,
   withTenantTx,
   type DatabaseHandle,
@@ -110,6 +113,40 @@ export type AdjustmentQuery = { employeeId?: string; typeCode?: string; status?:
 export type RunInput = { yearMonth: string; periodId?: string; currency?: string; unpaidDaysByEmployee?: Record<string, number> };
 export type PostRunInput = { journalEntryId?: string; branchId?: string; fiscalPeriodId?: string; journalLines?: JournalLineInput[] };
 export type PayRunInput = { branchId: string; cashLocationId: string; method?: 'cash' | 'cheque' | 'bank_transfer' | 'card'; fiscalPeriodId?: string };
+
+/**
+ * 💵 إذن صرف راتب — `frmSalaryPay.xaml` «💰 دفع الرواتب».
+ *
+ * `yearMonth` is the window's two combo boxes «الشهر» and «السنة» in one `YYYY-MM` key;
+ * `method` is `rdCash` «نقدي» or `rdBank` «تحويل بنكي».
+ */
+export type SalaryPaymentInput = {
+  employeeId: string;
+  yearMonth: string;
+  paymentDate: string;
+  /** الفرع — «يجب اختيار الفرع.» */
+  branchId?: string;
+  /** 📊 عرض الراتب — the مسيّر this إذن pays, when it pays one. */
+  runId?: string;
+  method?: 'cash' | 'bank';
+  cashLocationId?: string;
+  /** 👤 اسم الموظف المسؤول — the employee record of whoever signs the إذن. */
+  responsibleEmployeeId?: string;
+  notes?: string;
+  unpaidDays?: number;
+  fiscalPeriodId?: string;
+  /** Money moves at once unless this is `false` — the desktop always pays on save. */
+  postVoucher?: boolean;
+};
+export type SalaryPaymentQuery = {
+  employeeId?: string;
+  yearMonth?: string;
+  branchId?: string;
+  method?: string;
+  from?: string;
+  to?: string;
+  number?: string;
+};
 
 /** `Departments.manag_id` — the إدارة above a قسم, joined under a second name. */
 const management = alias(departments, 'management');
@@ -679,6 +716,245 @@ export class HrmService {
     return { id, deleted: true };
   }
 
+  /**
+   * 💵 «🔍 البحث» — `LoadDG` prints `رقم الإذن · 👤 الموظف · 💰 المبلغ · الشهر · السنة ·
+   * 📅 التاريخ · المستخدم` and narrows it by «رقم الإذن», by «الموظف», and by
+   * `من تاريخ`/`إلى تاريخ` unless «كل الفترة» (`chkall`) is on.
+   */
+  async listSalaryPayments(tenantId: string, query: SalaryPaymentQuery = {}) {
+    await this.ensureEnabled(tenantId);
+    const responsible = alias(employees, 'responsible');
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({
+          row: salaryPayments,
+          employeeName: employees.name,
+          employeeNo: employees.employeeNo,
+          branchName: branches.nameAr,
+          cashLocationName: cashLocations.name,
+          responsibleName: responsible.name,
+          voucherNumber: vouchers.number,
+          voucherStatus: vouchers.status,
+        })
+        .from(salaryPayments)
+        .leftJoin(employees, eq(employees.id, salaryPayments.employeeId))
+        .leftJoin(branches, eq(branches.id, salaryPayments.branchId))
+        .leftJoin(cashLocations, eq(cashLocations.id, salaryPayments.cashLocationId))
+        .leftJoin(responsible, eq(responsible.id, salaryPayments.responsibleEmployeeId))
+        .leftJoin(vouchers, eq(vouchers.id, salaryPayments.voucherId))
+        .where(
+          and(
+            eq(salaryPayments.tenantId, tenantId),
+            isNull(salaryPayments.deletedAt),
+            query.employeeId ? eq(salaryPayments.employeeId, query.employeeId) : undefined,
+            query.yearMonth ? eq(salaryPayments.yearMonth, query.yearMonth) : undefined,
+            query.branchId ? eq(salaryPayments.branchId, query.branchId) : undefined,
+            query.method ? eq(salaryPayments.method, query.method) : undefined,
+            query.number ? eq(salaryPayments.number, query.number) : undefined,
+            query.from ? gte(salaryPayments.paymentDate, query.from) : undefined,
+            query.to ? lte(salaryPayments.paymentDate, query.to) : undefined,
+          ),
+        )
+        .orderBy(desc(salaryPayments.paymentDate), desc(salaryPayments.createdAt))
+        .limit(200));
+    return {
+      data: rows.map((entry) => {
+        const [year, month] = entry.row.yearMonth.split('-');
+        return {
+          ...entry.row,
+          month: month ?? '',
+          year: year ?? '',
+          employeeName: entry.employeeName ?? null,
+          employeeNo: entry.employeeNo ?? null,
+          branchName: entry.branchName ?? null,
+          cashLocationName: entry.cashLocationName ?? null,
+          responsibleName: entry.responsibleName ?? null,
+          voucherNumber: entry.voucherNumber ?? null,
+          voucherStatus: entry.voucherStatus ?? null,
+        };
+      }),
+    };
+  }
+
+  async readSalaryPayment(tenantId: string, id: string) {
+    await this.ensureEnabled(tenantId);
+    const { data } = await this.listSalaryPayments(tenantId);
+    const row = data.find((entry) => entry.id === id);
+    if (!row) throw new DomainError('NOT_FOUND', 'Salary payment not found', 404);
+    return row;
+  }
+
+  /**
+   * 💵 «💾 حفظ» — `btnSave_Click`.
+   *
+   * The window refuses three things before it writes («يجب اختيار الفرع.» ·
+   * «يجب اختيار الموظف.» · «يجب اختيار الصندوق.»), refuses a second إذن for the same
+   * employee and month («لقد تم دفع راتب الموظف سابقاً.» L470), refuses a صندوق with no
+   * account behind it («لم يتم العثور على الحساب المقابل للصندوق.» L486), and «📊 عرض
+   * الراتب» refuses an employee with nothing due («لا يوجد رواتب مستحقة للموظف.» L321).
+   *
+   * What it pays is the month's مسيّر: the run line when `runId` is given, otherwise the
+   * employee's own components plus every approved حركة of that month — the same
+   * arithmetic `POST /hrm/payroll/preview` prints, so an إذن cannot pay a number the
+   * مسيّر disagrees with. `الصافي` is `RecalcNet` L340:
+   * `الراتب الأساسي + بدل سكن + بدل مواصلات + الحوافز − الخصومات`, and the four
+   * allowances the window has no box for ride in `otherAllowances`.
+   */
+  async createSalaryPayment(tenantId: string, input: SalaryPaymentInput) {
+    await this.ensureEnabled(tenantId);
+    const [employee] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(employees).where(and(eq(employees.tenantId, tenantId), eq(employees.id, input.employeeId), isNull(employees.deletedAt))).limit(1));
+    if (!employee) throw new DomainError('SALARY_PAYMENT_EMPLOYEE_REQUIRED', 'يجب اختيار الموظف.', 422);
+
+    if (!input.branchId) throw new DomainError('SALARY_PAYMENT_BRANCH_REQUIRED', 'يجب اختيار الفرع.', 422);
+    const [branch] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select({ id: branches.id }).from(branches).where(and(eq(branches.tenantId, tenantId), eq(branches.id, input.branchId!))).limit(1));
+    if (!branch) throw new DomainError('SALARY_PAYMENT_BRANCH_REQUIRED', 'يجب اختيار الفرع.', 422);
+
+    if (!input.cashLocationId) throw new DomainError('SALARY_PAYMENT_CASH_LOCATION_REQUIRED', 'يجب اختيار الصندوق.', 422);
+    const [location] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(cashLocations).where(and(eq(cashLocations.tenantId, tenantId), eq(cashLocations.id, input.cashLocationId!))).limit(1));
+    if (!location) throw new DomainError('SALARY_PAYMENT_CASH_LOCATION_REQUIRED', 'يجب اختيار الصندوق.', 422);
+    // «لم يتم العثور على الحساب المقابل للصندوق.» — money cannot leave what has no account.
+    if (!location.accountId) throw new DomainError('SALARY_PAYMENT_CASH_ACCOUNT_REQUIRED', 'لم يتم العثور على الحساب المقابل للصندوق.', 422);
+
+    const method = input.method ?? (location.kind === 'bank' ? 'bank' : 'cash');
+    if ((location.kind === 'bank') !== (method === 'bank')) {
+      throw new DomainError('SALARY_PAYMENT_METHOD_MISMATCH', 'طريقة الدفع لا تطابق الصندوق أو البنك المختار', 422);
+    }
+
+    const [duplicate] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select({ id: salaryPayments.id }).from(salaryPayments).where(and(eq(salaryPayments.tenantId, tenantId), eq(salaryPayments.employeeId, employee.id), eq(salaryPayments.yearMonth, input.yearMonth), isNull(salaryPayments.deletedAt))).limit(1));
+    if (duplicate) throw new DomainError('SALARY_PAYMENT_DUPLICATE', 'لقد تم دفع راتب الموظف سابقاً.', 409);
+
+    const amounts = await this.salaryForMonth(tenantId, employee, input.yearMonth, { runId: input.runId, unpaidDays: input.unpaidDays });
+    if (new Decimal(amounts.net).lte(0)) throw new DomainError('SALARY_PAYMENT_NOTHING_DUE', 'لا يوجد رواتب مستحقة للموظف.', 422);
+
+    const number = await withTenantTx(this.database.db, tenantId, (tx) => this.nextSalaryPaymentNumber(tx, tenantId));
+    const [month, year] = [input.yearMonth.slice(5), input.yearMonth.slice(0, 4)];
+    const id = newId();
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.insert(salaryPayments).values({
+        id,
+        tenantId,
+        number,
+        employeeId: employee.id,
+        branchId: branch.id,
+        runId: input.runId,
+        yearMonth: input.yearMonth,
+        paymentDate: input.paymentDate,
+        method: method === 'bank' ? 'bank_transfer' : 'cash',
+        cashLocationId: location.id,
+        responsibleEmployeeId: input.responsibleEmployeeId,
+        components: amounts.components,
+        basic: amounts.basic,
+        housing: amounts.housing,
+        transport: amounts.transport,
+        otherAllowances: amounts.otherAllowances,
+        additions: amounts.additions,
+        deductions: amounts.deductions,
+        net: amounts.net,
+        notes: input.notes?.trim() || null,
+      }));
+
+    if (input.postVoucher === false) return this.readSalaryPayment(tenantId, id);
+
+    // «يصرف من حساب» — the desktop debits the employee's own account (`Employees.AccCode`)
+    // and credits the صندوق; that account is what a سلفة debited and what the مسيّر owes.
+    const employeeAccountId = employee.employeeAccountId ?? employee.salaryPayableAccountId;
+    if (!employeeAccountId) throw new DomainError('SALARY_PAYMENT_EMPLOYEE_ACCOUNT_REQUIRED', 'لا يوجد حساب للموظف في دليل الحسابات', 422);
+
+    try {
+      const voucher = await this.treasury.createVoucher(tenantId, {
+        branchId: branch.id,
+        kind: 'payment',
+        subtype: 'salary',
+        date: input.paymentDate,
+        cashLocationId: location.id,
+        method: method === 'bank' ? 'bank_transfer' : 'cash',
+        amount: amounts.net,
+        netAmount: amounts.net,
+        recipient: employee.name,
+        counterAccountId: employeeAccountId,
+        description: input.notes?.trim() || `صرف راتب ${month}/${year} للموظف ${employee.name}`,
+        idempotencyKey: `salary-payment:${id}`,
+      });
+      if (!voucher) throw new DomainError('INTERNAL', 'Salary payment voucher was not created', 500);
+      const posted = await this.treasury.postVoucher(tenantId, voucher.id, { fiscalPeriodId: input.fiscalPeriodId });
+      await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx.update(salaryPayments).set({ voucherId: posted.id, journalEntryId: posted.journalEntryId ?? null, updatedAt: new Date() }).where(and(eq(salaryPayments.tenantId, tenantId), eq(salaryPayments.id, id))));
+      return this.readSalaryPayment(tenantId, id);
+    } catch (error) {
+      // Nothing half-done: an إذن whose money did not leave the till is not an إذن.
+      await withTenantTx(this.database.db, tenantId, (tx) => tx.delete(salaryPayments).where(and(eq(salaryPayments.tenantId, tenantId), eq(salaryPayments.id, id))));
+      throw error;
+    }
+  }
+
+  /**
+   * «🗑️ حذف» — `btnDelete_Click` L568 asks «اختر سنداً ليتم حذفه.» and then soft-deletes
+   * the إذن *and* its receipt. The cloud deletes the إذن and refuses one whose سند صرف is
+   * still posted: a voucher is a treasury document with an entry of its own, and
+   * `POST /treasury/vouchers/:id/void` is how a document is corrected — not erasing the
+   * إذن that pointed at it.
+   */
+  async deleteSalaryPayment(tenantId: string, id: string) {
+    await this.ensureEnabled(tenantId);
+    const [current] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(salaryPayments).where(and(eq(salaryPayments.tenantId, tenantId), eq(salaryPayments.id, id), isNull(salaryPayments.deletedAt))).limit(1));
+    if (!current) throw new DomainError('SALARY_PAYMENT_NOT_FOUND', 'اختر سنداً ليتم حذفه.', 404);
+    if (current.voucherId) {
+      const [voucher] = await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx.select({ status: vouchers.status }).from(vouchers).where(and(eq(vouchers.tenantId, tenantId), eq(vouchers.id, current.voucherId!))).limit(1));
+      if (voucher?.status === 'posted') throw new DomainError('SALARY_PAYMENT_POSTED', 'لا يمكن حذف إذن مرحَّل — يُلغى سند الصرف أولاً', 409);
+    }
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.update(salaryPayments).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(salaryPayments.tenantId, tenantId), eq(salaryPayments.id, id))));
+    return { id, deleted: true };
+  }
+
+  /**
+   * The month's numbers, the way «📊 عرض الراتب» reads them: the مسيّر line when a run is
+   * named (`Salary_Res ⋈ Salary_Res_Details`), otherwise the employee's own card plus
+   * every approved حركة of that month — `calculatePayrollLine`, the same function the
+   * مسيّر preview uses.
+   */
+  private async salaryForMonth(
+    tenantId: string,
+    employee: Employee,
+    yearMonth: string,
+    options: { runId?: string; unpaidDays?: number } = {},
+  ) {
+    if (options.runId) {
+      const [line] = await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx.select().from(payrollRunLines).where(and(eq(payrollRunLines.tenantId, tenantId), eq(payrollRunLines.runId, options.runId!), eq(payrollRunLines.employeeId, employee.id))).limit(1));
+      if (!line) throw new DomainError('SALARY_PAYMENT_RUN_LINE_MISSING', 'لا يوجد راتب مستحق للموظف في هذا المسير', 422);
+      return salaryBreakdown(line.components, line.additions, line.deductions, line.gross, line.net);
+    }
+    const adjustments = await this.adjustmentsForMonth(tenantId, yearMonth);
+    const line = calculatePayrollLine({
+      id: employee.id,
+      name: employee.name,
+      components: employee.salaryComponents ?? {},
+      unpaidDays: options.unpaidDays ?? 0,
+      adjustments: adjustments
+        .filter((entry) => entry.employeeId === employee.id)
+        .map((entry) => ({ kind: entry.kind as 'addition' | 'deduction', valueText: entry.valueText })),
+    });
+    return salaryBreakdown(line.components, line.additions, line.deductions, line.gross, line.net);
+  }
+
+  /** «رقم الإذن» — `LoadNxtNo` L120: the highest number on the books, plus one. */
+  private async nextSalaryPaymentNumber(tx: DrizzleTx, tenantId: string) {
+    const rows = await tx.select({ number: salaryPayments.number }).from(salaryPayments).where(and(eq(salaryPayments.tenantId, tenantId), isNotNull(salaryPayments.number)));
+    let highest = 0;
+    for (const row of rows) {
+      const parsed = Number(row.number);
+      if (Number.isFinite(parsed) && parsed > highest) highest = parsed;
+    }
+    return String(highest + 1);
+  }
+
   async approveAdjustment(tenantId: string, id: string) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salaryAdjustments).set({ status: 'approved', updatedAt: new Date() }).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, id), eq(salaryAdjustments.status, 'draft'))).returning()); if (!row) throw new DomainError('NOT_FOUND', 'Draft adjustment not found', 404); return row; }
 
   async preview(tenantId: string, input: RunInput) { await this.ensureEnabled(tenantId); const staff = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(employees).where(and(eq(employees.tenantId, tenantId), eq(employees.status, 'active'), isNull(employees.deletedAt)))); const activeAdjustments = await this.adjustmentsForMonth(tenantId, input.yearMonth); const lines = staff.map((employee) => calculatePayrollLine({ id: employee.id, name: employee.name, components: employee.salaryComponents, unpaidDays: input.unpaidDaysByEmployee?.[employee.id] ?? 0, adjustments: activeAdjustments.filter((entry) => entry.employeeId === employee.id).map((entry) => ({ kind: entry.kind as 'addition' | 'deduction', valueText: entry.valueText })) })); return { data: { yearMonth: input.yearMonth, employeeCount: lines.length, netPayable: sumLines(lines.map((line) => line.net)), lines } }; }
@@ -691,6 +967,30 @@ export class HrmService {
   async reverseRun(tenantId: string, id: string, reason: string) { await this.ensureEnabled(tenantId); if (!reason.trim()) throw new DomainError('VALIDATION_FAILED', 'Reversal reason is required', 422); const current = await this.readRun(tenantId, id); if (current.data.status !== 'posted' && current.data.status !== 'paid') throw new DomainError('PAYROLL_REVERSAL_INVALID', 'Only posted or paid runs can be reversed', 409); await withTenantTx(this.database.db, tenantId, (tx) => tx.update(payrollRuns).set({ status: 'reversed', reversedAt: new Date(), reversalReason: reason, updatedAt: new Date() }).where(and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.id, id)))); return this.readRun(tenantId, id); }
 
   private async adjustmentsForMonth(tenantId: string, yearMonth: string) { const start = `${yearMonth}-01`; const end = monthEnd(yearMonth); return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.status, 'approved'), lte(salaryAdjustments.startsOn, end), or(isNull(salaryAdjustments.endsOn), gte(salaryAdjustments.endsOn, start)) ?? sql`true`))); }
+}
+
+/**
+ * 💵 The six amounts the window prints. `الراتب الأساسي` · `بدل سكن` · `بدل مواصلات` are
+ * their own boxes; the four allowances the window has no box for (طعام · طبي · مكافأة
+ * ثابتة · أخرى) ride in `otherAllowances`, so `الصافي` here is the مسيّر's `net` exactly.
+ * Days without pay shrink `gross` before the three named allowances are subtracted, so
+ * `otherAllowances` floors at zero rather than going negative.
+ */
+function salaryBreakdown(components: Record<string, string>, additions: string, deductions: string, gross: string, net: string) {
+  const basic = new Decimal(components.basic || '0');
+  const housing = new Decimal(components.housing || '0');
+  const transport = new Decimal(components.transport || '0');
+  const other = Decimal.max(0, new Decimal(gross).minus(basic).minus(housing).minus(transport));
+  return {
+    components,
+    basic: basic.toFixed(4),
+    housing: housing.toFixed(4),
+    transport: transport.toFixed(4),
+    otherAllowances: other.toFixed(4),
+    additions: new Decimal(additions).toFixed(4),
+    deductions: new Decimal(deductions).toFixed(4),
+    net: new Decimal(net).toFixed(4),
+  };
 }
 
 function validateComponents(components: Record<string, string>) { for (const entry of Object.entries(components)) if (!new Decimal(entry[1] || '0').isFinite()) throw new DomainError('VALIDATION_FAILED', `Invalid salary component ${entry[0]}`, 422); }

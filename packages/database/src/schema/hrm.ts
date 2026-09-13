@@ -77,6 +77,55 @@ export const salaryAdjustments = pgTable('salary_adjustments', {
   ...baseLegacyColumns(),
 }, (table) => ({ employeeIdx: index('salary_adjustments_employee_idx').on(table.tenantId, table.employeeId, table.startsOn), statusIdx: index('salary_adjustments_status_idx').on(table.tenantId, table.status), numberKey: uniqueIndex('salary_adjustments_tenant_number_key').on(table.tenantId, table.number).where(sql`deleted_at IS NULL AND number IS NOT NULL`), typeIdx: index('salary_adjustments_type_idx').on(table.tenantId, table.typeId) }));
 
+/**
+ * 💵 إذن صرف راتب — `Form_WPF/frmSalaryPay.xaml` («دفع الرواتب»).
+ *
+ * `SalaryPay` is one row per employee per month — «لقد تم دفع راتب الموظف سابقاً»
+ * (`btnSave_Click` L470) is a unique `(emp, month, year)` in disguise — carrying the
+ * amounts the window shows and the صندوق/بنك the money left through. The cloud could
+ * only pay a whole month at once (`POST /hrm/payroll/runs/:id/pay`), with no document to
+ * show an employee, no رقم إذن and no way to find one again; this is that document.
+ *
+ * `الشهر` and `السنة` are two combo boxes in the desktop and one `YYYY-MM` key here —
+ * the key a payroll run is filed under, and the one the duplicate guard needs. The seven
+ * allowances on the employee card are stored as three boxes the window has
+ * (`basic` · `housing` · `transport`) plus `otherAllowances` for the four it does not, so
+ * `الصافي` here is the same number the month's مسيّر line carries.
+ */
+export const salaryPayments = pgTable('salary_payments', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  /** 💵 رقم الإذن — `frmSalaryPay.xaml.cs` L120 `LoadNxtNo`: `MAX(id) + 1`. */
+  number: text('number').notNull(),
+  employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'restrict' }),
+  branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'set null' }),
+  /** 📊 عرض الراتب — the month's مسيّر this إذن pays, when it pays one. */
+  runId: uuid('run_id').references(() => payrollRuns.id, { onDelete: 'set null' }),
+  yearMonth: text('year_month').notNull(),
+  paymentDate: date('payment_date').notNull(),
+  method: text('method').notNull(),
+  cashLocationId: uuid('cash_location_id').references(() => cashLocations.id, { onDelete: 'restrict' }),
+  /** 👤 اسم الموظف المسؤول — `LoadEmp(MainClass.EmpNo)`: whoever signs the إذن. */
+  responsibleEmployeeId: uuid('responsible_employee_id').references(() => employees.id, { onDelete: 'set null' }),
+  components: jsonb('components').$type<Record<string, string>>().notNull().default({}),
+  basic: numeric('basic', cashValue).notNull().default('0'),
+  housing: numeric('housing', cashValue).notNull().default('0'),
+  transport: numeric('transport', cashValue).notNull().default('0'),
+  otherAllowances: numeric('other_allowances', cashValue).notNull().default('0'),
+  additions: numeric('additions', cashValue).notNull().default('0'),
+  deductions: numeric('deductions', cashValue).notNull().default('0'),
+  net: numeric('net', cashValue).notNull().default('0'),
+  notes: text('notes'),
+  voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+  journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'set null' }),
+  ...baseAuditColumns(),
+  ...baseSoftDeleteColumns(),
+}, (table) => ({
+  numberKey: uniqueIndex('salary_payments_tenant_number_key').on(table.tenantId, table.number).where(sql`deleted_at IS NULL`),
+  employeeMonthKey: uniqueIndex('salary_payments_employee_month_key').on(table.tenantId, table.employeeId, table.yearMonth).where(sql`deleted_at IS NULL`),
+  dateIdx: index('salary_payments_tenant_date_idx').on(table.tenantId, table.paymentDate),
+  employeeIdx: index('salary_payments_tenant_employee_idx').on(table.tenantId, table.employeeId),
+}));
+
 export const payrollRuns = pgTable('payroll_runs', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), periodId: uuid('period_id').references(() => fiscalPeriods.id, { onDelete: 'restrict' }), yearMonth: text('year_month').notNull(), status: text('status').notNull().default('draft'), currency: text('currency').notNull().default('SAR'), summary: jsonb('summary').$type<Record<string, unknown>>().notNull().default({}), journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'set null' }), voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }), postedAt: timestamp('posted_at', { withTimezone: true }), paidAt: timestamp('paid_at', { withTimezone: true }), reversedAt: timestamp('reversed_at', { withTimezone: true }), reversalReason: text('reversal_reason'), ...baseAuditColumns(), ...baseLegacyColumns(),
 }, (table) => ({ monthKey: uniqueIndex('payroll_runs_month_key').on(table.tenantId, table.yearMonth).where(sql`status <> 'reversed'`), statusIdx: index('payroll_runs_status_idx').on(table.tenantId, table.status) }));
@@ -86,4 +135,5 @@ export const payrollRunLines = pgTable('payroll_run_lines', {
 }, (table) => ({ pk: primaryKey({ columns: [table.runId, table.lineNo] }), employeeIdx: index('payroll_run_lines_employee_idx').on(table.tenantId, table.employeeId) }));
 
 export type Employee = typeof employees.$inferSelect;
+export type SalaryPayment = typeof salaryPayments.$inferSelect;
 export type PayrollRun = typeof payrollRuns.$inferSelect;

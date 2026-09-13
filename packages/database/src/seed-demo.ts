@@ -215,6 +215,9 @@ export async function seedDemoData(
     const chart = await seedDefaultChartOfAccounts(client, tenantId);
     log(`seed  chart of accounts: ${chart.inserted} new (${chart.total} total)`);
 
+    const adjustmentTypes = await seedSalaryAdjustmentTypes(client, tenantId);
+    log(`seed  salary adjustment types: ${adjustmentTypes.inserted} new (${adjustmentTypes.total} total)`);
+
     await linkCashAccounts(client, tenantId, org.safeId, org.bankId, chart.byCode);
 
     const catalog = await seedCatalogBasics(client, tenantId, chart.byCode);
@@ -426,6 +429,41 @@ async function seedOrganisation(
 }
 
 // ------------------------------------------------------------------------ accounting
+
+/**
+ * 🎁 أنواع الحوافز والجزاءات — `frmEmpSalaryAddSub` cannot open without them.
+ * `SalaryAddSubTypes` is a table in the desktop whose rows are not in the repository, but
+ * the code-behind names three by id: 1 = مكافأة (an addition), 2 = خصم, 3 = سلفة (both
+ * deductions). Migration `0050` plants them for every tenant that already existed and
+ * `OrgProvisioningService` for every tenant the API creates afterwards; this does it for a
+ * tenant the seed script writes directly, so the demo company is not the one tenant with
+ * an empty «نوع الإجراء» box.
+ */
+export const DEMO_SALARY_ADJUSTMENT_TYPES: Array<{ code: string; name: string; kind: string; sortOrder: number }> = [
+  { code: 'bonus', name: 'مكافأة', kind: 'addition', sortOrder: 1 },
+  { code: 'deduction', name: 'خصم', kind: 'deduction', sortOrder: 2 },
+  { code: 'advance', name: 'سلفة', kind: 'deduction', sortOrder: 3 },
+];
+
+/** Seeds `DEMO_SALARY_ADJUSTMENT_TYPES`, skipping codes the tenant already has. */
+export async function seedSalaryAdjustmentTypes(client: Client, tenantId: string): Promise<{ inserted: number; total: number }> {
+  const existing = await client.query<{ code: string }>(
+    `SELECT code FROM salary_adjustment_types WHERE tenant_id = $1 AND deleted_at IS NULL`,
+    [tenantId],
+  );
+  const present = new Set(existing.rows.map((row) => row.code));
+  let inserted = 0;
+  for (const type of DEMO_SALARY_ADJUSTMENT_TYPES) {
+    if (present.has(type.code)) continue;
+    await client.query(
+      `INSERT INTO salary_adjustment_types (id, tenant_id, code, name, kind, sort_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, true)`,
+      [newId(), tenantId, type.code, type.name, type.kind, type.sortOrder],
+    );
+    inserted += 1;
+  }
+  return { inserted, total: present.size + inserted };
+}
 
 /** Seeds `DEMO_CHART_OF_ACCOUNTS`, skipping codes the tenant already has. Exported for the `seed:coa` backfill CLI. */
 export async function seedDefaultChartOfAccounts(

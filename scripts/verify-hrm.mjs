@@ -14,6 +14,8 @@
  *   6. الحذف — «لا يمكن حذف موظف مرتبط بمستخدم»، ثم حذف موظف بلا ارتباط
  *   7. 🎁 الحوافز والجزاءات — الأنواع الثلاثة، الرفوض الأربعة، «رقم السند»، الملاحظة
  *      التي تُكتب نفسها، وقيد السلفة والمكافأة (`frmEmpSalaryAddSub`)
+ *   8. 💵 دفع الرواتب — «رقم الإذن»، الرفوض الثلاثة، «لقد تم دفع راتب الموظف سابقاً»،
+ *      «لا يوجد رواتب مستحقة للموظف»، وسند الصرف الذي يُصرف به الراتب (`frmSalaryPay`)
  *
  * The two other refusals («لا يمكن حذف موظف مرتبط بفواتير» and the payroll one) are in
  * `apps/api/test/employee-card.spec.ts`: they leave an invoice and a payroll run behind.
@@ -239,6 +241,7 @@ console.log('\n7. 🎁 الحوافز والجزاءات — إدخال الحو
 
 const today = new Date().toISOString().slice(0, 10);
 const madeAdjustments = [];
+const removedDrafts = [];
 const types = await get('/hrm/adjustment-types');
 const bonusType = types.find((row) => row.code === 'bonus');
 const deductionType = types.find((row) => row.code === 'deduction');
@@ -331,16 +334,106 @@ const usedType = await refused('delete', `/hrm/adjustment-types/${bonusType.id}`
 check('لا يمكن حذف نوع مستخدم في حركات', usedType.status === 409 && usedType.detail === 'لا يمكن حذف نوع مستخدم في حركات', `${usedType.status} ${usedType.code}`);
 
 // ---------------------------------------------------------------------------
+// 8. 💵 دفع الرواتب — `Form_WPF/frmSalaryPay.xaml` («دفع الرواتب»). One إذن صرف per
+// employee per month, carrying `رقم الإذن` · `الموظف` · `الشهر`/`السنة` ·
+// `طريقة الدفع` · `الصندوق/البنك` · `الراتب الأساسي` · `بدل سكن` · `بدل مواصلات` ·
+// `💰 الحوافز` · `🔴 الخصومات` · `💵 الصافي` · `ملاحظات`, and a search grid narrowed by
+// «رقم الإذن», «الموظف» and `من تاريخ`/`إلى تاريخ`.
+// ---------------------------------------------------------------------------
+console.log('\n8. 💵 دفع الرواتب — إذن صرف راتب');
+
+const paidIds = [];
+const branchId = (await get('/branches'))[0]?.id;
+const pay = (body) => post('/hrm/salary-payments', body);
+
+const noBranch = await refused('post', '/hrm/salary-payments', { employeeId: employee.id, yearMonth: today.slice(0, 7), paymentDate: today, cashLocationId: till.id });
+check('يجب اختيار الفرع.', noBranch.detail === 'يجب اختيار الفرع.', `${noBranch.status} ${noBranch.code}`);
+const noEmployee = await refused('post', '/hrm/salary-payments', { branchId, yearMonth: today.slice(0, 7), paymentDate: today, cashLocationId: till.id });
+check('يجب اختيار الموظف.', noEmployee.detail === 'يجب اختيار الموظف.', `${noEmployee.status} ${noEmployee.code}`);
+const noTill = await refused('post', '/hrm/salary-payments', { employeeId: employee.id, branchId, yearMonth: today.slice(0, 7), paymentDate: today });
+check('يجب اختيار الصندوق.', noTill.detail === 'يجب اختيار الصندوق.', `${noTill.status} ${noTill.code}`);
+
+const bare = await post('/cash-locations', { branchId, kind: 'safe', name: `صندوق بلا حساب ${stamp}` });
+const noAccount = await refused('post', '/hrm/salary-payments', { employeeId: employee.id, branchId, yearMonth: today.slice(0, 7), paymentDate: today, cashLocationId: bare.id });
+check('لم يتم العثور على الحساب المقابل للصندوق.', noAccount.detail === 'لم يتم العثور على الحساب المقابل للصندوق.', `${noAccount.status} ${noAccount.code}`);
+
+const broke = await post('/hrm/employees', { employeeNo: `VRP${stamp}`, name: `موظف بلا راتب ${stamp}`, branchId });
+const nothingDue = await refused('post', '/hrm/salary-payments', { employeeId: broke.id, branchId, yearMonth: today.slice(0, 7), paymentDate: today, cashLocationId: till.id });
+check('لا يوجد رواتب مستحقة للموظف.', nothingDue.detail === 'لا يوجد رواتب مستحقة للموظف.', `${nothingDue.status} ${nothingDue.code}`);
+
+// «رقم الإذن» is `MAX(id) + 1` over every إذن on the books — a second run of this script
+// continues the sequence rather than starting from one, so the check is relative.
+const numbersBefore = (await get('/hrm/salary-payments')).map((row) => Number(row.number) || 0);
+const highestBefore = numbersBefore.length ? Math.max(...numbersBefore) : 0;
+const first = await pay({ employeeId: employee.id, branchId, yearMonth: today.slice(0, 7), paymentDate: today, cashLocationId: till.id });
+paidIds.push(first.id);
+// A soft-deleted إذن keeps its number — `LoadNxtNo` is `MAX(id)` over every row, deleted
+// ones included — so the next إذن continues past the last number ever used rather than
+// reusing a gap. What we can check from outside is that it follows everything on the books.
+check('رقم الإذن يتبع ما على الدفتر', Number(first.number) > highestBefore, `${highestBefore} → ${first.number}`);
+check(
+  'المبلغ = الراتب الأساسي + بدل سكن + بدل مواصلات + بدلات أخرى − الخصومات',
+  Number(first.net) === Number(first.basic) + Number(first.housing) + Number(first.transport) + Number(first.otherAllowances) + Number(first.additions) - Number(first.deductions),
+  `${first.net} = ${first.basic} + ${first.housing} + ${first.transport} + ${first.otherAllowances} + ${first.additions} − ${first.deductions}`,
+);
+check('الصافي يطابق مسيّر الشهر', Number(first.net) === Number((await post('/hrm/payroll/preview', { yearMonth: today.slice(0, 7) })).lines.find((line) => line.employeeId === employee.id)?.net ?? 0), first.net);
+
+const duplicate = await refused('post', '/hrm/salary-payments', { employeeId: employee.id, branchId, yearMonth: today.slice(0, 7), paymentDate: today, cashLocationId: till.id });
+check('لقد تم دفع راتب الموظف سابقاً.', duplicate.status === 409 && duplicate.detail === 'لقد تم دفع راتب الموظف سابقاً.', `${duplicate.status} ${duplicate.code}`);
+
+const paymentLines = (await get(`/journal-entries/${first.journalEntryId}`)).lines ?? [];
+check(
+  'سند الصرف — مدين حساب الموظف، دائن الصندوق',
+  paymentLines.some((line) => line.accountId === employee.employeeAccountId && Number(line.debit) === Number(first.net)) &&
+    paymentLines.some((line) => line.accountId === till.accountId && Number(line.credit) === Number(first.net)),
+  paymentLines.map((line) => `${Number(line.debit) > 0 ? 'مدين' : 'دائن'} ${Number(line.debit) || Number(line.credit)}`).join(' · '),
+);
+
+// Another month of the seeded fiscal year — an إذن cannot be paid into a month no open
+// period covers, and the seeded calendar is the current year only.
+const nextMonth =
+  (await get('/fiscal-periods'))
+    .filter((row) => row.status === 'open')
+    .map((row) => String(row.startDate ?? '').slice(0, 7))
+    .find((value) => value && value !== today.slice(0, 7)) ?? today.slice(0, 7);
+const nextPayment = await pay({ employeeId: employee.id, branchId, yearMonth: nextMonth, paymentDate: `${nextMonth}-01`, cashLocationId: till.id, notes: 'صرف نقداً من الخزينة' });
+paidIds.push(nextPayment.id);
+check('رقم الإذن يتسلسل', Number(nextPayment.number) === Number(first.number) + 1, `${first.number} → ${nextPayment.number}`);
+check('الشهر والسنة على الإذن', nextPayment.month === nextMonth.slice(5) && nextPayment.year === nextMonth.slice(0, 4), `${nextPayment.month}/${nextPayment.year}`);
+
+const listedPayments = await get('/hrm/salary-payments');
+check('🔍 البحث — الأسماء والملاحظات', listedPayments.every((row) => row.employeeName && row.branchName) && listedPayments.some((row) => row.notes === 'صرف نقداً من الخزينة'), `${listedPayments.length} صف`);
+const payByNumber = await get(`/hrm/salary-payments?number=${nextPayment.number}`);
+check('البحث برقم الإذن', payByNumber.length === 1 && payByNumber[0].id === nextPayment.id, `${payByNumber.length} صف`);
+const payByEmployee = await get(`/hrm/salary-payments?employee_id=${employee.id}`);
+check('البحث بالموظف', payByEmployee.length >= 2 && payByEmployee.every((row) => row.employeeId === employee.id), `${payByEmployee.length} صف`);
+const payByDate = await get(`/hrm/salary-payments?from=${today}&to=${today}`);
+check('البحث بالفترة', payByDate.every((row) => row.paymentDate === today), `${payByDate.length} صف`);
+
+const postedPayment = await refused('delete', `/hrm/salary-payments/${nextPayment.id}`);
+check('لا يمكن حذف إذن مرحَّل', postedPayment.status === 409 && postedPayment.code === 'SALARY_PAYMENT_POSTED', postedPayment.detail);
+
+const draft = await pay({ employeeId: employee.id, branchId, yearMonth: '2030-11', paymentDate: '2030-11-01', cashLocationId: till.id, postVoucher: false });
+check('إذنٌ بلا صرف يبقى بلا سند', draft.voucherId === null && draft.journalEntryId === null, `${draft.voucherId} / ${draft.journalEntryId}`);
+removedDrafts.push(draft.id);
+
+// ---------------------------------------------------------------------------
 // Cleanup — what this run created, removed again.
 // ---------------------------------------------------------------------------
 // Only what this run created — the demo tenant's own حوافز must survive a verification.
 for (const id of madeAdjustments) await refused('delete', `/hrm/adjustments/${id}`);
+// The إذن that carries no سند صرف goes; the ones that paid a salary stay, and the script
+// says so rather than quietly failing to clean up after itself.
+for (const id of removedDrafts) await refused('delete', `/hrm/salary-payments/${id}`);
+for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo) === `VRP${stamp}`)) await refused('delete', `/hrm/employees/${row.id}`);
 for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'))) await refused('delete', `/hrm/employees/${row.id}`);
 for (const row of (await get('/hrm/departments')).filter((entry) => String(entry.code).startsWith('VR'))) await refused('delete', `/hrm/departments/${row.id}`);
 const remaining = (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'));
 check('لا يبقى أثر بعد التشغيل', remaining.length === 0, `${remaining.length} صف`);
 const remainingAdjustments = (await get('/hrm/adjustments')).filter((row) => madeAdjustments.includes(row.id));
 check('تبقى الحركات المرحَّلة وحدها', remainingAdjustments.every((row) => row.status === 'approved' && row.journalEntryId), `${remainingAdjustments.length} صف`);
+const remainingDrafts = (await get('/hrm/salary-payments')).filter((row) => removedDrafts.includes(row.id));
+check('حُذف الإذن المسوَّد', remainingDrafts.length === 0, `${remainingDrafts.length} صف`);
 
-console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات verified' : `\n✗ ${failures} check(s) failed`);
+console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات · 💵 دفع الرواتب verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
