@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, desc, eq, gte, ilike, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DomainError } from '@erp/contracts';
 import {
   accounts,
@@ -219,6 +219,20 @@ export type JournalLineInput = {
   partyId?: string;
   costCenterId?: string;
   branchId?: string;
+  /** المندوب — `FrmNewEntry.xaml` `colSalesman`. */
+  salesmanId?: string;
+};
+
+/**
+ * 📒 إنشاء قيد يومية — the card of `Form_WPF/FrmNewEntry.xaml`: `رقم القيد` (allocated
+ * on save) · `📅 التاريخ` · `⏰ الوقت` · `🔑 الرقم العام` (the id) · `✅ قيد ضريبي` ·
+ * `📝 الملاحظة`. Every field is optional here, because every entry written by a sale, a
+ * voucher or a shift close is posted through this same call without ever seeing the
+ * window.
+ */
+export type JournalCardInput = {
+  time?: string | null;
+  isVat?: boolean;
 };
 
 @Injectable()
@@ -819,7 +833,7 @@ export class AccountingService {
       sourceType?: string;
       sourceId?: string;
       idempotencyKey?: string;
-    },
+    } & JournalCardInput,
   ) {
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const resolved = await this.resolvePostingContext(tx, tenantId, input.date, input.branchId, input.fiscalPeriodId);
@@ -903,7 +917,7 @@ export class AccountingService {
     return period.id;
   }
 
-  async postJournalInTx(tx: DrizzleTx, tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string }) {
+  async postJournalInTx(tx: DrizzleTx, tenantId: string, input: { branchId: string; fiscalPeriodId: string; date: string; description?: string; lines: JournalLineInput[]; sourceType?: string; sourceId?: string; idempotencyKey?: string } & JournalCardInput) {
     if (input.lines.length < 2) throw new DomainError('JOURNAL_LINES_REQUIRED', 'A journal entry needs at least two lines', 422);
     const debit = input.lines.reduce((sum, line) => sum.plus(line.debit ?? '0'), new Decimal(0));
     const credit = input.lines.reduce((sum, line) => sum.plus(line.credit ?? '0'), new Decimal(0));
@@ -917,21 +931,41 @@ export class AccountingService {
 
     const entryId = newId();
     const allocated = await this.sequences.next({ tenantId, branchId: input.branchId, docType: 'journal_entry', fiscalYearId: period.fiscalYearId }, tx, { prefix: 'JE-', padding: 6 });
+    /**
+     * 📝 الملاحظة — `FrmNewEntry.xaml.cs` L745: when the clerk leaves the note empty the
+     * window writes `سند قيد يومية رقم: {EntryNo} بتاريخ {date}`. An unnamed entry is
+     * unfindable a year later, and the number is only known once the sequence has run.
+     */
+    const defaultNote = `سند قيد يومية رقم: ${allocated.display} بتاريخ ${input.date}`;
     await tx.insert(journalEntries).values({
       id: entryId,
       tenantId,
       branchId: input.branchId,
       fiscalPeriodId: input.fiscalPeriodId,
       date: input.date,
+      entryTime: input.time ?? null,
+      isVat: input.isVat ?? false,
       number: allocated.display,
       kind: 'manual',
       status: 'posted',
-      description: input.description ?? null,
+      description: input.description?.trim() || defaultNote,
       sourceType: input.sourceType ?? null,
       sourceId: input.sourceId ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
       postedAt: new Date(),
     });
+    /**
+     * الشرح — `FrmNewEntry.xaml.cs` L761 names the line after the account it settles when
+     * the clerk leaves it empty, so a ledger line always says what it was for.
+     */
+    const names = new Map(
+      (
+        await tx
+          .select({ id: accounts.id, nameAr: accounts.nameAr })
+          .from(accounts)
+          .where(and(eq(accounts.tenantId, tenantId), inArray(accounts.id, input.lines.map((line) => line.accountId))))
+      ).map((row) => [row.id, row.nameAr]),
+    );
     await tx.insert(journalEntryLines).values(input.lines.map((line, index) => ({
       entryId,
       lineNo: index + 1,
@@ -942,7 +976,10 @@ export class AccountingService {
       costCenterId: line.costCenterId ?? null,
       partyId: line.partyId ?? null,
       branchId: line.branchId ?? input.branchId,
-      description: line.description ?? null,
+      salesmanId: line.salesmanId ?? null,
+      description:
+        line.description?.trim() ||
+        `سند قيد يومية رقم: ${allocated.display} - سداد دفعة من حساب: ${names.get(line.accountId) ?? ''}`.trim(),
     })));
     const [entry] = await tx.select().from(journalEntries).where(eq(journalEntries.id, entryId));
     return entry;
@@ -1155,6 +1192,7 @@ export class AccountingService {
           credit: journalEntryLines.credit,
           costCenterId: journalEntryLines.costCenterId,
           partyId: journalEntryLines.partyId,
+          salesmanId: journalEntryLines.salesmanId,
           description: journalEntryLines.description,
         })
         .from(journalEntryLines)

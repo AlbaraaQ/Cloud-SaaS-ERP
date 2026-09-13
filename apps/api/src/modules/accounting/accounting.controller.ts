@@ -242,6 +242,13 @@ export class AccountingController {
       date: string;
       description?: string;
       lines: JournalLineInput[];
+      sourceType?: string;
+      sourceId?: string;
+      idempotencyKey?: string;
+      /** ⏰ الوقت — `FrmNewEntry.xaml` `txtTime`. */
+      time?: string | null;
+      /** ✅ قيد ضريبي — `FrmNewEntry.xaml` `chkIsVAT`. */
+      isVat?: boolean;
     },
   ) {
     return { data: await this.accounting.postJournal(getTenantContext().tenantId, body) };

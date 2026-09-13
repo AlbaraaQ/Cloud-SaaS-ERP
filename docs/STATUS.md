@@ -468,6 +468,35 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   execute button of the window's own search form, and the three summary-tile labels are
   invented (the desktop has no tile row).
 
+* **المرحلة 07 — المحاسبة، الجزء الثالث: 📒 إنشاء قيد يومية**
+  (`Form_WPF/FrmNewEntry.xaml` «إنشاء قيد يومية»). **Two of the window's six card
+  fields did not exist in the data model.** `⏰ الوقت` matters more than it looks: the
+  desktop stores a *timestamp*, so two entries written on the same day keep the order
+  they were written in and حركة الصندوق filters by date and time, while the cloud stored
+  a date alone and could not tell 09:00 from 21:00. Migration `0046` adds
+  `journal_entries.entry_time`, `journal_entries.is_vat` (`✅ قيد ضريبي`, `Entry.IsVAT`)
+  and `journal_entry_lines.salesman_id` (`المندوب`, `Entry_sub.salesman`) — all three
+  nullable or false by default, so every entry already on the books and every caller
+  that sends none of them is untouched. The third thing the window does is fill in what
+  the clerk leaves empty, and that is not decoration: `Save()` writes
+  `سند قيد يومية رقم: {EntryNo} بتاريخ {date}` when الملاحظة is blank and names each
+  unnamed line after the account it settles, because an entry with no note is unfindable
+  a year later. Both defaults now live in the service — the note after the number has
+  been allocated, since the number is what the note quotes — and what the clerk *did*
+  write is kept, trimmed, never replaced. The screen is the window: the six card fields
+  (with `رقم القيد` and `🔑 الرقم العام` read-only, because both are allocated by the
+  server when the entry posts), `📋 تفاصيل القيد` with its nine columns,
+  `الفرق=` in the grid's header — green when the two sides agree, as the window colours
+  it — `مجموع المدين:` / `مجموع الدائن:` in its footer, `رمز الحساب` resolved to a name
+  as it is typed, and the four refusals in the window's own words (`لا يوجد بيانات` ·
+  `يجب إدخال اسم ورقم الحساب` · `يوجد بند رقم … بدون قيمة` ·
+  `لا يمكن حفظ قيد غير متوازن`) before the question `هل أنت متأكد من حفظ القيد؟` —
+  because a posted entry is not edited, only reversed. Tests
+  `apps/api/test/journal-entry-card.spec.ts` (9) and section 8 of
+  `scripts/verify-accounting.mjs` (11 more live checks, 48 in total). **566** API tests,
+  36 staff, 71 contract. Deferred on purpose: `🖨️ طباعة`/`👁️ معاينة` of the entry
+  document and the ⏮◀▶⏭ navigator, both of which belong to the reporting phase.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

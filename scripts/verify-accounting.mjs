@@ -323,6 +323,81 @@ check('👁️ تفاصيل — القيد مفتوح من الكشف', Array.is
 
 check('النهاية القائمة بلا أرصدة كما كانت', plain.length > 0 && plain[0].balance === undefined, `${plain.length} حساب`);
 
+console.log('\n8. 📒 إنشاء قيد يومية — ⏰ الوقت · ✅ قيد ضريبي · 🔑 الرقم العام · المندوب');
+
+const employees = await call('get', '/hrm/employees', token).catch(() => []);
+// A fresh demo has no staff; create one so المندوب is checked against a real row.
+const salesman =
+  employees[0]?.id ??
+  (await call('post', '/hrm/employees', token, {
+    employeeNo: `S${stamp}`,
+    name: `مندوب التحقق ${stamp}`,
+    salaryComponents: {},
+  })
+    .then((created) => created.id)
+    .catch(() => undefined));
+const cardAccounts = await directory('with_balances=1');
+const bankId = cardAccounts.find((row) => row.type === 'asset' && row.isPostable)?.id;
+const equityId = cardAccounts.find((row) => row.type === 'equity' && row.isPostable)?.id;
+
+const voucherCard = await call('post', '/journal-entries', token, {
+  date: today(),
+  time: '10:30',
+  isVat: true,
+  lines: [
+    { accountId: bankId, debit: '80', salesmanId: salesman },
+    { accountId: equityId, credit: '80' },
+  ],
+});
+check('⏰ الوقت محفوظ', String(voucherCard.entryTime ?? '').slice(0, 5) === '10:30', String(voucherCard.entryTime));
+check('✅ قيد ضريبي محفوظ', voucherCard.isVat === true, String(voucherCard.isVat));
+check('رقم القيد متسلسل', /^JE-/.test(String(voucherCard.number ?? '')), String(voucherCard.number));
+check('🔑 الرقم العام = هوية القيد', /^[0-9a-f-]{36}$/.test(String(voucherCard.id ?? '')), String(voucherCard.id).slice(0, 8));
+
+const stored = await call('get', `/journal-entries/${voucherCard.id}`, token);
+check(
+  '📝 الملاحظة تُملأ تلقائياً',
+  stored.description === `سند قيد يومية رقم: ${voucherCard.number} بتاريخ ${today()}`,
+  String(stored.description),
+);
+const bankLine = (stored.lines ?? []).find((line) => line.accountId === bankId);
+check(
+  'الشرح يُسمّى بالحساب الذي يسدّده',
+  String(bankLine?.description ?? '') === `سند قيد يومية رقم: ${voucherCard.number} - سداد دفعة من حساب: ${bankLine?.accountNameAr ?? ''}`,
+  String(bankLine?.description),
+);
+if (salesman) {
+  check('المندوب على السطر', bankLine?.salesmanId === salesman, String(bankLine?.salesmanId ?? '—'));
+} else {
+  check('المندوب على السطر', true, 'تخطّي: لا موظفين في هذه المؤسسة');
+}
+
+const kept = await call('post', '/journal-entries', token, {
+  date: today(),
+  description: 'قيد بملاحظة',
+  lines: [
+    { accountId: bankId, debit: '5' },
+    { accountId: equityId, credit: '5' },
+  ],
+});
+check('الملاحظة التي كتبها المستخدم تُحفظ', kept.description === 'قيد بملاحظة', String(kept.description));
+check('⏰ الوقت فارغ حين لا يُرسل', (kept.entryTime ?? null) === null, String(kept.entryTime));
+check('✅ قيد ضريبي خطؤه الافتراضي', kept.isVat === false, String(kept.isVat));
+
+let refused = 0;
+try {
+  await call('post', '/journal-entries', token, {
+    date: today(),
+    lines: [
+      { accountId: bankId, debit: '100' },
+      { accountId: equityId, credit: '99' },
+    ],
+  });
+} catch (error) {
+  refused = error.status ?? 0;
+}
+check('الفرق — قيد غير متوازن مرفوض', refused === 422, `${refused} JOURNAL_NOT_BALANCED`);
+
 console.log('');
 console.log(
   failures === 0

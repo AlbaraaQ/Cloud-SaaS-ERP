@@ -8,6 +8,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  time,
   timestamp,
   uniqueIndex,
   uuid,
@@ -15,6 +16,7 @@ import {
 
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
+import { employees } from './hrm.js';
 import { branches } from './organization.js';
 import { tenants } from './platform.js';
 
@@ -119,6 +121,10 @@ export const journalEntries = pgTable(
     fiscalPeriodId: uuid('fiscal_period_id').notNull().references(() => fiscalPeriods.id, { onDelete: 'restrict' }),
     date: date('date').notNull(),
     number: text('number'),
+    /** ⏰ الوقت — `FrmNewEntry.xaml` `txtTime`; NULL for entries posted before it was recorded. */
+    entryTime: time('entry_time'),
+    /** ✅ قيد ضريبي — `FrmNewEntry.xaml` `chkIsVAT` (`Entry.IsVAT`). */
+    isVat: boolean('is_vat').notNull().default(false),
     kind: text('kind').notNull().default('manual'),
     status: text('status').notNull().default('draft'),
     description: text('description'),
@@ -153,6 +159,8 @@ export const journalEntryLines = pgTable(
     costCenterId: uuid('cost_center_id'),
     partyId: uuid('party_id'),
     branchId: uuid('branch_id'),
+    /** المندوب — `FrmNewEntry.xaml` `colSalesman` (`Entry_sub.salesman`); NULL when no one is credited. */
+    salesmanId: uuid('salesman_id').references(() => employees.id, { onDelete: 'set null' }),
     description: text('description'),
   },
   (table) => ({
