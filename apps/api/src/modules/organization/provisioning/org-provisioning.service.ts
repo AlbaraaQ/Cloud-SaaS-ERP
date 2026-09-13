@@ -11,6 +11,7 @@ import {
   DEMO_POSTING_PROFILE,
   newId,
   priceLists,
+  salaryAdjustmentTypes,
   tenants,
   warehouses,
   withTenantTx,
@@ -80,6 +81,7 @@ export class OrgProvisioningService {
     const mainCashAccountId = await this.ensureChartOfAccounts(tx, tenantId, actorUserId, now);
     if (mainCashAccountId) created = true;
     if (await this.ensurePostingProfile(tx, tenantId, actorUserId, now)) created = true;
+    if (await this.ensureSalaryAdjustmentTypes(tx, tenantId, actorUserId, now)) created = true;
 
     let branchId = await firstId(
       tx
@@ -295,6 +297,49 @@ export class OrgProvisioningService {
    * guessed — posting then fails with a named key error instead of corrupting the
    * ledger. Returns whether a profile was created.
    */
+  /**
+   * 🎁 أنواع الحوافز والجزاءات — the three rows `frmEmpSalaryAddSub` cannot work
+   * without. `SalaryAddSubTypes` is a database table in the desktop and its seed is not
+   * in the repository, but the code-behind names the three by id: 1 = مكافأة (an
+   * addition), 2 = خصم, 3 = سلفة (both deductions). Migration `0050` inserts them for
+   * every tenant that already existed; this does it for every tenant created after it,
+   * in the same transaction that seeds the chart of accounts.
+   */
+  private async ensureSalaryAdjustmentTypes(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<boolean> {
+    const seed: Array<{ code: string; name: string; kind: string; sortOrder: number }> = [
+      { code: 'bonus', name: 'مكافأة', kind: 'addition', sortOrder: 1 },
+      { code: 'deduction', name: 'خصم', kind: 'deduction', sortOrder: 2 },
+      { code: 'advance', name: 'سلفة', kind: 'deduction', sortOrder: 3 },
+    ];
+    const existing = await tx
+      .select({ code: salaryAdjustmentTypes.code })
+      .from(salaryAdjustmentTypes)
+      .where(and(eq(salaryAdjustmentTypes.tenantId, tenantId), isNull(salaryAdjustmentTypes.deletedAt)));
+    const present = new Set(existing.map((row) => row.code));
+    const missing = seed.filter((row) => !present.has(row.code));
+    if (!missing.length) return false;
+    await tx.insert(salaryAdjustmentTypes).values(
+      missing.map((row) => ({
+        id: newId(),
+        tenantId,
+        code: row.code,
+        name: row.name,
+        kind: row.kind,
+        sortOrder: row.sortOrder,
+        isActive: true,
+        createdAt: now,
+        createdBy: actorUserId,
+      })),
+    );
+    this.logger.log({ tenantId, inserted: missing.length }, 'salary adjustment types seeded');
+    return true;
+  }
+
   private async ensurePostingProfile(
     tx: DrizzleTx,
     tenantId: string,

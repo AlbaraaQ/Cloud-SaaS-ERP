@@ -3,7 +3,21 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
-import { HrmService, type AdjustmentInput, type DepartmentInput, type DepartmentPatch, type EmployeeInput, type EmployeePatch, type JobInput, type JobPatch, type PayRunInput, type PostRunInput, type RunInput } from './hrm.service.js';
+import {
+  HrmService,
+  type AdjustmentInput,
+  type AdjustmentTypeInput,
+  type AdjustmentTypePatch,
+  type DepartmentInput,
+  type DepartmentPatch,
+  type EmployeeInput,
+  type EmployeePatch,
+  type JobInput,
+  type JobPatch,
+  type PayRunInput,
+  type PostRunInput,
+  type RunInput,
+} from './hrm.service.js';
 
 @Controller('hrm')
 export class HrmController {
@@ -24,9 +38,16 @@ export class HrmController {
   @Delete('employees/:id') @RequiresPermission('hrm.manage') deleteEmployee(@Param('id') id: string) { return this.hrm.deleteEmployee(getTenantContext().tenantId, id); }
   @Post('attendance/import') @RequiresPermission('hrm.manage') importAttendance(@Body() body: { csv: string }) { return this.hrm.importAttendanceCsv(getTenantContext().tenantId, body.csv); }
   @Get('attendance/summary') @RequiresPermission('hrm.view') attendanceSummary(@Query('enroll') enroll: string, @Query('from') from: string, @Query('to') to: string) { return this.hrm.attendanceSummary(getTenantContext().tenantId, enroll, from, to); }
-  @Get('adjustments') @RequiresPermission('hrm.view') adjustments() { return this.hrm.listAdjustments(getTenantContext().tenantId); }
+  /** 🎁 الحوافز والجزاءات — `frmEmpSalaryAddSub` «إدخال الحوافز والخصومات للموظفين». */
+  @Get('adjustment-types') @RequiresPermission('hrm.view') adjustmentTypes() { return this.hrm.listAdjustmentTypes(getTenantContext().tenantId); }
+  @Post('adjustment-types') @RequiresPermission('hrm.manage') createAdjustmentType(@Body() body: AdjustmentTypeInput) { return this.hrm.createAdjustmentType(getTenantContext().tenantId, body); }
+  @Patch('adjustment-types/:id') @RequiresPermission('hrm.manage') updateAdjustmentType(@Param('id') id: string, @Body() body: AdjustmentTypePatch) { return this.hrm.updateAdjustmentType(getTenantContext().tenantId, id, body); }
+  @Delete('adjustment-types/:id') @RequiresPermission('hrm.manage') deleteAdjustmentType(@Param('id') id: string) { return this.hrm.deleteAdjustmentType(getTenantContext().tenantId, id); }
+  @Get('adjustments') @RequiresPermission('hrm.view') adjustments(@Query('employee_id') employeeId?: string, @Query('type_code') typeCode?: string, @Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) { return this.hrm.listAdjustments(getTenantContext().tenantId, { employeeId, typeCode, status, from, to }); }
+  @Get('adjustments/:id') @RequiresPermission('hrm.view') readAdjustment(@Param('id') id: string) { return this.hrm.readAdjustment(getTenantContext().tenantId, id); }
   @Post('adjustments') @RequiresPermission('hrm.manage') createAdjustment(@Body() body: AdjustmentInput) { return this.hrm.createAdjustment(getTenantContext().tenantId, body); }
   @Post('adjustments/:id/approve') @RequiresPermission('hrm.adjust.approve') approveAdjustment(@Param('id') id: string) { return this.hrm.approveAdjustment(getTenantContext().tenantId, id); }
+  @Delete('adjustments/:id') @RequiresPermission('hrm.manage') deleteAdjustment(@Param('id') id: string) { return this.hrm.deleteAdjustment(getTenantContext().tenantId, id); }
   @Post('payroll/preview') @RequiresPermission('hrm.view') preview(@Body() body: RunInput) { return this.hrm.preview(getTenantContext().tenantId, body); }
   @Get('payroll/runs') @RequiresPermission('hrm.view') runs() { return this.hrm.listRuns(getTenantContext().tenantId); }
   @Post('payroll/runs') @RequiresPermission('hrm.manage') createRun(@Body() body: RunInput) { return this.hrm.createRun(getTenantContext().tenantId, body); }

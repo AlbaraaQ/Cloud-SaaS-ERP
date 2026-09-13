@@ -35,9 +35,47 @@ export const attendanceLogs = pgTable('attendance_logs', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'cascade' }), machine: text('machine').notNull(), enroll: text('enroll').notNull(), punchAt: timestamp('punch_at', { withTimezone: true }).notNull(), direction: text('direction').notNull(), fingerprint: text('fingerprint').notNull(), payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({ fingerprintKey: uniqueIndex('attendance_logs_fingerprint_key').on(table.tenantId, table.fingerprint), employeeIdx: index('attendance_logs_employee_idx').on(table.tenantId, table.employeeId, table.punchAt), enrollIdx: index('attendance_logs_enroll_idx').on(table.tenantId, table.enroll, table.punchAt) }));
 
+/**
+ * 🎁 أنواع الحوافز والجزاءات — the desktop's `SalaryAddSubTypes` lookup
+ * (`frmEmpSalaryAddSub.xaml.cs` L173). Its rows are not in the repository, but the
+ * code-behind fixes three of them by id: 1 = مكافأة, 2 = خصم, 3 = سلفة — and it is the
+ * type that decides whether the checkbox says «✅ تضاف على الراتب» or
+ * «✂️ تخصم من الراتب» (`CmbType_EditValueChanged` L540).
+ */
+export const salaryAdjustmentTypes = pgTable(
+  'salary_adjustment_types',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    /** `addition` | `deduction` — the sign the payroll run gives the amount. */
+    kind: text('kind').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    ...baseAuditColumns(),
+    ...baseSoftDeleteColumns(),
+  },
+  (table) => ({
+    codeKey: uniqueIndex('salary_adjustment_types_tenant_code_key').on(table.tenantId, table.code).where(sql`deleted_at IS NULL`),
+    tenantIdx: index('salary_adjustment_types_tenant_idx').on(table.tenantId, table.sortOrder),
+  }),
+);
+
 export const salaryAdjustments = pgTable('salary_adjustments', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }), kind: text('kind').notNull(), componentCode: text('component_code').notNull(), valueText: numeric('value_text', cashValue).notNull(), startsOn: date('starts_on').notNull(), endsOn: date('ends_on'), recurring: boolean('recurring').notNull().default(false), subFromSalary: boolean('sub_from_salary').notNull().default(false), status: text('status').notNull().default('draft'), cashLocationId: uuid('cash_location_id').references(() => cashLocations.id, { onDelete: 'set null' }), journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'set null' }), reason: text('reason'), ...baseAuditColumns(), ...baseLegacyColumns(),
-}, (table) => ({ employeeIdx: index('salary_adjustments_employee_idx').on(table.tenantId, table.employeeId, table.startsOn), statusIdx: index('salary_adjustments_status_idx').on(table.tenantId, table.status) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), employeeId: uuid('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }), kind: text('kind').notNull(), componentCode: text('component_code').notNull(), valueText: numeric('value_text', cashValue).notNull(), startsOn: date('starts_on').notNull(), endsOn: date('ends_on'), recurring: boolean('recurring').notNull().default(false), subFromSalary: boolean('sub_from_salary').notNull().default(false), status: text('status').notNull().default('draft'), cashLocationId: uuid('cash_location_id').references(() => cashLocations.id, { onDelete: 'set null' }), journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'set null' }), reason: text('reason'),
+  /** 🎁 رقم السند — `frmEmpSalaryAddSub.xaml.cs` L225 `LoadNextNumber`: `MAX(id)+1`. */
+  number: text('number'),
+  /** 🎁 النوع — `cmbType` over `SalaryAddSubTypes`. */
+  typeId: uuid('type_id').references(() => salaryAdjustmentTypes.id, { onDelete: 'restrict' }),
+  /** 🎁 طريقة الدفع — `rdCash` (نقدي) | `rdCheck` (بنكي); the صندوق or البنك is `cashLocationId`. */
+  paymentMethod: text('payment_method'),
+  ...baseAuditColumns(),
+  ...baseSoftDeleteColumns(),
+  ...baseLegacyColumns(),
+}, (table) => ({ employeeIdx: index('salary_adjustments_employee_idx').on(table.tenantId, table.employeeId, table.startsOn), statusIdx: index('salary_adjustments_status_idx').on(table.tenantId, table.status), numberKey: uniqueIndex('salary_adjustments_tenant_number_key').on(table.tenantId, table.number).where(sql`deleted_at IS NULL AND number IS NOT NULL`), typeIdx: index('salary_adjustments_type_idx').on(table.tenantId, table.typeId) }));
 
 export const payrollRuns = pgTable('payroll_runs', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), periodId: uuid('period_id').references(() => fiscalPeriods.id, { onDelete: 'restrict' }), yearMonth: text('year_month').notNull(), status: text('status').notNull().default('draft'), currency: text('currency').notNull().default('SAR'), summary: jsonb('summary').$type<Record<string, unknown>>().notNull().default({}), journalEntryId: uuid('journal_entry_id').references(() => journalEntries.id, { onDelete: 'set null' }), voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }), postedAt: timestamp('posted_at', { withTimezone: true }), paidAt: timestamp('paid_at', { withTimezone: true }), reversedAt: timestamp('reversed_at', { withTimezone: true }), reversalReason: text('reversal_reason'), ...baseAuditColumns(), ...baseLegacyColumns(),

@@ -12,11 +12,15 @@
  *   4. إجمالي الرواتب والمستحقات — مجموع البدلات السبعة
  *   5. قائمة الموظفين — البحث بالاسم وبالرقم، والتضييق بالإدارة
  *   6. الحذف — «لا يمكن حذف موظف مرتبط بمستخدم»، ثم حذف موظف بلا ارتباط
+ *   7. 🎁 الحوافز والجزاءات — الأنواع الثلاثة، الرفوض الأربعة، «رقم السند»، الملاحظة
+ *      التي تُكتب نفسها، وقيد السلفة والمكافأة (`frmEmpSalaryAddSub`)
  *
  * The two other refusals («لا يمكن حذف موظف مرتبط بفواتير» and the payroll one) are in
- * `apps/api/test/employee-card.spec.ts`: they leave an invoice and a payroll run behind,
- * and this script leaves nothing — every row it creates, it deletes, so it can be run
- * twice in a row.
+ * `apps/api/test/employee-card.spec.ts`: they leave an invoice and a payroll run behind.
+ * This script cleans up after itself — every row it creates, it deletes, so it can be run
+ * twice in a row — with one exception worth naming: the سلفة it pays out in section 7
+ * becomes a real posted document, and a posted entry is not something a verification
+ * script may quietly erase.
  *
  * Usage: node scripts/verify-hrm.mjs
  */
@@ -226,12 +230,117 @@ const sectionWithEmployees = await refused('delete', `/hrm/departments/${section
 check('لا يمكن حذف قسم عليه موظفون', sectionWithEmployees.status === 409 && sectionWithEmployees.code === 'DEPARTMENT_IN_USE', sectionWithEmployees.detail);
 
 // ---------------------------------------------------------------------------
+// 7. 🎁 الحوافز والجزاءات — `Form_WPF/frmEmpSalaryAddSub.xaml` «إدخال الحوافز والخصومات
+// للموظفين». The window's grid prints `الموظف · النوع · المبلغ · التاريخ`, its four
+// refusals are `ValidateInputs` L566, its «رقم السند» is `LoadNextNumber` L225, and its
+// note writes itself when the clerk leaves it empty (L665).
+// ---------------------------------------------------------------------------
+console.log('\n7. 🎁 الحوافز والجزاءات — إدخال الحوافز والخصومات للموظفين');
+
+const today = new Date().toISOString().slice(0, 10);
+const madeAdjustments = [];
+const types = await get('/hrm/adjustment-types');
+const bonusType = types.find((row) => row.code === 'bonus');
+const deductionType = types.find((row) => row.code === 'deduction');
+const advanceType = types.find((row) => row.code === 'advance');
+check(
+  'الأنواع الثلاثة — مكافأة إضافة، وخصم وسلفة خصمان',
+  bonusType?.name === 'مكافأة' && bonusType?.kind === 'addition' &&
+    deductionType?.name === 'خصم' && deductionType?.kind === 'deduction' &&
+    advanceType?.name === 'سلفة' && advanceType?.kind === 'deduction',
+  types.map((row) => `${row.name}/${row.kind}`).join(' · '),
+);
+
+const nobody = await refused('post', '/hrm/adjustments', { employeeId: '00000000-0000-0000-0000-000000000000', typeId: bonusType.id, valueText: '100', startsOn: today });
+check('يجب اختيار موظف', nobody.detail === 'يجب اختيار موظف', `${nobody.status} ${nobody.code}`);
+const noType = await refused('post', '/hrm/adjustments', { employeeId: employee.id, valueText: '100', startsOn: today });
+check('يجب اختيار نوع الإجراء', noType.detail === 'يجب اختيار نوع الإجراء', `${noType.status} ${noType.code}`);
+const noValue = await refused('post', '/hrm/adjustments', { employeeId: employee.id, typeId: bonusType.id, valueText: '0', startsOn: today, subFromSalary: true });
+check('يجب إدخال مبلغ', noValue.detail === 'يجب إدخال مبلغ', `${noValue.status} ${noValue.code}`);
+const noLocation = await refused('post', '/hrm/adjustments', { employeeId: employee.id, typeId: advanceType.id, valueText: '100', startsOn: today, subFromSalary: false });
+check('يجب اختيار الصندوق أو البنك', noLocation.detail === 'يجب اختيار الصندوق أو البنك', `${noLocation.status} ${noLocation.code}`);
+
+const noteA = await post('/hrm/adjustments', { employeeId: employee.id, typeId: bonusType.id, valueText: '150', startsOn: today, subFromSalary: true });
+const noteB = await post('/hrm/adjustments', { employeeId: employee.id, typeId: advanceType.id, valueText: '150', startsOn: today, subFromSalary: true });
+madeAdjustments.push(noteA.id, noteB.id);
+check('رقم السند يتسلسل', Number(noteB.number) === Number(noteA.number) + 1, `${noteA.number} → ${noteB.number}`);
+check('الملاحظة تُكتب نفسها', noteA.reason === `مكافأة للموظف ${renamed.name}` && noteB.reason === `سلفة للموظف ${renamed.name}`, noteA.reason);
+
+const expenseAccount = (await get('/accounts?q=3122001')).find((row) => row.code === '3122001');
+const till = (await get('/cash-locations')).find((row) => row.kind === 'safe' && row.accountId);
+const advance = await post('/hrm/adjustments', {
+  employeeId: employee.id,
+  typeId: advanceType.id,
+  valueText: '500',
+  startsOn: today,
+  subFromSalary: false,
+  paymentMethod: 'cash',
+  cashLocationId: till.id,
+});
+madeAdjustments.push(advance.id);
+check('سلفة تُصرف الآن تصبح مرحَّلة', advance.status === 'approved' && Boolean(advance.journalEntryId), `${advance.status} · قيد ${advance.journalEntryId ? 'نعم' : 'لا'}`);
+
+const advanceLines = await get(`/journal-entries/${advance.journalEntryId}`);
+const advanceLinesList = advanceLines.lines ?? [];
+check(
+  'قيد السلفة — مدين حساب الموظف، دائن الصندوق',
+  advanceLinesList.some((line) => line.accountId === employee.employeeAccountId && Number(line.debit) === 500) &&
+    advanceLinesList.some((line) => line.accountId === till.accountId && Number(line.credit) === 500),
+  advanceLinesList.map((line) => `${Number(line.debit) > 0 ? 'مدين' : 'دائن'} ${Number(line.debit) || Number(line.credit)}`).join(' · '),
+);
+
+if (expenseAccount) {
+  const bonus = await post('/hrm/adjustments', {
+    employeeId: employee.id,
+    typeId: bonusType.id,
+    valueText: '300',
+    startsOn: today,
+    subFromSalary: false,
+    paymentMethod: 'cash',
+    cashLocationId: till.id,
+  });
+  const bonusLines = (await get(`/journal-entries/${bonus.journalEntryId}`)).lines ?? [];
+  check(
+    'قيد المكافأة — مدين «راتب أساسي»، دائن الصندوق',
+    bonusLines.some((line) => line.accountId === expenseAccount.id && Number(line.debit) === 300) &&
+      bonusLines.some((line) => line.accountId === till.accountId && Number(line.credit) === 300),
+    `${expenseAccount.code} ${expenseAccount.nameAr}`,
+  );
+  madeAdjustments.push(bonus.id);
+}
+
+const onSalary = await post('/hrm/adjustments', { employeeId: employee.id, typeId: deductionType.id, valueText: '120', startsOn: today, subFromSalary: true });
+madeAdjustments.push(onSalary.id);
+check('ما يخصم من الراتب مسودة بلا قيد', onSalary.status === 'draft' && onSalary.journalEntryId === null, onSalary.status);
+const approvedAdjustment = await post(`/hrm/adjustments/${onSalary.id}/approve`, {});
+check('الاعتماد يدخلها مسير الرواتب', approvedAdjustment.status === 'approved', approvedAdjustment.status);
+
+const monthPreview = await post('/hrm/payroll/preview', { yearMonth: today.slice(0, 7) });
+const previewLine = (monthPreview.lines ?? []).find((row) => row.employeeId === employee.id);
+check('تظهر في استحقاق الشهر', Number(previewLine?.deductions ?? 0) >= 120, String(previewLine?.deductions ?? '—'));
+
+const postedRefusal = await refused('delete', `/hrm/adjustments/${advance.id}`);
+check('لا يمكن حذف حركة مرحَّلة', postedRefusal.status === 409 && postedRefusal.code === 'ADJUSTMENT_POSTED', postedRefusal.detail);
+const deletedDraft = await del(`/hrm/adjustments/${onSalary.id}`);
+check('حذف مسودة', deletedDraft.deleted === true && (await refused('get', `/hrm/adjustments/${onSalary.id}`)).status === 404);
+
+const listedAdjustments = await get(`/hrm/adjustments?employee_id=${employee.id}`);
+check('القائمة تحمل أسماء الموظف والنوع والصندوق', listedAdjustments.every((row) => row.employeeName && row.typeName), `${listedAdjustments.length} صف`);
+
+const usedType = await refused('delete', `/hrm/adjustment-types/${bonusType.id}`);
+check('لا يمكن حذف نوع مستخدم في حركات', usedType.status === 409 && usedType.detail === 'لا يمكن حذف نوع مستخدم في حركات', `${usedType.status} ${usedType.code}`);
+
+// ---------------------------------------------------------------------------
 // Cleanup — what this run created, removed again.
 // ---------------------------------------------------------------------------
+// Only what this run created — the demo tenant's own حوافز must survive a verification.
+for (const id of madeAdjustments) await refused('delete', `/hrm/adjustments/${id}`);
 for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'))) await refused('delete', `/hrm/employees/${row.id}`);
 for (const row of (await get('/hrm/departments')).filter((entry) => String(entry.code).startsWith('VR'))) await refused('delete', `/hrm/departments/${row.id}`);
 const remaining = (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'));
 check('لا يبقى أثر بعد التشغيل', remaining.length === 0, `${remaining.length} صف`);
+const remainingAdjustments = (await get('/hrm/adjustments')).filter((row) => madeAdjustments.includes(row.id));
+check('تبقى الحركات المرحَّلة وحدها', remainingAdjustments.every((row) => row.status === 'approved' && row.journalEntryId), `${remainingAdjustments.length} صف`);
 
-console.log(failures === 0 ? '\n✔ Phase 08 part one — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام verified' : `\n✗ ${failures} check(s) failed`);
+console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

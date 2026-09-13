@@ -3,9 +3,25 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { alias } from 'drizzle-orm/pg-core';
-import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
-import { accounts, attendanceLogs, departments, employees, jobs, payrollRunLines, payrollRuns, salaryAdjustments, tenantSettings, withTenantTx, type DatabaseHandle, type Employee } from '@erp/database';
+import {
+  accounts,
+  attendanceLogs,
+  cashLocations,
+  departments,
+  employees,
+  jobs,
+  payrollRunLines,
+  payrollRuns,
+  salaryAdjustments,
+  salaryAdjustmentTypes,
+  tenantSettings,
+  withTenantTx,
+  type DatabaseHandle,
+  type DrizzleTx,
+  type Employee,
+} from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService, defaultNormalBalance, type AccountType, type JournalLineInput } from '../accounting/accounting.service.js';
@@ -68,7 +84,29 @@ export const SALARY_COMPONENT_LABELS: Record<string, string> = {
   fixedBonus: 'مكافأة ثابتة',
   other: 'أخرى',
 };
-export type AdjustmentInput = { employeeId: string; kind: 'addition' | 'deduction'; componentCode: string; valueText: string; startsOn: string; endsOn?: string; recurring?: boolean; subFromSalary?: boolean; cashLocationId?: string; reason?: string };
+export type AdjustmentTypeInput = { code: string; name: string; kind: 'addition' | 'deduction'; sortOrder?: number; isActive?: boolean };
+export type AdjustmentTypePatch = Partial<AdjustmentTypeInput>;
+export type AdjustmentInput = {
+  employeeId: string;
+  /** 🎁 النوع — `cmbType` over `SalaryAddSubTypes`; `kind` follows it unless sent. */
+  typeId?: string;
+  typeCode?: string;
+  kind?: 'addition' | 'deduction';
+  componentCode?: string;
+  valueText: string;
+  startsOn: string;
+  endsOn?: string;
+  recurring?: boolean;
+  /** ✅ تضاف على الراتب / ✂️ تخصم من الراتب — `ChkSubSalary`. */
+  subFromSalary?: boolean;
+  /** 🎁 طريقة الدفع — `rdCash` | `rdCheck`. */
+  paymentMethod?: 'cash' | 'bank';
+  cashLocationId?: string;
+  reason?: string;
+  /** Post the document's entry at once (the desktop always does); `false` for a draft. */
+  postEntry?: boolean;
+};
+export type AdjustmentQuery = { employeeId?: string; typeCode?: string; status?: string; from?: string; to?: string };
 export type RunInput = { yearMonth: string; periodId?: string; currency?: string; unpaidDaysByEmployee?: Record<string, number> };
 export type PostRunInput = { journalEntryId?: string; branchId?: string; fiscalPeriodId?: string; journalLines?: JournalLineInput[] };
 export type PayRunInput = { branchId: string; cashLocationId: string; method?: 'cash' | 'cheque' | 'bank_transfer' | 'card'; fiscalPeriodId?: string };
@@ -388,8 +426,259 @@ export class HrmService {
 
   async attendanceSummary(tenantId: string, enroll: string, from: string, to: string) { await this.ensureEnabled(tenantId); const rows = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(attendanceLogs).where(and(eq(attendanceLogs.tenantId, tenantId), eq(attendanceLogs.enroll, enroll), gte(attendanceLogs.punchAt, new Date(from)), lte(attendanceLogs.punchAt, new Date(to)))).orderBy(attendanceLogs.punchAt)); let minutes = new Decimal(0); let open: Date | undefined; for (const row of rows) { if (row.direction === 'in') open = row.punchAt; else if (row.direction === 'out' && open) { minutes = minutes.plus(new Decimal(row.punchAt.getTime() - open.getTime()).div(60_000)); open = undefined; } } return { data: { enroll, punches: rows.length, workingHours: minutes.div(60).toFixed(2), method: 'naive in/out pairing; no RC-10 evaluation engine' } }; }
 
-  async listAdjustments(tenantId: string) { await this.ensureEnabled(tenantId); return { data: await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(eq(salaryAdjustments.tenantId, tenantId)).orderBy(desc(salaryAdjustments.createdAt)).limit(200)) }; }
-  async createAdjustment(tenantId: string, input: AdjustmentInput) { await this.ensureEnabled(tenantId); if (new Decimal(input.valueText).lte(0)) throw new DomainError('VALIDATION_FAILED', 'Adjustment value must be positive', 422); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(salaryAdjustments).values({ id: newId(), tenantId, employeeId: input.employeeId, kind: input.kind, componentCode: input.componentCode, valueText: input.valueText, startsOn: input.startsOn, endsOn: input.endsOn, recurring: input.recurring ?? false, subFromSalary: input.subFromSalary ?? input.kind === 'deduction', cashLocationId: input.cashLocationId, reason: input.reason }).returning()); return row; }
+  // ---------------------------------------------------------------------------
+  // 🎁 الحوافز والجزاءات — `Form_WPF/frmEmpSalaryAddSub.xaml`
+  // ---------------------------------------------------------------------------
+
+  async listAdjustmentTypes(tenantId: string) {
+    await this.ensureEnabled(tenantId);
+    return withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(salaryAdjustmentTypes).where(and(eq(salaryAdjustmentTypes.tenantId, tenantId), isNull(salaryAdjustmentTypes.deletedAt))).orderBy(asc(salaryAdjustmentTypes.sortOrder), asc(salaryAdjustmentTypes.code)));
+  }
+
+  async createAdjustmentType(tenantId: string, input: AdjustmentTypeInput) {
+    await this.ensureEnabled(tenantId);
+    const name = input.name?.trim();
+    if (!name) throw new DomainError('ADJUSTMENT_TYPE_NAME_REQUIRED', 'يجب إدخال اسم النوع', 422);
+    if (input.kind !== 'addition' && input.kind !== 'deduction') throw new DomainError('ADJUSTMENT_TYPE_KIND_INVALID', 'نوع الإجراء إضافة أو خصم فقط', 422);
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(salaryAdjustmentTypes).values({ id: newId(), tenantId, code: input.code.trim(), name, kind: input.kind, sortOrder: input.sortOrder ?? 0, isActive: input.isActive ?? true }).returning());
+    return row;
+  }
+
+  async updateAdjustmentType(tenantId: string, id: string, patch: AdjustmentTypePatch) {
+    await this.ensureEnabled(tenantId);
+    if (patch.name !== undefined && !patch.name.trim()) throw new DomainError('ADJUSTMENT_TYPE_NAME_REQUIRED', 'يجب إدخال اسم النوع', 422);
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salaryAdjustmentTypes).set({
+      ...(patch.code === undefined ? {} : { code: patch.code.trim() }),
+      ...(patch.name === undefined ? {} : { name: patch.name.trim() }),
+      ...(patch.kind === undefined ? {} : { kind: patch.kind }),
+      ...(patch.sortOrder === undefined ? {} : { sortOrder: patch.sortOrder }),
+      ...(patch.isActive === undefined ? {} : { isActive: patch.isActive }),
+      updatedAt: new Date(),
+    }).where(and(eq(salaryAdjustmentTypes.tenantId, tenantId), eq(salaryAdjustmentTypes.id, id), isNull(salaryAdjustmentTypes.deletedAt))).returning());
+    if (!row) throw new DomainError('NOT_FOUND', 'Adjustment type not found', 404);
+    return row;
+  }
+
+  async deleteAdjustmentType(tenantId: string, id: string) {
+    await this.ensureEnabled(tenantId);
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const used = await tx.execute(sql`SELECT EXISTS (SELECT 1 FROM salary_adjustments WHERE tenant_id = ${tenantId} AND type_id = ${id} AND deleted_at IS NULL) AS used`);
+      if ((rowsOf(used)[0] as { used: boolean }).used) throw new DomainError('ADJUSTMENT_TYPE_IN_USE', 'لا يمكن حذف نوع مستخدم في حركات', 409);
+      const result = await tx.update(salaryAdjustmentTypes).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(salaryAdjustmentTypes.tenantId, tenantId), eq(salaryAdjustmentTypes.id, id), isNull(salaryAdjustmentTypes.deletedAt)));
+      if (!result.rowCount) throw new DomainError('NOT_FOUND', 'Adjustment type not found', 404);
+      return { id, deleted: true };
+    });
+  }
+
+  /**
+   * 🎁 قائمة الحركات — `frmEmpSalaryAddSub` `LoadGrid` prints
+   * `RecordId · EmpId · EmpName · Value · TypeName · RecordDate` and narrows it by
+   * employee and by `من`/`إلى` date. The cloud's list was the last 200 rows with none of
+   * that, and no name on any row.
+   */
+  async listAdjustments(tenantId: string, query: AdjustmentQuery = {}) {
+    await this.ensureEnabled(tenantId);
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({
+          row: salaryAdjustments,
+          employeeName: employees.name,
+          employeeNo: employees.employeeNo,
+          typeName: salaryAdjustmentTypes.name,
+          typeCode: salaryAdjustmentTypes.code,
+          typeKind: salaryAdjustmentTypes.kind,
+          cashLocationName: cashLocations.name,
+        })
+        .from(salaryAdjustments)
+        .leftJoin(employees, eq(employees.id, salaryAdjustments.employeeId))
+        .leftJoin(salaryAdjustmentTypes, eq(salaryAdjustmentTypes.id, salaryAdjustments.typeId))
+        .leftJoin(cashLocations, eq(cashLocations.id, salaryAdjustments.cashLocationId))
+        .where(
+          and(
+            eq(salaryAdjustments.tenantId, tenantId),
+            isNull(salaryAdjustments.deletedAt),
+            query.employeeId ? eq(salaryAdjustments.employeeId, query.employeeId) : undefined,
+            query.status ? eq(salaryAdjustments.status, query.status) : undefined,
+            query.from ? gte(salaryAdjustments.startsOn, query.from) : undefined,
+            query.to ? lte(salaryAdjustments.startsOn, query.to) : undefined,
+            query.typeCode ? eq(salaryAdjustmentTypes.code, query.typeCode) : undefined,
+          ),
+        )
+        .orderBy(desc(salaryAdjustments.startsOn), desc(salaryAdjustments.createdAt))
+        .limit(200));
+    return { data: rows.map((entry) => ({ ...entry.row, employeeName: entry.employeeName ?? null, employeeNo: entry.employeeNo ?? null, typeName: entry.typeName ?? null, typeCode: entry.typeCode ?? null, typeKind: entry.typeKind ?? null, cashLocationName: entry.cashLocationName ?? null })) };
+  }
+
+  async readAdjustment(tenantId: string, id: string) {
+    await this.ensureEnabled(tenantId);
+    const { data } = await this.listAdjustments(tenantId);
+    const row = data.find((entry) => entry.id === id);
+    if (!row) throw new DomainError('NOT_FOUND', 'Adjustment not found', 404);
+    return row;
+  }
+
+  /**
+   * 🎁 إدخال الحوافز والخصومات للموظفين.
+   *
+   * `frmEmpSalaryAddSub.xaml.cs` L566 refuses four things in its own words —
+   * «يجب اختيار موظف» · «يجب اختيار نوع الإجراء» · «يجب إدخال مبلغ» ·
+   * «يجب اختيار الصندوق أو البنك» — writes «رقم السند» as `MAX(id)+1` (L225), fills the
+   * note itself when the clerk leaves it empty («مكافأة للموظف …», L665), and posts one
+   * journal entry per document (L718) that puts the employee's own account — the account
+   * Part One creates — on one side and the صندوق or البنك on the other.
+   */
+  async createAdjustment(tenantId: string, input: AdjustmentInput) {
+    await this.ensureEnabled(tenantId);
+    const [employee] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(employees).where(and(eq(employees.tenantId, tenantId), eq(employees.id, input.employeeId), isNull(employees.deletedAt))).limit(1));
+    if (!employee) throw new DomainError('ADJUSTMENT_EMPLOYEE_REQUIRED', 'يجب اختيار موظف', 422);
+
+    const type = await this.resolveAdjustmentType(tenantId, input);
+    if (!type) throw new DomainError('ADJUSTMENT_TYPE_REQUIRED', 'يجب اختيار نوع الإجراء', 422);
+
+    const value = new Decimal(input.valueText || '0');
+    if (!value.isFinite() || value.lte(0)) throw new DomainError('ADJUSTMENT_VALUE_REQUIRED', 'يجب إدخال مبلغ', 422);
+
+    const kind = input.kind ?? (type.kind === 'deduction' ? 'deduction' : 'addition');
+    const subFromSalary = input.subFromSalary ?? kind === 'deduction';
+
+    // ✂️ تخصم من الراتب means the payroll run carries it; anything else is money moving
+    // through a صندوق or a بنك today, and the desktop asks which one (`PopulateParameters`
+    // L846 writes `Cash` or `Bank`, never both).
+    let cashLocation: { id: string; name: string; branchId: string; accountId: string | null; kind: string } | undefined;
+    if (!subFromSalary) {
+      if (!input.cashLocationId) throw new DomainError('ADJUSTMENT_CASH_LOCATION_REQUIRED', 'يجب اختيار الصندوق أو البنك', 422);
+      const [location] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(cashLocations).where(and(eq(cashLocations.tenantId, tenantId), eq(cashLocations.id, input.cashLocationId!))).limit(1));
+      if (!location) throw new DomainError('ADJUSTMENT_CASH_LOCATION_REQUIRED', 'يجب اختيار الصندوق أو البنك', 422);
+      cashLocation = location;
+      const expected = input.paymentMethod ?? (cashLocation.kind === 'bank' ? 'bank' : 'cash');
+      const actual = cashLocation.kind === 'bank' ? 'bank' : 'cash';
+      if (expected !== actual) throw new DomainError('ADJUSTMENT_PAYMENT_METHOD_MISMATCH', 'طريقة الدفع لا تطابق الصندوق أو البنك المختار', 422);
+    }
+
+    const number = await withTenantTx(this.database.db, tenantId, (tx) => this.nextAdjustmentNumber(tx, tenantId));
+    const reason = input.reason?.trim() || `${type.name} للموظف ${employee.name}`;
+
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(salaryAdjustments).values({
+      id: newId(),
+      tenantId,
+      employeeId: employee.id,
+      kind,
+      componentCode: input.componentCode ?? type.code,
+      valueText: value.toFixed(4),
+      startsOn: input.startsOn,
+      endsOn: input.endsOn,
+      recurring: input.recurring ?? false,
+      subFromSalary,
+      cashLocationId: cashLocation?.id,
+      paymentMethod: cashLocation ? (cashLocation.kind === 'bank' ? 'bank' : 'cash') : undefined,
+      number,
+      typeId: type.id,
+      reason,
+    }).returning());
+    if (!row) throw new DomainError('INTERNAL', 'Adjustment was not created', 500);
+
+    if (subFromSalary || input.postEntry === false || !cashLocation) return this.readAdjustment(tenantId, row.id);
+
+    try {
+      const entry = await this.postAdjustmentEntry(tenantId, row.id, value.toFixed(4), kind, employee, cashLocation, reason, input.startsOn);
+      await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salaryAdjustments).set({ journalEntryId: entry.id, status: 'approved', updatedAt: new Date() }).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, row.id))));
+      return this.readAdjustment(tenantId, row.id);
+    } catch (error) {
+      // Nothing half-done: a document whose money did not move is not a document.
+      await withTenantTx(this.database.db, tenantId, (tx) => tx.delete(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, row.id))));
+      throw error;
+    }
+  }
+
+  /**
+   * `BindReceiptToEntry` L718 — one entry, two lines. A مكافأة debits the salary expense
+   * and credits the صندوق (money out for work done); a خصم or سلفة debits the employee's
+   * own account and credits the صندوق, which is what the window writes for every type
+   * other than 1: the employee now owes what the till handed over.
+   *
+   * A deliberate difference from the desktop: a مكافأة there debits the صندوق and
+   * credits the employee — cash growing where a bonus spends it. And an adjustment that
+   * rides the salary (`subFromSalary`) posts **no** entry here: the payroll run posts it
+   * once, instead of the desktop's immediate debit to «راتب أساسي» that the payroll then
+   * counts a second time.
+   */
+  private async postAdjustmentEntry(tenantId: string, adjustmentId: string, value: string, kind: 'addition' | 'deduction', employee: Employee, cashLocation: { id: string; name: string; branchId: string; accountId: string | null }, reason: string, date: string) {
+    if (!cashLocation.accountId) throw new DomainError('ADJUSTMENT_CASH_ACCOUNT_REQUIRED', 'الصندوق أو البنك بلا حساب في دليل الحسابات', 422);
+    const employeeAccountId = employee.employeeAccountId ?? (await this.employeeAccount(tenantId, employee.id, employee.name, employee.branchId, undefined, undefined))?.id;
+    if (!employeeAccountId) throw new DomainError('ADJUSTMENT_EMPLOYEE_ACCOUNT_REQUIRED', 'لا يوجد حساب للموظف في دليل الحسابات', 422);
+    const expenseAccountId = employee.salaryExpenseAccountId ?? (await this.accountByCode(tenantId, '3122001'))?.id;
+    if (kind === 'addition' && !expenseAccountId) throw new DomainError('ADJUSTMENT_EXPENSE_ACCOUNT_REQUIRED', 'لا يوجد حساب راتب أساسي في دليل الحسابات', 422);
+    const entry = await this.accounting.postJournal(tenantId, {
+      branchId: cashLocation.branchId,
+      date,
+      description: reason,
+      sourceType: 'salary_adjustment',
+      sourceId: adjustmentId,
+      lines: kind === 'addition'
+        ? [
+            { accountId: expenseAccountId!, debit: value, credit: '0' },
+            { accountId: cashLocation.accountId, debit: '0', credit: value },
+          ]
+        : [
+            { accountId: employeeAccountId, debit: value, credit: '0' },
+            { accountId: cashLocation.accountId, debit: '0', credit: value },
+          ],
+    });
+    if (!entry?.id) throw new DomainError('INTERNAL', 'Adjustment entry was not posted', 500);
+    return entry;
+  }
+
+  private async resolveAdjustmentType(tenantId: string, input: AdjustmentInput) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      if (input.typeId) {
+        const [row] = await tx.select().from(salaryAdjustmentTypes).where(and(eq(salaryAdjustmentTypes.tenantId, tenantId), eq(salaryAdjustmentTypes.id, input.typeId), isNull(salaryAdjustmentTypes.deletedAt))).limit(1);
+        return row;
+      }
+      if (input.typeCode) {
+        const [row] = await tx.select().from(salaryAdjustmentTypes).where(and(eq(salaryAdjustmentTypes.tenantId, tenantId), eq(salaryAdjustmentTypes.code, input.typeCode), isNull(salaryAdjustmentTypes.deletedAt))).limit(1);
+        return row;
+      }
+      return undefined;
+    });
+  }
+
+  private async accountByCode(tenantId: string, code: string) {
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(accounts).where(and(eq(accounts.tenantId, tenantId), eq(accounts.code, code), isNull(accounts.deletedAt))).limit(1));
+    return row;
+  }
+
+  /** «رقم السند» — `LoadNextNumber` L225: the highest number on the books, plus one. */
+  private async nextAdjustmentNumber(tx: DrizzleTx, tenantId: string) {
+    const rows = await tx.select({ number: salaryAdjustments.number }).from(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), isNotNull(salaryAdjustments.number)));
+    let highest = 0;
+    for (const row of rows) {
+      const parsed = Number(row.number);
+      if (Number.isFinite(parsed) && parsed > highest) highest = parsed;
+    }
+    return String(highest + 1);
+  }
+
+  /**
+   * `IconButton9_Click` L449 deletes with «⚠️ هل أنت متأكد من الحذف؟» and sets
+   * `IS_Deleted = 1`. The cloud refuses two cases the desktop does not consider: a
+   * document whose entry is already posted (deleting a document is not how a ledger is
+   * corrected — `POST /journal-entries/:id/reverse` is), and one a posted payroll run has
+   * already counted.
+   */
+  async deleteAdjustment(tenantId: string, id: string) {
+    await this.ensureEnabled(tenantId);
+    const [current] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, id), isNull(salaryAdjustments.deletedAt))).limit(1));
+    if (!current) throw new DomainError('NOT_FOUND', 'Adjustment not found', 404);
+    if (current.journalEntryId) throw new DomainError('ADJUSTMENT_POSTED', 'لا يمكن حذف حركة مرحَّلة — يُعكس قيدها أولاً', 409);
+    if (current.status === 'approved') {
+      const counted = await withTenantTx(this.database.db, tenantId, (tx) => tx.select({ id: payrollRuns.id }).from(payrollRuns).where(and(eq(payrollRuns.tenantId, tenantId), eq(payrollRuns.yearMonth, current.startsOn.slice(0, 7)), or(eq(payrollRuns.status, 'posted'), eq(payrollRuns.status, 'paid')))).limit(1));
+      if (counted.length) throw new DomainError('ADJUSTMENT_IN_PAYROLL', 'لا يمكن حذف حركة دخلت مسير رواتب مُرحَّل', 409);
+    }
+    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salaryAdjustments).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, id))));
+    return { id, deleted: true };
+  }
+
   async approveAdjustment(tenantId: string, id: string) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.update(salaryAdjustments).set({ status: 'approved', updatedAt: new Date() }).where(and(eq(salaryAdjustments.tenantId, tenantId), eq(salaryAdjustments.id, id), eq(salaryAdjustments.status, 'draft'))).returning()); if (!row) throw new DomainError('NOT_FOUND', 'Draft adjustment not found', 404); return row; }
 
   async preview(tenantId: string, input: RunInput) { await this.ensureEnabled(tenantId); const staff = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(employees).where(and(eq(employees.tenantId, tenantId), eq(employees.status, 'active'), isNull(employees.deletedAt)))); const activeAdjustments = await this.adjustmentsForMonth(tenantId, input.yearMonth); const lines = staff.map((employee) => calculatePayrollLine({ id: employee.id, name: employee.name, components: employee.salaryComponents, unpaidDays: input.unpaidDaysByEmployee?.[employee.id] ?? 0, adjustments: activeAdjustments.filter((entry) => entry.employeeId === employee.id).map((entry) => ({ kind: entry.kind as 'addition' | 'deduction', valueText: entry.valueText })) })); return { data: { yearMonth: input.yearMonth, employeeCount: lines.length, netPayable: sumLines(lines.map((line) => line.net)), lines } }; }
