@@ -160,6 +160,59 @@ function entryTypeOf(row: {
 }
 
 export type AccountPatch = Partial<AccountInput> & { allowManual?: boolean };
+/**
+ * 🌳 شجرة مراكز التكلفة — `Form_WPF/frmCostCenter.xaml` shows every centre in a tree
+ * (`LoadTree` / `BuildTreeNodes`, joining `ParentCode`) and `frmCostCenterBalance.xaml`
+ * («تقرير مركز كلفة») reports one of them with its balance. `withBalances` adds the
+ * figure the cloud's list never carried: the centre's own movement plus its children's,
+ * from **posted** entries only.
+ */
+export type CostCenterQuery = {
+  q?: string;
+  branchId?: string;
+  withBalances?: boolean;
+};
+
+export type CostCenterBalance = {
+  ownDebit: string;
+  ownCredit: string;
+  /** رصيد المركز وحده دون أبنائه. */
+  ownBalance: string;
+  /** الرصيد مضافاً إليه أبناؤه — ما تُظهره الشجرة على العقدة الأب. */
+  debit: string;
+  credit: string;
+  balance: string;
+  children: number;
+};
+
+/** `📑 نوع التقرير` and the period filters of `frmCostCenterBalance`. */
+export type CostCenterStatementQuery = {
+  from?: string;
+  to?: string;
+  branchId?: string;
+  /** `اسم الحساب` — narrow the centre's report to one account. */
+  accountId?: string;
+  /** `تجميعي` collapses the lines of one entry; the default is `تفصيلي`. */
+  summary?: boolean;
+  fullPeriod?: boolean;
+  hidePreviousBalance?: boolean;
+};
+
+/** A cost centre as the list returns it — and, with `withBalances`, its node's balance. */
+export type CostCenterRow = {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string | null;
+  parentId: string | null;
+  branchId: string | null;
+  parentName?: string | null;
+  level?: number;
+  /** 🏷️ النوع — `🟢 رئيسي` / `🔵 فرعي`. */
+  kind?: 'main' | 'sub';
+  balance?: CostCenterBalance;
+};
+
 export type CostCenterPatch = Partial<CostCenterInput>;
 
 export type CostCenterInput = {
@@ -561,8 +614,40 @@ export class AccountingService {
       const lines = await tx.select().from(journalEntryLines).where(eq(journalEntryLines.entryId, entryId));
       const reversalId = newId();
       await tx.insert(journalEntries).values({ id: reversalId, tenantId, branchId: input.branchId, fiscalPeriodId: input.fiscalPeriodId, date: input.date, kind: 'reversal', status: 'posted', description: input.reason, reversalOf: entryId, postedAt: new Date() });
-      await tx.insert(journalEntryLines).values(lines.map((line) => ({ entryId: reversalId, lineNo: line.lineNo, tenantId, accountId: line.accountId, debit: line.credit, credit: line.debit, partyId: line.partyId, description: line.description })));
-      await tx.update(journalEntries).set({ status: 'void', updatedAt: new Date() }).where(eq(journalEntries.id, entryId));
+      /**
+       * The mirror of every line — amounts swapped *and every dimension carried*. A
+       * reversal that drops the cost centre, the branch or the salesman leaves those
+       * reports holding money the ledger no longer has: 🌳 شجرة مراكز التكلفة would keep
+       * spending that was reversed, which is exactly what it did until migration `0047`
+       * made the `void` below stick.
+       */
+      await tx.insert(journalEntryLines).values(lines.map((line) => ({
+        entryId: reversalId,
+        lineNo: line.lineNo,
+        tenantId,
+        accountId: line.accountId,
+        debit: line.credit,
+        credit: line.debit,
+        partyId: line.partyId,
+        costCenterId: line.costCenterId,
+        salesmanId: line.salesmanId,
+        branchId: line.branchId,
+        currencyCode: line.currencyCode,
+        currencyAmount: line.currencyAmount,
+        fxRate: line.fxRate,
+        description: line.description,
+      })));
+      /**
+       * The original keeps its status, on purpose. The reversal is the mirror of its
+       * lines — debit for credit — so the two together already net to nothing; marking
+       * the original `void` as well would subtract the amount twice, since every balance
+       * in this module counts `status = 'posted'` only. What the reversal leaves behind
+       * is `reversalOf`, which is how the register knows an entry was undone.
+       *
+       * (Until migration `0047` this line ran and did nothing: the immutability trigger
+       * allowed the `void` and then returned `OLD`, discarding it. Which is the only
+       * reason a reversal ever balanced.)
+       */
       return { id: reversalId, reversalOf: entryId };
     });
   }
@@ -1001,14 +1086,313 @@ export class AccountingService {
 
   // -------------------------------------------------------------- cost centres
 
-  async listCostCenters(tenantId: string) {
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      tx
+  async listCostCenters(tenantId: string, query: CostCenterQuery = {}): Promise<CostCenterRow[]> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await tx
         .select()
         .from(costCenters)
-        .where(and(eq(costCenters.tenantId, tenantId), isNull(costCenters.deletedAt)))
-        .orderBy(asc(costCenters.code)),
-    );
+        .where(
+          and(
+            eq(costCenters.tenantId, tenantId),
+            isNull(costCenters.deletedAt),
+            query.branchId ? eq(costCenters.branchId, query.branchId) : undefined,
+            query.q
+              ? or(ilike(costCenters.code, `%${query.q}%`), ilike(costCenters.nameAr, `%${query.q}%`))
+              : undefined,
+          ),
+        )
+        .orderBy(asc(costCenters.code));
+      if (!query.withBalances) return rows;
+
+      const movements = await tx
+        .select({
+          costCenterId: journalEntryLines.costCenterId,
+          debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+          credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+        })
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .where(
+          and(
+            eq(journalEntryLines.tenantId, tenantId),
+            eq(journalEntries.status, 'posted'),
+            sql`${journalEntryLines.costCenterId} IS NOT NULL`,
+          ),
+        )
+        .groupBy(journalEntryLines.costCenterId);
+
+      const own = new Map<string, { debit: Decimal; credit: Decimal }>();
+      for (const row of movements) {
+        if (!row.costCenterId) continue;
+        own.set(row.costCenterId, { debit: money(row.debit), credit: money(row.credit) });
+      }
+
+      // A cost centre's children are reached through `parent_id`; every ancestor of a row
+      // is found by walking up, and the balance follows the same path downwards.
+      const parentOf = new Map(rows.map((row) => [row.id, row.parentId ?? null]));
+      const rolled = new Map<string, { debit: Decimal; credit: Decimal; children: number }>();
+      for (const row of rows) {
+        const self = own.get(row.id) ?? { debit: new Decimal(0), credit: new Decimal(0) };
+        rolled.set(row.id, { debit: self.debit, credit: self.credit, children: 0 });
+      }
+      for (const row of rows) {
+        const self = rolled.get(row.id)!;
+        let parentId = parentOf.get(row.id) ?? null;
+        const seen = new Set<string>([row.id]);
+        while (parentId && !seen.has(parentId)) {
+          seen.add(parentId);
+          const target = rolled.get(parentId);
+          if (!target) break;
+          target.debit = target.debit.plus(self.debit);
+          target.credit = target.credit.plus(self.credit);
+          target.children += 1;
+          parentId = parentOf.get(parentId) ?? null;
+        }
+      }
+
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const levelOf = (row: (typeof rows)[number]): number => {
+        let level = 0;
+        let parentId = row.parentId ?? null;
+        const seen = new Set<string>([row.id]);
+        while (parentId && !seen.has(parentId)) {
+          seen.add(parentId);
+          const parent = byId.get(parentId);
+          if (!parent) break;
+          level += 1;
+          parentId = parent.parentId ?? null;
+        }
+        return level;
+      };
+
+      return rows.map((row) => {
+        const self = own.get(row.id) ?? { debit: new Decimal(0), credit: new Decimal(0) };
+        const subtree = rolled.get(row.id)!;
+        const totals: CostCenterBalance = {
+          ownDebit: self.debit.toFixed(4),
+          ownCredit: self.credit.toFixed(4),
+          ownBalance: self.debit.minus(self.credit).toFixed(4),
+          debit: subtree.debit.toFixed(4),
+          credit: subtree.credit.toFixed(4),
+          balance: subtree.debit.minus(subtree.credit).toFixed(4),
+          children: subtree.children,
+        };
+        return {
+          ...row,
+          parentName: row.parentId ? (byId.get(row.parentId)?.nameAr ?? null) : null,
+          level: levelOf(row),
+          /** 🏷️ النوع — `🟢 رئيسي` / `🔵 فرعي`, exactly as the window's radio buttons read. */
+          kind: row.parentId ? 'sub' : 'main',
+          balance: totals,
+        };
+      });
+    });
+  }
+
+  /**
+   * 📊 كشف مركز الكلفة — `Form_WPF/frmCostCenterBalance.xaml` («تقرير مركز كلفة»).
+   *
+   * The report is the account statement pointed at a cost centre instead of an account:
+   * `م · 💸 مدين · 💰 دائن · ⚖️ الرصيد · 📌 الحالة · 🔢 الرقم العام · 📄 رقم السند`, with
+   * الفرع · النوع · التاريخ · البيان as well (`BuildDataTable`), the same `رصيد سابق`
+   * row when a period is set, and the same `تجميعي`/`تفصيلي` choice (`deptExpr` vs
+   * `GROUP BY`, L245–L255).
+   *
+   * One difference is deliberate: the window guesses the centre's nature from the first
+   * character of its code (`costCenterCode.Substring(0, 1)`, L236), the same trick it
+   * uses for accounts. A cost centre accumulates costs, so here الرصيد grows on the
+   * debit side and `📌 الحالة` names the side the money is actually on.
+   */
+  async costCenterStatement(tenantId: string, centerId: string, query: CostCenterStatementQuery = {}) {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const rows = await this.listCostCenters(tenantId, { withBalances: true });
+      const center = rows.find((row) => row.id === centerId);
+      if (!center) throw new DomainError('NOT_FOUND', 'Cost centre not found', 404);
+
+      // The centre and everything beneath it — the window reports the centre itself,
+      // but a balance the tree shows rolled up must agree with what this report says.
+      const branch = new Set<string>([centerId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const row of rows) {
+          if (row.parentId && branch.has(row.parentId) && !branch.has(row.id)) {
+            branch.add(row.id);
+            grew = true;
+          }
+        }
+      }
+      const scope = [...branch];
+
+      const period = query.fullPeriod
+        ? []
+        : [query.from ? gte(journalEntries.date, query.from) : undefined, query.to ? lte(journalEntries.date, query.to) : undefined].filter(
+            (clause) => clause !== undefined,
+          );
+
+      const before = query.from
+        ? await tx
+            .select({
+              debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+              credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+            })
+            .from(journalEntryLines)
+            .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+            .where(
+              and(
+                eq(journalEntryLines.tenantId, tenantId),
+                eq(journalEntries.status, 'posted'),
+                inArray(journalEntryLines.costCenterId, scope),
+                query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+                query.accountId ? eq(journalEntryLines.accountId, query.accountId) : undefined,
+                lt(journalEntries.date, query.from),
+              ),
+            )
+            .then((result) => result[0])
+        : undefined;
+      let running = money(before?.debit).minus(money(before?.credit));
+
+      const select = {
+        entryId: journalEntries.id,
+        date: journalEntries.date,
+        number: journalEntries.number,
+        entryDescription: journalEntries.description,
+        lineDescription: sql<string | null>`MIN(${journalEntryLines.description})`,
+        debit: sql<string>`COALESCE(SUM(${journalEntryLines.debit}), 0)::text`,
+        credit: sql<string>`COALESCE(SUM(${journalEntryLines.credit}), 0)::text`,
+        accountCode: accounts.code,
+        accountNameAr: accounts.nameAr,
+        branchName: branches.nameAr,
+        kind: journalEntries.kind,
+        sourceType: journalEntries.sourceType,
+        voucherKind: vouchers.kind,
+      };
+      const movements = await tx
+        .select(select)
+        .from(journalEntryLines)
+        .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
+        .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+        .leftJoin(branches, eq(branches.id, journalEntries.branchId))
+        .leftJoin(vouchers, eq(vouchers.journalEntryId, journalEntries.id))
+        .where(
+          and(
+            eq(journalEntryLines.tenantId, tenantId),
+            eq(journalEntries.status, 'posted'),
+            inArray(journalEntryLines.costCenterId, scope),
+            query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+            query.accountId ? eq(journalEntryLines.accountId, query.accountId) : undefined,
+            ...period,
+          ),
+        )
+        .groupBy(
+          ...(query.summary
+            ? [
+                journalEntries.id,
+                journalEntries.date,
+                journalEntries.number,
+                journalEntries.description,
+                accounts.code,
+                accounts.nameAr,
+                branches.nameAr,
+                journalEntries.kind,
+                journalEntries.sourceType,
+                vouchers.kind,
+              ]
+            : [
+                journalEntries.id,
+                journalEntryLines.lineNo,
+                journalEntries.date,
+                journalEntries.number,
+                journalEntries.description,
+                journalEntryLines.description,
+                journalEntryLines.debit,
+                journalEntryLines.credit,
+                accounts.code,
+                accounts.nameAr,
+                branches.nameAr,
+                journalEntries.kind,
+                journalEntries.sourceType,
+                vouchers.kind,
+              ]),
+        )
+        .orderBy(
+          asc(journalEntries.date),
+          asc(journalEntries.number),
+          ...(query.summary ? [] : [asc(journalEntryLines.lineNo)]),
+        );
+
+      const statement: StatementRow[] = [];
+      const periodTotals = { debit: new Decimal(0), credit: new Decimal(0) };
+
+      if (!query.fullPeriod && query.from && !query.hidePreviousBalance) {
+        const side = running.isPositive() ? { debit: running, credit: new Decimal(0) } : { debit: new Decimal(0), credit: running.negated() };
+        statement.push({
+          rank: 0,
+          date: query.from,
+          entryId: null,
+          number: null,
+          branchName: null,
+          entryType: 'رصيد سابق',
+          description: 'رصيد مرحل من فترة سابقة',
+          debit: side.debit.toFixed(4),
+          credit: side.credit.toFixed(4),
+          runningBalance: running.abs().toFixed(4),
+          balanceStatus: statusOf(running),
+          accountCode: null,
+          accountName: null,
+        });
+      }
+
+      let rank = 1;
+      for (const row of movements) {
+        const debit = money(row.debit);
+        const credit = money(row.credit);
+        periodTotals.debit = periodTotals.debit.plus(debit);
+        periodTotals.credit = periodTotals.credit.plus(credit);
+        running = running.plus(debit.minus(credit));
+        statement.push({
+          rank: rank++,
+          date: row.date,
+          entryId: row.entryId,
+          number: row.number,
+          branchName: row.branchName ?? null,
+          entryType: entryTypeOf(row),
+          description: (query.summary ? row.entryDescription : row.lineDescription ?? row.entryDescription) ?? null,
+          debit: debit.toFixed(4),
+          credit: credit.toFixed(4),
+          runningBalance: running.abs().toFixed(4),
+          balanceStatus: statusOf(running),
+          accountCode: row.accountCode,
+          accountName: row.accountNameAr,
+        });
+      }
+
+      const totals: StatementTotals = {
+        debit: periodTotals.debit.toFixed(4),
+        credit: periodTotals.credit.toFixed(4),
+        periodDebit: periodTotals.debit.greaterThan(periodTotals.credit)
+          ? periodTotals.debit.minus(periodTotals.credit).toFixed(4)
+          : '0.0000',
+        periodCredit: periodTotals.credit.greaterThan(periodTotals.debit)
+          ? periodTotals.credit.minus(periodTotals.debit).toFixed(4)
+          : '0.0000',
+        closing: running.abs().toFixed(4),
+        closingStatus: statusOf(running),
+      };
+
+      return {
+        costCenter: {
+          id: center.id,
+          code: center.code,
+          nameAr: center.nameAr,
+          parentId: center.parentId ?? null,
+          branchId: center.branchId ?? null,
+          balance: center.balance,
+        },
+        totals,
+        rows: statement,
+      };
+    });
   }
 
   async createCostCenter(tenantId: string, input: CostCenterInput) {

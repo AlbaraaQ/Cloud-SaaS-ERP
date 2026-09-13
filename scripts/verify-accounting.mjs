@@ -398,6 +398,97 @@ try {
 }
 check('الفرق — قيد غير متوازن مرفوض', refused === 422, `${refused} JOURNAL_NOT_BALANCED`);
 
+console.log('\n9. 🌳 مراكز التكلفة — الشجرة بالأرصدة · 📊 كشف مركز الكلفة');
+
+const centresWithBalances = await call('get', '/cost-centers?with_balances=1', token);
+const mainCentre = centresWithBalances.find((row) => !row.parentId) ?? centresWithBalances[0];
+check('الشجرة تردّ الرصيد على العقدة', mainCentre?.balance !== undefined, JSON.stringify(mainCentre?.balance ?? null).slice(0, 60));
+let childCentre = centresWithBalances.find((row) => row.parentId === mainCentre?.id);
+if (!childCentre) {
+  childCentre = await call('post', '/cost-centers', token, {
+    code: `CC${stamp}S`,
+    nameAr: `فرع تحقق ${stamp}`,
+    parentId: mainCentre?.id,
+  });
+}
+const kinds = await call('get', '/cost-centers?with_balances=1', token);
+check(
+  '🏷️ النوع — 🟢 رئيسي / 🔵 فرعي',
+  kinds.find((row) => row.id === mainCentre.id)?.kind === 'main' &&
+    kinds.find((row) => row.id === childCentre.id)?.kind === 'sub',
+  `${kinds.find((row) => row.id === mainCentre.id)?.kind} / ${kinds.find((row) => row.id === childCentre.id)?.kind}`,
+);
+
+const ccAccounts = await directory('with_balances=1');
+const ccExpense = ccAccounts.find((row) => row.type === 'expense' && row.isPostable);
+const ccCash = ccAccounts.find((row) => row.type === 'asset' && row.isPostable);
+const leafCentre = centresWithBalances.find((row) => row.parentId) ?? mainCentre;
+
+const ccBefore = Number((await call('get', '/cost-centers?with_balances=1', token)).find((row) => row.id === leafCentre.id)?.balance?.balance ?? 0);
+await call('post', '/journal-entries', token, {
+  date: today(),
+  lines: [
+    { accountId: ccExpense.id, debit: '60', costCenterId: leafCentre.id },
+    { accountId: ccCash.id, credit: '60' },
+  ],
+});
+const ccAfter = Number((await call('get', '/cost-centers?with_balances=1', token)).find((row) => row.id === leafCentre.id)?.balance?.balance ?? 0);
+check('الرصيد يتحرّك بحركة المركز', near(ccAfter - ccBefore, 60), `${money(ccBefore)} → ${money(ccAfter)}`);
+
+const ccRow = (await call('get', '/cost-centers?with_balances=1', token)).find((row) => row.id === leafCentre.id);
+const ccStatement = await callEnvelope('get', `/statements/cost-center/${leafCentre.id}?from=${today()}&hide_previous_balance=1`);
+check(
+  '📊 كشف مركز الكلفة يردّ الحركة',
+  // The script posts on every run, so the report is checked against what the tree says
+  // about the same centre — not against a number from the first run.
+  near(Number(ccStatement.totals.debit), Number(ccRow?.balance?.debit ?? 0)),
+  `${money(Number(ccStatement.totals.debit))} = ${money(Number(ccRow?.balance?.debit ?? 0))}`,
+);
+check(
+  '📌 الحالة تسمّي الجانب',
+  ccStatement.totals.closingStatus === 'مدين',
+  String(ccStatement.totals.closingStatus),
+);
+const ccSummary = await callEnvelope('get', `/statements/cost-center/${leafCentre.id}?from=${today()}&summary=1&hide_previous_balance=1`);
+check(
+  '📑 نوع التقرير — تجميعي/تفصيلي',
+  ccSummary.data.length <= ccStatement.data.length,
+  `${ccSummary.data.length} مقابل ${ccStatement.data.length}`,
+);
+const ccFull = await callEnvelope('get', `/statements/cost-center/${leafCentre.id}?full_period=1`);
+check('فترة كاملة — بلا سطر افتتاح', ccFull.data.every((row) => row.rank !== 0), `${ccFull.data.length} صف`);
+check('الرصيد = رصيد الشجرة', near(Number(ccFull.totals.closing), ccAfter), `${money(Number(ccFull.totals.closing))} = ${money(ccAfter)}`);
+
+console.log('\n10. العكس — القيد المعكوس يصفّر الأثر ويحمل أبعاده');
+
+const reversalTarget = await call('post', '/journal-entries', token, {
+  date: today(),
+  lines: [
+    { accountId: ccExpense.id, debit: '45', costCenterId: leafCentre.id },
+    { accountId: ccCash.id, credit: '45' },
+  ],
+});
+const beforeReverse = Number((await call('get', '/cost-centers?with_balances=1', token)).find((row) => row.id === leafCentre.id)?.balance?.balance ?? 0);
+const reversalPeriods = await call('get', '/fiscal-periods', token);
+const reversalPeriod = reversalPeriods.find((row) => row.status === 'open');
+const reversal = await call('post', `/journal-entries/${reversalTarget.id}/reverse`, token, {
+  branchId: (await call('get', '/branches', token))[0].id,
+  fiscalPeriodId: reversalPeriod?.id,
+  date: today(),
+  reason: `عكس للتحقق ${stamp}`,
+});
+const afterReverse = Number((await call('get', '/cost-centers?with_balances=1', token)).find((row) => row.id === leafCentre.id)?.balance?.balance ?? 0);
+check(
+  'العكس يصفّر أثر المركز ولا يضاعفه',
+  near(beforeReverse - afterReverse, 45),
+  `${money(beforeReverse)} → ${money(afterReverse)}`,
+);
+const reversalDetail = await call('get', `/journal-entries/${reversalTarget.id}`, token);
+check('القيد الأصلي يبقى مرحّلاً — المرآة هي العكس', reversalDetail.status === 'posted', String(reversalDetail.status));
+const mirrorLines = (await call('get', `/journal-entries/${reversal.reversalOf ? reversal.id : reversal.id}`, token)).lines ?? [];
+const mirrored = mirrorLines.find((line) => line.accountId === ccExpense.id);
+check('المرآة تحمل مركز التكلفة', mirrored?.costCenterId === leafCentre.id, String(mirrored?.costCenterId ?? '—'));
+
 console.log('');
 console.log(
   failures === 0

@@ -160,19 +160,11 @@ const accounting: ModuleNode = {
         }),
         screen(
           'cc-balances',
-          'أرصدة مراكز التكلفة',
-          'Cost-centre balances',
-          '/reports/cost-center-balances',
+          '📊 كشف مركز الكلفة',
+          'Cost-centre statement',
+          '/accounting/cost-center-statement',
           'ready',
-          { permission: 'reporting.view' },
-        ),
-        screen(
-          'cc-report',
-          'تقرير مركز الكلفة',
-          'Cost-centre report',
-          '/reports/cost-center-report',
-          'ready',
-          { permission: 'reporting.view' },
+          { permission: 'accounting.reports.view', endpoint: '/statements/cost-center/{costCenterId}' },
         ),
         screen('daily-movement', 'الحركة اليومية', 'Daily movement', '/reports/general-ledger', 'ready', {
           permission: 'reporting.view',

@@ -153,11 +153,58 @@ export class AccountingController {
 
   // ------------------------------------------------------------- cost centres
 
+  /**
+   * 🌳 شجرة مراكز التكلفة — `Form_WPF/frmCostCenter.xaml`. `q` searches الرقم or الاسم,
+   * `branch_id` narrows it, and `with_balances=1` adds to every centre the figure the
+   * tree shows on its node: its own posted movement plus its children's. A caller that
+   * sends nothing gets exactly the list this endpoint always returned.
+   */
   @Get('cost-centers')
   @RequiresPermission('accounting.account.view')
-  @ApiOperation({ summary: 'List cost centres' })
-  async listCostCenters() {
-    return { data: await this.accounting.listCostCenters(getTenantContext().tenantId) };
+  @ApiOperation({ summary: 'List cost centres, optionally as a tree with balances' })
+  async listCostCenters(
+    @Query('q') q?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('with_balances') withBalances?: string,
+  ) {
+    return {
+      data: await this.accounting.listCostCenters(getTenantContext().tenantId, {
+        q,
+        branchId,
+        withBalances: on(withBalances),
+      }),
+    };
+  }
+
+  /**
+   * 📊 كشف مركز الكلفة — `Form_WPF/frmCostCenterBalance.xaml` («تقرير مركز كلفة»), the
+   * account statement pointed at a cost centre: the same `رصيد سابق` row, the same
+   * `تجميعي`/`تفصيلي` choice and the same running الرصيد with `📌 الحالة`, plus the
+   * window's own `اسم الحساب` and `🌿 الفرع` filters.
+   */
+  @Get('statements/cost-center/:costCenterId')
+  @RequiresPermission('accounting.reports.view')
+  @ApiOperation({ summary: 'Cost-centre statement (كشف مركز الكلفة)' })
+  async costCenterStatement(
+    @Param('costCenterId') costCenterId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branch_id') branchId?: string,
+    @Query('account_id') accountId?: string,
+    @Query('summary') summary?: string,
+    @Query('full_period') fullPeriod?: string,
+    @Query('hide_previous_balance') hidePreviousBalance?: string,
+  ) {
+    const statement = await this.accounting.costCenterStatement(getTenantContext().tenantId, costCenterId, {
+      from,
+      to,
+      branchId,
+      accountId,
+      summary: on(summary),
+      fullPeriod: on(fullPeriod) || !(from || to),
+      hidePreviousBalance: on(hidePreviousBalance),
+    });
+    return { data: statement.rows, totals: statement.totals, costCenter: statement.costCenter };
   }
 
   @Post('cost-centers')

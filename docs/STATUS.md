@@ -497,6 +497,43 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   36 staff, 71 contract. Deferred on purpose: `🖨️ طباعة`/`👁️ معاينة` of the entry
   document and the ⏮◀▶⏭ navigator, both of which belong to the reporting phase.
 
+* **المرحلة 07 — المحاسبة، الجزء الرابع: 🌳 مراكز التكلفة**
+  (`Form_WPF/frmCostCenter.xaml` «مركز التكلفة 🏢» و`frmCostCenterBalance.xaml`
+  «تقرير مركز كلفة»). **The cost-centre tree had no numbers on it.** `GET /cost-centers`
+  answered with a flat table of centres and no balance at all, so a centre could not be
+  asked what it had spent; the window's tree and its report were both missing. No
+  migration was needed for the tree itself — `cost_centers` already carried `parent_id`
+  and `branch_id`; what was missing was the figure, so it is now computed exactly as the
+  chart of accounts computes it: posted entries only, rolled up through `parent_id`, with
+  `parentName`, `level` and `🏷️ النوع` (`🟢 رئيسي`/`🔵 فرعي`) beside it, and a caller
+  that sends nothing still gets the old list. The report is new:
+  `GET /statements/cost-center/:id` is the account statement pointed at a centre — the
+  same `رصيد سابق` row, the same running الرصيد, the same totals — plus the window's own
+  `اسم الحساب` and `🌿 الفرع` filters, and `📑 نوع التقرير` (`تجميعي`/`تفصيلي`). One
+  deliberate difference: the window guesses a centre's nature from the first character of
+  its code, as it does for accounts; a cost centre accumulates costs, so الرصيد grows on
+  the debit side and `📌 الحالة` names the side the money is on. **Giving the centre a
+  balance is what exposed two defects that had nothing to do with cost centres.**
+  `prevent_posted_journal_mutation()` — installed by `0004_accounting.sql` L115 — allows
+  exactly one mutation of a posted entry (`status = 'void'`) and then returns `OLD`,
+  discarding the value it just allowed. Every `void` since then was silently thrown away:
+  a cancelled sale kept its revenue, a cancelled purchase kept its cost, and a reversal
+  left its original `posted`. No balance ever drifted, because a reversal also posts a
+  mirrored entry that cancels the original — which is exactly why no test had caught it.
+  And the mirrored lines carried only `partyId` and `description`, so every report scoped
+  to a dimension — cost centre, branch, or the `المندوب` of part three — kept an amount
+  the ledger had already released. Migration `0047` fixes the trigger's return value, the
+  mirror now carries its dimensions, and `reverseJournal` no longer asks for the `void`
+  at all: the mirror *is* the reversal, and voiding the original as well subtracts the
+  amount twice when every balance counts `posted` only. Tests
+  `apps/api/test/cost-centers.spec.ts` (9) and `reversal-and-void.spec.ts` (4, including
+  a direct regression test that the guard now applies the void it allows and still
+  refuses everything else), plus sections 9–10 of `scripts/verify-accounting.mjs`
+  (12 more live checks, 60 in total). **579** API tests, 36 staff, 71 contract. Two
+  navigation rows pointed at `/reports/cost-center-balances` and
+  `/reports/cost-center-report`, routes that had never been built; they are now one real
+  screen under `/accounting/cost-center-statement`, next to `كشف حساب`.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the
