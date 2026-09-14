@@ -722,6 +722,38 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   tsc وlint أخضران. مؤجَّل: «👁️ عرض» وعمود «عرض» إلى أن تُفتح شاشات السندات بـ`?id=`،
   ونصف «مشتريات» إلى أن يحمل فاتورة الشراء موظفاً.
 
+* **المرحلة 09 — الوحدات الرأسية، الجزء الأول: 🧑‍💼 المندوبون والعمولات**
+  (`Form_WPF/frmSalesMen.xaml` «شاشة المندوبين» و`Form_WPF/frmInvBySalesMen.xaml`
+  «مبيعات مندوب خلال فترة»). **«كم يستحق هذا المندوب؟» لم يكن لها جواب في السحابة:
+  `sales_invoices.salesman_id` موجود ولا شيء يقرأه، والثلاث نسب التي يقرأها
+  `frmInvBySalesMen` (`comm` · `Colle_Comm` · `Profit_Comm`) لا مكان لها أصلاً —
+  فبطاقة المندوب كانت اسماً وعلماً.** ترحيل 0052 يضيفها إلى `salesmen` مع
+  `الهاتف · الجوال · البريد الإلكتروني · ملاحظات`، ويضيف `employee_id`: جسرٌ سحابيٌّ
+  لا نظير له في الديسكتوب لأن الديسكتوب يسمّي المندوب بجدولٍ واحد، أما السحابة فالفواتير
+  فيها تسمي بطاقة المندوب وسندات القبض تسمي بطاقة الموظف (`vouchers.salesman_id`)،
+  والجسر وحده هو ما يجعل مندوباً واحداً يملك الاثنين. وحساب العمولات منقولٌ نصّاً من
+  `ProcessInvoiceRow` L330–L341: `عمولة المبيعات = النسبة × صافي الفاتورة`،
+  و`عمولة التحصيل = النسبة × الصافي` إن حُصِّلت الفاتورة (الديسكتوب يقرأ `pay_type`
+  والسحابة تُثبت التحصيل بـ`paid_total`)، و`عمولة الربح = النسبة × (الصافي − التكلفة)`
+  إن كان الربح موجباً. وثلاثةُ مصادرَ للصفوف: الفواتير المرحَّلة، وإشعارُ المدين
+  المُعلَّق بفاتورة بيع (يستردّ عمولتي المبيعات والتحصيل بإشارةٍ سالبة)،
+  وسنداتُ القبض (`ReceiptType` 5 و7) بقيمتها بلا ضريبة وعمولتها على ما قُبض.
+  `GET /sales/salesmen/commissions` و`GET/POST/PATCH/DELETE /sales/salesmen` (لا جسمٌ
+  قائم تغيّر)، وشاشتان: `/sales/salesmen` بالبطاقة كاملةً والرابط إلى التقرير،
+  و`/sales/salesman-commissions` بصفٍّ في شجرة المبيعات. وقراراتٌ مُعلَّلة في
+  `PHASE_09_VERTICALS.md` §4.3 — أهمّها: «💰 إجمالي القيمة» هنا **بإشارة** لأن
+  `RecalculateSummary` L482 يجمع القيمة بلا `isPlus` فيكبر إجمالي الديسكتوب بالمرتجع؛
+  والنسبة تُرفض خارج 0–100 بدل أن تُخزَّن صفراً كما يفعل `double.TryParse`؛ وقيمة
+  السند `net_amount` بدل `NetVal × 100 / 115` المكتوبة في الكود؛ والسندات مقيدة
+  بالتاريخين دائماً وغير مقيدة بالفرع كما في النافذة — ومُثبَّتةٌ باختبارٍ حتى لا
+  تُصلَح صامتاً. `apps/api/test/salesman-card.spec.ts` (5) و
+  `apps/api/test/salesman-commissions.spec.ts` (9) و`scripts/verify-salesmen.mjs`
+  (**21** نقطة تحقّق حيّة، ثلاث تشغيلات متتالية خضراء: الوثائق التي لا يمكن إبطالها —
+  فاتورةٌ مُحصَّلة وإشعار مدين — تُنشأ مرّةً وتُعاد، وما سواها يُلغى).
+  **684** اختبار API (كان 670) · 36 staff · 71 contract · tsc وlint أخضران.
+  مؤجَّل: «👁️ عرض» و«👁️ معاينة» و`.repx` إلى مرحلة التقارير، ونصف «مشتريات» إلى أن
+  تحمل فاتورة الشراء موظفاً.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

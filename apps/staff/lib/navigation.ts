@@ -730,6 +730,23 @@ const sales: ModuleNode = {
         screen('reps-report', 'تقرير المندوبين', 'Sales reps', '/reports/sales-by-salesman', 'ready', {
           permission: 'reporting.view',
         }),
+        screen(
+          'salesman-commissions',
+          '📋 طباعة فواتير مندوب وعمولاتهم',
+          'Salesman commissions',
+          '/sales/salesman-commissions',
+          'ready',
+          {
+            /**
+             * `frmInvBySalesMen` — the window `frmSalesMen` opens with
+             * «📋 طباعة فواتير مندوب وعمولاتهم» L272. It reads three ledgers of the sales
+             * module (فواتير · إشعارات مدين · سندات قبض), so it lives here and answers to
+             * `sales.view` rather than to the report engine's `reporting.view`.
+             */
+            permission: 'sales.view',
+            endpoint: 'GET /sales/salesmen/commissions',
+          },
+        ),
         screen('employee-sales', 'مبيعات موظف', 'Sales by employee', '/reports/sales-by-employee', 'ready', {
           permission: 'reporting.view',
         }),

@@ -20,9 +20,12 @@ import { items, taxGroups } from './catalog.js';
 import { parties } from './parties.js';
 import { tenants } from './platform.js';
 import { shiftCloses } from './treasury.js';
+import { employees } from './hrm.js';
 
 const money = { precision: 20, scale: 4, mode: 'string' as const };
 const qty = { precision: 20, scale: 4, mode: 'string' as const };
+/** نسبة مئوية — a commission percentage: 15 means «15%», four decimals like the desktop's `decimal`. */
+const percent = { precision: 9, scale: 4, mode: 'string' as const };
 
 export const salesInvoices = pgTable(
   'sales_invoices',
@@ -221,6 +224,20 @@ export const offerParties = pgTable(
   },
   (t) => ({ key: uniqueIndex('offer_parties_offer_party_key').on(t.tenantId, t.offerId, t.partyId) }),
 );
+/**
+ * 🧑‍💼 المندوب — `Form_WPF/frmSalesMen.xaml` («شاشة المندوبين»).
+ *
+ * The desktop's card is a name, three commission percentages and three contacts
+ * (`frmSalesMen.xaml.cs` L155 `btnSave_Click` writes
+ * `name, comm, tel, mobile, email, notes, Profit_Comm, Colle_Comm`). The three rates
+ * are what `frmInvBySalesMen.xaml.cs` reads back on every document it prints
+ * (L295 `SELECT comm, name, Profit_Comm, Colle_Comm FROM salesmen`).
+ *
+ * `employeeId` is the cloud's own bridge: a فاتورة names this card
+ * (`sales_invoices.salesman_id`) while a سند قبض names the employee card
+ * (`vouchers.salesman_id`), and the desktop joins both to one `salesmen` table. See
+ * migration 0052.
+ */
 export const salesmen = pgTable(
   'salesmen',
   {
@@ -231,9 +248,31 @@ export const salesmen = pgTable(
     name: text('name').notNull(),
     employeeRef: text('employee_ref'),
     active: boolean('active').notNull().default(true),
+    /** عمولة المبيعات — `salesmen.comm`. */
+    commissionRate: numeric('commission_rate', percent).notNull().default('0'),
+    /** عمولة التحصيل — `salesmen.Colle_Comm`. */
+    collectionCommissionRate: numeric('collection_commission_rate', percent).notNull().default('0'),
+    /** عمولة الربح — `salesmen.Profit_Comm`. */
+    profitCommissionRate: numeric('profit_commission_rate', percent).notNull().default('0'),
+    /** بطاقة الموظف — the employee card this مندوب is, when he has one. */
+    employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'set null' }),
+    /** 📞 الهاتف */
+    tel: text('tel'),
+    /** 📱 الجوال */
+    mobile: text('mobile'),
+    /** 📧 البريد الإلكتروني */
+    email: text('email'),
+    /** ملاحظات */
+    notes: text('notes'),
     ...baseAuditColumns(),
   },
-  (t) => ({ name: uniqueIndex('salesmen_tenant_name_key').on(t.tenantId, t.name) }),
+  (t) => ({
+    name: uniqueIndex('salesmen_tenant_name_key').on(t.tenantId, t.name),
+    employee: uniqueIndex('salesmen_tenant_employee_key')
+      .on(t.tenantId, t.employeeId)
+      .where(sql`employee_id IS NOT NULL`),
+    active: index('salesmen_tenant_active_idx').on(t.tenantId, t.name).where(sql`active`),
+  }),
 );
 
 export const salesTables = {

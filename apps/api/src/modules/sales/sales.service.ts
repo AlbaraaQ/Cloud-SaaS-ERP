@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, desc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { calculateInvoiceTotals, DomainError, newId } from '@erp/contracts';
 import {
   accounts,
+  branches,
+  employees,
   inventoryTransactions,
   invoicePayments,
   items,
@@ -16,6 +18,7 @@ import {
   salesmen,
   shiftCloses,
   stockBalances,
+  vouchers,
   withTenantTx,
   type DatabaseHandle,
   type DrizzleTx,
@@ -25,6 +28,7 @@ import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
 import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
+import { isUniqueViolation } from '../organization/shared/org-support.js';
 import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
 
@@ -80,6 +84,73 @@ export type PostingInput = {
 };
 
 const money = (value: string) => new Decimal(value);
+
+/** 🧑‍💼 بطاقة المندوب — the writable half of `frmSalesMen.xaml` (see migration 0052). */
+export type SalesmanInput = {
+  name?: string;
+  employeeRef?: string | null;
+  /** الموظف — the cloud's bridge to the employee card (migration 0052). */
+  employeeId?: string | null;
+  active?: boolean;
+  /** عمولة المبيعات — `salesmen.comm`. */
+  commissionRate?: string;
+  /** عمولة التحصيل — `salesmen.Colle_Comm`. */
+  collectionCommissionRate?: string;
+  /** عمولة الربح — `salesmen.Profit_Comm`. */
+  profitCommissionRate?: string;
+  /** 📞 الهاتف */
+  tel?: string | null;
+  /** 📱 الجوال */
+  mobile?: string | null;
+  /** 📧 البريد الإلكتروني */
+  email?: string | null;
+  /** ملاحظات */
+  notes?: string | null;
+};
+
+/**
+ * 📋 طباعة فواتير مندوب وعمولاتهم — the filters of `frmInvBySalesMen.xaml`
+ * («مبيعات مندوب خلال فترة»): `👤 المندوب` + `🌐 الكل` (both on by default),
+ * `📅 الفترة الزمنية` with `كل الفترة` and `من`/`إلى` (both today).
+ */
+export type SalesmanCommissionQuery = {
+  salesmanId?: string;
+  allSalesmen?: boolean;
+  allPeriod?: boolean;
+  from?: string;
+  to?: string;
+  branchId?: string;
+};
+
+export type SalesmanCommissionRow = {
+  seq: number;
+  /** 📌 نوع الحركة */
+  movementType: string;
+  /** 📅 التاريخ */
+  date: string | null;
+  documentId: string;
+  /** 🔢 رقم السند */
+  number: string | null;
+  /** 🔗 رقم المرجع */
+  refNumber: string | null;
+  salesmanId: string;
+  /** 👤 المندوب */
+  salesmanName: string;
+  branchName: string | null;
+  /** 💰 القيمة — net of VAT and of both discounts, as `frmInvBySalesMen` computes it. */
+  value: string;
+  /** 📈 عمولة المبيعات */
+  salesCommission: string;
+  /** 💳 عمولة التحصيل */
+  collectionCommission: string;
+  /** 📊 عمولة الربح */
+  profitCommission: string;
+  /**
+   * `isPlus` — the desktop stores every value unsigned and keeps the direction in this
+   * column (`ProcessInvoiceRow` L328), then applies it in `RecalculateSummary` L498.
+   */
+  isPlus: 1 | -1;
+};
 
 @Injectable()
 export class SalesService {
@@ -1283,12 +1354,97 @@ export class SalesService {
     );
   }
 
+  /**
+   * 🧑‍💼 بطاقة المندوب — `Form_WPF/frmSalesMen.xaml` («شاشة المندوبين»).
+   *
+   * `btnSave_Click` L155 writes one row of
+   * `salesmen(name, comm, tel, mobile, email, notes, IS_Deleted, Profit_Comm,
+   * Colle_Comm)`, and `LoadDG` L63 lists `WHERE name LIKE … AND IS_Deleted=0`.
+   * `btnDelete_Click` L215 refuses nothing with «اختر مندوباً ليتم حذفه.».
+   */
   async listSalesmen(tenantId: string) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
       tx.select().from(salesmen).where(eq(salesmen.tenantId, tenantId)).orderBy(salesmen.name),
     );
   }
-  async createSalesman(tenantId: string, input: { name: string; employeeRef?: string; active?: boolean }) {
+
+  /**
+   * نسبة مئوية — the three boxes are parsed by `btnSave_Click` L174 with
+   * `double.TryParse(txtComm.Text, out double c) ? c : 0`, so a box that holds no
+   * number is silently a zero. The cloud refuses instead: a commission of 250% pays
+   * the مندوب more than the sale is worth, and «0» was never typed by anybody.
+   */
+  private rateOrThrow(value: string | undefined, field: string): string | undefined {
+    if (value === undefined) return undefined;
+    let parsed: Decimal;
+    try {
+      parsed = new Decimal(value);
+    } catch {
+      throw new DomainError('SALESMAN_RATE_INVALID', 'نسبة العمولة يجب أن تكون رقماً', 422, {
+        field,
+      });
+    }
+    if (!parsed.isFinite() || parsed.lt(0) || parsed.gt(100))
+      throw new DomainError('SALESMAN_RATE_RANGE', 'نسبة العمولة يجب أن تكون بين 0 و100', 422, {
+        field,
+      });
+    return parsed.toFixed(4);
+  }
+
+  /**
+   * الموظف — the card may point at one, and only at one that exists here, and only at
+   * one no other card already holds: the link is what joins his فواتير to his سندات,
+   * and two cards claiming the same employee would split a مندوب in half.
+   */
+  private async assertEmployee(tenantId: string, employeeId: string | null | undefined, selfId?: string) {
+    if (!employeeId) return;
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: employees.id })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.tenantId, tenantId),
+            eq(employees.id, employeeId),
+            isNull(employees.deletedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (!row)
+      throw new DomainError('SALESMAN_EMPLOYEE_NOT_FOUND', 'الموظف غير موجود', 422, {
+        field: 'employeeId',
+      });
+    const [taken] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: salesmen.id })
+        .from(salesmen)
+        .where(
+          and(
+            eq(salesmen.tenantId, tenantId),
+            eq(salesmen.employeeId, employeeId),
+            selfId ? sql`${salesmen.id} <> ${selfId}` : undefined,
+          ),
+        )
+        .limit(1),
+    );
+    if (taken)
+      throw new DomainError('SALESMAN_EMPLOYEE_TAKEN', 'هذا الموظف مرتبط بمندوب آخر', 409, {
+        field: 'employeeId',
+      });
+  }
+
+  /** The index is the authority — under concurrency the pre-check can pass and the write still lose. */
+  private rethrowEmployeeTaken(error: unknown): void {
+    if (isUniqueViolation(error, 'salesmen_tenant_employee_key'))
+      throw new DomainError('SALESMAN_EMPLOYEE_TAKEN', 'هذا الموظف مرتبط بمندوب آخر', 409, {
+        field: 'employeeId',
+      });
+    throw error;
+  }
+
+  async createSalesman(tenantId: string, input: SalesmanInput & { name: string }) {
+    await this.assertEmployee(tenantId, input.employeeId);
     const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
       tx
         .insert(salesmen)
@@ -1298,16 +1454,27 @@ export class SalesService {
           name: input.name,
           employeeRef: input.employeeRef,
           active: input.active ?? true,
+          commissionRate: this.rateOrThrow(input.commissionRate, 'commissionRate') ?? '0',
+          collectionCommissionRate:
+            this.rateOrThrow(input.collectionCommissionRate, 'collectionCommissionRate') ?? '0',
+          profitCommissionRate:
+            this.rateOrThrow(input.profitCommissionRate, 'profitCommissionRate') ?? '0',
+          employeeId: input.employeeId ?? null,
+          tel: input.tel ?? null,
+          mobile: input.mobile ?? null,
+          email: input.email ?? null,
+          notes: input.notes ?? null,
         })
         .returning(),
-    );
+    ).catch((error: unknown) => {
+      this.rethrowEmployeeTaken(error);
+      throw error;
+    });
     return row;
   }
-  async updateSalesman(
-    tenantId: string,
-    id: string,
-    input: { name?: string; employeeRef?: string | null; active?: boolean },
-  ) {
+
+  async updateSalesman(tenantId: string, id: string, input: SalesmanInput) {
+    await this.assertEmployee(tenantId, input.employeeId, id);
     const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
       tx
         .update(salesmen)
@@ -1315,11 +1482,38 @@ export class SalesService {
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.employeeRef === undefined ? {} : { employeeRef: input.employeeRef }),
           ...(input.active === undefined ? {} : { active: input.active }),
+          ...(input.commissionRate === undefined
+            ? {}
+            : { commissionRate: this.rateOrThrow(input.commissionRate, 'commissionRate') }),
+          ...(input.collectionCommissionRate === undefined
+            ? {}
+            : {
+                collectionCommissionRate: this.rateOrThrow(
+                  input.collectionCommissionRate,
+                  'collectionCommissionRate',
+                ),
+              }),
+          ...(input.profitCommissionRate === undefined
+            ? {}
+            : {
+                profitCommissionRate: this.rateOrThrow(
+                  input.profitCommissionRate,
+                  'profitCommissionRate',
+                ),
+              }),
+          ...(input.employeeId === undefined ? {} : { employeeId: input.employeeId }),
+          ...(input.tel === undefined ? {} : { tel: input.tel }),
+          ...(input.mobile === undefined ? {} : { mobile: input.mobile }),
+          ...(input.email === undefined ? {} : { email: input.email }),
+          ...(input.notes === undefined ? {} : { notes: input.notes }),
           updatedAt: new Date(),
         })
         .where(and(eq(salesmen.tenantId, tenantId), eq(salesmen.id, id)))
         .returning(),
-    );
+    ).catch((error: unknown) => {
+      this.rethrowEmployeeTaken(error);
+      throw error;
+    });
     if (!row) throw new DomainError('NOT_FOUND', 'Salesman was not found', 404);
     return row;
   }
@@ -1348,6 +1542,329 @@ export class SalesService {
       return { id, archived: false, deleted: true };
     });
   }
+
+  /**
+   * 📋 طباعة فواتير مندوب وعمولاتهم — `Form_WPF/frmInvBySalesMen.xaml`
+   * («مبيعات مندوب خلال فترة»), opened by `frmSalesMen.xaml.cs` L272 `Button1_Click`.
+   *
+   * The window reads three ledgers and prints one row per document:
+   *
+   *   • `ShowInvoiceResults` L196 — `Inv` with `salesman > 0`, `IS_Deleted=0`,
+   *     `inv_type IN (2,3)` and `proc_type IN (1,2)`, narrowed by the مندوب, by the
+   *     branch (`MainClass.BranchNo`) and by the two dates unless «كل الفترة» is on.
+   *     `ProcessInvoiceRow` L254 sums `val1 × exchange_price` per invoice, takes VAT
+   *     out when prices include it, then `minus` and the lines' discounts (L307) to
+   *     reach `netForComm` — which is what the cloud already stores in `subtotal`
+   *     (`calculateInvoiceTotals` nets VAT and both discounts out first).
+   *   • `LoadCreditNotes` L351 — `Notes WHERE Doc_Type=2 AND Inv_No=…`: one
+   *     «إشعار مدين» row per debit note hanging off a **sale** invoice, and never off
+   *     a مرتجع.
+   *   • `LoadReceiptsByType` L411 — «سند قبض عميل» (`ReceiptType=5`) and «سند قبض»
+   *     (`ReceiptType=7`), always inside the two dates.
+   *
+   * and three commissions a row (`ProcessInvoiceRow` L330–L341):
+   *
+   *   عمولة المبيعات  = comm        % × netForComm
+   *   عمولة التحصيل   = Colle_Comm  % × netForComm  — only when `pay_type` is set
+   *   عمولة الربح     = Profit_Comm % × (netForComm − AvrgCost), and only when that is +
+   *
+   * `RecalculateSummary` L482 adds `Value` once per row and flips each commission by
+   * `isPlus`. The one place the cloud does not follow it: `sumVal += row.Value` ignores
+   * `isPlus`, so a مرتجع *raises* the desktop's «💰 إجمالي القيمة». The total here is
+   * signed, like the «💰 الإجمالي» of «حركات الموظف» (Phase 08 part five) — a report
+   * that grows when the goods come back would pay commission on a refund.
+   */
+  async salesmanCommissions(tenantId: string, query: SalesmanCommissionQuery = {}) {
+    // «🌐 الكل» and «كل الفترة» are both checked in the XAML (L262/L287), and the two
+    // date pickers open on today (`FrmInvBySalesMen_Loaded` L58).
+    /**
+     * «🌐 الكل» is checked in the XAML, but a caller who sends a مندوب without saying
+     * «الكل» means that مندوب — `frmRptSalary` defaults «كل الفترة» the same way when no
+     * month is sent. Sending both is still the screen's job.
+     */
+    const allSalesmen = query.allSalesmen ?? !query.salesmanId;
+    const allPeriod = query.allPeriod ?? true;
+    const today = new Date().toISOString().slice(0, 10);
+    const from = query.from ?? today;
+    const to = query.to ?? today;
+
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const cards = await tx
+        .select()
+        .from(salesmen)
+        .where(eq(salesmen.tenantId, tenantId))
+        .orderBy(salesmen.name);
+      /**
+       * With «🌐 الكل» off and nothing picked the desktop filters nothing at all
+       * (`ShowInvoiceResults` L187), so every active card stays in scope.
+       */
+      const scope = cards.filter(
+        (card) =>
+          card.active !== false &&
+          (allSalesmen || !query.salesmanId || card.id === query.salesmanId),
+      );
+      // A document may name either side of the card: a فاتورة writes the مندوب's id, a
+      // سند قبض writes the employee's (`vouchers.salesman_id`, migration 0025). The
+      // desktop joins both to one `salesmen` row; the cloud joins through the link.
+      const byCardId = new Map(scope.map((card) => [card.id, card]));
+      const byEmployeeId = new Map(
+        scope.filter((card) => card.employeeId).map((card) => [card.employeeId as string, card]),
+      );
+      const namedBy = [...byCardId.keys(), ...byEmployeeId.keys()];
+      const rows: SalesmanCommissionRow[] = [];
+      const push = (row: Omit<SalesmanCommissionRow, 'seq'>) =>
+        rows.push({ seq: rows.length + 1, ...row });
+      /** `Math.Round(x, 2)` in `ProcessInvoiceRow` L330 — two decimals, half up. */
+      const pct = (percent: string, base: Decimal) =>
+        base.times(new Decimal(percent)).div(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+      if (namedBy.length > 0) {
+        const invoices = await tx
+          .select({
+            id: salesInvoices.id,
+            number: salesInvoices.number,
+            kind: salesInvoices.kind,
+            date: sql<string>`${salesInvoices.postedAt}::date`,
+            subtotal: salesInvoices.subtotal,
+            /**
+             * `AvrgCost = SUM(val × AvrgCost)` L257 — the cost of what left the
+             * warehouse. It lives on the lines (`recordAutoStock` writes it at
+             * posting), so the report sums them rather than trusting a header total.
+             */
+            costTotal: sql<string>`COALESCE((SELECT SUM(l.cost_total) FROM sales_invoice_lines l WHERE l.invoice_id = ${salesInvoices.id}), 0)`,
+            paidTotal: salesInvoices.paidTotal,
+            salesmanId: salesInvoices.salesmanId,
+            branchName: branches.nameAr,
+            refNumber: sql<string | null>`(SELECT ref.number FROM sales_invoices ref WHERE ref.id = ${salesInvoices.referenceInvoiceId})`,
+            isPos: sql<boolean>`(${salesInvoices.orderType} IS NOT NULL OR ${salesInvoices.shiftId} IS NOT NULL)`,
+          })
+          .from(salesInvoices)
+          .leftJoin(branches, eq(branches.id, salesInvoices.branchId))
+          .where(
+            and(
+              eq(salesInvoices.tenantId, tenantId),
+              // المرحَّل وحده — `IS_Deleted=0` plus the cloud's own «مُلغى».
+              eq(salesInvoices.status, 'posted'),
+              isNull(salesInvoices.voidedAt),
+              // `proc_type IN (1,2)` — a فاتورة and its مرتجع, never a مسوَّدة.
+              inArray(salesInvoices.kind, ['sale', 'sale_return']),
+              inArray(salesInvoices.salesmanId, namedBy),
+              allPeriod ? undefined : gte(sql`${salesInvoices.postedAt}::date`, from),
+              allPeriod ? undefined : lte(sql`${salesInvoices.postedAt}::date`, to),
+              query.branchId ? eq(salesInvoices.branchId, query.branchId) : undefined,
+            ),
+          )
+          .orderBy(asc(sql`${salesInvoices.postedAt}::date`), asc(salesInvoices.number));
+
+        const saleIds = invoices.filter((row) => row.kind === 'sale').map((row) => row.id);
+        const notes = saleIds.length
+          ? await tx
+              .select({
+                id: salesAdjustmentNotes.id,
+                number: salesAdjustmentNotes.number,
+                invoiceId: salesAdjustmentNotes.invoiceId,
+                amount: salesAdjustmentNotes.amount,
+                date: sql<string>`${salesAdjustmentNotes.postedAt}::date`,
+              })
+              .from(salesAdjustmentNotes)
+              .where(
+                and(
+                  eq(salesAdjustmentNotes.tenantId, tenantId),
+                  // `Doc_Type=2` — «إشعار مدين», the note that *raises* what a customer owes.
+                  eq(salesAdjustmentNotes.kind, 'debit'),
+                  // المسوَّد لا يُحصى — a note that was never posted is not a movement yet.
+                  eq(salesAdjustmentNotes.status, 'posted'),
+                  inArray(salesAdjustmentNotes.invoiceId, saleIds),
+                ),
+              )
+              .orderBy(asc(salesAdjustmentNotes.postedAt), asc(salesAdjustmentNotes.number))
+          : [];
+        const notesByInvoice = new Map<string, (typeof notes)[number][]>();
+        for (const note of notes) {
+          const key = String(note.invoiceId);
+          notesByInvoice.set(key, [...(notesByInvoice.get(key) ?? []), note]);
+        }
+
+        for (const invoice of invoices) {
+          const card =
+            (invoice.salesmanId ? byCardId.get(invoice.salesmanId) : undefined) ??
+            (invoice.salesmanId ? byEmployeeId.get(invoice.salesmanId) : undefined);
+          // `if (salTable.Rows.Count == 0) return;` L302 — a document whose مندوب has no
+          // card is not a commission row, exactly as the desktop drops it.
+          if (!card) continue;
+          const value = new Decimal(invoice.subtotal ?? '0');
+          const cogs = new Decimal(invoice.costTotal ?? '0');
+          const profitBase = value.minus(cogs).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+          const isPlus: 1 | -1 = invoice.kind === 'sale' ? 1 : -1;
+          /**
+           * «عمولة التحصيل فقط إذا كان نوع الدفع موجودًا» L331 — the desktop reads
+           * `Inv.pay_type`; the cloud's settled half of an invoice is its `paid_total`
+           * (a cash/card/bank posting fills it at once, and `addPayment` adds to it).
+           */
+          const settled = new Decimal(invoice.paidTotal ?? '0').gt(0);
+          push({
+            movementType: invoiceLabel(invoice.kind, invoice.isPos),
+            date: invoice.date,
+            documentId: invoice.id,
+            number: invoice.number,
+            refNumber: invoice.refNumber ?? null,
+            salesmanId: card.id,
+            salesmanName: card.name,
+            branchName: invoice.branchName ?? null,
+            value: value.toFixed(4),
+            salesCommission: pct(card.commissionRate, value).toFixed(4),
+            collectionCommission: settled
+              ? pct(card.collectionCommissionRate, value).toFixed(4)
+              : '0.0000',
+            profitCommission: profitBase.gt(0)
+              ? pct(card.profitCommissionRate, profitBase).toFixed(4)
+              : '0.0000',
+            isPlus,
+          });
+          // «إشعار مدين» — the commission the note takes back, `IsPlus = -1` (L390).
+          for (const note of notesByInvoice.get(invoice.id) ?? []) {
+            const noteValue = new Decimal(note.amount ?? '0');
+            push({
+              movementType: 'إشعار مدين',
+              date: note.date,
+              documentId: note.id,
+              number: note.number,
+              refNumber: invoice.number,
+              salesmanId: card.id,
+              salesmanName: card.name,
+              branchName: invoice.branchName ?? null,
+              value: noteValue.toFixed(4),
+              salesCommission: pct(card.commissionRate, noteValue).toFixed(4),
+              collectionCommission: pct(card.collectionCommissionRate, noteValue).toFixed(4),
+              profitCommission: '0.0000',
+              isPlus: -1,
+            });
+          }
+        }
+
+        const employeeIds = [...byEmployeeId.keys()];
+        const receipts = employeeIds.length
+          ? await tx
+              .select({
+                id: vouchers.id,
+                number: vouchers.number,
+                date: vouchers.date,
+                amount: vouchers.amount,
+                netAmount: vouchers.netAmount,
+                subtype: vouchers.subtype,
+                salesmanId: vouchers.salesmanId,
+                branchName: branches.nameAr,
+              })
+              .from(vouchers)
+              .leftJoin(branches, eq(branches.id, vouchers.branchId))
+              .where(
+                and(
+                  eq(vouchers.tenantId, tenantId),
+                  eq(vouchers.kind, 'receipt'),
+                  eq(vouchers.status, 'posted'),
+                  isNull(vouchers.voidedAt),
+                  // `ReceiptType` 5 «سند قبض عميل» and 7 «سندات قبض».
+                  inArray(vouchers.subtype, ['customer', 'account', 'other']),
+                  inArray(vouchers.salesmanId, employeeIds),
+                  /**
+                   * `LoadReceiptsByType` L426 — the receipts are inside the two dates
+                   * **always**; «كل الفترة» lifts the filter from the invoices only.
+                   * Ported as it stands, and the screen says so.
+                   */
+                  gte(vouchers.date, from),
+                  lte(vouchers.date, to),
+                ),
+              )
+              .orderBy(asc(vouchers.date), asc(vouchers.number))
+          : [];
+
+        for (const receipt of receipts) {
+          const card = receipt.salesmanId ? byEmployeeId.get(receipt.salesmanId) : undefined;
+          if (!card) continue;
+          const received = new Decimal(receipt.amount ?? '0');
+          const net = new Decimal(receipt.netAmount ?? '0');
+          /**
+           * `baseVal = NetVal × 100 / 115` L452 — the desktop pulls a hardcoded 15% VAT
+           * out of the receipt. The cloud's سند carries its VAT as a field
+           * (`net_amount` = amount − vat), which is the same number without the guess.
+           */
+          const base = net.gt(0) ? net : received;
+          push({
+            movementType: receipt.subtype === 'customer' ? 'سند قبض عميل' : 'سند قبض',
+            date: receipt.date,
+            documentId: receipt.id,
+            number: receipt.number,
+            refNumber: null,
+            salesmanId: card.id,
+            salesmanName: card.name,
+            branchName: receipt.branchName ?? null,
+            value: base.toFixed(4),
+            salesCommission: '0.0000',
+            // L453 — the collection commission is on what was actually received.
+            collectionCommission: pct(card.collectionCommissionRate, received).toFixed(4),
+            profitCommission: '0.0000',
+            isPlus: 1,
+          });
+        }
+      }
+
+      const totals = rows.reduce(
+        (running, row) => ({
+          value: running.value.plus(new Decimal(row.value).times(row.isPlus)),
+          sales: running.sales.plus(new Decimal(row.salesCommission).times(row.isPlus)),
+          collection: running.collection.plus(
+            new Decimal(row.collectionCommission).times(row.isPlus),
+          ),
+          profit: running.profit.plus(new Decimal(row.profitCommission).times(row.isPlus)),
+        }),
+        {
+          value: new Decimal(0),
+          sales: new Decimal(0),
+          collection: new Decimal(0),
+          profit: new Decimal(0),
+        },
+      );
+      const countOf = (label: string) => rows.filter((row) => row.movementType === label).length;
+
+      return {
+        data: {
+          salesmanId: !allSalesmen && query.salesmanId ? query.salesmanId : null,
+          salesmanName:
+            (!allSalesmen && query.salesmanId ? byCardId.get(query.salesmanId)?.name : null) ??
+            null,
+          allSalesmen,
+          allPeriod,
+          from,
+          to,
+          branchId: query.branchId ?? null,
+          summary: {
+            /** 💰 إجمالي القيمة — signed: sales less returns and notes (see the note above). */
+            totalValue: totals.value.toFixed(4),
+            /** 📈 ع. المبيعات */
+            salesCommission: totals.sales.toFixed(4),
+            /** 💳 ع. التحصيل */
+            collectionCommission: totals.collection.toFixed(4),
+            /** 📊 ع. الربح */
+            profitCommission: totals.profit.toFixed(4),
+            invoices: rows.filter((row) => row.movementType.startsWith('فاتورة')).length,
+            notes: countOf('إشعار مدين'),
+            receipts: rows.filter((row) => row.movementType.startsWith('سند')).length,
+            rows: rows.length,
+          },
+          rows,
+        },
+      };
+    });
+  }
+}
+
+/**
+ * 📌 نوع الحركة — `ProcessInvoiceRow` L322: `inv_type` 2 is a مبيعات document and 3 is
+ * نقطة بيع; `proc_type` 1 is the فاتورة and 2 its مرتجع. The four labels are verbatim.
+ */
+function invoiceLabel(kind: string, isPos: boolean): string {
+  if (kind === 'sale_return') return isPos ? 'فاتورة مرتجع نقطة بيع' : 'فاتورة مرتجع بيع';
+  return isPos ? 'فاتورة نقطة بيع' : 'فاتورة بيع';
 }
 
 export const salesService = { calculateInvoiceTotals };
