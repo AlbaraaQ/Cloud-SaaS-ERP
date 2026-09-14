@@ -888,6 +888,30 @@ const tailoring: ModuleNode = {
       ],
     },
     {
+      key: 'tailoring-measurements',
+      labelAr: 'القياسات',
+      labelEn: 'Measurements',
+      items: [
+        // 📏 القياسات — `frmMeasurements.xaml` («إدارة قياسات العملاء»).
+        screen('tailoring-measurement', 'قياسات العملاء', 'Customer measurements', '/tailoring/measurements', 'ready', {
+          permission: 'tailoring.view',
+          endpoint: '/tailoring/measurements',
+        }),
+        // 📏 خصائص القياسات — `frmMeasurementAttributes.xaml` («إدارة خصائص القياسات»).
+        screen(
+          'tailoring-measurement-attribute',
+          'خصائص القياسات',
+          'Measurement attributes',
+          '/tailoring/measurements/attributes',
+          'ready',
+          {
+            permission: 'tailoring.view',
+            endpoint: '/tailoring/measurement-attributes',
+          },
+        ),
+      ],
+    },
+    {
       key: 'tailoring-catalogue',
       labelAr: 'التعاريف',
       labelEn: 'Catalogue',

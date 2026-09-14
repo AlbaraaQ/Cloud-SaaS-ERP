@@ -13,6 +13,7 @@ import {
   priceLists,
   salaryAdjustmentTypes,
   tailoringGarmentTypes,
+  tailoringMeasurementAttributes,
   tailoringOrderStatuses,
   tenants,
   warehouses,
@@ -86,6 +87,7 @@ export class OrgProvisioningService {
     if (await this.ensureSalaryAdjustmentTypes(tx, tenantId, actorUserId, now)) created = true;
     if (await this.ensureTailoringOrderStatuses(tx, tenantId, actorUserId, now)) created = true;
     if (await this.ensureTailoringGarmentTypes(tx, tenantId, actorUserId, now)) created = true;
+    if (await this.ensureMeasurementAttributes(tx, tenantId, actorUserId, now)) created = true;
 
     let branchId = await firstId(
       tx
@@ -426,6 +428,47 @@ export class OrgProvisioningService {
       })),
     );
     this.logger.log({ tenantId, inserted: missing.length }, 'tailoring garment types seeded');
+    return true;
+  }
+
+  /**
+   * 📏 خصائص القياسات — `MeasurementAttributes(AttributeID, AttributeName, DisplayOrder,
+   * IsActive)`. Rows of that table are data, and they are not in this repository; the
+   * only place it names any خاصية is the add prompt of
+   * `frmMeasurementAttributes.xaml.cs` `btnAdd_Click`:
+   * «أدخل اسم الخاصية (مثل: الطول، العرض، الكم)» — so those three are seeded, in that
+   * order, exactly as migration `0055` seeds them for tenants that already existed.
+   */
+  private async ensureMeasurementAttributes(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<boolean> {
+    const seed: Array<{ nameAr: string; displayOrder: number }> = [
+      { nameAr: 'الطول', displayOrder: 1 },
+      { nameAr: 'العرض', displayOrder: 2 },
+      { nameAr: 'الكم', displayOrder: 3 },
+    ];
+    const existing = await tx
+      .select({ nameAr: tailoringMeasurementAttributes.nameAr })
+      .from(tailoringMeasurementAttributes)
+      .where(and(eq(tailoringMeasurementAttributes.tenantId, tenantId), isNull(tailoringMeasurementAttributes.deletedAt)));
+    const present = new Set(existing.map((row) => row.nameAr));
+    const missing = seed.filter((row) => !present.has(row.nameAr));
+    if (!missing.length) return false;
+    await tx.insert(tailoringMeasurementAttributes).values(
+      missing.map((row) => ({
+        id: newId(),
+        tenantId,
+        nameAr: row.nameAr,
+        displayOrder: row.displayOrder,
+        active: true,
+        createdAt: now,
+        createdBy: actorUserId,
+      })),
+    );
+    this.logger.log({ tenantId, inserted: missing.length }, 'measurement attributes seeded');
     return true;
   }
 

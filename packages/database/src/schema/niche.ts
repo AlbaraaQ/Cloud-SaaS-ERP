@@ -17,9 +17,29 @@ export const opticalPrescriptions = pgTable('optical_prescriptions', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), invoiceLineId: uuid('invoice_line_id').references(() => salesInvoiceLines.id, { onDelete: 'set null' }), orientation: text('orientation').notNull().default('distance'), rightEye: jsonb('right_eye').$type<{ sph?: string; cyl?: string; axis?: string; add?: string; ipd?: string }>().notNull().default({}), leftEye: jsonb('left_eye').$type<{ sph?: string; cyl?: string; axis?: string; add?: string; ipd?: string }>().notNull().default({}), otherGrid: jsonb('other_grid').$type<Record<string, string>>().notNull().default({}), notes: text('notes'), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
 }, (t) => ({ party: index('optical_prescriptions_party_idx').on(t.tenantId, t.partyId), line: index('optical_prescriptions_line_idx').on(t.tenantId, t.invoiceLineId) }));
 
+/**
+ * 📏 القياس — `CustomerMeasurements(MeasurementID, Cust_ID, MeasurementName,
+ * MeasurementDate, Notes, IsActive)` (`Form_WPF/frmMeasurements.xaml` «إدارة قياسات
+ * العملاء» + `frmMeasurementDetails.xaml` «📏 بيانات القياس»).
+ *
+ * `measurements` keeps its free-form keys: `frmCustomers.xaml` L1184 «📐 المقاسات»
+ * stores fixed columns of its own (الطول · كتف · الرقبة · وسع اليد · وسع الخطوة · رقم
+ * الصفحة) on the same document, and values written through the 📏 خصائص are keyed by
+ * attribute **id** — so renaming a خاصية never orphans a number already taken.
+ */
 export const customerMeasurements = pgTable('customer_measurements', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), kind: text('kind').notNull().default('tailoring'), measurements: jsonb('measurements').$type<Record<string, string>>().notNull().default({}), notes: text('notes'), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
-}, (t) => ({ party: index('customer_measurements_party_idx').on(t.tenantId, t.partyId, t.createdAt) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), kind: text('kind').notNull().default('tailoring'),
+  /** 👤 اسم صاحب القياس — `MeasurementName`; «قياس بتاريخ …» stands in when it is null. */
+  name: text('name'),
+  /** 📅 التاريخ — `MeasurementDate`. */
+  measurementDate: date('measurement_date'),
+  measurements: jsonb('measurements').$type<Record<string, string>>().notNull().default({}), notes: text('notes'), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
+}, (t) => ({ party: index('customer_measurements_party_idx').on(t.tenantId, t.partyId, t.createdAt), date: index('customer_measurements_tenant_date_idx').on(t.tenantId, t.measurementDate, t.createdAt) }));
+
+/** 📏 خصائص القياسات — `MeasurementAttributes(AttributeID, AttributeName, DisplayOrder, IsActive)`. */
+export const tailoringMeasurementAttributes = pgTable('tailoring_measurement_attributes', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), nameAr: text('name_ar').notNull(), displayOrder: integer('display_order').notNull().default(0), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ name: uniqueIndex('tailoring_measurement_attributes_tenant_name_key').on(t.tenantId, t.nameAr).where(sql`deleted_at IS NULL`), order: index('tailoring_measurement_attributes_tenant_idx').on(t.tenantId, t.displayOrder) }));
 
 /**
  * 🧵 طلب التفصيل — `TailoringOrders` / `vw_OrdersComplete`
@@ -129,4 +149,4 @@ export const sallaItemSync = pgTable('salla_item_sync', { id: uuid('id').primary
 export const sallaExportLog = pgTable('salla_export_log', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'set null' }), itemId: uuid('item_id').references(() => items.id, { onDelete: 'set null' }), action: text('action').notNull(), status: text('status').notNull().default('queued'), requestPayload: jsonb('request_payload').$type<Record<string, unknown>>().notNull().default({}), responsePayload: jsonb('response_payload').$type<Record<string, unknown>>(), error: text('error'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow() }, (t) => ({ status: index('salla_export_log_status_idx').on(t.tenantId, t.status) }));
 export const sallaBranchMappings = pgTable('salla_branch_mappings', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id), cashLocationId: uuid('cash_location_id'), remoteBranchId: text('remote_branch_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ remote: uniqueIndex('salla_branch_mappings_remote_key').on(t.tenantId, t.connectionId, t.remoteBranchId).where(sql`deleted_at IS NULL`) }));
 
-export const nicheTables = { opticalPrescriptions, customerMeasurements, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };
+export const nicheTables = { opticalPrescriptions, customerMeasurements, tailoringMeasurementAttributes, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };

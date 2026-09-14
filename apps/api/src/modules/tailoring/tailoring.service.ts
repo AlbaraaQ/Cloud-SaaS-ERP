@@ -8,6 +8,7 @@ import {
   tailoringInvoicePayments,
   tailoringInvoices,
   tailoringOptionCategories,
+  tailoringMeasurementAttributes,
   tailoringOptionValues,
   tailoringOrderOptions,
   tailoringOrders,
@@ -55,7 +56,61 @@ import { TreasuryService } from '../treasury/treasury.service.js';
  *   • «الكل» in `cmbStatus` is `StatusID = 0`, i.e. no filter at all (L79).
  *   • the search box matches رقم الطلب or اسم العميل (L100), never الجوال.
  */
-export type MeasurementInput = { partyId: string; kind?: string; measurements: Record<string, string>; notes?: string; active?: boolean };
+export type MeasurementInput = {
+  partyId: string;
+  kind?: string;
+  /** 👤 اسم صاحب القياس — `MeasurementName`; «قياس بتاريخ …» stands in when it is null. */
+  name?: string | null;
+  /** 📅 التاريخ — `MeasurementDate`, today when it is not sent. */
+  measurementDate?: string;
+  /**
+   * 📐 قيم القياسات — one row per خاصية, as `frmMeasurementDetails` builds them from
+   * `MeasurementAttributes`. A value is written only when it is greater than zero.
+   */
+  values?: Array<{ attributeId: string; value: string | number }>;
+  /** Keys written before the 📏 خصائص existed (`height` · `shoulder` …) are kept as they are. */
+  measurements?: Record<string, string>;
+  notes?: string | null;
+  active?: boolean;
+};
+export type MeasurementPatch = Partial<MeasurementInput> & { version?: number };
+export type MeasurementQuery = { search?: string; partyId?: string; limit?: number | string; offset?: number | string };
+
+export type MeasurementValueRow = { attributeId: string; attributeName: string; value: string; displayOrder: number };
+export type MeasurementRow = {
+  id: string;
+  partyId: string;
+  customerName: string;
+  customerPhone: string;
+  kind: string;
+  name: string | null;
+  displayName: string;
+  measurementDate: string;
+  notes: string | null;
+  active: boolean;
+  measurementCount: number;
+  values: MeasurementValueRow[];
+  measurements: Record<string, string>;
+  createdAt: string;
+  version: number;
+};
+export type MeasurementListResult = {
+  data: MeasurementRow[];
+  meta: { total: number; customer: { id: string; name: string; phone: string } | null };
+};
+
+/** 📏 خصائص القياسات — `MeasurementAttributes(AttributeID, AttributeName, DisplayOrder, IsActive)`. */
+export type AttributeRow = {
+  id: string;
+  nameAr: string;
+  displayOrder: number;
+  active: boolean;
+  /** ⚙️ الحالة — `CASE WHEN IsActive = 1 THEN 'نشط' ELSE 'معطل' END`. */
+  statusText: string;
+  version: number;
+};
+export type AttributeInput = { nameAr: string };
+export type AttributePatch = { nameAr?: string; active?: boolean; version?: number };
 
 export type StatusRow = {
   id: string;
@@ -187,52 +242,452 @@ export class TailoringService {
       throw new DomainError('NOT_FOUND', 'Tailoring pack is disabled', 404);
   }
 
-  // ─────────────────────────────── 📏 القياسات (unchanged) ───────────────────────────────
+  // ─────────────────────────────── 📏 القياسات ───────────────────────────────
 
-  async list(tenantId: string, partyId: string) {
+  /**
+   * 📏 القياسات — `Form_WPF/frmMeasurements.xaml` («إدارة قياسات العملاء») with the
+   * card of `frmMeasurementDetails.xaml` («📏 بيانات القياس») and the definitions
+   * window `frmMeasurementAttributes.xaml` («📏 إدارة خصائص القياسات»).
+   *
+   * The list is one of two things, and the desktop decides by whether a عميل has been
+   * searched for: `LoadAllMeasurements` (every active قياس with its customer,
+   * `ORDER BY cm.MeasurementDate DESC`) or `LoadCustomerMeasurements` (one customer's
+   * قياسات after «🔍 بحث» resolves `SELECT TOP 10 id, name, mobile FROM Customers WHERE
+   * mobile LIKE @Search OR name LIKE @Search ORDER BY name` and takes the first row).
+   */
+  async listMeasurements(tenantId: string, query: MeasurementQuery = {}): Promise<MeasurementListResult> {
     await this.ensureEnabled(tenantId);
+    const limit = Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200);
+    const offset = Math.max(Number(query.offset ?? 0) || 0, 0);
+
+    // «🔍 بحث» — the desktop refuses an empty box and reports a customer it cannot find.
+    if (query.search !== undefined) {
+      const keyword = query.search.trim();
+      if (!keyword)
+        throw new DomainError(
+          'TAILORING_MEASUREMENT_SEARCH_REQUIRED',
+          'الرجاء إدخال رقم الجوال أو اسم العميل',
+          422,
+        );
+      const customer = await this.firstCustomerByKeyword(tenantId, keyword);
+      if (!customer) throw new DomainError('TAILORING_CUSTOMER_NOT_FOUND', 'لم يتم العثور على عميل', 404);
+      const rows = await this.measurementsOf(tenantId, customer.id);
+      return { data: rows, meta: { total: rows.length, customer } };
+    }
+
+    const where = query.partyId
+      ? and(eq(customerMeasurements.tenantId, tenantId), eq(customerMeasurements.partyId, query.partyId), isNull(customerMeasurements.deletedAt))
+      : and(eq(customerMeasurements.tenantId, tenantId), isNull(customerMeasurements.deletedAt));
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ measurement: customerMeasurements, customerName: parties.name, customerPhone: parties.phone })
+        .from(customerMeasurements)
+        .innerJoin(parties, eq(parties.id, customerMeasurements.partyId))
+        .where(where)
+        .orderBy(desc(customerMeasurements.measurementDate), desc(customerMeasurements.createdAt))
+        .limit(limit)
+        .offset(offset),
+    );
+    const [counted] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select({ total: count() }).from(customerMeasurements).where(where),
+    );
     return {
-      data: await withTenantTx(this.database.db, tenantId, (tx) =>
-        tx
-          .select()
-          .from(customerMeasurements)
-          .where(
-            and(
-              eq(customerMeasurements.tenantId, tenantId),
-              eq(customerMeasurements.partyId, partyId),
-              isNull(customerMeasurements.deletedAt),
-            ),
-          )
-          .orderBy(desc(customerMeasurements.createdAt)),
-      ),
+      data: await this.shapeMeasurements(tenantId, rows),
+      meta: { total: Number(counted?.total ?? 0), customer: null },
     };
   }
 
-  async latest(tenantId: string, partyId: string) {
-    const rows = await this.list(tenantId, partyId);
-    return { data: rows.data[0] ?? null };
+  /** `GET /tailoring/parties/{id}/measurements` — the قياسات of one عميل (unchanged shape, grown). */
+  async list(tenantId: string, partyId: string) {
+    const rows = await this.measurementsOf(tenantId, partyId);
+    return { data: rows };
   }
 
-  async create(tenantId: string, input: MeasurementInput) {
+  async latest(tenantId: string, partyId: string) {
+    const rows = await this.measurementsOf(tenantId, partyId);
+    return { data: rows[0] ?? null };
+  }
+
+  async getMeasurement(tenantId: string, id: string): Promise<MeasurementRow> {
     await this.ensureEnabled(tenantId);
     const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
       tx
+        .select({ measurement: customerMeasurements, customerName: parties.name, customerPhone: parties.phone })
+        .from(customerMeasurements)
+        .innerJoin(parties, eq(parties.id, customerMeasurements.partyId))
+        .where(and(eq(customerMeasurements.tenantId, tenantId), eq(customerMeasurements.id, id), isNull(customerMeasurements.deletedAt)))
+        .limit(1),
+    );
+    if (!row) throw new DomainError('TAILORING_MEASUREMENT_NOT_FOUND', 'القياس غير موجود', 404);
+    const [shaped] = await this.shapeMeasurements(tenantId, [row]);
+    return shaped!;
+  }
+
+  /**
+   * `frmMeasurementDetails.btnSave_Click` — one transaction, two refusals:
+   * «الرجاء إدخال اسم صاحب القياس» و«الرجاء إدخال قياس واحد على الأقل» (a value counts
+   * only when it parses to a decimal greater than zero; the rest are not written).
+   *
+   * The name is refused only when the caller **sends** it blank — the card always does —
+   * because this endpoint existed before the name did, and «قياس بتاريخ …» is the
+   * desktop's own label for an unnamed قياس.
+   */
+  async createMeasurement(tenantId: string, input: MeasurementInput, userId?: string): Promise<MeasurementRow> {
+    await this.ensureEnabled(tenantId);
+    if (!input.partyId)
+      throw new DomainError('TAILORING_MEASUREMENT_CUSTOMER_REQUIRED', 'الرجاء البحث عن عميل أولًا', 422);
+    if (input.name !== undefined && !String(input.name).trim())
+      throw new DomainError('TAILORING_MEASUREMENT_NAME_REQUIRED', 'الرجاء إدخال اسم صاحب القياس', 422);
+
+    const attributes = await this.loadAttributes(tenantId, { activeOnly: false });
+    const values = await this.valuesOrThrow(tenantId, attributes, input);
+    const [row] = await withTenantTx(this.database.db, tenantId, async (tx) => {
+      const customer = await tx
+        .select({ id: parties.id })
+        .from(parties)
+        .where(and(eq(parties.tenantId, tenantId), eq(parties.id, input.partyId), isNull(parties.deletedAt)))
+        .limit(1);
+      if (!customer.length) throw new DomainError('PARTY_NOT_FOUND', 'العميل غير موجود', 404);
+      return tx
         .insert(customerMeasurements)
         .values({
           id: newId(),
           tenantId,
           partyId: input.partyId,
           kind: input.kind ?? 'tailoring',
-          measurements: input.measurements,
-          notes: input.notes,
+          name: input.name ? String(input.name).trim() : null,
+          measurementDate: input.measurementDate && isISODate(input.measurementDate) ? input.measurementDate : todayISO(),
+          measurements: values,
+          notes: input.notes ?? null,
           active: input.active ?? true,
+          createdBy: userId ?? null,
         })
-        .returning(),
+        .returning();
+    });
+    return this.getMeasurement(tenantId, row!.id);
+  }
+
+  /** «✏️ تعديل القياس» — the desktop DELETEs every value then re-inserts those > 0. */
+  async updateMeasurement(tenantId: string, id: string, patch: MeasurementPatch, userId?: string): Promise<MeasurementRow> {
+    await this.ensureEnabled(tenantId);
+    if (patch.name !== undefined && !String(patch.name).trim())
+      throw new DomainError('TAILORING_MEASUREMENT_NAME_REQUIRED', 'الرجاء إدخال اسم صاحب القياس', 422);
+
+    const attributes = await this.loadAttributes(tenantId, { activeOnly: false });
+    const current = await this.rawMeasurement(tenantId, id);
+    const values = patch.values || patch.measurements ? await this.valuesOrThrow(tenantId, attributes, patch) : current.measurements;
+    if (patch.values && !Object.keys(values).length)
+      throw new DomainError('TAILORING_MEASUREMENT_VALUE_REQUIRED', 'الرجاء إدخال قياس واحد على الأقل', 422);
+
+    const updated = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(customerMeasurements)
+        .set({
+          kind: patch.kind ?? current.kind,
+          name: patch.name !== undefined ? (String(patch.name).trim() || null) : current.name,
+          measurementDate:
+            patch.measurementDate && isISODate(patch.measurementDate) ? patch.measurementDate : current.measurementDate,
+          measurements: values,
+          notes: patch.notes !== undefined ? patch.notes : current.notes,
+          active: patch.active ?? current.active,
+          updatedAt: new Date(),
+          updatedBy: userId ?? null,
+          version: sql`${customerMeasurements.version} + 1`,
+        })
+        .where(
+          and(
+            eq(customerMeasurements.tenantId, tenantId),
+            eq(customerMeasurements.id, id),
+            isNull(customerMeasurements.deletedAt),
+            patch.version === undefined ? undefined : eq(customerMeasurements.version, patch.version),
+          ),
+        )
+        .returning({ id: customerMeasurements.id }),
     );
+    if (!updated.length) throw new DomainError('VERSION_CONFLICT', 'تم تعديل هذا السجل من مكان آخر', 409);
+    return this.getMeasurement(tenantId, id);
+  }
+
+  /** «🗑️ حذف القياس» — `sp_DeleteMeasurement` hides the قياس; a طلب that used it keeps its number. */
+  async deleteMeasurement(tenantId: string, id: string, userId?: string): Promise<{ deleted: true; id: string }> {
+    await this.ensureEnabled(tenantId);
+    await this.rawMeasurement(tenantId, id);
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(customerMeasurements)
+        .set({ deletedAt: new Date(), deletedBy: userId ?? null, active: false, updatedAt: new Date(), updatedBy: userId ?? null })
+        .where(and(eq(customerMeasurements.tenantId, tenantId), eq(customerMeasurements.id, id), isNull(customerMeasurements.deletedAt))),
+    );
+    return { deleted: true, id };
+  }
+
+  // ─────────────────────────────── 📏 خصائص القياسات ───────────────────────────────
+
+  /**
+   * `frmMeasurementAttributes.LoadData` —
+   * `SELECT AttributeID, AttributeName, DisplayOrder, CASE WHEN IsActive = 1 THEN 'نشط'
+   * ELSE 'معطل' END AS StatusText FROM MeasurementAttributes ORDER BY DisplayOrder`.
+   */
+  async listAttributes(tenantId: string, options: { activeOnly?: boolean } = {}): Promise<{ data: AttributeRow[] }> {
+    await this.ensureEnabled(tenantId);
+    return { data: await this.loadAttributes(tenantId, options) };
+  }
+
+  /** «➕ إضافة» — `ISNULL(MAX(DisplayOrder), 0) + 1`, then reload ordered by الترتيب. */
+  async createAttribute(tenantId: string, input: AttributeInput, userId?: string): Promise<AttributeRow> {
+    await this.ensureEnabled(tenantId);
+    const nameAr = String(input.nameAr ?? '').trim();
+    if (!nameAr) throw new DomainError('TAILORING_ATTRIBUTE_NAME_REQUIRED', 'الرجاء إدخال اسم الخاصية', 422);
+
+    const rows = await this.loadAttributes(tenantId, { activeOnly: false });
+    if (rows.some((row) => row.nameAr === nameAr))
+      throw new DomainError('TAILORING_ATTRIBUTE_NAME_TAKEN', 'اسم الخاصية موجود مسبقاً', 409);
+    const nextOrder = rows.reduce((max, row) => Math.max(max, row.displayOrder), 0) + 1;
+    try {
+      await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx.insert(tailoringMeasurementAttributes).values({
+          id: newId(),
+          tenantId,
+          nameAr,
+          displayOrder: nextOrder,
+          active: true,
+          createdBy: userId ?? null,
+        }),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new DomainError('TAILORING_ATTRIBUTE_NAME_TAKEN', 'اسم الخاصية موجود مسبقاً', 409);
+      throw error;
+    }
+    const created = await this.loadAttributes(tenantId, { activeOnly: false });
+    return created.find((row) => row.nameAr === nameAr)!;
+  }
+
+  /**
+   * «✏️ تعديل» — a rename, and the way back from «🔕 تعطيل»: the desktop only ever sets
+   * `IsActive = 0` and has no activate button of its own.
+   */
+  async updateAttribute(tenantId: string, id: string, patch: AttributePatch, userId?: string): Promise<AttributeRow> {
+    await this.ensureEnabled(tenantId);
+    const current = await this.rawAttribute(tenantId, id);
+    const nameAr = patch.nameAr === undefined ? current.nameAr : String(patch.nameAr).trim();
+    if (!nameAr) throw new DomainError('TAILORING_ATTRIBUTE_NAME_REQUIRED', 'الرجاء إدخال اسم الخاصية', 422);
+    if (nameAr !== current.nameAr) {
+      const rows = await this.loadAttributes(tenantId, { activeOnly: false });
+      if (rows.some((row) => row.nameAr === nameAr))
+        throw new DomainError('TAILORING_ATTRIBUTE_NAME_TAKEN', 'اسم الخاصية موجود مسبقاً', 409);
+    }
+    try {
+      const updated = await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx
+          .update(tailoringMeasurementAttributes)
+          .set({
+            nameAr,
+            active: patch.active ?? current.active,
+            updatedAt: new Date(),
+            updatedBy: userId ?? null,
+            version: sql`${tailoringMeasurementAttributes.version} + 1`,
+          })
+          .where(
+            and(
+              eq(tailoringMeasurementAttributes.tenantId, tenantId),
+              eq(tailoringMeasurementAttributes.id, id),
+              isNull(tailoringMeasurementAttributes.deletedAt),
+              patch.version === undefined ? undefined : eq(tailoringMeasurementAttributes.version, patch.version),
+            ),
+          )
+          .returning({ id: tailoringMeasurementAttributes.id }),
+      );
+      if (!updated.length) throw new DomainError('VERSION_CONFLICT', 'تم تعديل هذا السجل من مكان آخر', 409);
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new DomainError('TAILORING_ATTRIBUTE_NAME_TAKEN', 'اسم الخاصية موجود مسبقاً', 409);
+      throw error;
+    }
+    const rows = await this.loadAttributes(tenantId, { activeOnly: false });
+    const updated = rows.find((row) => row.id === id);
+    if (!updated) throw new DomainError('TAILORING_ATTRIBUTE_NOT_FOUND', 'الخاصية غير موجودة', 404);
+    return updated;
+  }
+
+  /** «🔕 تعطيل» — `UPDATE … SET IsActive=0`: «سيتم إخفاؤها من القياسات الجديدة». */
+  async deactivateAttribute(tenantId: string, id: string, userId?: string): Promise<AttributeRow> {
+    return this.updateAttribute(tenantId, id, { active: false }, userId);
+  }
+
+  /**
+   * «▲ تحريك للأعلى» و«▼ تحريك للأسفل» — the desktop swaps `DisplayOrder` with the
+   * neighbour (`WHERE DisplayOrder IN (@Current, @Prev)`) and re-selects the row by id.
+   * At either end there is no neighbour and it quietly does nothing.
+   */
+  async moveAttribute(tenantId: string, id: string, direction: 'up' | 'down', userId?: string): Promise<AttributeRow> {
+    await this.ensureEnabled(tenantId);
+    const current = await this.rawAttribute(tenantId, id);
+    const rows = await this.loadAttributes(tenantId, { activeOnly: false });
+    const index = rows.findIndex((row) => row.id === id);
+    const neighbour = direction === 'up' ? rows[index - 1] : rows[index + 1];
+    if (!neighbour) return rows[index]!;
+
+    await withTenantTx(this.database.db, tenantId, async (tx) => {
+      await tx
+        .update(tailoringMeasurementAttributes)
+        .set({ displayOrder: neighbour.displayOrder, updatedAt: new Date(), updatedBy: userId ?? null })
+        .where(and(eq(tailoringMeasurementAttributes.tenantId, tenantId), eq(tailoringMeasurementAttributes.id, current.id)));
+      await tx
+        .update(tailoringMeasurementAttributes)
+        .set({ displayOrder: current.displayOrder, updatedAt: new Date(), updatedBy: userId ?? null })
+        .where(and(eq(tailoringMeasurementAttributes.tenantId, tenantId), eq(tailoringMeasurementAttributes.id, neighbour.id)));
+    });
+    const moved = await this.loadAttributes(tenantId, { activeOnly: false });
+    return moved.find((row) => row.id === id)!;
+  }
+
+  private async loadAttributes(tenantId: string, options: { activeOnly?: boolean }): Promise<AttributeRow[]> {
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(tailoringMeasurementAttributes)
+        .where(
+          and(
+            eq(tailoringMeasurementAttributes.tenantId, tenantId),
+            isNull(tailoringMeasurementAttributes.deletedAt),
+            options.activeOnly ? eq(tailoringMeasurementAttributes.active, true) : undefined,
+          ),
+        )
+        .orderBy(asc(tailoringMeasurementAttributes.displayOrder), asc(tailoringMeasurementAttributes.nameAr)),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      nameAr: row.nameAr,
+      displayOrder: row.displayOrder,
+      active: row.active,
+      // ⚙️ الحالة — `CASE WHEN IsActive = 1 THEN 'نشط' ELSE 'معطل' END`.
+      statusText: row.active ? 'نشط' : 'معطل',
+      version: row.version,
+    }));
+  }
+
+  private async rawAttribute(tenantId: string, id: string) {
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(tailoringMeasurementAttributes)
+        .where(
+          and(
+            eq(tailoringMeasurementAttributes.tenantId, tenantId),
+            eq(tailoringMeasurementAttributes.id, id),
+            isNull(tailoringMeasurementAttributes.deletedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (!row) throw new DomainError('TAILORING_ATTRIBUTE_NOT_FOUND', 'الخاصية غير موجودة', 404);
     return row;
   }
 
-  // ─────────────────────────────── ⚙️ الحالات ───────────────────────────────
+  private async rawMeasurement(tenantId: string, id: string) {
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(customerMeasurements)
+        .where(and(eq(customerMeasurements.tenantId, tenantId), eq(customerMeasurements.id, id), isNull(customerMeasurements.deletedAt)))
+        .limit(1),
+    );
+    if (!row) throw new DomainError('TAILORING_MEASUREMENT_NOT_FOUND', 'القياس غير موجود', 404);
+    return row;
+  }
+
+  /** `SELECT TOP 10 … ORDER BY name`, then the first row (`SearchCustomer`). */
+  private async firstCustomerByKeyword(tenantId: string, keyword: string) {
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: parties.id, name: parties.name, phone: parties.phone })
+        .from(parties)
+        .where(and(eq(parties.tenantId, tenantId), eq(parties.kind, 'customer'), isNull(parties.deletedAt), this.customerSearch(keyword)))
+        .orderBy(asc(parties.name))
+        .limit(1),
+    );
+    return row ? { id: row.id, name: row.name, phone: row.phone ?? '' } : null;
+  }
+
+  /** `mobile LIKE @Search OR name LIKE @Search` — one box, two columns. */
+  private customerSearch(keyword: string): SQL | undefined {
+    const like = `%${keyword}%`;
+    return or(ilike(parties.phone, like), ilike(parties.name, like));
+  }
+
+  private async measurementsOf(tenantId: string, partyId: string): Promise<MeasurementRow[]> {
+    await this.ensureEnabled(tenantId);
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ measurement: customerMeasurements, customerName: parties.name, customerPhone: parties.phone })
+        .from(customerMeasurements)
+        .innerJoin(parties, eq(parties.id, customerMeasurements.partyId))
+        .where(and(eq(customerMeasurements.tenantId, tenantId), eq(customerMeasurements.partyId, partyId), isNull(customerMeasurements.deletedAt)))
+        .orderBy(desc(customerMeasurements.measurementDate), desc(customerMeasurements.createdAt)),
+    );
+    return this.shapeMeasurements(tenantId, rows);
+  }
+
+  private async shapeMeasurements(
+    tenantId: string,
+    rows: Array<{ measurement: typeof customerMeasurements.$inferSelect; customerName: string; customerPhone: string | null }>,
+  ): Promise<MeasurementRow[]> {
+    const attributes = await this.loadAttributes(tenantId, { activeOnly: false });
+    const byId = new Map(attributes.map((attribute) => [attribute.id, attribute]));
+    return rows.map(({ measurement, customerName, customerPhone }) => {
+      const values: MeasurementValueRow[] = [];
+      for (const [key, value] of Object.entries(measurement.measurements ?? {})) {
+        const attribute = byId.get(key);
+        if (!attribute) continue;
+        values.push({ attributeId: attribute.id, attributeName: attribute.nameAr, value, displayOrder: attribute.displayOrder });
+      }
+      values.sort((left, right) => left.displayOrder - right.displayOrder);
+      const date = measurement.measurementDate ?? measurement.createdAt.toISOString().slice(0, 10);
+      return {
+        id: measurement.id,
+        partyId: measurement.partyId,
+        customerName,
+        customerPhone: customerPhone ?? '',
+        kind: measurement.kind,
+        name: measurement.name,
+        // `frmOrderDetails.LoadCustomerMeasurements` L259 — «قياس بتاريخ …» when unnamed.
+        displayName: measurement.name ?? `قياس بتاريخ ${date}`,
+        measurementDate: date,
+        notes: measurement.notes,
+        active: measurement.active,
+        // 📐 عدد المقاسات — `SELECT COUNT(*) FROM MeasurementValues WHERE MeasurementID=…`,
+        // and only values greater than zero are ever written.
+        measurementCount: values.filter((row) => decimal(row.value) > 0).length ||
+          Object.values(measurement.measurements ?? {}).filter((value) => decimal(value) > 0).length,
+        values,
+        measurements: measurement.measurements ?? {},
+        createdAt: measurement.createdAt.toISOString(),
+        version: measurement.version,
+      };
+    });
+  }
+
+  /** The card's values, keyed by attribute id; anything not > 0 is not written. */
+  private async valuesOrThrow(
+    tenantId: string,
+    attributes: AttributeRow[],
+    input: { values?: Array<{ attributeId: string; value: string | number }>; measurements?: Record<string, string> },
+  ): Promise<Record<string, string>> {
+    const merged: Record<string, string> = { ...(input.measurements ?? {}) };
+    if (!input.values) {
+      if (input.measurements && !Object.keys(merged).length)
+        throw new DomainError('TAILORING_MEASUREMENT_VALUE_REQUIRED', 'الرجاء إدخال قياس واحد على الأقل', 422);
+      return merged;
+    }
+    for (const entry of input.values) {
+      const attribute = attributes.find((row) => row.id === entry.attributeId);
+      if (!attribute) throw new DomainError('TAILORING_ATTRIBUTE_NOT_FOUND', 'الخاصية غير موجودة', 404);
+      if (decimal(entry.value) > 0) merged[attribute.id] = String(entry.value);
+      else delete merged[attribute.id];
+    }
+    if (!Object.keys(merged).length)
+      throw new DomainError('TAILORING_MEASUREMENT_VALUE_REQUIRED', 'الرجاء إدخال قياس واحد على الأقل', 422);
+    return merged;
+  }
 
   /**
    * `frmOrders.LoadStatusFilter` L54 —
@@ -722,7 +1177,7 @@ export class TailoringService {
     if (measurementIds.length) {
       const measurements = await withTenantTx(this.database.db, tenantId, (tx) =>
         tx
-          .select({ id: customerMeasurements.id, createdAt: customerMeasurements.createdAt, kind: customerMeasurements.kind })
+          .select({ id: customerMeasurements.id, createdAt: customerMeasurements.createdAt, measurementDate: customerMeasurements.measurementDate, name: customerMeasurements.name })
           .from(customerMeasurements)
           .where(and(eq(customerMeasurements.tenantId, tenantId), isNull(customerMeasurements.deletedAt))),
       );
@@ -730,7 +1185,8 @@ export class TailoringService {
         if (!measurementIds.includes(measurement.id)) continue;
         // `frmOrderDetails.LoadCustomerMeasurements` L259 — the display name falls back to
         // «قياس بتاريخ …» when `MeasurementName` is null.
-        names.set(measurement.id, `قياس بتاريخ ${measurement.createdAt.toISOString().slice(0, 10)}`);
+        const date = (measurement.measurementDate ?? measurement.createdAt.toISOString().slice(0, 10)) as string;
+        names.set(measurement.id, measurement.name ?? `قياس بتاريخ ${date}`);
       }
     }
     return rows.map((row) => ({

@@ -6,12 +6,16 @@ import { RequiresPermission } from '../platform/decorators/requires-permission.d
 import {
   MEASUREMENT_FIELDS,
   TailoringService,
+  type AttributeInput,
+  type AttributePatch,
   type CategoryInput,
   type InvoiceInput,
   type InvoicePatch,
   type InvoiceQuery,
   type MeasurementField,
   type MeasurementInput,
+  type MeasurementPatch,
+  type MeasurementQuery,
   type OrderInput,
   type OrderPatch,
   type OrderQuery,
@@ -72,10 +76,83 @@ export class TailoringController {
     return this.tailoring.latest(this.tenantId, partyId);
   }
 
+  /**
+   * 📋 قياسات العميل — `frmMeasurements.LoadAllMeasurements`, or
+   * `LoadCustomerMeasurements` once «🔍 بحث» has picked a عميل by `?search=`.
+   */
+  @Get('measurements')
+  @RequiresPermission('tailoring.view')
+  listMeasurements(
+    @Query('search') search?: string,
+    @Query('partyId') partyId?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const query: MeasurementQuery = {};
+    if (search !== undefined) query.search = search;
+    if (partyId) query.partyId = partyId;
+    if (limit) query.limit = limit;
+    if (offset) query.offset = offset;
+    return this.tailoring.listMeasurements(this.tenantId, query);
+  }
+
+  @Get('measurements/:id')
+  @RequiresPermission('tailoring.view')
+  getMeasurement(@Param('id') id: string) {
+    return this.tailoring.getMeasurement(this.tenantId, id);
+  }
+
   @Post('measurements')
   @RequiresPermission('tailoring.manage')
   create(@Body() body: MeasurementInput) {
-    return this.tailoring.create(this.tenantId, body);
+    return this.tailoring.createMeasurement(this.tenantId, body, this.userId);
+  }
+
+  @Patch('measurements/:id')
+  @RequiresPermission('tailoring.manage')
+  updateMeasurement(@Param('id') id: string, @Body() body: MeasurementPatch) {
+    return this.tailoring.updateMeasurement(this.tenantId, id, body, this.userId);
+  }
+
+  @Delete('measurements/:id')
+  @RequiresPermission('tailoring.manage')
+  deleteMeasurement(@Param('id') id: string) {
+    return this.tailoring.deleteMeasurement(this.tenantId, id, this.userId);
+  }
+
+  // ─────────────────────────────── 📏 خصائص القياسات ───────────────────────────────
+
+  /** `frmMeasurementAttributes.LoadData` — `ORDER BY DisplayOrder`, with ⚙️ الحالة نشط/معطل. */
+  @Get('measurement-attributes')
+  @RequiresPermission('tailoring.view')
+  listAttributes(@Query('activeOnly') activeOnly?: string) {
+    return this.tailoring.listAttributes(this.tenantId, { activeOnly: flag(activeOnly) ?? false });
+  }
+
+  @Post('measurement-attributes')
+  @RequiresPermission('tailoring.manage')
+  createAttribute(@Body() body: AttributeInput) {
+    return this.tailoring.createAttribute(this.tenantId, body, this.userId);
+  }
+
+  @Patch('measurement-attributes/:id')
+  @RequiresPermission('tailoring.manage')
+  updateAttribute(@Param('id') id: string, @Body() body: AttributePatch) {
+    return this.tailoring.updateAttribute(this.tenantId, id, body, this.userId);
+  }
+
+  /** «🔕 تعطيل» — `IsActive = 0`: «سيتم إخفاؤها من القياسات الجديدة». */
+  @Post('measurement-attributes/:id/deactivate')
+  @RequiresPermission('tailoring.manage')
+  deactivateAttribute(@Param('id') id: string) {
+    return this.tailoring.deactivateAttribute(this.tenantId, id, this.userId);
+  }
+
+  /** «▲ تحريك للأعلى» و«▼ تحريك للأسفل» — `direction=up|down`. */
+  @Post('measurement-attributes/:id/move')
+  @RequiresPermission('tailoring.manage')
+  moveAttribute(@Param('id') id: string, @Body() body: { direction: 'up' | 'down' }) {
+    return this.tailoring.moveAttribute(this.tenantId, id, body?.direction === 'down' ? 'down' : 'up', this.userId);
   }
 
   // ─────────────────────────────── ⚙️ الحالات ───────────────────────────────
