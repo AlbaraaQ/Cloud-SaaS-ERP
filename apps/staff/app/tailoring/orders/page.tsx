@@ -248,7 +248,7 @@ function TailoringOrders() {
 
   return (
     <Screen
-      title="إدارة طلبات التفصيل"
+      title="🧵 إدارة طلبات التفصيل"
       subtitle="طلب التفصيل: العميل وقياسه ونوع التفصيل وموعد التسليم، وحالته من «مستلم» إلى «تم التسليم»، وما دُفع منه وما بقي."
       crumbs={['التفصيل', 'الطلبات']}
       actions={
@@ -265,7 +265,7 @@ function TailoringOrders() {
       <div className="card tight no-print">
         <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label className="field" style={{ margin: 0, minWidth: 180 }}>
-            <span>⚙️ الحالة</span>
+            <span>الحالة:</span>
             <select
               className="input"
               value={filters.statusId}
@@ -285,7 +285,7 @@ function TailoringOrders() {
             </select>
           </label>
           <label className="field" style={{ margin: 0, width: 160 }}>
-            <span>من</span>
+            <span>من:</span>
             <input
               className="input"
               type="date"
@@ -294,7 +294,7 @@ function TailoringOrders() {
             />
           </label>
           <label className="field" style={{ margin: 0, width: 160 }}>
-            <span>إلى</span>
+            <span>إلى:</span>
             <input
               className="input"
               type="date"
@@ -303,7 +303,7 @@ function TailoringOrders() {
             />
           </label>
           <label className="field" style={{ margin: 0, minWidth: 220, flex: 1 }}>
-            <span>🔍 بحث — رقم الطلب أو اسم العميل</span>
+            <span>🔍 البحث (رقم/اسم):</span>
             <input
               className="input"
               value={filters.search}
@@ -322,9 +322,10 @@ function TailoringOrders() {
       {orders.status === 'error' && <ErrorBox message={orders.error} onRetry={orders.reload} />}
       {orders.status === 'success' && (
         <>
-          <p className="muted" style={{ margin: 0 }}>
-            عدد السجلات: {orders.data?.total ?? rows.length}
-          </p>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="group-label" style={{ margin: 0 }}>📋 قائمة الطلبات</span>
+            <span className="muted">عدد السجلات: {orders.data?.total ?? rows.length}</span>
+          </div>
           {rows.length === 0 ? (
             <Empty
               title="لا توجد طلبات"
@@ -413,7 +414,7 @@ function TailoringOrders() {
                 <legend className="group-label">👤 بيانات العميل</legend>
                 <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <label className="field" style={{ margin: 0, minWidth: 260, flex: 1 }}>
-                    <span>العميل</span>
+                    <span>العميل:</span>
                     <select
                       className="input"
                       value={draft.partyId}
@@ -428,7 +429,7 @@ function TailoringOrders() {
                     </select>
                   </label>
                   <p className="muted" style={{ margin: 0 }}>
-                    📞 الجوال: {selectedCustomer?.phone ?? '—'}
+                    الجوال: {selectedCustomer?.phone ?? '—'}
                   </p>
                 </div>
               </fieldset>
@@ -437,7 +438,7 @@ function TailoringOrders() {
                 <legend className="group-label">📋 تفاصيل الطلب</legend>
                 <div className="form-grid">
                   <label className="field">
-                    <span>القياس</span>
+                    <span>القياس:</span>
                     <select
                       className="input"
                       value={draft.measurementId}
@@ -453,7 +454,7 @@ function TailoringOrders() {
                     </select>
                   </label>
                   <label className="field">
-                    <span>نوع التفصيل</span>
+                    <span>نوع التفصيل:</span>
                     <select
                       className="input"
                       value={draft.typeId}
@@ -494,7 +495,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <label className="field">
-                    <span>📅 موعد التسليم</span>
+                    <span>موعد التسليم:</span>
                     <input
                       className="input"
                       type="date"
@@ -503,7 +504,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <label className="field">
-                    <span>الكمية</span>
+                    <span>الكمية:</span>
                     <input
                       className="input"
                       type="number"
@@ -514,7 +515,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <label className="field">
-                    <span>💰 السعر</span>
+                    <span>السعر:</span>
                     <input
                       className="input"
                       type="number"
@@ -525,7 +526,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <label className="field">
-                    <span>💵 المدفوع</span>
+                    <span>المدفوع:</span>
                     <input
                       className="input"
                       type="number"
@@ -535,7 +536,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <div className="field">
-                    <span>⌛ المتبقي</span>
+                    <span>المتبقي:</span>
                     <output
                       className="input"
                       style={{ color: remaining < 0 ? 'var(--ok, #0a7a3d)' : '#E35656', fontWeight: 700 }}
@@ -578,7 +579,7 @@ function TailoringOrders() {
                 <legend className="group-label">🧵 تفاصيل القماش والتصميم</legend>
                 <div className="form-grid">
                   <label className="field">
-                    <span>نوع القماش</span>
+                    <span>نوع القماش:</span>
                     <input
                       className="input"
                       value={draft.fabricType}
@@ -586,7 +587,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <label className="field">
-                    <span>لون القماش</span>
+                    <span>اللون:</span>
                     <input
                       className="input"
                       value={draft.fabricColor}
@@ -594,7 +595,7 @@ function TailoringOrders() {
                     />
                   </label>
                   <label className="field" style={{ gridColumn: '1 / -1' }}>
-                    <span>ملاحظات التصميم</span>
+                    <span>ملاحظات:</span>
                     <textarea
                       className="input"
                       rows={3}
