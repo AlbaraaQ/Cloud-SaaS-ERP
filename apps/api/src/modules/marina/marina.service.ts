@@ -1,15 +1,21 @@
 /* eslint-disable no-restricted-syntax */
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { and, asc, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
-import { marinaBookingAdditions, marinaBookings, marinaDayClosings, marinaOperationPlanLines, marinaOperationPlans, marinaPreparations, marinaViolations, rentalInvoices, tenantSettings, vesselGroupPricing, vesselGroups, vesselOwners, vessels, withTenantTx, type DatabaseHandle } from '@erp/database';
+import { marinaBookingAdditions, marinaBookings, marinaDayClosings, marinaOperationPlanLines, marinaOperationPlans, marinaPreparations, marinaViolations, parties, rentalInvoices, tenantSettings, vesselGroupPricing, vesselGroups, vesselOwners, vessels, withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SalesService } from '../sales/sales.service.js';
 
 import { calculateMarinaPeriod } from './marina-pricing.js';
+
+export type RentalInvoiceFilters = { partyId?: string; customer?: string; from?: string; to?: string; minNet?: string; maxNet?: string };
+
+function isISODate(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
 
 @Injectable()
 export class MarinaService {
@@ -21,7 +27,12 @@ export class MarinaService {
   async addOwner(tenantId: string, vesselId: string, input: { partyId: string; percent: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(vesselOwners).values({ id: newId(), tenantId, vesselId, partyId: input.partyId, percent: input.percent }).returning()); return row; }
   async createBooking(tenantId: string, input: { branchId: string; partyId: string; vesselId: string; startsAt: string; endsAt: string; companions?: number; insuranceAmount?: string; metadata?: Record<string, unknown> }) { await this.ensureEnabled(tenantId); await this.assertDayOpen(tenantId, input.branchId, input.startsAt.slice(0, 10)); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(marinaBookings).values({ id: newId(), tenantId, branchId: input.branchId, partyId: input.partyId, vesselId: input.vesselId, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), companions: input.companions ?? 0, insuranceAmount: input.insuranceAmount ?? '0', metadata: input.metadata ?? {} }).returning()); return row; }
   async addBookingAddition(tenantId: string, bookingId: string, input: { description: string; amount: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(marinaBookingAdditions).values({ id: newId(), tenantId, bookingId, description: input.description, amount: input.amount }).returning()); return row; }
-  async createRentalInvoice(tenantId: string, bookingId: string) { await this.ensureEnabled(tenantId); const [booking] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(marinaBookings).where(and(eq(marinaBookings.tenantId, tenantId), eq(marinaBookings.id, bookingId)))); if (!booking) throw new DomainError('BOOKING_NOT_FOUND', 'Booking not found', 404); await this.assertDayOpen(tenantId, booking.branchId, booking.startsAt.toISOString().slice(0, 10)); const [vessel] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(vessels).where(and(eq(vessels.tenantId, tenantId), eq(vessels.id, booking.vesselId)))); const prices = vessel?.groupId ? await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(vesselGroupPricing).where(and(eq(vesselGroupPricing.tenantId, tenantId), eq(vesselGroupPricing.groupId, vessel.groupId!)))) : []; const hourly = prices.find((p) => p.periodKind === 'hour')?.price ?? '0'; const half = prices.find((p) => p.periodKind === 'half_hour')?.price; const offer = prices.find((p) => p.periodKind === 'offer')?.price; const periodAmount = calculateMarinaPeriod({ startsAt: booking.startsAt.toISOString(), endsAt: booking.endsAt.toISOString(), hourlyPrice: hourly, halfHourPrice: half, offerPrice: offer }); const additions = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(marinaBookingAdditions).where(and(eq(marinaBookingAdditions.tenantId, tenantId), eq(marinaBookingAdditions.bookingId, bookingId)))); const additionsAmount = additions.reduce((sum, line) => sum.plus(line.amount), new Decimal(0)); const total = new Decimal(periodAmount).plus(additionsAmount).plus(booking.insuranceAmount); const invoice = await this.sales.create(tenantId, { branchId: booking.branchId, partyId: booking.partyId, kind: 'sale', lines: [{ description: `Marina rental ${bookingId}`, quantity: '1', unitPrice: total.toFixed(4), taxRate: '0' }] }); const [rental] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(rentalInvoices).values({ id: newId(), tenantId, bookingId, salesInvoiceId: invoice.id, periodAmount, additionsAmount: additionsAmount.toFixed(4), insuranceAmount: booking.insuranceAmount, total: total.toFixed(4), metadata: { companions: booking.companions, source: 'booking' } }).returning()); return { data: { ...rental, salesInvoiceId: invoice.id } }; }
+  async createRentalInvoice(tenantId: string, bookingId: string) { await this.ensureEnabled(tenantId); const [booking] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(marinaBookings).where(and(eq(marinaBookings.tenantId, tenantId), eq(marinaBookings.id, bookingId)))); if (!booking) throw new DomainError('BOOKING_NOT_FOUND', 'Booking not found', 404); await this.assertDayOpen(tenantId, booking.branchId, booking.startsAt.toISOString().slice(0, 10)); const [vessel] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(vessels).where(and(eq(vessels.tenantId, tenantId), eq(vessels.id, booking.vesselId)))); const prices = vessel?.groupId ? await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(vesselGroupPricing).where(and(eq(vesselGroupPricing.tenantId, tenantId), eq(vesselGroupPricing.groupId, vessel.groupId!)))) : []; const hourly = prices.find((p) => p.periodKind === 'hour')?.price ?? '0'; const half = prices.find((p) => p.periodKind === 'half_hour')?.price; const offer = prices.find((p) => p.periodKind === 'offer')?.price; // 💰 القيمة (`Booking.Price`) is the operator's; the فئة's tariff is the fall-back.
+    const priced = calculateMarinaPeriod({ startsAt: booking.startsAt.toISOString(), endsAt: booking.endsAt.toISOString(), hourlyPrice: hourly, halfHourPrice: half, offerPrice: offer });
+    const periodAmount = new Decimal(booking.rentalAmount ?? '0').gt(0) ? booking.rentalAmount : priced; const additions = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(marinaBookingAdditions).where(and(eq(marinaBookingAdditions.tenantId, tenantId), eq(marinaBookingAdditions.bookingId, bookingId)))); const additionsAmount = additions.reduce((sum, line) => sum.plus(line.amount), new Decimal(0)); const total = new Decimal(periodAmount).plus(additionsAmount).plus(booking.insuranceAmount); const invoice = await this.sales.create(tenantId, { branchId: booking.branchId, partyId: booking.partyId, kind: 'sale', lines: [{ description: `Marina rental ${bookingId}`, quantity: '1', unitPrice: total.toFixed(4), taxRate: '0' }] }); // `CalcuAll` — ضريبة 15% على الإجمالي، والصافي = الإجمالي + الضريبة.
+    const vatRate = await this.vatRate(tenantId);
+    const taxAmount = total.mul(vatRate).div(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+    const [rental] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(rentalInvoices).values({ id: newId(), tenantId, bookingId, salesInvoiceId: invoice.id, documentDate: booking.documentDate, periodAmount, additionsAmount: additionsAmount.toFixed(4), insuranceAmount: booking.insuranceAmount, total: total.toFixed(4), taxAmount: taxAmount.toFixed(2), netAmount: total.plus(taxAmount).toFixed(2), metadata: { companions: booking.companions, source: 'booking', vatRate, periodHours: booking.periodHours, periodMinutes: booking.periodMinutes } }).returning()); return { data: { ...rental, salesInvoiceId: invoice.id } }; }
   async violation(tenantId: string, input: { vesselId?: string; bookingId?: string; partyId?: string; violationDate: string; amount?: string; description: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(marinaViolations).values({ id: newId(), tenantId, ...input, amount: input.amount ?? '0' }).returning()); return row; }
   async plan(tenantId: string, input: { groupId?: string; planDate: string; name: string; lines?: Array<{ vesselId: string; periodLabel?: string; metadata?: Record<string, unknown> }> }) { await this.ensureEnabled(tenantId); const id = newId(); await withTenantTx(this.database.db, tenantId, async (tx) => { await tx.insert(marinaOperationPlans).values({ id, tenantId, groupId: input.groupId, planDate: input.planDate, name: input.name }); if (input.lines?.length) await tx.insert(marinaOperationPlanLines).values(input.lines.map((line, index) => ({ planId: id, tenantId, lineNo: index + 1, vesselId: line.vesselId, periodLabel: line.periodLabel, metadata: line.metadata ?? {} }))); }); return { id }; }
   async listBookings(tenantId: string) { await this.ensureEnabled(tenantId); return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(marinaBookings).where(eq(marinaBookings.tenantId, tenantId)).orderBy(desc(marinaBookings.startsAt)).limit(200)); }
@@ -119,10 +130,53 @@ export class MarinaService {
   }
 
   /** ربط الفواتير — rental invoices with their booking and the sales invoice behind them. */
-  async listRentalInvoices(tenantId: string) {
+  /**
+   * `GET /marina/rental-invoices` — «🧾 قائمة الفواتير» of
+   * `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير»): «🔍 خيارات البحث» are رقم
+   * الفاتورة · التاريخ من/إلى · العميل · جوال العميل · الصافي من/إلى, and the grid is
+   * `الرقم · 📅 التاريخ · 👤 العميل · 💰 الصافي · 👤 المستخدم · 📱 الجوال`.
+   *
+   * «نوع العملية» و«المستخدم» are not filters here: this table holds rental invoices
+   * only (`proc_type=4` was the desktop's discriminator), and no column carries the
+   * cashier — both are left out rather than offered and ignored.
+   */
+  async listRentalInvoices(tenantId: string, filters: RentalInvoiceFilters = {}) {
     await this.ensureEnabled(tenantId);
-    return withTenantTx(this.database.db, tenantId, (tx) =>
-      tx.select().from(rentalInvoices).where(eq(rentalInvoices.tenantId, tenantId)).orderBy(desc(rentalInvoices.createdAt)).limit(200));
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ invoice: rentalInvoices, customerName: parties.name, customerPhone: parties.phone, bookingNumber: marinaBookings.number })
+        .from(rentalInvoices)
+        .innerJoin(marinaBookings, eq(marinaBookings.id, rentalInvoices.bookingId))
+        .leftJoin(parties, eq(parties.id, marinaBookings.partyId))
+        .where(
+          and(
+            eq(rentalInvoices.tenantId, tenantId),
+            filters.partyId ? eq(marinaBookings.partyId, filters.partyId) : undefined,
+            filters.customer ? or(ilike(parties.phone, `%${filters.customer.trim()}%`), ilike(parties.name, `%${filters.customer.trim()}%`)) : undefined,
+            filters.minNet ? gte(rentalInvoices.netAmount, filters.minNet) : undefined,
+            filters.maxNet ? lte(rentalInvoices.netAmount, filters.maxNet) : undefined,
+          ),
+        )
+        .orderBy(desc(rentalInvoices.createdAt))
+        .limit(200),
+    );
+    const from = isISODate(filters.from) ? filters.from : undefined;
+    const to = isISODate(filters.to) ? filters.to : undefined;
+    return rows
+      .filter(({ invoice }) => {
+        const day = String(invoice.documentDate ?? invoice.createdAt.toISOString().slice(0, 10));
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+        return true;
+      })
+      .map(({ invoice, customerName, customerPhone, bookingNumber }) => ({
+        ...invoice,
+        // 🔢 الرقم — the حجز's own number is the invoice's الرقم in the search grid.
+        number: bookingNumber ?? null,
+        customerName: customerName ?? '',
+        customerPhone: customerPhone ?? '',
+        documentDate: invoice.documentDate ?? invoice.createdAt.toISOString().slice(0, 10),
+      }));
   }
 
   /** Bookings that have finished but were never invoiced — the work list of that screen. */
@@ -243,6 +297,15 @@ export class MarinaService {
         .where(and(eq(marinaDayClosings.tenantId, tenantId), branchId ? eq(marinaDayClosings.branchId, branchId) : undefined))
         .orderBy(desc(marinaDayClosings.closeDate))
         .limit(200));
+  }
+
+  /** `SettingGeneral.MainVAT where Inv_Id=4` — «ضريبة 15%», unless the tenant changed it. */
+  private async vatRate(tenantId: string): Promise<number> {
+    const [setting] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select().from(tenantSettings).where(and(eq(tenantSettings.tenantId, tenantId), eq(tenantSettings.key, 'marina.vatRate'))).limit(1),
+    );
+    const value = Number(setting?.value ?? 15);
+    return Number.isFinite(value) && value >= 0 ? value : 15;
   }
 
   /** A closed day is frozen: no new booking and no new rental invoice may be dated into it. */

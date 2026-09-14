@@ -128,18 +128,72 @@ export const vesselGroupPricing = pgTable('vessel_group_pricing', {
 export const vesselOwners = pgTable('vessel_owners', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), percent: numeric('percent', pct).notNull(), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
 }, (t) => ({ owner: uniqueIndex('vessel_owners_party_key').on(t.tenantId, t.vesselId, t.partyId).where(sql`deleted_at IS NULL`) }));
+/**
+ * 🛶 الحجز — `Booking(InvID, MarineId, UserId, ClientId, Bdate, dateIn, PeriodHour,
+ * PeriodMinute, Price, status, BookingType, notes, IsDeleted)`
+ * (`Form_WPF/frmBookingM.xaml` «الحجوزات»).
+ *
+ * `status` keeps the desktop's own words — «مؤكد» و«غير مؤكد» هما عنصرا `cmbBookingStatu`
+ * ويُحفظان بنصّهما العربي؛ وصفٌّ كُتب قبل هذا الجزء يحمل 'booked' ويُقرأ «مؤكد». و📅
+ * التاريخ (`Bdate`) غير 📅 تاريخ الحجز (`dateIn`) هناك، وهنا كذلك: `documentDate` يوم
+ * الورقة و`startsAt` يوم الرحلة. و«📝 ملاحظات» غائبةٌ عن قصد: `txtNotes` تُمحى ولا تُحفظ.
+ */
 export const marinaBookings = pgTable('marina_bookings', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').notNull().references(() => branches.id), partyId: uuid('party_id').notNull().references(() => parties.id), vesselId: uuid('vessel_id').notNull().references(() => vessels.id), startsAt: timestamp('starts_at', { withTimezone: true }).notNull(), endsAt: timestamp('ends_at', { withTimezone: true }).notNull(), companions: integer('companions').notNull().default(0), insuranceAmount: numeric('insurance_amount', money).notNull().default('0'), status: text('status').notNull().default('booked'), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
-}, (t) => ({ vesselTime: index('marina_bookings_vessel_time_idx').on(t.tenantId, t.vesselId, t.startsAt, t.endsAt) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').notNull().references(() => branches.id), partyId: uuid('party_id').notNull().references(() => parties.id), vesselId: uuid('vessel_id').notNull().references(() => vessels.id),
+  /** 🔢 الرقم — `BK-000001`. */
+  number: text('number'),
+  /** 📅 التاريخ — `Bdate`؛ يوم الورقة لا يوم الرحلة. */
+  documentDate: date('document_date').notNull().default(sql`CURRENT_DATE`),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(), endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  /** 🚢 نوع الحجز — «حجز عادي» أو «بحر مفتوح». */
+  bookingType: text('booking_type').notNull().default('حجز عادي'),
+  /** ⏱️ المدة ساعة — `PeriodHour`. */
+  periodHours: integer('period_hours').notNull().default(0),
+  /** ⏱️ المدة دقيقة — `PeriodMinute`؛ و`RentPeriod` = الساعة + الدقيقة ÷ 60. */
+  periodMinutes: integer('period_minutes').notNull().default(0),
+  /** 💰 القيمة — `Price`، يكتبها المشغّل، وتصير `tot_Rent` في فاتورة التأجير. */
+  rentalAmount: numeric('rental_amount', money).notNull().default('0'),
+  companions: integer('companions').notNull().default(0), insuranceAmount: numeric('insurance_amount', money).notNull().default('0'), status: text('status').notNull().default('booked'), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
+}, (t) => ({ vesselTime: index('marina_bookings_vessel_time_idx').on(t.tenantId, t.vesselId, t.startsAt, t.endsAt), number: uniqueIndex('marina_bookings_tenant_number_key').on(t.tenantId, t.number).where(sql`number IS NOT NULL AND deleted_at IS NULL`), date: index('marina_bookings_tenant_date_idx').on(t.tenantId, t.documentDate, t.createdAt) }));
+/** 🎁 الإضافات — `BookingAddition(bookId, AditionID, Price, quanty, notes, IsDeleted)`. */
 export const marinaBookingAdditions = pgTable('marina_booking_additions', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), bookingId: uuid('booking_id').notNull().references(() => marinaBookings.id, { onDelete: 'cascade' }), description: text('description').notNull(), amount: numeric('amount', money).notNull(), ...baseAuditColumns(),
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), bookingId: uuid('booking_id').notNull().references(() => marinaBookings.id, { onDelete: 'cascade' }), description: text('description').notNull(),
+  /** العدد — `quanty`. */
+  quantity: numeric('quantity', money).notNull().default('1'),
+  /** السعر — `Price`، لوحدةٍ واحدة؛ والإجمالي = العدد × السعر. */
+  unitPrice: numeric('unit_price', money).notNull().default('0'),
+  /** الإجمالي — `amount`. */
+  amount: numeric('amount', money).notNull(), ...baseAuditColumns(),
 });
 export const rentalInvoices = pgTable('rental_invoices', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), bookingId: uuid('booking_id').notNull().references(() => marinaBookings.id), salesInvoiceId: uuid('sales_invoice_id').references(() => salesInvoices.id, { onDelete: 'set null' }), periodAmount: numeric('period_amount', money).notNull(), additionsAmount: numeric('additions_amount', money).notNull().default('0'), insuranceAmount: numeric('insurance_amount', money).notNull().default('0'), total: numeric('total', money).notNull(), status: text('status').notNull().default('draft'), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns(), ...baseLegacyColumns(),
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), bookingId: uuid('booking_id').notNull().references(() => marinaBookings.id), salesInvoiceId: uuid('sales_invoice_id').references(() => salesInvoices.id, { onDelete: 'set null' }),
+  /** 📅 التاريخ — `RentInvoice.date`. */
+  documentDate: date('document_date'),
+  periodAmount: numeric('period_amount', money).notNull(), additionsAmount: numeric('additions_amount', money).notNull().default('0'), insuranceAmount: numeric('insurance_amount', money).notNull().default('0'),
+  /** الإجمالي — `CalcuAll`: الإضافات + القيمة. */
+  total: numeric('total', money).notNull(),
+  /** ضريبة 15% — `tax` = ROUND(الإجمالي × MainVAT ÷ 100, 2). */
+  taxAmount: numeric('tax_amount', money).notNull().default('0'),
+  /** الصافي — `tot_net` = الإجمالي + الضريبة. */
+  netAmount: numeric('net_amount', money).notNull().default('0'), status: text('status').notNull().default('draft'), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns(), ...baseLegacyColumns(),
 }, (t) => ({ booking: uniqueIndex('rental_invoices_booking_key').on(t.tenantId, t.bookingId) }));
+/**
+ * ⚠️ المخالفة — `Violation(MarineId, Vdate, Period, status, ViolatType, notes, IsDeleted)`
+ * (`Form_WPF/frmViolationM.xaml` «المخالفات»). `description` هي `notes` عند الديسكتوب
+ * («📝 ملاحظة»)، و`violationType` هي «⚠️ نوع المخالفة» و`periodDays` هي «⏱️ مدة المخالفة
+ * (يوم)» — وهما ما ترفض النافذة بدونهما.
+ */
 export const marinaViolations = pgTable('marina_violations', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), vesselId: uuid('vessel_id').references(() => vessels.id), bookingId: uuid('booking_id').references(() => marinaBookings.id), partyId: uuid('party_id').references(() => parties.id), violationDate: date('violation_date').notNull(), amount: numeric('amount', money).notNull().default('0'), description: text('description').notNull(), status: text('status').notNull().default('open'), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
-});
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  /** 🔢 الرقم — `VI-000001` (وهو `MAX(id) + 1` في `LoadNextNo`). */
+  number: text('number'),
+  vesselId: uuid('vessel_id').references(() => vessels.id), bookingId: uuid('booking_id').references(() => marinaBookings.id), partyId: uuid('party_id').references(() => parties.id), violationDate: date('violation_date').notNull(),
+  /** ⏱️ مدة المخالفة (يوم) — `Period`. */
+  periodDays: numeric('period_days', money),
+  /** ⚠️ نوع المخالفة — `ViolatType`. */
+  violationType: text('violation_type'),
+  amount: numeric('amount', money).notNull().default('0'), description: text('description').notNull(), status: text('status').notNull().default('open'), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
+}, (t) => ({ number: uniqueIndex('marina_violations_tenant_number_key').on(t.tenantId, t.number).where(sql`number IS NOT NULL AND deleted_at IS NULL`), type: index('marina_violations_tenant_type_idx').on(t.tenantId, t.violationType, t.violationDate) }));
 export const marinaOperationPlans = pgTable('marina_operation_plans', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), groupId: uuid('group_id').references(() => vesselGroups.id), planDate: date('plan_date').notNull(), name: text('name').notNull(), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
 }, (t) => ({ day: index('marina_operation_plans_day_idx').on(t.tenantId, t.planDate) }));

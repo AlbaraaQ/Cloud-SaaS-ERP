@@ -1,12 +1,207 @@
+/**
+ * Marina — `Form_WPF/frmBookingM.xaml` («الحجوزات») · `Form_WPF/frmViolationM.xaml`
+ * («المخالفات») · `Form_WPF/frmGroupM.xaml` («📋 بطاقة فئة») · `Form_WPF/frmOwners.xaml`
+ * («تعريف مالك») · `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير»).
+ *
+ * Reading (الحجوزات · المخالفات · فواتير التأجير · خطط التشغيل) needs `marina.view`;
+ * writing a حجز أو مخالفة needs `marina.manage`; and issuing a فاتورة تأجير needs
+ * `marina.invoice` — the same split as the windows: everyone looks, the harbour master
+ * writes, and the cashier invoices.
+ */
 /* eslint-disable no-restricted-syntax */
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
-import { getTenantContext } from '../platform/context/tenant-context.js';
+import { getTenantContext, tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
+import {
+  MarinaDocumentsService,
+  type AdditionInput,
+  type BookingInput,
+  type BookingPatch,
+  type BookingQuery,
+  type ViolationInput,
+  type ViolationPatch,
+  type ViolationQuery,
+} from './booking-documents.service.js';
 import { MarinaService } from './marina.service.js';
+
 @Controller('marina')
-export class MarinaController { constructor(private readonly marina: MarinaService) {} @Get() @RequiresPermission('marina.view') list() { return this.marina.list(getTenantContext().tenantId); } @Get('bookings') @RequiresPermission('marina.view') bookings() { return this.marina.listBookings(getTenantContext().tenantId); } @Get('violations') @RequiresPermission('marina.view') violations() { return this.marina.listViolations(getTenantContext().tenantId); } @Post('groups') @RequiresPermission('marina.manage') group(@Body() b: { name: string; code?: string }) { return this.marina.createGroup(getTenantContext().tenantId, b); } @Post('groups/:id/pricing') @RequiresPermission('marina.manage') price(@Param('id') id: string, @Body() b: { periodKind: string; price: string; currency?: string }) { return this.marina.price(getTenantContext().tenantId, id, b); } @Post('vessels') @RequiresPermission('marina.manage') vessel(@Body() b: { groupId?: string; code: string; name: string; capacity?: number; metadata?: Record<string, unknown> }) { return this.marina.createVessel(getTenantContext().tenantId, b); } @Post('vessels/:id/owners') @RequiresPermission('marina.manage') owner(@Param('id') id: string, @Body() b: { partyId: string; percent: string }) { return this.marina.addOwner(getTenantContext().tenantId, id, b); } @Post('bookings') @RequiresPermission('marina.manage') booking(@Body() b: { branchId: string; partyId: string; vesselId: string; startsAt: string; endsAt: string; companions?: number; insuranceAmount?: string; metadata?: Record<string, unknown> }) { return this.marina.createBooking(getTenantContext().tenantId, b); } @Post('bookings/:id/additions') @RequiresPermission('marina.manage') addition(@Param('id') id: string, @Body() b: { description: string; amount: string }) { return this.marina.addBookingAddition(getTenantContext().tenantId, id, b); } @Post('bookings/:id/rental-invoice') @RequiresPermission('marina.invoice') invoice(@Param('id') id: string) { return this.marina.createRentalInvoice(getTenantContext().tenantId, id); } @Post('violations') @RequiresPermission('marina.manage') violation(@Body() b: { vesselId?: string; bookingId?: string; partyId?: string; violationDate: string; amount?: string; description: string }) { return this.marina.violation(getTenantContext().tenantId, b); } @Post('operation-plans') @RequiresPermission('marina.manage') plan(@Body() b: { groupId?: string; planDate: string; name: string; lines?: Array<{ vesselId: string; periodLabel?: string; metadata?: Record<string, unknown> }> }) { return this.marina.plan(getTenantContext().tenantId, b); } }
+export class MarinaController {
+  constructor(private readonly marina: MarinaService, private readonly documents: MarinaDocumentsService) {}
+
+  private get tenantId(): string {
+    return getTenantContext().tenantId;
+  }
+
+  private get userId(): string | undefined {
+    return tryGetAuthContext()?.userId;
+  }
+
+  @Get()
+  @RequiresPermission('marina.view')
+  list() {
+    return this.marina.list(this.tenantId);
+  }
+
+  // ─────────────────────────────── 📋 بيانات الحجوزات ───────────────────────────────
+
+  /**
+   * «🔍 البحث» — رقم الحجز · اسم العميل أو جواله · من تاريخ وإلى تاريخ، و«📋 نتائج
+   * البحث» هي نفسها «📋 بيانات الحجوزات» مفتوحةً على حجزٍ واحد.
+   */
+  @Get('bookings')
+  @RequiresPermission('marina.view')
+  bookings(
+    @Query('number') number?: string,
+    @Query('customer') customer?: string,
+    @Query('partyId') partyId?: string,
+    @Query('vesselId') vesselId?: string,
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const query: BookingQuery = {};
+    if (number) query.number = number;
+    if (customer) query.customer = customer;
+    if (partyId) query.partyId = partyId;
+    if (vesselId) query.vesselId = vesselId;
+    if (status) query.status = status;
+    if (from) query.from = from;
+    if (to) query.to = to;
+    if (limit) query.limit = limit;
+    if (offset) query.offset = offset;
+    return this.documents.listBookings(this.tenantId, query);
+  }
+
+  @Get('bookings/:id')
+  @RequiresPermission('marina.view')
+  booking(@Param('id') id: string) {
+    return this.documents.getBooking(this.tenantId, id);
+  }
+
+  /** «💾» — الحجز كاملاً بإضافاته في صفقةٍ واحدة. */
+  @Post('bookings')
+  @RequiresPermission('marina.manage')
+  createBooking(@Body() body: BookingInput) {
+    return this.documents.createBooking(this.tenantId, body, this.userId);
+  }
+
+  @Patch('bookings/:id')
+  @RequiresPermission('marina.manage')
+  updateBooking(@Param('id') id: string, @Body() body: BookingPatch) {
+    return this.documents.updateBooking(this.tenantId, id, body, this.userId);
+  }
+
+  @Delete('bookings/:id')
+  @RequiresPermission('marina.manage')
+  deleteBooking(@Param('id') id: string) {
+    return this.documents.deleteBooking(this.tenantId, id, this.userId);
+  }
+
+  /** «🎁 الإضافات» — العدد × السعر = الإجمالي. */
+  @Post('bookings/:id/additions')
+  @RequiresPermission('marina.manage')
+  addition(@Param('id') id: string, @Body() body: AdditionInput) {
+    return this.documents.addAddition(this.tenantId, id, body, this.userId);
+  }
+
+  /** «🗑️ حذف» على صفٍّ من صفوف الإضافات. */
+  @Delete('bookings/:id/additions/:additionId')
+  @RequiresPermission('marina.manage')
+  removeAddition(@Param('id') id: string, @Param('additionId') additionId: string) {
+    return this.documents.removeAddition(this.tenantId, id, additionId);
+  }
+
+  /** 🧾 فاتورة التأجير من حجز — `RentInvoice(tot_Rent, tot_Additions, tax, tot_net)`. */
+  @Post('bookings/:id/rental-invoice')
+  @RequiresPermission('marina.invoice')
+  invoice(@Param('id') id: string) {
+    return this.marina.createRentalInvoice(this.tenantId, id);
+  }
+
+  // ─────────────────────────────── ⚠️ المخالفات ───────────────────────────────
+
+  /** «⚠️ قائمة المخالفات» — `select * from Violation where IsDeleted=0`. */
+  @Get('violations')
+  @RequiresPermission('marina.view')
+  violations(
+    @Query('number') number?: string,
+    @Query('type') type?: string,
+    @Query('vesselId') vesselId?: string,
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const query: ViolationQuery = {};
+    if (number) query.number = number;
+    if (type) query.type = type;
+    if (vesselId) query.vesselId = vesselId;
+    if (status) query.status = status;
+    if (from) query.from = from;
+    if (to) query.to = to;
+    return this.documents.listViolations(this.tenantId, query);
+  }
+
+  @Get('violations/:id')
+  @RequiresPermission('marina.view')
+  violation(@Param('id') id: string) {
+    return this.documents.getViolation(this.tenantId, id);
+  }
+
+  /** «💾 حفظ» — ثلاثة رفوض بترتيب النافذة. */
+  @Post('violations')
+  @RequiresPermission('marina.manage')
+  createViolation(@Body() body: ViolationInput) {
+    return this.documents.createViolation(this.tenantId, body, this.userId);
+  }
+
+  @Patch('violations/:id')
+  @RequiresPermission('marina.manage')
+  updateViolation(@Param('id') id: string, @Body() body: ViolationPatch) {
+    return this.documents.updateViolation(this.tenantId, id, body, this.userId);
+  }
+
+  @Delete('violations/:id')
+  @RequiresPermission('marina.manage')
+  deleteViolation(@Param('id') id: string) {
+    return this.documents.deleteViolation(this.tenantId, id, this.userId);
+  }
+
+  // ─────────────────────────────── التعاريف ───────────────────────────────
+
+  @Post('groups')
+  @RequiresPermission('marina.manage')
+  group(@Body() b: { name: string; code?: string }) {
+    return this.marina.createGroup(this.tenantId, b);
+  }
+
+  @Post('groups/:id/pricing')
+  @RequiresPermission('marina.manage')
+  price(@Param('id') id: string, @Body() b: { periodKind: string; price: string; currency?: string }) {
+    return this.marina.price(this.tenantId, id, b);
+  }
+
+  @Post('vessels')
+  @RequiresPermission('marina.manage')
+  vessel(@Body() b: { groupId?: string; code: string; name: string; capacity?: number; metadata?: Record<string, unknown> }) {
+    return this.marina.createVessel(this.tenantId, b);
+  }
+
+  @Post('vessels/:id/owners')
+  @RequiresPermission('marina.manage')
+  owner(@Param('id') id: string, @Body() b: { partyId: string; percent: string }) {
+    return this.marina.addOwner(this.tenantId, id, b);
+  }
+
+  @Post('operation-plans')
+  @RequiresPermission('marina.manage')
+  plan(@Body() b: { groupId?: string; planDate: string; name: string; lines?: Array<{ vesselId: string; periodLabel?: string; metadata?: Record<string, unknown> }> }) {
+    return this.marina.plan(this.tenantId, b);
+  }
+}
 
 /**
  * Marina operations — preparation, rota, invoice linking and the day close (0025).
@@ -42,10 +237,18 @@ export class MarinaOperationsController {
     return this.marina.returnPreparation(getTenantContext().tenantId, id, body ?? {});
   }
 
+  /** «🔍 خيارات البحث» — `frmInvoiceRentSrch` — then «🗑️ تصفية الحقول» clears them. */
   @Get('rental-invoices')
   @RequiresPermission('marina.view')
-  rentals() {
-    return this.marina.listRentalInvoices(getTenantContext().tenantId);
+  rentals(
+    @Query('partyId') partyId?: string,
+    @Query('customer') customer?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('minNet') minNet?: string,
+    @Query('maxNet') maxNet?: string,
+  ) {
+    return this.marina.listRentalInvoices(getTenantContext().tenantId, { partyId, customer, from, to, minNet, maxNet });
   }
 
   @Get('bookings/uninvoiced')

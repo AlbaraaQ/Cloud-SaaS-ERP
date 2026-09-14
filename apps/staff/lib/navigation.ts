@@ -1113,18 +1113,16 @@ const marina: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('marina-link', 'ربط الفواتير', 'Link invoices', '/marina/link-invoices', 'ready', {
+        // 🧾 بحث الفواتير — `frmInvoiceRentSrch.xaml` («بحث الفواتير»): «🔍 خيارات البحث»
+        // و«🧾 قائمة الفواتير»؛ وإصدار فاتورة التأجير من حجزٍ بلا فاتورة يسكن الشاشة نفسها.
+        screen('marina-link', 'بحث الفواتير', 'Rental invoice search', '/marina/link-invoices', 'ready', {
           permission: 'marina.view',
           endpoint: '/marina/rental-invoices',
         }),
-        screen(
-          'marina-bookings',
-          'الحجوزات والإضافات والفواتير',
-          'Bookings, additions and invoices',
-          '/marina/bookings',
-          'ready',
-          { endpoint: '/marina/bookings' },
-        ),
+        // ⛵ الحجوزات — `frmBookingM.xaml` («الحجوزات»): «📋 بيانات الحجوزات» و«🔍 البحث».
+        screen('marina-bookings', 'الحجوزات', 'Bookings', '/marina/bookings', 'ready', {
+          endpoint: '/marina/bookings',
+        }),
         screen('marina-day-close', 'إغلاق اليومية', 'Day close', '/marina/day-close', 'ready', {
           permission: 'marina.view',
           endpoint: '/marina/day-close',

@@ -20,13 +20,34 @@ type RentalInvoice = {
   additionsAmount: string;
   insuranceAmount: string;
   total: string;
+  taxAmount: string;
+  netAmount: string;
+  /** 🔢 الرقم — رقم الحجز, as `frmInvoiceRentSrch` shows it. */
+  number: string | null;
+  documentDate: string;
+  customerName: string;
+  customerPhone: string;
   status: string;
   createdAt: string;
 };
 
 export default function MarinaLinkInvoicesPage() {
   const { can } = useSession();
-  const rentals = useQuery<RentalInvoice[]>(() => apiList<RentalInvoice>('/marina/rental-invoices'), []);
+  const [filters, setFilters] = useState({ customer: '', from: '', to: '', minNet: '', maxNet: '' });
+  const [applied, setApplied] = useState<typeof filters | null>(null);
+  const rentals = useQuery<RentalInvoice[]>(() => {
+    // «🔍 خيارات البحث» — `frmInvoiceRentSrch`: العميل أو جواله، التاريخان، والصافي من/إلى.
+    const params = new URLSearchParams();
+    if (applied) {
+      if (applied.customer.trim()) params.set('customer', applied.customer.trim());
+      if (applied.from) params.set('from', applied.from);
+      if (applied.to) params.set('to', applied.to);
+      if (applied.minNet) params.set('minNet', applied.minNet);
+      if (applied.maxNet) params.set('maxNet', applied.maxNet);
+    }
+    const query = params.toString();
+    return apiList<RentalInvoice>(`/marina/rental-invoices${query ? `?${query}` : ''}`);
+  }, [applied]);
   const uninvoiced = useQuery<Booking[]>(() => apiList<Booking>('/marina/bookings/uninvoiced'), []);
   const bookings = useQuery<Booking[]>(() => apiList<Booking>('/marina/bookings'), []);
   const marina = useQuery<Marina>(() => apiData<Marina>('/marina'), []);
@@ -123,23 +144,75 @@ export default function MarinaLinkInvoicesPage() {
         </QueryView>
       </div>
 
+      {/* «🔍 خيارات البحث» — `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير»). */}
+      <div className="card tight no-print">
+        <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="field" style={{ margin: 0, minWidth: 200 }}>
+            <span>العميل</span>
+            <input
+              className="input"
+              value={filters.customer}
+              placeholder="🔍 الاسم أو الجوال..."
+              onChange={(event) => setFilters({ ...filters, customer: event.target.value })}
+            />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 150 }}>
+            <span>التاريخ من</span>
+            <input className="input" type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 150 }}>
+            <span>إلى</span>
+            <input className="input" type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 120 }}>
+            <span>الصافي من</span>
+            <input className="input numeric" value={filters.minNet} onChange={(event) => setFilters({ ...filters, minNet: event.target.value })} />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 120 }}>
+            <span>إلى</span>
+            <input className="input numeric" value={filters.maxNet} onChange={(event) => setFilters({ ...filters, maxNet: event.target.value })} />
+          </label>
+          <button className="btn primary" type="button" onClick={() => setApplied(filters)}>
+            🔍 بحث
+          </button>
+          {applied && (
+            <button
+              className="btn"
+              type="button"
+              onClick={() => {
+                setFilters({ customer: '', from: '', to: '', minNet: '', maxNet: '' });
+                setApplied(null);
+              }}
+            >
+              🗑️ تصفية الحقول
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* «🧾 قائمة الفواتير» — الرقم · 📅 التاريخ · 👤 العميل · 💰 الصافي · 📱 الجوال.
+          `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير»). */}
       <QueryView query={rentals} empty="لا توجد فواتير تأجير" emptyDetail="أصدر فاتورة تأجير من الحجوزات أعلاه.">
         {(rows) => (
           <DataTable
             rows={rows}
             rowKey={(row) => row.id}
             columns={[
+              { key: 'number', header: 'الرقم', align: 'ltr', cell: (row) => row.number ?? '—' },
+              { key: 'date', header: '📅 التاريخ', align: 'ltr', cell: (row) => row.documentDate },
+              { key: 'customer', header: '👤 العميل', cell: (row) => row.customerName || customerName(row.bookingId) },
               { key: 'vessel', header: 'المركب', cell: (row) => bookingVessel(row.bookingId) },
               { key: 'period', header: 'قيمة الفترة', align: 'num', cell: (row) => money(row.periodAmount) },
               { key: 'additions', header: 'الإضافات', align: 'num', cell: (row) => money(row.additionsAmount) },
-              { key: 'insurance', header: 'التأمين', align: 'num', cell: (row) => money(row.insuranceAmount) },
               { key: 'total', header: 'الإجمالي', align: 'num', cell: (row) => money(row.total) },
+              { key: 'tax', header: 'الضريبة', align: 'num', cell: (row) => money(row.taxAmount) },
+              { key: 'net', header: '💰 الصافي', align: 'num', cell: (row) => money(row.netAmount) },
+              { key: 'phone', header: '📱 الجوال', align: 'ltr', cell: (row) => row.customerPhone || '—' },
               {
                 key: 'sales',
                 header: 'فاتورة المبيعات',
                 cell: (row) => (row.salesInvoiceId ? <span className="badge">مرتبطة</span> : <span className="badge">غير مرتبطة</span>),
               },
-              { key: 'created', header: 'أُنشئت', align: 'ltr', cell: (row) => dateTime(row.createdAt) },
             ]}
           />
         )}

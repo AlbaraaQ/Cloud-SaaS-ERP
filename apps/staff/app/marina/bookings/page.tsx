@@ -1,243 +1,574 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-import { DataTable, Notice, QueryView } from '../../../components/data-view';
-import { Screen } from '../../../components/screen';
-import { ApiError, apiData, apiList, apiPost } from '../../../lib/api';
-import {
-  branchOptions,
-  dateTime,
-  defaultOf,
-  listBranches,
-  listParties,
-  money,
-  partyLabel,
-  statusLabel,
-  type Branch,
-  type Party,
-} from '../../../lib/lookups';
+import { Empty, ErrorBox, Forbidden, Loading, Screen } from '../../../components/screen';
+import { apiDelete, apiFetch, apiList, apiPatch, apiPost } from '../../../lib/api';
+import { listBranches, listParties, type Branch, type Party } from '../../../lib/lookups';
 import { useSession } from '../../../lib/session';
 import { useQuery } from '../../../lib/use-query';
 
-type Vessel = { id: string; code: string; name: string };
-type Marina = { groups: Array<{ id: string; name: string }>; vessels: Vessel[] };
+/**
+ * ⛵ الحجوزات — `Form_WPF/frmBookingM.xaml` («الحجوزات»).
+ *
+ * «📋 بيانات الحجوزات» is the card: 🔢 الرقم · 📅 التاريخ · 📋 الفئة · 🔖 حالة الحجز
+ * («مؤكد»/«غير مؤكد») · 🚢 نوع الحجز («حجز عادي»/«بحر مفتوح») · 📅 تاريخ الحجز و🕐 وقته ·
+ * 👤 العميل · ⚓ المركب · 💰 القيمة · ⏱️ المدة ساعة/دقيقة · 🎁 الإضافات (الكمية · السعر ·
+ * الإجمالي) — ثم مجاميع `CalcuAll`: «إجمالي الإضافات» · «الإجمالي» · «ضريبة 15%» ·
+ * «الصافي». «🔍 البحث» is the second tab: رقم الحجز · اسم العميل · رقم الجوال · من
+ * تاريخ/إلى تاريخ، و«📋 نتائج البحث» تحته.
+ *
+ * ورفضها الأول قبل أي صفٍّ: «يجب تحديد مدة الحجز» — ساعةٌ ودقيقة يقفان على صفر.
+ *
+ * «📝 ملاحظات» مكتوبة في الشاشة عند الديسكتوب ولا تُحفظ (`txtNotes` تُمحى ولا تُقرأ)،
+ * فلم تُنقل. و«🖨️ طباعة» مؤجَّلة مع ملفّات `Reports/*.repx`.
+ */
+type Addition = { id: string; description: string; quantity: string; unitPrice: string; amount: string };
+type Draft = { id?: string; description: string; quantity: string; unitPrice: string };
+
 type Booking = {
   id: string;
+  number: string | null;
+  branchId: string;
+  partyId: string;
+  customerName: string;
+  customerPhone: string;
+  vesselId: string;
+  vesselName: string;
+  vesselCode: string;
+  documentDate: string;
+  startsAt: string;
+  endsAt: string;
+  bookingType: string;
+  periodHours: number;
+  periodMinutes: number;
+  rentalPeriod: number;
+  rentalAmount: string;
+  insuranceAmount: string;
+  companions: number;
+  status: string;
+  statusText: string;
+  additions: Addition[];
+  additionsTotal: string;
+  total: string;
+  taxAmount: string;
+  netAmount: string;
+  vatRate: number;
+  version: number;
+};
+
+type Card = {
+  id?: string;
+  version?: number;
   branchId: string;
   partyId: string;
   vesselId: string;
+  documentDate: string;
   startsAt: string;
   endsAt: string;
-  companions: number | null;
-  insuranceAmount: string;
+  bookingType: string;
   status: string;
-  invoiceId: string | null;
+  periodHours: string;
+  periodMinutes: string;
+  rentalAmount: string;
+  insuranceAmount: string;
+  companions: string;
+  additions: Draft[];
 };
 
-const localNow = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+type Vessel = { id: string; code: string; name: string; groupId?: string | null };
+type Marina = { groups: Array<{ id: string; name: string }>; vessels: Vessel[] };
 
-export default function MarinaBookingsPage() {
+const today = () => new Date().toISOString().slice(0, 10);
+const stamp = (dateTime: string) => dateTime.slice(0, 16);
+
+const emptyCard = (branchId = '', partyId = '', vesselId = ''): Card => ({
+  branchId,
+  partyId,
+  vesselId,
+  documentDate: today(),
+  startsAt: `${today()}T08:00`,
+  endsAt: `${today()}T10:00`,
+  bookingType: 'حجز عادي',
+  status: 'مؤكد',
+  periodHours: '2',
+  periodMinutes: '0',
+  rentalAmount: '0',
+  insuranceAmount: '0',
+  companions: '0',
+  additions: [],
+});
+
+const cardOf = (booking: Booking): Card => ({
+  id: booking.id,
+  version: booking.version,
+  branchId: booking.branchId,
+  partyId: booking.partyId,
+  vesselId: booking.vesselId,
+  documentDate: booking.documentDate,
+  startsAt: stamp(booking.startsAt),
+  endsAt: stamp(booking.endsAt),
+  bookingType: booking.bookingType,
+  status: booking.status,
+  periodHours: String(booking.periodHours),
+  periodMinutes: String(booking.periodMinutes),
+  rentalAmount: booking.rentalAmount,
+  insuranceAmount: booking.insuranceAmount,
+  companions: String(booking.companions),
+  additions: booking.additions.map((row) => ({ id: row.id, description: row.description, quantity: Number(row.quantity).toString(), unitPrice: Number(row.unitPrice).toString() })),
+});
+
+const num = (value: string): number => {
+  const parsed = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+/** `CalcuAll` — الإضافات، فالإجمالي، فالضريبة، فالصافي. */
+const totalsOf = (card: Card, vatRate: number) => {
+  const additionsSum = card.additions.reduce((sum, line) => sum + num(line.quantity) * num(line.unitPrice), 0);
+  // الإجمالي، ثم الضريبة عليه، ثم الصافي — `CalcuAll` بحذافيره.
+  const gross = additionsSum + num(card.rentalAmount) + num(card.insuranceAmount);
+  const vat = Math.round(gross * (vatRate / 100) * 100) / 100;
+  return { additionsTotal: additionsSum, total: gross, taxAmount: vat, netAmount: gross + vat };
+};
+
+const fmt = (value: number, digits = 2) => value.toFixed(digits).replace(/\.00$/, '');
+
+function MarinaBookings() {
   const { can } = useSession();
-  const bookings = useQuery<Booking[]>(() => apiList<Booking>('/marina/bookings'), []);
-  const marina = useQuery<Marina>(() => apiData<Marina>('/marina'), []);
+  const canManage = can('marina.manage');
+  const canInvoice = can('marina.invoice');
+
+  const [filters, setFilters] = useState({ number: '', customer: '', from: '', to: '' });
+  const [applied, setApplied] = useState<typeof filters | null>(null);
+  const [card, setCard] = useState<Card | null>(null);
+  const [line, setLine] = useState<Draft>({ description: '', quantity: '1', unitPrice: '0' });
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const bookings = useQuery<Booking[]>(() => {
+    const params = new URLSearchParams();
+    if (applied) {
+      if (applied.number.trim()) params.set('number', applied.number.trim());
+      if (applied.customer.trim()) params.set('customer', applied.customer.trim());
+      if (applied.from) params.set('from', applied.from);
+      if (applied.to) params.set('to', applied.to);
+    }
+    const query = params.toString();
+    return apiList<Booking>(`/marina/bookings${query ? `?${query}` : ''}`);
+  }, [applied]);
+
+  const marina = useQuery<Marina>(() => apiFetch<Marina>('/marina').then((body) => ((body as { data?: Marina }).data ?? body) as Marina), []);
   const parties = useQuery<Party[]>(() => listParties(), []);
   const branches = useQuery<Branch[]>(() => listBranches(), []);
 
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ branchId: '', partyId: '', vesselId: '', startsAt: localNow(), endsAt: localNow(), companions: '', insuranceText: '' });
-  const [addition, setAddition] = useState({ bookingId: '', description: '', amountText: '' });
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
-
-  const branchRows = branches.data ?? [];
-  const effectiveBranch = form.branchId || defaultOf(branchRows)?.id || '';
+  const rows = bookings.data ?? [];
   const vessels = marina.data?.vessels ?? [];
+  const vatRate = 15;
 
-  async function run(action: () => Promise<unknown>, okText: string) {
+  const setField = (patch: Partial<Card>) => setCard((current) => (current ? { ...current, ...patch } : current));
+  const totals = card ? totalsOf(card, vatRate) : null;
+
+  async function save() {
+    if (!card) return;
     setBusy(true);
-    setNotice(undefined);
+    setError('');
+    setNotice('');
     try {
-      await action();
-      setNotice({ kind: 'ok', text: okText });
+      const payload = {
+        branchId: card.branchId,
+        partyId: card.partyId,
+        vesselId: card.vesselId,
+        documentDate: card.documentDate,
+        startsAt: new Date(card.startsAt).toISOString(),
+        endsAt: new Date(card.endsAt).toISOString(),
+        bookingType: card.bookingType,
+        status: card.status,
+        periodHours: Number(card.periodHours || 0),
+        periodMinutes: Number(card.periodMinutes || 0),
+        rentalAmount: card.rentalAmount || '0',
+        insuranceAmount: card.insuranceAmount || '0',
+        companions: Number(card.companions || 0),
+        additions: card.additions.map((row) => ({ description: row.description, quantity: row.quantity, unitPrice: row.unitPrice })),
+      };
+      await (card.id
+        ? apiPatch(`/marina/bookings/${card.id}`, { ...payload, ...(card.version ? { version: card.version } : {}) })
+        : apiPost('/marina/bookings', payload));
+      setNotice('تم حفظ الحجز');
+      setCard(null);
       bookings.reload();
-    } catch (error) {
-      setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
   }
 
+  async function remove(booking: Booking) {
+    if (!window.confirm(`هل أنت متأكد من حذف هذا الحجز؟\n\n${booking.number ?? ''} — ${booking.customerName}`)) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await apiDelete(`/marina/bookings/${booking.id}`);
+      setNotice('تم الحذف');
+      bookings.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function invoice(booking: Booking) {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await apiPost(`/marina/bookings/${booking.id}/rental-invoice`, {});
+      setNotice('تم إصدار فاتورة التأجير');
+      bookings.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openNew = () => {
+    setError('');
+    setNotice('');
+    setCard(emptyCard(branches.data?.[0]?.id ?? '', parties.data?.[0]?.id ?? '', vessels[0]?.id ?? ''));
+  };
+
   return (
     <Screen
-      title="حجوزات المراكب"
-      subtitle="حجز مركب لفترة محددة، إضافة خدمات عليه، ثم إصدار فاتورة التأجير المحسوبة من تسعير المجموعة."
-      crumbs={['إدارة المراسي', 'العمليات']}
+      title="⛵ الحجوزات"
+      subtitle="حجز مركب لعميل: قيمته ومدته وإضافاته، ثم مجاميعه — «إجمالي الإضافات · الإجمالي · ضريبة 15% · الصافي» كما يحسبها الديسكتوب، ومنه فاتورة التأجير."
+      crumbs={['إدارة المراسي', 'الحجوزات']}
       actions={
-        can('marina.manage') ? (
-          <button className="btn primary" type="button" onClick={() => setOpen(!open)}>
-            {open ? 'إغلاق' : 'حجز جديد'}
-          </button>
-        ) : null
+        <div className="row" style={{ gap: 6 }}>
+          <Link className="btn" href="/marina/violations">
+            ⚠️ المخالفات
+          </Link>
+          {canManage && (
+            <button className="btn primary" type="button" onClick={openNew}>
+              ➕ حجز جديد
+            </button>
+          )}
+        </div>
       }
     >
-      {open && (
-        <form
-          className="card"
-          onSubmit={(event) => {
-            event.preventDefault();
-            run(
-              () =>
-                apiPost('/marina/bookings', {
-                  branchId: effectiveBranch,
-                  partyId: form.partyId,
-                  vesselId: form.vesselId,
-                  startsAt: new Date(form.startsAt).toISOString(),
-                  endsAt: new Date(form.endsAt).toISOString(),
-                  companions: form.companions ? Number(form.companions) : undefined,
-                  insuranceAmount: form.insuranceText.trim() || undefined,
-                }),
-              'تم إنشاء الحجز.',
-            );
-          }}
-        >
-          <h2>حجز جديد</h2>
-          <div className="form-grid">
-            <label className="field">
-              <span>الفرع *</span>
-              <select className="input" value={effectiveBranch} onChange={(event) => setForm({ ...form, branchId: event.target.value })} required>
-                {branchOptions(branchRows).map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>العميل *</span>
-              <select className="input" value={form.partyId} onChange={(event) => setForm({ ...form, partyId: event.target.value })} required>
-                <option value="">— اختر —</option>
-                {(parties.data ?? []).map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {partyLabel(row)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>المركب *</span>
-              <select className="input" value={form.vesselId} onChange={(event) => setForm({ ...form, vesselId: event.target.value })} required>
-                <option value="">— اختر —</option>
-                {vessels.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {`${row.code} — ${row.name}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>من *</span>
-              <input className="input" type="datetime-local" dir="ltr" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} required />
-            </label>
-            <label className="field">
-              <span>إلى *</span>
-              <input className="input" type="datetime-local" dir="ltr" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} required />
-            </label>
-            <label className="field">
-              <span>عدد المرافقين</span>
-              <input className="input" dir="ltr" inputMode="numeric" value={form.companions} onChange={(event) => setForm({ ...form, companions: event.target.value })} />
-            </label>
-            <label className="field">
-              <span>مبلغ التأمين</span>
-              <input className="input" dir="ltr" inputMode="decimal" value={form.insuranceText} onChange={(event) => setForm({ ...form, insuranceText: event.target.value })} />
-            </label>
-          </div>
-          <Notice notice={notice} />
-          <button className="btn primary" type="submit" disabled={busy}>
-            {busy ? 'جارٍ الحفظ…' : 'حفظ الحجز'}
+      {error && <p className="alert danger">{error}</p>}
+      {notice && <p className="alert ok">{notice}</p>}
+
+      {/* «🔍 البحث» — رقم الحجز · اسم العميل أو جواله · من تاريخ وإلى تاريخ. */}
+      <div className="card tight no-print">
+        <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="field" style={{ margin: 0, minWidth: 130 }}>
+            <span>رقم الحجز</span>
+            <input className="input" value={filters.number} placeholder="BK-000001" onChange={(event) => setFilters({ ...filters, number: event.target.value })} />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 200 }}>
+            <span>اسم العميل / رقم الجوال</span>
+            <input className="input" value={filters.customer} placeholder="🔍 الجوال أو الاسم..." onChange={(event) => setFilters({ ...filters, customer: event.target.value })} />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 150 }}>
+            <span>من تاريخ</span>
+            <input className="input" type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
+          </label>
+          <label className="field" style={{ margin: 0, minWidth: 150 }}>
+            <span>إلى تاريخ</span>
+            <input className="input" type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} />
+          </label>
+          <button className="btn primary" type="button" onClick={() => setApplied(filters)}>
+            🔍 بحث
           </button>
-        </form>
-      )}
-
-      {!open && <Notice notice={notice} />}
-
-      <div className="card">
-        <h2>إضافة خدمة على حجز</h2>
-        <div className="form-grid">
-          <label className="field">
-            <span>الحجز</span>
-            <select className="input" value={addition.bookingId} onChange={(event) => setAddition({ ...addition, bookingId: event.target.value })}>
-              <option value="">— اختر —</option>
-              {(bookings.data ?? []).map((row) => {
-                const vessel = vessels.find((entry) => entry.id === row.vesselId);
-                return (
-                  <option key={row.id} value={row.id}>
-                    {`${vessel?.name ?? row.vesselId} — ${dateTime(row.startsAt)}`}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-          <label className="field">
-            <span>الوصف</span>
-            <input className="input" value={addition.description} onChange={(event) => setAddition({ ...addition, description: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>المبلغ</span>
-            <input className="input" dir="ltr" inputMode="decimal" value={addition.amountText} onChange={(event) => setAddition({ ...addition, amountText: event.target.value })} />
-          </label>
+          {applied && (
+            <button className="btn" type="button" onClick={() => { setFilters({ number: '', customer: '', from: '', to: '' }); setApplied(null); }}>
+              🗑️ تصفية الحقول
+            </button>
+          )}
         </div>
-        <button
-          className="btn"
-          type="button"
-          disabled={busy || !can('marina.manage') || !addition.bookingId || !addition.description.trim()}
-          onClick={() =>
-            run(async () => {
-              await apiPost(`/marina/bookings/${addition.bookingId}/additions`, { description: addition.description.trim(), amount: addition.amountText.trim() || '0' });
-              setAddition({ bookingId: '', description: '', amountText: '' });
-            }, 'تمت إضافة الخدمة على الحجز.')
-          }
-        >
-          إضافة الخدمة
-        </button>
       </div>
 
-      <QueryView query={bookings} empty="لا توجد حجوزات" emptyDetail="أنشئ حجزاً جديداً لمركب.">
-        {(rows) => (
-          <DataTable
-            rows={rows}
-            rowKey={(row) => row.id}
-            columns={[
-              { key: 'vessel', header: 'المركب', cell: (row) => vessels.find((entry) => entry.id === row.vesselId)?.name ?? '—' },
-              {
-                key: 'party',
-                header: 'العميل',
-                cell: (row) => {
-                  const party = (parties.data ?? []).find((entry) => entry.id === row.partyId);
-                  return party ? partyLabel(party) : '—';
-                },
-              },
-              { key: 'from', header: 'من', align: 'ltr', cell: (row) => dateTime(row.startsAt) },
-              { key: 'to', header: 'إلى', align: 'ltr', cell: (row) => dateTime(row.endsAt) },
-              { key: 'companions', header: 'المرافقون', align: 'num', cell: (row) => row.companions ?? '—' },
-              { key: 'insurance', header: 'التأمين', align: 'num', cell: (row) => money(row.insuranceAmount) },
-              { key: 'status', header: 'الحالة', cell: (row) => <span className="badge">{statusLabel(row.status)}</span> },
-              {
-                key: 'actions',
-                header: '',
-                cell: (row) =>
-                  !row.invoiceId && can('marina.invoice') ? (
-                    <button className="btn sm primary" type="button" disabled={busy} onClick={() => run(() => apiPost(`/marina/bookings/${row.id}/rental-invoice`, {}), 'تم إصدار فاتورة التأجير.')}>
-                      إصدار فاتورة
-                    </button>
-                  ) : (
-                    <span className="muted small">{row.invoiceId ? 'مفوترة' : '—'}</span>
-                  ),
-              },
-            ]}
-          />
-        )}
-      </QueryView>
+      {bookings.status === 'loading' && <Loading rows={6} />}
+      {bookings.status === 'forbidden' && <Forbidden />}
+      {bookings.status === 'error' && <ErrorBox message={bookings.error} onRetry={bookings.reload} />}
+      {bookings.status === 'success' && (
+        <>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="group-label" style={{ margin: 0 }}>📋 بيانات الحجوزات</span>
+            <span className="muted">عدد السجلات: {rows.length}</span>
+          </div>
+          {rows.length === 0 ? (
+            <Empty title="لا توجد حجوزات" detail="ابدأ بـ «➕ حجز جديد»: مركب وعميل وقيمة ومدة — والمدة شرط الحفظ." />
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>🔢 الرقم</th>
+                    <th>📅 التاريخ</th>
+                    <th>👤 العميل</th>
+                    <th>⚓ المركب</th>
+                    <th>🚢 نوع الحجز</th>
+                    <th className="num">⏱️ المدة</th>
+                    <th className="num">💰 القيمة</th>
+                    <th className="num">🎁 الإضافات</th>
+                    <th className="num">الإجمالي</th>
+                    <th className="num">الصافي</th>
+                    <th>🔖 حالة الحجز</th>
+                    {(canManage || canInvoice) && <th>إجراءات</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id} onDoubleClick={() => canManage && setCard(cardOf(row))}>
+                      <td dir="ltr">{row.number ?? '—'}</td>
+                      <td dir="ltr">{row.documentDate}</td>
+                      <td>{row.customerName}</td>
+                      <td>
+                        {row.vesselCode} — {row.vesselName}
+                      </td>
+                      <td>{row.bookingType}</td>
+                      <td className="num" dir="ltr">
+                        {row.periodHours}س {row.periodMinutes}د
+                      </td>
+                      <td className="num" dir="ltr">{fmt(Number(row.rentalAmount))}</td>
+                      <td className="num" dir="ltr">{fmt(Number(row.additionsTotal))}</td>
+                      <td className="num" dir="ltr">{fmt(Number(row.total))}</td>
+                      <td className="num" dir="ltr">{fmt(Number(row.netAmount))}</td>
+                      <td>
+                        <span className={`badge${row.statusText === 'مؤكد' ? '' : ' danger'}`}>{row.statusText}</span>
+                      </td>
+                      {(canManage || canInvoice) && (
+                        <td>
+                          <div className="row" style={{ gap: 4 }}>
+                            {canManage && (
+                              <button className="btn sm" type="button" onClick={() => setCard(cardOf(row))}>
+                                ✏️ تعديل
+                              </button>
+                            )}
+                            {canInvoice && (
+                              <button className="btn sm" type="button" onClick={() => invoice(row)}>
+                                🧾 فاتورة
+                              </button>
+                            )}
+                            {canManage && (
+                              <button className="btn sm danger" type="button" onClick={() => remove(row)}>
+                                🗑️ حذف
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {card && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card" style={{ maxWidth: 860 }}>
+            <div className="modal-head">
+              <span className="modal-title">{card.id ? '✏️ تعديل الحجز' : '📋 بيانات الحجوزات'}</span>
+              <button className="btn sm" type="button" onClick={() => setCard(null)}>
+                ✖ خروج
+              </button>
+            </div>
+            <div style={{ padding: 16, display: 'grid', gap: 12, maxHeight: '70vh', overflow: 'auto' }}>
+              <div className="form-grid">
+                <label className="field">
+                  <span>🔢 الرقم</span>
+                  <input className="input" value={card.id ? 'يُصدر عند الحفظ' : 'يُصدر عند الحفظ'} disabled />
+                </label>
+                <label className="field">
+                  <span>📅 التاريخ</span>
+                  <input className="input" type="date" value={card.documentDate} onChange={(event) => setField({ documentDate: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>🏢 الفرع</span>
+                  <select className="input" value={card.branchId} onChange={(event) => setField({ branchId: event.target.value })}>
+                    <option value="">— اختر فرعاً —</option>
+                    {(branches.data ?? []).map((branch) => (
+                      <option key={branch.id} value={branch.id}>{branch.nameAr ?? branch.code ?? branch.id}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>👤 العميل *</span>
+                  <select className="input" value={card.partyId} onChange={(event) => setField({ partyId: event.target.value })}>
+                    <option value="">— اختر عميلاً —</option>
+                    {(parties.data ?? []).map((party) => (
+                      <option key={party.id} value={party.id}>{party.name}{party.phone ? ` · ${party.phone}` : ''}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>⚓ المركب *</span>
+                  <select className="input" value={card.vesselId} onChange={(event) => setField({ vesselId: event.target.value })}>
+                    <option value="">— اختر مركباً —</option>
+                    {vessels.map((vessel) => (
+                      <option key={vessel.id} value={vessel.id}>{vessel.code} — {vessel.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>🔖 حالة الحجز</span>
+                  <select className="input" value={card.status} onChange={(event) => setField({ status: event.target.value })}>
+                    <option value="مؤكد">مؤكد</option>
+                    <option value="غير مؤكد">غير مؤكد</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>📅 تاريخ الحجز</span>
+                  <input className="input" type="datetime-local" value={card.startsAt} onChange={(event) => setField({ startsAt: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>🕐 حتى</span>
+                  <input className="input" type="datetime-local" value={card.endsAt} onChange={(event) => setField({ endsAt: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>💰 القيمة</span>
+                  <input className="input numeric" value={card.rentalAmount} onChange={(event) => setField({ rentalAmount: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>⏱️ المدة ساعة</span>
+                  <input className="input numeric" value={card.periodHours} onChange={(event) => setField({ periodHours: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>دقيقة</span>
+                  <input className="input numeric" value={card.periodMinutes} onChange={(event) => setField({ periodMinutes: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>🛡️ التأمين</span>
+                  <input className="input numeric" value={card.insuranceAmount} onChange={(event) => setField({ insuranceAmount: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>👥 المرافقون</span>
+                  <input className="input numeric" value={card.companions} onChange={(event) => setField({ companions: event.target.value })} />
+                </label>
+              </div>
+
+              <fieldset className="card tight" style={{ margin: 0 }}>
+                <legend className="group-label" style={{ margin: 0 }}>🚢 نوع الحجز</legend>
+                <div className="row" style={{ gap: 12 }}>
+                  {['حجز عادي', 'بحر مفتوح'].map((type) => (
+                    <label key={type} className="row" style={{ gap: 6 }}>
+                      <input type="radio" name="bookingType" checked={card.bookingType === type} onChange={() => setField({ bookingType: type })} />
+                      <span>{type}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {/* 🎁 الإضافات — الوصف · العدد · السعر · الإجمالي · 🗑️ حذف */}
+              <fieldset className="card tight" style={{ margin: 0 }}>
+                <legend className="group-label" style={{ margin: 0 }}>🎁 الإضافات</legend>
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label className="field" style={{ margin: 0, flex: 1, minWidth: 180 }}>
+                    <span>الوصف</span>
+                    <input className="input" value={line.description} onChange={(event) => setLine({ ...line, description: event.target.value })} />
+                  </label>
+                  <label className="field" style={{ margin: 0, width: 90 }}>
+                    <span>الكمية</span>
+                    <input className="input numeric" value={line.quantity} onChange={(event) => setLine({ ...line, quantity: event.target.value })} />
+                  </label>
+                  <label className="field" style={{ margin: 0, width: 110 }}>
+                    <span>السعر</span>
+                    <input className="input numeric" value={line.unitPrice} onChange={(event) => setLine({ ...line, unitPrice: event.target.value })} />
+                  </label>
+                  <button
+                    className="btn primary"
+                    type="button"
+                    title="إضافة"
+                    onClick={() => {
+                      if (!line.description.trim()) return;
+                      setCard({ ...card, additions: [...card.additions, { ...line }] });
+                      setLine({ description: '', quantity: '1', unitPrice: '0' });
+                    }}
+                  >
+                    ✔
+                  </button>
+                </div>
+                {card.additions.length > 0 && (
+                  <div className="table-wrap" style={{ marginTop: 8 }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>الوصف</th>
+                          <th className="num">العدد</th>
+                          <th className="num">السعر</th>
+                          <th className="num">الإجمالي</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {card.additions.map((row, index) => (
+                          <tr key={`${row.description}-${index}`}>
+                            <td>{row.description}</td>
+                            <td className="num" dir="ltr">{row.quantity}</td>
+                            <td className="num" dir="ltr">{row.unitPrice}</td>
+                            <td className="num" dir="ltr">{fmt(num(row.quantity) * num(row.unitPrice))}</td>
+                            <td>
+                              <button
+                                className="btn sm danger"
+                                type="button"
+                                onClick={() => setCard({ ...card, additions: card.additions.filter((_, i) => i !== index) })}
+                              >
+                                🗑️ حذف
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </fieldset>
+
+              {totals && (
+                <div className="row" style={{ gap: 16, flexWrap: 'wrap', fontWeight: 700 }}>
+                  <span>إجمالي الإضافات: <span dir="ltr">{fmt(totals.additionsTotal)}</span></span>
+                  <span>الإجمالي: <span dir="ltr">{fmt(totals.total)}</span></span>
+                  <span>ضريبة {vatRate}%: <span dir="ltr">{fmt(totals.taxAmount)}</span></span>
+                  <span>الصافي: <span dir="ltr">{fmt(totals.netAmount)}</span></span>
+                </div>
+              )}
+              <p className="muted" style={{ margin: 0 }}>
+                «يجب تحديد مدة الحجز» — الساعة والدقيقة لا يقفان معاً على صفر.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn primary" type="button" onClick={() => void save()} disabled={busy}>
+                💾 حفظ
+              </button>
+              {/* «🔄 جديد» = `CLR` — كل الصناديق تعود فارغة. */}
+              <button className="btn" type="button" disabled={busy} onClick={() => setCard(emptyCard(card.branchId, card.partyId, card.vesselId))}>
+                🔄 جديد
+              </button>
+              <button className="btn danger" type="button" onClick={() => setCard(null)} disabled={busy}>
+                ✖ خروج
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Screen>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<Loading rows={6} />}>
+      <MarinaBookings />
+    </Suspense>
   );
 }
