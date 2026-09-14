@@ -1,13 +1,14 @@
 # المرحلة 09 — الوحدات الرأسية (desktop parity)
 
-**الحالة: الأجزاء الأول والثاني والثالث والرابع مُنجزة** — الجزء الأول 🧑‍💼 المندوبون
+**الحالة: الأجزاء الأول والثاني والثالث والرابع والخامس مُنجزة** — الجزء الأول 🧑‍💼 المندوبون
 والعمولات (`frmSalesMen` + `frmInvBySalesMen`؛ ترحيل 0052، **21** نقطة تحقّق حيّة)
 والجزء الثاني 🧵 طلب التفصيل (`frmOrders` + `frmOrderDetails` + `frmOptions`؛ ترحيل
 0053، **38** نقطة تحقّق حيّة) والجزء الثالث 🧾 فاتورة التفصيل (`frmViewOrders` +
 `AddNewSizes`؛ ترحيل 0054، **41** نقطة تحقّق حيّة) والجزء الرابع 📏 القياسات
 (`frmMeasurements` + `frmMeasurementDetails` + `frmMeasurementAttributes`؛ ترحيل 0055،
-**37** نقطة تحقّق حيّة، **718** اختبار API). بقية الوحدات — النظارات، المرسى، سلة —
-مبدؤها في خارطة الطريق (`ROADMAP_PHASES_02_11.md`) وقياسها في §8.
+**37** نقطة تحقّق حيّة) والجزء الخامس 👓 النظارات (`frmGlasses` + `Other_Column`؛ ترحيل
+0056، **33** نقطة تحقّق حيّة، **729** اختبار API). بقية الوحدات — المرسى، سلة — مبدؤها في
+خارطة الطريق (`ROADMAP_PHASES_02_11.md`) وقياسها في §9.
 
 الغرض: نقل **النوافذ الرأسية** كما يعرضها الديسكتوب — حقولها وفلاترها وعبارات رفضها —
 لا اختراع وحداتٍ جديدة. الوحدات الرأسية في السحابة جزءٌ منها خدماتٌ بلا شاشات
@@ -49,6 +50,13 @@
 | 📏 القياسات | `Form_WPF/frmMeasurements.xaml` («إدارة قياسات العملاء») + `.xaml.cs` (351/345) · `Form_WPF/frmMeasurementDetails.xaml` («📏 بيانات القياس») + `.xaml.cs` (250/320) · `Form_WPF/frmMeasurementAttributes.xaml` («📏 إدارة خصائص القياسات») + `.xaml.cs` (244/409) |
 | القاعدة | `CustomerMeasurements(MeasurementID, Cust_ID, MeasurementName, MeasurementDate, Notes, IsActive)` · `MeasurementValues(MeasurementID, AttributeID, AttributeValue)` · `MeasurementAttributes(AttributeID, AttributeName, DisplayOrder, IsActive)` · `sp_DeleteMeasurement` · «📐 المقاسات» في `frmCustomers.xaml` L1184 |
 
+### الجزء الخامس
+
+| المجال | الملفات |
+|---|---|
+| 👓 بيانات النظارات | `Form_WPF/frmGlasses.xaml` («👓 بيانات النظارات») + `.xaml.cs` (598/308) — التبويب «👓  القياسات» و«⚙  أسماء الحقول» · `Form_WPF/frmInvSale.xaml.cs` L2503–2530 (`glassesOptions`، Alt+G) |
+| القاعدة | `Glasses(InvGlobalID, ItemId, orientation, SPH, CYL, AX, [ADD], IPD)` — كتابتها `Class/InvoiceOper.cs` L1656–1672 وقراءتها `glassOtions` L3904 وحذفها مع الفاتورة L1517 · `Other_Column(R1,R2,R3,R4,R5,L1,L2,L3,L4,L5)` — `insertglasses` و`loadcolumnOther` و`loadNameLbl` · `Class/Print.cs` L710 (`ReSPH … LeIPD`) |
+
 ## 2. ما هو موجود في السحابة قبل كل جزء (قياس)
 
 ### قبل الجزء الأول
@@ -87,6 +95,14 @@
 | `/tailoring/parties/{id}/measurements` | قياسات عميل بلا ترتيب وبلا عدد | لا «📋 قياسات العميل» ولا «🔍 بحث» بالجوال أو الاسم |
 | — | لا شيء | لا «📏 خصائص القياسات»: فبطاقة القياس عند الديسكتوب **تُبنى وقت التشغيل** منها |
 
+### قبل الجزء الخامس
+
+| النهاية | الحالة قبل الجزء الخامس | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `GET/POST /optics/prescriptions` | وصفةٌ على عميل أو سطر فاتورة، `rightEye`/`leftEye` jsonb | **لا** تعديل، ولا حذف، ولا قائمة، ولا شاشة، ولا اختبار |
+| — | لا شيء | «⚙  أسماء الحقول»: لا جدولَ `Other_Column` في السحابة، فلا عناوينَ للمربعات العشرة ولا حفظاً لها |
+| `GET /optics/invoice-lines/{id}/print-section` | `{title, rows}` | العنوان إنكليزي، والقسم لا يحمل عناوين الحقول ولا قيم العينين مفصولة |
+
 ## 3. الأجزاء
 
 | الجزء | المصادر | المحتوى | الحالة |
@@ -95,7 +111,7 @@
 | الثاني | `frmOrders` · `frmOrderDetails` · `frmOptions` | **🧵 طلب التفصيل**: الطلب وحالاته الأربع وخياراته وقماشه (§5) | **تمّ** |
 | الثالث | `frmViewOrders` · `AddNewSizes` | **🧾 فاتورة التفصيل** — `Inv_Tailor` و`Inv_Sub_Tailor`، وحالاتها `مستلم · في الخياطة · جاهز · تم التسليم` (§6) | **تمّ** |
 | الرابع | `frmMeasurements` · `frmMeasurementAttributes` · `frmMeasurementDetails` | **📏 القياسات** — قياس كل عميل باسمه وتاريخه وقيمه، وخصائص القياس التي تُبنى منها البطاقة (§7) | **تمّ** |
-| الخامس | `frmGlasses` · `glassOtions` (`InvoiceOper` L3904) | النظارات — وحدة `optics` قائمة بلا شاشة ولا اختبار | ⬜ |
+| الخامس | `frmGlasses` · `glassOtions` (`InvoiceOper` L3904) · `Other_Column` | **👓 النظارات** — الوصفة بعشر قيم نصية، و«⚙️ أسماء الحقول» التي تسمّيها كل مؤسسة (§8) | **تمّ** |
 | السادس | `frmBookingM` · `frmViolationM` · `frmOwners` · `frmGroupM` | المرسى — وحدة `marina` قائمة، تُستكمل نوافذها | ⬜ |
 | السابع | `FrmSallah.xaml` · `SallaAPI.cs` · `ManagerOnline.cs` · `OrdersManager.cs` · `ProductsManager.cs` | سلة والمتصلات — حيث «الطلبات» تعني طلبات سلة | ⬜ |
 
@@ -546,7 +562,101 @@
 * **718** اختبار API (كان 707) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
   أخضران.
 
-## 8. معايير القبول لكل جزء
+## 8. الجزء الخامس — 👓 النظارات
+
+### 8.1 ما يفعله الديسكتوب فعلاً
+
+`Form_WPF/frmGlasses.xaml` («👓 بيانات النظارات») نافذةٌ واحدة بتبويبين، لا نافذتان:
+
+* **«👓  القياسات»** — عمودان: «🔴 العين اليمنى (RE)» و«🟢 العين اليسرى (LE)»، وفي كلٍّ
+  خمسة صناديق. أسماؤها **ليست في الملف**: `loadNameLbl` يقرؤها وقت التشغيل —
+  `select isnull(L1,'LE-SPH') … isnull(R5,'RE-IPD') from Other_Column` — ويكتبها في
+  العناوين؛ فما يكتبه صاحب المحل في التبويب الثاني هو ما يراه بجانب كل رقم.
+* **«⚙  أسماء الحقول»** — «حقل 1» … «حقل 5» تحت «R (Right)» و«حقل 6» … «حقل 10» تحت
+  «L (Left)»، و«💾 حفظ الأسماء» = `delete from Other_Column` ثم
+  `insert into Other_Column (R1,R2,R3,R4,R5,L1,L2,L3,L4,L5)` ثم «تم الحفظ بنجاح» بعنوان
+  «المدقق». فاليسار هو **النصف الثاني** من الصف: حقل 6 هو `L1`.
+* التبويبان لا يُفتحان معاً: من فاتورة بيع (`code = 1`) تُخفى «⚙  أسماء الحقول»
+  و«💾 حفظ الأسماء»، ومن مدخل التعاريف تظهران.
+
+الأزرار: «🔄 جديد» (`CLR` — عشرة صناديق فارغة) · «✔ إدراج» (`bindClass` ثم `Close`) ·
+«✖ خروج». `bindClass` يُضيف **صفّين** دائماً — `orientation` `"R"` ثم `"L"` — و
+`bindControls` يقرأ كلًّا منهما بـ`OrdinalIgnoreCase`. وكل قيمة `VarChar`:
+`Conversions.ToString` لا يُحلّل شيئاً، فلا تحقّقَ ولا رفضَ في النافذة كلها.
+
+الدورة كاملة: `frmInvSale.glassesOptions` L2505 (Alt+G) يفتحها للصنف تحت المؤشر بعد
+رفضين — «الرجاء إضافة صنف للفاتورة» و«الرجاء وضع المؤشر على الصنف» — و`InvoiceOper`
+L1662 يكتب الصفّين وL1517 يحذفهما مع الفاتورة، و`glassOtions` L3904 يقرؤهما لكل سطر،
+و`Class/Print.cs` L710 يطبعها `ReSPH · ReCYL · ReAX · ReADD · ReIPD` و`LeSPH · …`.
+
+### 8.2 ما شُحن
+
+* **الترحيل `0056_optics_labels.sql`** (+ `down/`) — `optics_field_labels` على صورة
+  `Other_Column`: عشرة أعمدةٍ مسماة (`r1…r5` · `l1…l5`) وبدائلها في defaults الأعمدة
+  نفسها («RE-SPH» … «LE-IPD»)، وصفٌّ واحد لكل مؤسسة (`optics_field_labels_tenant_key`
+  حيث `deleted_at is null`). لا بذور: من لم يفتح النافذة يقرأ البدائل، كما يفعل
+  `isnull`. والترحيل لا يُضيف RLS — كما في 0055 — فالعزل من `withTenantTx` وشرط
+  `tenant_id` الصريح في كل قراءة، ويُثبَّت باختبار.
+* **`opticsFieldLabels`** في `packages/database/src/schema/niche.ts` وضمن `nicheTables`.
+* **`OpticsService`** — `listPrescriptions` (`?search=|partyId=|limit=|offset=` مع
+  `meta.total` و`meta.customer`) · `getPrescription` · `createPrescription` ·
+  `updatePrescription` (`version` في `WHERE`) · `deletePrescription` (حذف ناعم) ·
+  `getFieldLabels` (بعناوينها وبدائلها) · `saveFieldLabels` (استبدال الصف) ·
+  `invoicePrintSection` (القسم كما كان، مضافاً إليه العناوين).
+* **النهايات** — `GET/POST /optics/prescriptions` · `GET/PATCH/DELETE
+  /optics/prescriptions/{id}` · `GET/PUT /optics/field-labels` ·
+  `GET /optics/invoice-lines/{lineId}/print-section`؛ القراءة `optics.view` والكتابة
+  `optics.manage`، وبوّابة `pack.optics` على حالها.
+* **شاشتان** — `/optics/prescriptions` (البطاقة: عمودان وخمسة صناديق لكل عين، وأزرارها
+  «🔄 جديد · ✔ إدراج · ✖ خروج») و`/optics/field-labels` («حقل 1» … «حقل 10» تحت
+  «R (Right)» و«L (Left)» و«💾 حفظ الأسماء · ✖ خروج»)، ووحدة «👓 النظارات» في الشجرة.
+* **اختبارات** — `apps/api/test/optics-prescriptions.spec.ts` (**11** اختباراً) و
+  `scripts/verify-optics.mjs` (**33** نقطة تحقّق حيّة).
+
+### 8.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **الوصفة على عميل، لا على سطر فاتورة.** الديسكتوب يُسنِدها إلى
+   `Glasses(InvGlobalID, ItemId)`، فلا قائمةَ له — تُفتح من الفاتورة وحدها. السحابة
+   تُبقي `invoice_line_id` (وقسم الطباعة يقرؤه) وتجعل العميل هو الأصل، فلزمها بابٌ إلى
+   البطاقة: `GET /optics/prescriptions` وهو الشاشة الوحيدة المخترَعة في هذا الجزء.
+2. **صفٌّ واحد يحمل العينين.** الصفّان في الديسكتوب هما R وL، و`optical_prescriptions`
+   كان يحمل `rightEye` و`leftEye` معاً؛ فأُبقي. و`orientation` عندنا **نوع الوصفة**
+   (بعيد/قريب) لا «أيّ عين» كما في عمود `Glasses.orientation` — المعنيان محفوظان
+   ومُسمّيان بما يُفرّقهما.
+3. **القيم نصوص، بلا تحليل.** `SPH … IPD` أعمدة `VarChar` و`Conversions.ToString` لا
+   يُحلّل؛ و«PL» و«+1.25» و«-0.50 × 90» قيمٌ مشروعة. مربّع رقميّ يرفضها يفقد ما يقصده
+   البصّريّ.
+4. **الاسم الفارغ يُقرأ ببديله.** `isnull(L3,'LE-AX')` لا يُفرّق بين «لم يُسمَّ» و«سُمّي
+   بلا اسم»؛ فالصندوق الفارغ يُقرأ «LE-AX» بدل أن يُفقد عنوانه، وهو خلافٌ في القراءة
+   وحدها — المخزَّن كما كُتب.
+5. **«💾 حفظ الأسماء» يستبدل الصفّ، والشاشة لا تُفرّغ الصناديق بعده.** النافذة تنادي
+   `CLR()` عقب الحفظ فتُفرّغها؛ وشاشتنا تُعيد قراءتها من القاعدة، وهو ما تظهره النافذة
+   نفسها عند فتحها مرةً ثانية.
+6. **قسم الطباعة يحمل `title` و`rows` كما كان**، ومعهما `labels` و`right` و`left`؛
+   وعنوانه صار «👓 بيانات النظارات» — عنوان النافذة — بدل "Optical prescription".
+7. **«الرجاء اختيار عميل»** جملة الديسكتوب نفسها (`frmOrderDetails.xaml.cs` L324):
+   نافذة النظارات لا ترفض شيئاً، ورفضاها («الرجاء إضافة صنف للفاتورة» · «الرجاء وضع
+   المؤشر على الصنف») هما للفاتورة لا للوصفة.
+8. **`pack.optics`** بوّابة الجزء كما كان، و`ensureEnabled` لم يتغيّر: بلا البوّابة لا
+   شاشةَ ولا نهاية.
+
+### 8.4 التحقق (نتائج)
+
+* `apps/api/test/optics-prescriptions.spec.ts` — **11 اختباراً**: العناوين العشرة وبدائلها
+  وحقل 6 = `L1`، «💾 حفظ الأسماء» يستبدل الصفّ والفارغ يُقرأ ببديله، الوصفة بعشر قيم
+  نصية («PL» تُحفظ نصاً)، الرفوض الثلاثة بنصّها، `VERSION_CONFLICT` على نسخةٍ قديمة،
+  «🔍 بحث» بالجوال وبالاسم وصندوقٌ فارغ، القائمة بـ`?partyId=` وترتيبها، الحذف، قسم
+  الطباعة بعناوين المؤسسة، فصل `optics.view` عن `optics.manage`، وعزل المستأجرين (وصفة
+  محمد 404 عند جاره، وعناوينه لم تتغيّر).
+* `scripts/verify-optics.mjs` — **33** نقطة تحقّق حيّة؛ تشغيلان متتاليان أخضران على ستاك
+  قائم، والثاني يبدأ من مؤسسةٍ فيها صفّ عناوين فينتهي وقد أُعيد كما كان: الوصفات
+  تُمحى، والعميل المُصنع يُحذف، والتنظيف في `finally`.
+* و`verify-measurements.mjs` (37) و`verify-tailoring.mjs` (37) و
+  `verify-tailoring-invoices.mjs` (39) خضراء بعد الترحيل: جدولٌ أُضيف ولم يتغيّر ما كان.
+* **729** اختبار API (كان 718) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران · و`/optics/prescriptions` و`/optics/field-labels` يردّان 200.
+
+## 9. معايير القبول لكل جزء
 
 1. اختبارات جديدة خضراء + المجموعة كاملة خضراء + `pnpm -r run lint` أخضر.
 2. تحقّق حيّ (سكربت) يمشي المسار ضد ستاك قائم، ويُعاد تشغيله بلا أثر.
@@ -556,7 +666,7 @@
    `arena/…`، وتعليق على PR #4.
 6. كل شاشةٍ طريقٌ حقيقيٌّ في الشجرة — لا صفَّ يشير إلى مسارٍ لم يُبنَ.
 
-## 9. مؤجَّل عن قصد
+## 10. مؤجَّل عن قصد
 
 * **`👁️ عرض`** في `frmInvBySalesMen` (وفي كل نوافذ المرحلة) — إلى أن تُفتح شاشات
   الوثائق بـ`?id=`.
@@ -578,3 +688,12 @@
   في `measurements`، وشاشتها شاشة بطاقة العميل لا هذه.
 * **`sp_DeleteMeasurement`** — متن الإجراء ليس في المستودع؛ والحذف عندنا ناعم
   بـ`deleted_at` لأن `IsActive = 1` هو شرط كل قراءة بعده.
+* **فتح «👓 بيانات النظارات» من سطر الفاتورة** (`frmInvSale` Alt+G ورفضاه «الرجاء إضافة
+  صنف للفاتورة» · «الرجاء وضع المؤشر على الصنف») — شاشة فاتورة البيع لا تُدير أسطرها
+  بعدُ في السحابة، و`invoice_line_id` جاهز لها متى بُنيت.
+* **`frmInvPOS.glassesOptions`** — غلافٌ فارغ في الديسكتوب نفسه (`// يبقى كما في
+  الأصل`)؛ فلا شيء يُنقل منه.
+* **`pnpm db:seed` لا يستدعي `OrgProvisioningService.provisionOrgDefaults`** — فمؤسسة
+  `demo` المزروعة في قاعدةٍ جديدة لا تحمل بذور الوحدات (حالات الطلب · أنواع الثوب ·
+  خصائص القياس) حتى تُدار يدوياً؛ وهو أثرٌ في بيئة التطوير لا في الكود، وأُثبت هنا
+  ليُعرف.

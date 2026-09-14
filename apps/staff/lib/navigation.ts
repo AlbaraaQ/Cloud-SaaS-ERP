@@ -930,6 +930,50 @@ const tailoring: ModuleNode = {
 };
 
 // ---------------------------------------------------------------------------
+// 5b. النظارات
+//
+// `Form_WPF/frmGlasses.xaml` («👓 بيانات النظارات») — one window, two tabs: «👓  القياسات»
+// (the ten values of the two eyes) and «⚙  أسماء الحقول» (the ten captions, saved by
+// «💾 حفظ الأسماء»). The desktop opens the قياسات from a sale invoice
+// (`frmInvSale.glassesOptions` L2505, Alt+G) and the captions from the definitions entry;
+// both are one module here.
+// ---------------------------------------------------------------------------
+const optics: ModuleNode = {
+  key: 'optics',
+  icon: '👓',
+  labelAr: 'النظارات',
+  labelEn: 'Optics',
+  href: '/optics/prescriptions',
+  permission: 'optics.view',
+  groups: [
+    {
+      key: 'optics-prescriptions',
+      labelAr: 'الوصفات',
+      labelEn: 'Prescriptions',
+      items: [
+        // 👓 بيانات النظارات — `Glasses(InvGlobalID, ItemId, orientation, SPH, CYL, AX, ADD, IPD)`.
+        screen('optics-prescription', 'بيانات النظارات', 'Glasses prescriptions', '/optics/prescriptions', 'ready', {
+          permission: 'optics.view',
+          endpoint: '/optics/prescriptions',
+        }),
+      ],
+    },
+    {
+      key: 'optics-defs',
+      labelAr: 'التعاريف',
+      labelEn: 'Definitions',
+      items: [
+        // ⚙️ أسماء الحقول — `Other_Column(R1…R5, L1…L5)`.
+        screen('optics-field-label', 'أسماء الحقول', 'Field labels', '/optics/field-labels', 'ready', {
+          permission: 'optics.view',
+          endpoint: '/optics/field-labels',
+        }),
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // 6. الموظفين والرواتب
 // ---------------------------------------------------------------------------
 const hrm: ModuleNode = {
@@ -1469,6 +1513,7 @@ export const modules: ModuleNode[] = [
   purchases,
   sales,
   tailoring,
+  optics,
   hrm,
   marina,
   projects,

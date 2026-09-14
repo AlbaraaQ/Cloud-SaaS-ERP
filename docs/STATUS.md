@@ -793,6 +793,31 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة أنواع التفصيل مع شاشة القياسات،
   وتاريخُ الحالات (لا شاشة تقرأه).
 
+* **المرحلة 09 — الوحدات الرأسية، الجزء الخامس: 👓 النظارات**
+  (`Form_WPF/frmGlasses.xaml` «👓 بيانات النظارات»، ومعها
+  `Form_WPF/frmInvSale.xaml.cs` L2505 `glassesOptions` و`Class/InvoiceOper.cs` L1662
+  و`Class/Print.cs` L710 و`Other_Column`). **عشر قيمٍ لعينين، وأسماؤها ليست في الملف:**
+  «👓  القياسات» عمودان — «🔴 العين اليمنى (RE)» و«🟢 العين اليسرى (LE)» — وخمسة
+  صناديق في كلٍّ، وعناوينها تُقرأ وقت التشغيل
+  (`select isnull(L1,'LE-SPH') … isnull(R5,'RE-IPD') from Other_Column`)؛ فالتبويب
+  الثاني «⚙  أسماء الحقول» — حقل 1…5 لليمين و6…10 لليسار — هو ما يسمّيها كل مؤسسة،
+  و«💾 حفظ الأسماء» يستبدل الصفّ (`delete` ثم `insert`) لا يُرقّعه. ترحيل 0056 يضيف
+  `optics_field_labels` على صورة `Other_Column` نفسها: عشرة أعمدة وبدائلها في defaults
+  الأعمدة، وصفٌّ واحد لكل مؤسسة، ولا بذور — فمن لم يفتح النافذة يقرأ «RE-SPH» …
+  «LE-IPD» كما يفعل `isnull`. والقيم نصوص: أعمدة `SPH … IPD` في الديسكتوب `VarChar`
+  و`Conversions.ToString` لا يُحلّل، ف«PL» و«+1.25» تُحفظ كما كُتبت وبلا تحقّق. وحدة
+  `optics` كانت قائمة بلا شاشة ولا اختبار، فصارت: `GET/POST /optics/prescriptions` و
+  `GET/PATCH/DELETE /optics/prescriptions/{id}` و`GET/PUT /optics/field-labels`،
+  والقراءة `optics.view` والكتابة `optics.manage`، وقسم الطباعة يحمل العناوين مع
+  الصفوف؛ وشاشتان في وحدة «👓 النظارات»: `/optics/prescriptions` (أزرارها «🔄 جديد ·
+  ✔ إدراج · ✖ خروج» بنصّها) و`/optics/field-labels`. والرفض «الرجاء اختيار عميل» هو
+  جملة الديسكتوب (`frmOrderDetails.xaml.cs` L324): نافذة النظارات لا ترفض شيئاً،
+  ورفضاها للفاتورة لا للوصفة. `apps/api/test/optics-prescriptions.spec.ts` (**11**
+  اختباراً) و`scripts/verify-optics.mjs` (**33** نقطة تحقّق حيّة، تشغيلان أخضران،
+  والتنظيف في `finally`). **729** اختبار API (كان 718) · 36 staff · 71 contract ·
+  17 database · tsc وlint أخضران. ومؤجَّل عن قصد: فتح البطاقة من سطر الفاتورة
+  (`invoice_line_id` جاهز) وغلاف `frmInvPOS` الفارغ.
+
 * **المرحلة 09 — الوحدات الرأسية، الجزء الرابع: 📏 القياسات**
   (`Form_WPF/frmMeasurements.xaml` «إدارة قياسات العملاء» و
   `Form_WPF/frmMeasurementDetails.xaml` «📏 بيانات القياس» و

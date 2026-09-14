@@ -18,6 +18,23 @@ export const opticalPrescriptions = pgTable('optical_prescriptions', {
 }, (t) => ({ party: index('optical_prescriptions_party_idx').on(t.tenantId, t.partyId), line: index('optical_prescriptions_line_idx').on(t.tenantId, t.invoiceLineId) }));
 
 /**
+ * ⚙️ أسماء الحقول — `Other_Column(R1,R2,R3,R4,R5,L1,L2,L3,L4,L5)`
+ * (`Form_WPF/frmGlasses.xaml` «👓 بيانات النظارات» → التبويب «⚙  أسماء الحقول»).
+ *
+ * The ten boxes of «👓  القياسات» are **not** named in the markup — `loadNameLbl` reads
+ * them at runtime with `isnull(R1,'RE-SPH') … isnull(L5,'LE-IPD') from Other_Column`, so
+ * these ten column defaults *are* the desktop's own words, and the tenant may rename any
+ * of them. Note the mapping: حقل 6…10 (L1…L5) are the **left** eye, حقل 1…5 (R1…R5) the
+ * right — the same order «💾 حفظ الأسماء» writes them in.
+ */
+export const opticsFieldLabels = pgTable('optics_field_labels', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  r1: text('r1').notNull().default('RE-SPH'), r2: text('r2').notNull().default('RE-CYL'), r3: text('r3').notNull().default('RE-AX'), r4: text('r4').notNull().default('RE-ADD'), r5: text('r5').notNull().default('RE-IPD'),
+  l1: text('l1').notNull().default('LE-SPH'), l2: text('l2').notNull().default('LE-CYL'), l3: text('l3').notNull().default('LE-AX'), l4: text('l4').notNull().default('LE-ADD'), l5: text('l5').notNull().default('LE-IPD'),
+  ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ tenant: uniqueIndex('optics_field_labels_tenant_key').on(t.tenantId).where(sql`deleted_at IS NULL`) }));
+
+/**
  * 📏 القياس — `CustomerMeasurements(MeasurementID, Cust_ID, MeasurementName,
  * MeasurementDate, Notes, IsActive)` (`Form_WPF/frmMeasurements.xaml` «إدارة قياسات
  * العملاء» + `frmMeasurementDetails.xaml` «📏 بيانات القياس»).
@@ -149,4 +166,4 @@ export const sallaItemSync = pgTable('salla_item_sync', { id: uuid('id').primary
 export const sallaExportLog = pgTable('salla_export_log', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'set null' }), itemId: uuid('item_id').references(() => items.id, { onDelete: 'set null' }), action: text('action').notNull(), status: text('status').notNull().default('queued'), requestPayload: jsonb('request_payload').$type<Record<string, unknown>>().notNull().default({}), responsePayload: jsonb('response_payload').$type<Record<string, unknown>>(), error: text('error'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow() }, (t) => ({ status: index('salla_export_log_status_idx').on(t.tenantId, t.status) }));
 export const sallaBranchMappings = pgTable('salla_branch_mappings', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id), cashLocationId: uuid('cash_location_id'), remoteBranchId: text('remote_branch_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ remote: uniqueIndex('salla_branch_mappings_remote_key').on(t.tenantId, t.connectionId, t.remoteBranchId).where(sql`deleted_at IS NULL`) }));
 
-export const nicheTables = { opticalPrescriptions, customerMeasurements, tailoringMeasurementAttributes, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };
+export const nicheTables = { opticalPrescriptions, opticsFieldLabels, customerMeasurements, tailoringMeasurementAttributes, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };
