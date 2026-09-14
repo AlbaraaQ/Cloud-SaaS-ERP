@@ -1,4 +1,4 @@
-# Marina pack (Phase 22 + Phase 09 part six)
+# Marina pack (Phase 22 + Phase 09 parts six & seven)
 
 Feature flag: `pack.marina`. Covers vessel groups, hour/half-hour/offer pricing, vessels,
 owner percentage links, bookings with insurance/companions metadata, booking additions,
@@ -20,10 +20,32 @@ The save is one transaction over three tables (`frmBookingM.xaml.cs` L590–L740
 الضريبة` — with `MainVAT` read from `SettingGeneral where Inv_Id=4`
 (`marina.vatRate` here, 15 by default).
 
-`booking-documents.service.ts` carries the two documents; `marina.service.ts` keeps the
-definitions, the operations and the rental invoice. The **operations controller is
-registered first** in `marina.module.ts`: its static `bookings/uninvoiced` must be mapped
-before the documents' `bookings/:id`.
+`booking-documents.service.ts` carries the two documents; `group-cards.service.ts`
+carries the فئة and its ⏰ فترات التأجير; `marina.service.ts` keeps the definitions, the
+operations and the rental invoice. The **operations controller is registered first** in
+`marina.module.ts`: its static `bookings/uninvoiced` must be mapped before the documents'
+`bookings/:id` — and inside the documents controller `groups/navigate` is declared before
+`groups/:id` for the same reason.
+
+## Where the definitions come from (Phase 09 part seven)
+
+| Window | File | What it holds |
+|---|---|---|
+| 📋 بطاقة فئة | `Form_WPF/frmGroupM.xaml` («📋 بطاقة فئة») | 🖼️ صورة الفئة · 🔢 الرقم · رمز الفئة · اسم الفئة (عربي/EN) · قيمة الساعة · عرض الساعة (دقيقة) · قيمة النصف ساعة · عرض النصف ساعة (دقيقة) · «➕ إضافة مدة» · «📋 قائمة الفئات» · ⏮ ◀ ▶ ⏭ · 🗑️ حذف · 💾 حفظ · ➕ جديد |
+| ⏰ فترات التأجير | `Form_WPF/frmAddPeriod.xaml` («⏰ فترات التأجير») | 🏷️ الفئة، ثم «⏰ المدة · 💵 السعر · 🎁 العرض · 🗑️» — عشر مددٍ من `RentPeriod` |
+
+`frmGroupM.btnSave_Click` writes `GroupMarine`, then `delete RentPeriodSub where
+MGroupID=…`, then the two canonical periods — `periodID=2` (ساعة) من قيمة الساعة،
+و`periodID=1` (نصف ساعة) من قيمة النصف ساعة — **on every save**, whatever `frmAddPeriod`
+had stored. `frmAddPeriod.SaveRentPeriods` is the mirror: `delete` everything for the فئة
+then every row of the grid. Both are kept, so a caller that replaces the periods replaces
+the whole tariff — including «ساعة» و«نصف ساعة» اللتين يقرأهما تسعير الحجز.
+
+⏰ المدة is a constant (`RENT_PERIODS` in `group-cards.service.ts`), not a table: the
+desktop's `RentPeriod` has no window of its own and is seeded in `AlterDb.txt` L3317
+(نصف ساعة … خمس ساعات). Only `period_id` is stored; `minutes` is derived from it, and
+`period_kind` stays `'hour'`/`'half_hour'` for the two canonical durations so the pricing
+of a حجز (`marina.service.ts` → `calculateMarinaPeriod`) is unchanged.
 
 ## Endpoints
 
@@ -36,6 +58,13 @@ before the documents' `bookings/:id`.
 | POST | `/marina/bookings/{id}/rental-invoice` | `marina.invoice` | `RentInvoice` — القيمة · الإضافات · التأمين · الإجمالي · الضريبة · الصافي |
 | GET/POST | `/marina/violations`, `/marina/violations/{id}` | view / manage | ⚠️ المخالفات، وثلاثة رفوض بترتيبها |
 | PATCH/DELETE | `/marina/violations/{id}` | `marina.manage` | تعديل · حذف ناعم («اختر المخالفة ليتم حذفها») |
+| GET | `/marina/groups` | `marina.view` | «📋 قائمة الفئات» بفتراتها وعدد مراكبها |
+| GET | `/marina/rent-periods` | `marina.view` | ⏰ المدة — the ten durations of `RentPeriod` |
+| GET | `/marina/groups/navigate` | `marina.view` | ⏮ ◀ ▶ ⏭ — `?dir=first|previous|next|last` و`?currentId=`; stays put at the ends |
+| GET/POST | `/marina/groups`, `/marina/groups/{id}` | view / manage | 📋 بطاقة فئة — «ادخل الفئة» · «الفئة تم ادخالها مسبقا» · «رابط صورة الفئة غير صحيح» |
+| PATCH/DELETE | `/marina/groups/{id}` | `marina.manage` | تعديل (with `version`) · «هذه الفئة لها ارتباطات فرعية لايمكن حذفها» · «اختر الفئة ليتم حذفها» (404) |
+| PUT | `/marina/groups/{id}/periods` | `marina.manage` | ⏰ فترات التأجير — `delete` then every row; «يجب إستكمال البيانات ⚠️» |
+| DELETE | `/marina/vessels/{id}` | `marina.manage` | تقاعد مركب — a فئة cannot be removed while it holds one |
 | GET | `/marina/rental-invoices` | `marina.view` | «🔍 خيارات البحث»: `?customer=` · `?from=`/`?to=` · `?minNet=`/`?maxNet=` |
 | POST | `/marina/rental-invoices/link` | `marina.invoice` | إصدار فواتير لحجوزاتٍ بلا فاتورة |
 
@@ -47,12 +76,18 @@ before the documents' `bookings/:id`.
   and tenant isolation.
 - `apps/api/test/marina-operations.spec.ts` — preparation, rota, invoice linking and the
   frozen day (a booking dated into a closed day is still refused).
+- `apps/api/test/marina-group-cards.spec.ts` — 9 tests: the ten durations, the card and the
+  two periods written from it, the four refusals, the update and `VERSION_CONFLICT`, the
+  periods and «يجب إستكمال البيانات ⚠️», ⏮ ◀ ▶ ⏭, the two delete refusals, the permission
+  split and tenant isolation.
 - `scripts/verify-marina.mjs` — 45 live checks against a running stack; re-runnable and
   non-destructive (it deletes the bookings and violations it creates, in a `finally`).
+- `scripts/verify-marina-groups.mjs` — 58 live checks for the فئة and its فترات; every
+  فئة and مركب it writes is deleted in a `finally`.
 
 ## Staff screens
 
 `/marina/bookings` (⛵ الحجوزات), `/marina/violations` (⚠️ المخالفات) and
 `/marina/link-invoices` (🧾 بحث الفواتير — with «🔍 خيارات البحث» and the linking action).
- `/marina/vessels` keeps the definitions (groups · vessels · owners), and
-📋 بطاقة الفئة (`frmGroupM`) is the next part.
+`/marina/groups` (📋 بطاقة فئة) carries the فئة with its ⏰ فترات التأجير in a second
+window, and `/marina/vessels` keeps the rest of the definitions (vessels · owners).

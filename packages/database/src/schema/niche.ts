@@ -116,15 +116,53 @@ export const tailoringGarmentTypes = pgTable('tailoring_garment_types', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), code: text('code').notNull(), nameAr: text('name_ar').notNull(), displayOrder: integer('display_order').notNull().default(0), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
 }, (t) => ({ code: uniqueIndex('tailoring_garment_types_tenant_code_key').on(t.tenantId, t.code).where(sql`deleted_at IS NULL`), order: index('tailoring_garment_types_tenant_idx').on(t.tenantId, t.displayOrder) }));
 
+/**
+ * 📋 بطاقة الفئة — `GroupMarine(id, code, name, nameEN, HourPrice, HalfHPrice, OfferHour,
+ * OfferHalf, IsDeleted, image)` (`Form_WPF/frmGroupM.xaml` «📋 بطاقة فئة»).
+ *
+ * The فئة is the harbour's tariff: قيمة الساعة وقيمة النصف ساعة — and the rest of its
+ * durations live in `vesselGroupPricing` (⏰ فترات التأجير, `Form_WPF/frmAddPeriod.xaml`).
+ */
 export const vesselGroups = pgTable('vessel_groups', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), name: text('name').notNull(), code: text('code'), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
-}, (t) => ({ code: uniqueIndex('vessel_groups_code_key').on(t.tenantId, t.code).where(sql`code IS NOT NULL AND deleted_at IS NULL`) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), name: text('name').notNull(), code: text('code'),
+  /** 🔢 رقم الفئة — `GroupMarine.id`, which `LoadNextNo` computes as `count + 1`. */
+  number: integer('number'),
+  /** اسم الفئة (EN) — `nameEN` (`txtNameEN`). */
+  nameEn: text('name_en'),
+  /** قيمة الساعة — `HourPrice` (`txtHourPrice`). */
+  hourPrice: numeric('hour_price', money).notNull().default('0'),
+  /** عرض الساعة (دقيقة) — `OfferHour` (`txtHourOffer`). */
+  hourOfferMinutes: integer('hour_offer_minutes').notNull().default(0),
+  /** قيمة النصف ساعة — `HalfHPrice` (`txtHalfHPrice`). */
+  halfHourPrice: numeric('half_hour_price', money).notNull().default('0'),
+  /** عرض النصف ساعة (دقيقة) — `OfferHalf` (`txtHalfHOffer`). */
+  halfHourOfferMinutes: integer('half_hour_offer_minutes').notNull().default(0),
+  /** 🖼️ صورة الفئة — `GroupMarine.image`; a URL, because this platform has no byte store. */
+  imageUrl: text('image_url'),
+  ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
+}, (t) => ({ code: uniqueIndex('vessel_groups_code_key').on(t.tenantId, t.code).where(sql`code IS NOT NULL AND deleted_at IS NULL`), number: uniqueIndex('vessel_groups_tenant_number_key').on(t.tenantId, t.number).where(sql`number IS NOT NULL AND deleted_at IS NULL`) }));
 export const vessels = pgTable('vessels', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), groupId: uuid('group_id').references(() => vesselGroups.id, { onDelete: 'set null' }), code: text('code').notNull(), name: text('name').notNull(), status: text('status').notNull().default('available'), capacity: integer('capacity').notNull().default(0), metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
 }, (t) => ({ code: uniqueIndex('vessels_code_key').on(t.tenantId, t.code).where(sql`deleted_at IS NULL`), group: index('vessels_group_idx').on(t.tenantId, t.groupId) }));
+/**
+ * ⏰ فترات التأجير — `RentPeriodSub(MGroupID, code, periodID, offer, rent)`
+ * (`Form_WPF/frmAddPeriod.xaml` «⏰ إدارة فترات التأجير»), the فئة's tariff.
+ *
+ * `periodKind` is this platform's own key ('hour' · 'half_hour' · …) and is what prices a
+ * حجز when `Booking.Price` is empty; `periodId` is the desktop's `RentPeriod.id`
+ * (1 نصف ساعة … 10 خمس ساعات). The two canonical durations carry both, so the card's
+ * قيمة الساعة وقيمة النصف ساعة and the تسعير behind them are one row, not two.
+ */
 export const vesselGroupPricing = pgTable('vessel_group_pricing', {
-  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), groupId: uuid('group_id').notNull().references(() => vesselGroups.id, { onDelete: 'cascade' }), periodKind: text('period_kind').notNull(), price: numeric('price', money).notNull(), currency: text('currency').notNull().default('SAR'), ...baseAuditColumns(),
-}, (t) => ({ kind: uniqueIndex('vessel_group_pricing_kind_key').on(t.tenantId, t.groupId, t.periodKind) }));
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), groupId: uuid('group_id').notNull().references(() => vesselGroups.id, { onDelete: 'cascade' }), periodKind: text('period_kind').notNull(),
+  /** ⏰ المدة — `RentPeriod.id`. */
+  periodId: integer('period_id'),
+  /** Length of that فترة in minutes — نصف ساعة 30 … خمس ساعات 300. */
+  minutes: integer('minutes').notNull().default(0),
+  /** 🎁 العرض — `RentPeriodSub.offer`, in minutes. */
+  offerMinutes: integer('offer_minutes').notNull().default(0),
+  price: numeric('price', money).notNull(), currency: text('currency').notNull().default('SAR'), ...baseAuditColumns(),
+}, (t) => ({ kind: uniqueIndex('vessel_group_pricing_kind_key').on(t.tenantId, t.groupId, t.periodKind), period: uniqueIndex('vessel_group_pricing_period_key').on(t.tenantId, t.groupId, t.periodId).where(sql`period_id IS NOT NULL`) }));
 export const vesselOwners = pgTable('vessel_owners', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), percent: numeric('percent', pct).notNull(), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
 }, (t) => ({ owner: uniqueIndex('vessel_owners_party_key').on(t.tenantId, t.vesselId, t.partyId).where(sql`deleted_at IS NULL`) }));

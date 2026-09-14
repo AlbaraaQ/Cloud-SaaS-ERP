@@ -24,6 +24,27 @@ export class MarinaService {
   async createGroup(tenantId: string, input: { name: string; code?: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(vesselGroups).values({ id: newId(), tenantId, ...input }).returning()); return row; }
   async price(tenantId: string, groupId: string, input: { periodKind: string; price: string; currency?: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(vesselGroupPricing).values({ id: newId(), tenantId, groupId, periodKind: input.periodKind, price: input.price, currency: input.currency ?? 'SAR' }).returning()); return row; }
   async createVessel(tenantId: string, input: { groupId?: string; code: string; name: string; capacity?: number; metadata?: Record<string, unknown> }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(vessels).values({ id: newId(), tenantId, groupId: input.groupId, code: input.code, name: input.name, capacity: input.capacity ?? 0, metadata: input.metadata ?? {} }).returning()); return row; }
+  /**
+   * «🗑️ حذف» of a ⚓ مركب — it is retired, not erased.
+   *
+   * The desktop has no window for this: a مركب is never removed, and a فئة can therefore
+   * never be removed while one belongs to it («هذه الفئة لها ارتباطات فرعية لايمكن
+   * حذفها»). The cloud needs the way out — a مركب that leaves the harbour — so that the
+   * فئة can follow it.
+   */
+  async deleteVessel(tenantId: string, id: string) {
+    await this.ensureEnabled(tenantId);
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(vessels)
+        .set({ deletedAt: new Date(), deletedBy: tryGetAuthContext()?.userId ?? null, updatedAt: new Date(), updatedBy: tryGetAuthContext()?.userId ?? null })
+        .where(and(eq(vessels.tenantId, tenantId), eq(vessels.id, id), isNull(vessels.deletedAt)))
+        .returning({ id: vessels.id }),
+    );
+    if (!rows.length) throw new DomainError('MARINA_VESSEL_NOT_FOUND', 'المركب غير موجود', 404);
+    return { deleted: true, id };
+  }
+
   async addOwner(tenantId: string, vesselId: string, input: { partyId: string; percent: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(vesselOwners).values({ id: newId(), tenantId, vesselId, partyId: input.partyId, percent: input.percent }).returning()); return row; }
   async createBooking(tenantId: string, input: { branchId: string; partyId: string; vesselId: string; startsAt: string; endsAt: string; companions?: number; insuranceAmount?: string; metadata?: Record<string, unknown> }) { await this.ensureEnabled(tenantId); await this.assertDayOpen(tenantId, input.branchId, input.startsAt.slice(0, 10)); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(marinaBookings).values({ id: newId(), tenantId, branchId: input.branchId, partyId: input.partyId, vesselId: input.vesselId, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), companions: input.companions ?? 0, insuranceAmount: input.insuranceAmount ?? '0', metadata: input.metadata ?? {} }).returning()); return row; }
   async addBookingAddition(tenantId: string, bookingId: string, input: { description: string; amount: string }) { await this.ensureEnabled(tenantId); const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(marinaBookingAdditions).values({ id: newId(), tenantId, bookingId, description: input.description, amount: input.amount }).returning()); return row; }

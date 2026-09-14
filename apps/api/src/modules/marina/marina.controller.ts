@@ -9,7 +9,7 @@
  * writes, and the cashier invoices.
  */
 /* eslint-disable no-restricted-syntax */
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 
 import { getTenantContext, tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
@@ -24,11 +24,18 @@ import {
   type ViolationPatch,
   type ViolationQuery,
 } from './booking-documents.service.js';
+import {
+  MarinaGroupCardsService,
+  type GroupCardInput,
+  type GroupCardPatch,
+  type GroupPeriodInput,
+  type NavigateDirection,
+} from './group-cards.service.js';
 import { MarinaService } from './marina.service.js';
 
 @Controller('marina')
 export class MarinaController {
-  constructor(private readonly marina: MarinaService, private readonly documents: MarinaDocumentsService) {}
+  constructor(private readonly marina: MarinaService, private readonly documents: MarinaDocumentsService, private readonly groups: MarinaGroupCardsService) {}
 
   private get tenantId(): string {
     return getTenantContext().tenantId;
@@ -172,12 +179,81 @@ export class MarinaController {
 
   // ─────────────────────────────── التعاريف ───────────────────────────────
 
-  @Post('groups')
-  @RequiresPermission('marina.manage')
-  group(@Body() b: { name: string; code?: string }) {
-    return this.marina.createGroup(this.tenantId, b);
+  // ─────────────────────────────── 📋 بطاقة فئة ───────────────────────────────
+
+  /**
+   * «📋 قائمة الفئات» — `select * from GroupMarine where IsDeleted=0`
+   * (`Form_WPF/frmGroupM.xaml` «📋 بطاقة فئة»), one card per فئة with its ⏰ فترات.
+   */
+  @Get('groups')
+  @RequiresPermission('marina.view')
+  groupCards() {
+    return this.groups.list(this.tenantId);
   }
 
+  /**
+   * ⏮ الأول · ◀ السابق · ▶ التالي · ⏭ الأخير — the four arrows walk `GroupMarine` by
+   * `id`; they stay where they are when there is nothing further, as the window does.
+   *
+   * Declared before `groups/:id` because Nest matches in registration order.
+   */
+  @Get('groups/navigate')
+  @RequiresPermission('marina.view')
+  groupCardNavigate(@Query('dir') dir = 'first', @Query('currentId') currentId?: string) {
+    const direction: NavigateDirection =
+      dir === 'last' ? 'last' : dir === 'next' ? 'next' : dir === 'previous' || dir === 'prev' ? 'previous' : 'first';
+    return this.groups.navigate(this.tenantId, direction, currentId);
+  }
+
+  /** «⏰ المدة» — the ten durations of `RentPeriod`, for `frmAddPeriod`'s drop-down. */
+  @Get('rent-periods')
+  @RequiresPermission('marina.view')
+  rentPeriods() {
+    return this.groups.listRentPeriods();
+  }
+
+  @Get('groups/:id')
+  @RequiresPermission('marina.view')
+  groupCard(@Param('id') id: string) {
+    return this.groups.get(this.tenantId, id);
+  }
+
+  /**
+   * «💾 حفظ» — the card (رمز الفئة · الاسمين · قيمة الساعة وعرضها · قيمة النصف ساعة
+   * وعرضها · 🖼️ الصورة), then the two canonical ⏰ فترات written as `frmGroupM` writes
+   * them. A caller that sends nothing but `{ name, code }` gets exactly the group it got
+   * before this part — the rest of the card defaults, and the pair of فترات is written.
+   */
+  @Post('groups')
+  @RequiresPermission('marina.manage')
+  group(@Body() body: GroupCardInput) {
+    return this.groups.create(this.tenantId, body, this.userId);
+  }
+
+  @Patch('groups/:id')
+  @RequiresPermission('marina.manage')
+  updateGroupCard(@Param('id') id: string, @Body() body: GroupCardPatch) {
+    return this.groups.update(this.tenantId, id, body, this.userId);
+  }
+
+  /** «🗑️ حذف» — «اختر الفئة ليتم حذفها», then «هذه الفئة لها ارتباطات فرعية لايمكن حذفها». */
+  @Delete('groups/:id')
+  @RequiresPermission('marina.manage')
+  deleteGroupCard(@Param('id') id: string) {
+    return this.groups.remove(this.tenantId, id, this.userId);
+  }
+
+  /**
+   * «💾» of `Form_WPF/frmAddPeriod.xaml` («⏰ إدارة فترات التأجير») — ⏰ المدة · 💵 السعر ·
+   * 🎁 العرض, saved as `delete RentPeriodSub where MGroupID=…` then every row again.
+   */
+  @Put('groups/:id/periods')
+  @RequiresPermission('marina.manage')
+  replaceGroupPeriods(@Param('id') id: string, @Body() body: { periods: GroupPeriodInput[] }) {
+    return this.groups.replacePeriods(this.tenantId, id, body?.periods ?? [], this.userId);
+  }
+
+  /** ⏰ فترات التأجير as the older surface wrote them — a single سعر لِمدةٍ واحدة. */
   @Post('groups/:id/pricing')
   @RequiresPermission('marina.manage')
   price(@Param('id') id: string, @Body() b: { periodKind: string; price: string; currency?: string }) {
@@ -188,6 +264,13 @@ export class MarinaController {
   @RequiresPermission('marina.manage')
   vessel(@Body() b: { groupId?: string; code: string; name: string; capacity?: number; metadata?: Record<string, unknown> }) {
     return this.marina.createVessel(this.tenantId, b);
+  }
+
+  /** «🗑️ حذف» of a ⚓ مركب — retired, so that its فئة can be retired after it. */
+  @Delete('vessels/:id')
+  @RequiresPermission('marina.manage')
+  deleteVessel(@Param('id') id: string) {
+    return this.marina.deleteVessel(this.tenantId, id);
   }
 
   @Post('vessels/:id/owners')

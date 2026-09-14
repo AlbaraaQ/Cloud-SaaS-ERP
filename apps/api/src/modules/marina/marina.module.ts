@@ -4,6 +4,7 @@ import { DatabaseModule } from '../../database/database.module.js';
 import { SalesModule } from '../sales/sales.module.js';
 
 import { MarinaDocumentsService } from './booking-documents.service.js';
+import { MarinaGroupCardsService } from './group-cards.service.js';
 import { MarinaController, MarinaOperationsController } from './marina.controller.js';
 import { MarinaService } from './marina.service.js';
 
@@ -15,6 +16,6 @@ import { MarinaService } from './marina.service.js';
 @Module({
   imports: [DatabaseModule, SalesModule],
   controllers: [MarinaOperationsController, MarinaController],
-  providers: [MarinaService, MarinaDocumentsService],
+  providers: [MarinaService, MarinaDocumentsService, MarinaGroupCardsService],
 })
 export class MarinaModule {}

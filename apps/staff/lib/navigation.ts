@@ -1080,6 +1080,16 @@ const marina: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Definitions',
       items: [
+        // 📋 بطاقة فئة — `frmGroupM.xaml` («📋 بطاقة فئة») و`frmAddPeriod.xaml`
+        // («⏰ إدارة فترات التأجير»): الفئة وتسعيرها، ثم «📋 قائمة الفئات».
+        screen(
+          'marina-group',
+          'بطاقة الفئة وفترات التأجير',
+          'Group card and rental periods',
+          '/marina/groups',
+          'ready',
+          { endpoint: '/marina/groups' },
+        ),
         screen(
           'marina-vessel',
           'بطاقات النماذج والمراكب والملاك',
