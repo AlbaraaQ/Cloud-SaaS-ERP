@@ -35,12 +35,16 @@ describe('staff navigation tree', () => {
     // Phase 06 gave the treasury its own module: the voucher documents, the safes and
     // the banks are one product area in `Desktop_ERP` (`frmSandQ`, `frmTreasury`,
     // `frmBanks`), and they are one module here.
+    // Phase 09 part two gave التفصيل its own module: طلب التفصيل, خياراته وأنواعه are
+    // one product area in `Desktop_ERP` (`frmOrders`, `frmOrderDetails`, `frmOptions`),
+    // and they are one module here.
     expect(modules.map((module) => module.key)).toEqual([
       'accounting',
       'treasury',
       'inventory',
       'purchases',
       'sales',
+      'tailoring',
       'hrm',
       'marina',
       'projects',

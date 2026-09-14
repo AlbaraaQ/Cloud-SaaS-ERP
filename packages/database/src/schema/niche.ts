@@ -20,6 +20,41 @@ export const customerMeasurements = pgTable('customer_measurements', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), kind: text('kind').notNull().default('tailoring'), measurements: jsonb('measurements').$type<Record<string, string>>().notNull().default({}), notes: text('notes'), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
 }, (t) => ({ party: index('customer_measurements_party_idx').on(t.tenantId, t.partyId, t.createdAt) }));
 
+/**
+ * 🧵 طلب التفصيل — `TailoringOrders` / `vw_OrdersComplete`
+ * (`Form_WPF/frmOrders.xaml` «إدارة طلبات التفصيل» + `frmOrderDetails.xaml` «إضافة طلب تفصيل»).
+ * `remainingAmount` is *not* stored: ⌛ المتبقي is 💰 السعر − 💵 المدفوع, as
+ * `frmOrderDetails.CalculateRemaining` L290 prints it.
+ */
+export const tailoringOrders = pgTable('tailoring_orders', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), number: text('number').notNull(), partyId: uuid('party_id').notNull().references(() => parties.id, { onDelete: 'restrict' }), measurementId: uuid('measurement_id').references(() => customerMeasurements.id, { onDelete: 'set null' }), typeId: uuid('type_id').notNull().references(() => tailoringTypes.id, { onDelete: 'restrict' }), statusId: uuid('status_id').notNull().references(() => tailoringOrderStatuses.id, { onDelete: 'restrict' }), orderDate: date('order_date').notNull(), deliveryDate: date('delivery_date'), quantity: numeric('quantity', money).notNull().default('1'), price: numeric('price', money).notNull().default('0'), paidAmount: numeric('paid_amount', money).notNull().default('0'), fabricType: text('fabric_type'), fabricColor: text('fabric_color'), designNotes: text('design_notes'), generalNotes: text('general_notes'), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ number: uniqueIndex('tailoring_orders_tenant_number_key').on(t.tenantId, t.number).where(sql`deleted_at IS NULL`), date: index('tailoring_orders_tenant_date_idx').on(t.tenantId, t.orderDate), party: index('tailoring_orders_tenant_party_idx').on(t.tenantId, t.partyId), status: index('tailoring_orders_tenant_status_idx').on(t.tenantId, t.statusId) }));
+
+/** 🔧 الخيارات المختارة للطلب — `OrderOptions(OrderID, CategoryID, ValueID)`. */
+export const tailoringOrderOptions = pgTable('tailoring_order_options', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), orderId: uuid('order_id').notNull().references(() => tailoringOrders.id, { onDelete: 'cascade' }), categoryId: uuid('category_id').notNull().references(() => tailoringOptionCategories.id, { onDelete: 'cascade' }), valueId: uuid('value_id').notNull().references(() => tailoringOptionValues.id, { onDelete: 'restrict' }), ...baseAuditColumns(),
+}, (t) => ({ key: uniqueIndex('tailoring_order_options_tenant_key').on(t.tenantId, t.orderId, t.categoryId) }));
+
+/** ⚙️ الحالة — `OrderStatus(StatusID, StatusName, IsActive, DisplayOrder)`. */
+export const tailoringOrderStatuses = pgTable('tailoring_order_statuses', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), code: text('code').notNull(), nameAr: text('name_ar').notNull(), displayOrder: integer('display_order').notNull().default(0), isFinal: boolean('is_final').notNull().default(false), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ code: uniqueIndex('tailoring_order_statuses_tenant_code_key').on(t.tenantId, t.code).where(sql`deleted_at IS NULL`), order: index('tailoring_order_statuses_tenant_idx').on(t.tenantId, t.displayOrder) }));
+
+/** 🧵 نوع التفصيل — `TailoringTypes(TypeID, TypeName, DefaultPrice, IsActive)`. */
+export const tailoringTypes = pgTable('tailoring_types', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), code: text('code'), nameAr: text('name_ar').notNull(), defaultPrice: numeric('default_price', money).notNull().default('0'), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ name: uniqueIndex('tailoring_types_tenant_name_key').on(t.tenantId, t.nameAr).where(sql`deleted_at IS NULL`), code: uniqueIndex('tailoring_types_tenant_code_key').on(t.tenantId, t.code).where(sql`deleted_at IS NULL AND code IS NOT NULL`) }));
+
+/** 🔧 الخيارات — `OptionCategories(CategoryID, CategoryName, IsActive, DisplayOrder)`. */
+export const tailoringOptionCategories = pgTable('tailoring_option_categories', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), nameAr: text('name_ar').notNull(), displayOrder: integer('display_order').notNull().default(0), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ name: uniqueIndex('tailoring_option_categories_tenant_name_key').on(t.tenantId, t.nameAr).where(sql`deleted_at IS NULL`), order: index('tailoring_option_categories_tenant_idx').on(t.tenantId, t.displayOrder) }));
+
+/** 🔧 الخيارات — `OptionValues(ValueID, CategoryID, ValueName, IsDefault, IsActive, DisplayOrder)`. */
+export const tailoringOptionValues = pgTable('tailoring_option_values', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), categoryId: uuid('category_id').notNull().references(() => tailoringOptionCategories.id, { onDelete: 'cascade' }), nameAr: text('name_ar').notNull(), isDefault: boolean('is_default').notNull().default(false), displayOrder: integer('display_order').notNull().default(0), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ name: uniqueIndex('tailoring_option_values_tenant_name_key').on(t.tenantId, t.categoryId, t.nameAr).where(sql`deleted_at IS NULL`), category: index('tailoring_option_values_category_idx').on(t.tenantId, t.categoryId, t.displayOrder) }));
+
 export const vesselGroups = pgTable('vessel_groups', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), name: text('name').notNull(), code: text('code'), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
 }, (t) => ({ code: uniqueIndex('vessel_groups_code_key').on(t.tenantId, t.code).where(sql`code IS NOT NULL AND deleted_at IS NULL`) }));
@@ -70,4 +105,4 @@ export const sallaItemSync = pgTable('salla_item_sync', { id: uuid('id').primary
 export const sallaExportLog = pgTable('salla_export_log', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'set null' }), itemId: uuid('item_id').references(() => items.id, { onDelete: 'set null' }), action: text('action').notNull(), status: text('status').notNull().default('queued'), requestPayload: jsonb('request_payload').$type<Record<string, unknown>>().notNull().default({}), responsePayload: jsonb('response_payload').$type<Record<string, unknown>>(), error: text('error'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow() }, (t) => ({ status: index('salla_export_log_status_idx').on(t.tenantId, t.status) }));
 export const sallaBranchMappings = pgTable('salla_branch_mappings', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id), cashLocationId: uuid('cash_location_id'), remoteBranchId: text('remote_branch_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ remote: uniqueIndex('salla_branch_mappings_remote_key').on(t.tenantId, t.connectionId, t.remoteBranchId).where(sql`deleted_at IS NULL`) }));
 
-export const nicheTables = { opticalPrescriptions, customerMeasurements, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };
+export const nicheTables = { opticalPrescriptions, customerMeasurements, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };

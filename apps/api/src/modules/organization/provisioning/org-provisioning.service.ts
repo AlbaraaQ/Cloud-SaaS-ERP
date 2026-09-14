@@ -12,6 +12,7 @@ import {
   newId,
   priceLists,
   salaryAdjustmentTypes,
+  tailoringOrderStatuses,
   tenants,
   warehouses,
   withTenantTx,
@@ -82,6 +83,7 @@ export class OrgProvisioningService {
     if (mainCashAccountId) created = true;
     if (await this.ensurePostingProfile(tx, tenantId, actorUserId, now)) created = true;
     if (await this.ensureSalaryAdjustmentTypes(tx, tenantId, actorUserId, now)) created = true;
+    if (await this.ensureTailoringOrderStatuses(tx, tenantId, actorUserId, now)) created = true;
 
     let branchId = await firstId(
       tx
@@ -337,6 +339,50 @@ export class OrgProvisioningService {
       })),
     );
     this.logger.log({ tenantId, inserted: missing.length }, 'salary adjustment types seeded');
+    return true;
+  }
+
+  /**
+   * 🧵 حالات طلب التفصيل — `OrderStatus` in `frmOrders.LoadStatusFilter` L54. The table's
+   * seed is not in the repository; the one place the lifecycle is written in words is
+   * `frmViewOrders.GetStateText` L119 (`مستلم · في الخياطة · جاهز · تم التسليم`).
+   * Migration `0053` inserts them for every tenant that already existed; this does it
+   * for every tenant created after it.
+   */
+  private async ensureTailoringOrderStatuses(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<boolean> {
+    const seed: Array<{ code: string; nameAr: string; displayOrder: number }> = [
+      { code: 'received', nameAr: 'مستلم', displayOrder: 1 },
+      { code: 'sewing', nameAr: 'في الخياطة', displayOrder: 2 },
+      { code: 'ready', nameAr: 'جاهز', displayOrder: 3 },
+      { code: 'delivered', nameAr: 'تم التسليم', displayOrder: 4 },
+    ];
+    const existing = await tx
+      .select({ code: tailoringOrderStatuses.code })
+      .from(tailoringOrderStatuses)
+      .where(and(eq(tailoringOrderStatuses.tenantId, tenantId), isNull(tailoringOrderStatuses.deletedAt)));
+    const present = new Set(existing.map((row) => row.code));
+    const missing = seed.filter((row) => !present.has(row.code));
+    if (!missing.length) return false;
+    await tx.insert(tailoringOrderStatuses).values(
+      missing.map((row) => ({
+        id: newId(),
+        tenantId,
+        code: row.code,
+        nameAr: row.nameAr,
+        displayOrder: row.displayOrder,
+        // ⚙️ الحالة النهائية — «تم التسليم», which is what ends ⌛ متأخّر.
+        isFinal: row.code === 'delivered',
+        active: true,
+        createdAt: now,
+        createdBy: actorUserId,
+      })),
+    );
+    this.logger.log({ tenantId, inserted: missing.length }, 'tailoring order statuses seeded');
     return true;
   }
 

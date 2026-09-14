@@ -754,6 +754,45 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   مؤجَّل: «👁️ عرض» و«👁️ معاينة» و`.repx` إلى مرحلة التقارير، ونصف «مشتريات» إلى أن
   تحمل فاتورة الشراء موظفاً.
 
+* **المرحلة 09 — الوحدات الرأسية، الجزء الثاني: 🧵 طلب التفصيل**
+  (`Form_WPF/frmOrders.xaml` «إدارة طلبات التفصيل» و`Form_WPF/frmOrderDetails.xaml`
+  «إضافة طلب تفصيل» و`Form_WPF/frmOptions.xaml` «⚙️ إدارة الخيارات الجاهزة»).
+  **وحدة `tailoring` في السحابة كانت تجيب عن سؤالٍ واحد: «ما قياس هذا العميل؟».
+  لا طلب، ولا حالة، ولا موعد تسليم، ولا سعر — ولا شيء مما يكتبه الخيّاط على البطاقة.**
+  ترحيل 0053 يضيف ستة جداول: `tailoring_orders` (رقم · العميل · القياس · نوع التفصيل ·
+  الحالة · التاريخان · الكمية · السعر · المدفوع · القماش والتصميم) و
+  `tailoring_order_options` و`tailoring_order_statuses` و`tailoring_types` و
+  `tailoring_option_categories` و`tailoring_option_values`. والحالات الأربع —
+  `مستلم · في الخياطة · جاهز · تم التسليم` — مبذورة في الترحيل لكل مؤسسة قائمة وفي
+  `OrgProvisioningService` لكل مؤسسة تُخلق بعده، لأن صفوف `OrderStatus` ليست في هذا
+  المستودع والموضع الوحيد الذي كُتبت فيه دورة التفصيل كلماتٍ هو
+  `frmViewOrders.GetStateText` L119. والقواعد منقولةٌ بنصّها: الرفوض الثلاثة
+  «الرجاء اختيار عميل» · «الرجاء اختيار نوع التفصيل» · «الرجاء إدخال السعر»
+  (`btnSave_Click` L318–L341)، و⌛ المتبقي = 💰 السعر − 💵 المدفوع وهو **سالبٌ مسموح**
+  (`CalculateRemaining` L290 يلوّنه أخضر ولا يرفضه)، و⌛ متأخّر = مضى موعد التسليم
+  والحالة ليست نهائية (تلويث الصف `#FFE4E4` L146)، و«🔄 تغيير الحالة» يستدعي
+  `sp_UpdateOrderStatus`، و⭐ تعيين افتراضي يُصفّر التصنيف ثم يُعيّن المختار (L323/L330).
+  النهايات: `GET/POST/PATCH/DELETE /tailoring/orders` و`POST /tailoring/orders/{id}/status`
+  و`GET /tailoring/order-statuses` و`GET/POST/PATCH/DELETE /tailoring/types` و
+  `/tailoring/option-categories` و`/tailoring/option-values` و
+  `POST /tailoring/option-values/{id}/default` — القراءة `tailoring.view` والكتابة
+  `tailoring.manage` — وشاشتان: `/tailoring/orders` (الشبكة والفلاتر والبطاقة في نافذة)
+  و`/tailoring/options` (لوحتا «📂 التصنيفات (الأنواع)» و«🔧 الخيارات المتاحة»)، ووحدة
+  جديدة في الشجرة: 🧵 التفصيل. وقراراتٌ مُعلَّلة في `PHASE_09_VERTICALS.md` §5.3 —
+  أهمّها: **«✏️ تعديل» يُعدّل الطلب المختار**، لأن `LoadOrderData` L417 في الديسكتوب
+  **فارغة** («يمكن تطويرها لاحقًا») وحفظُها يُدرج طلباً ثانياً؛ والعميل لا يُستبدل من
+  تحت الطلب (`TAILORING_CUSTOMER_IMMUTABLE`)؛ ورقم الطلب من سلسلة الوثائق بالبادئة `TO-`
+  لأن الإجراء الذي يولّده في الديسكتوب ليس في المستودع؛ و«🧵 أنواع التفصيل» تُدار
+  بالـ API بلا شاشة — كما في الديسكتوب إذ تُبذَر في القاعدة — وصفٌّ في الشجرة بحالة
+  `api`. وإصلاحٌ عارض كشفه سكربت التحقّق: `PartiesService.softDelete` كان يقارن الرصيد
+  — نصّاً بأربعة أعشار — بالسلسلة `'0'`، فكان **يرفض كل حذف عميل**؛ والمقارنة الآن
+  رقمية ومُثبَّتة باختبار. `apps/api/test/tailoring-orders.spec.ts` (**11** اختباراً)
+  واختبارٌ في `parties.spec.ts` و`scripts/verify-tailoring.mjs` (**38** نقطة تحقّق
+  حيّة، خمس تشغيلات متتالية خضراء، وأربعٌ منها تبدأ من قاعدة نظيفة وتنتهي بلا أثر:
+  لا طلب ولا نوع ولا تصنيف ولا عميل). **696** اختبار API (كان 684) · 36 staff ·
+  71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة أنواع التفصيل مع شاشة القياسات،
+  وتاريخُ الحالات (لا شاشة تقرأه).
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

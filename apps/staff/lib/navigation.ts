@@ -854,7 +854,53 @@ const sales: ModuleNode = {
 };
 
 // ---------------------------------------------------------------------------
-// 5. الموظفين والرواتب
+// 5. التفصيل
+// ---------------------------------------------------------------------------
+/**
+ * 🧵 التفصيل — `Form_WPF/frmOrders.xaml` («إدارة طلبات التفصيل»),
+ * `Form_WPF/frmOrderDetails.xaml` («إضافة طلب تفصيل») و`Form_WPF/frmOptions.xaml`
+ * («⚙️ إدارة الخيارات الجاهزة»). The desktop reaches them from its التفصيل menu; the
+ * القياسات half of the trade (`frmMeasurements`) is a later part of this phase.
+ */
+const tailoring: ModuleNode = {
+  key: 'tailoring',
+  icon: '🧵',
+  labelAr: 'التفصيل',
+  labelEn: 'Tailoring',
+  href: '/tailoring/orders',
+  permission: 'tailoring.view',
+  groups: [
+    {
+      key: 'tailoring-orders',
+      labelAr: 'الطلبات',
+      labelEn: 'Orders',
+      items: [
+        screen('tailoring-order', 'إدارة طلبات التفصيل', 'Tailoring orders', '/tailoring/orders', 'ready', {
+          permission: 'tailoring.view',
+          endpoint: '/tailoring/orders',
+        }),
+      ],
+    },
+    {
+      key: 'tailoring-catalogue',
+      labelAr: 'التعاريف',
+      labelEn: 'Catalogue',
+      items: [
+        screen('tailoring-options', 'إدارة الخيارات الجاهزة', 'Tailoring options', '/tailoring/options', 'ready', {
+          permission: 'tailoring.view',
+          endpoint: '/tailoring/option-categories',
+        }),
+        screen('tailoring-type', 'أنواع التفصيل', 'Tailoring types', '/s/tailoring/types', 'api', {
+          permission: 'tailoring.view',
+          endpoint: '/tailoring/types',
+        }),
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// 6. الموظفين والرواتب
 // ---------------------------------------------------------------------------
 const hrm: ModuleNode = {
   key: 'hrm',
@@ -1096,7 +1142,7 @@ const projects: ModuleNode = {
 };
 
 // ---------------------------------------------------------------------------
-// 8. الإعدادات
+// 9. الإعدادات
 // ---------------------------------------------------------------------------
 const settings: ModuleNode = {
   key: 'settings',
@@ -1281,7 +1327,7 @@ const settings: ModuleNode = {
 };
 
 // ---------------------------------------------------------------------------
-// 9. الدعم الفني
+// 10. الدعم الفني
 // ---------------------------------------------------------------------------
 const support: ModuleNode = {
   key: 'support',
@@ -1392,6 +1438,7 @@ export const modules: ModuleNode[] = [
   inventory,
   purchases,
   sales,
+  tailoring,
   hrm,
   marina,
   projects,

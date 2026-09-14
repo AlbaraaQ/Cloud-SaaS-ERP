@@ -196,7 +196,7 @@ describe('تقرير الرواتب — frmRptSalary', () => {
   it('💰 إجمالي الرواتب — مجموع «💵 صافي الراتب»', async () => {
     const shown = data((await report()).body);
     const rows = rowsOf(shown.rows) as Array<{ net: string }>;
-    const sum = rows.reduce((total, row) => total + Number(row.net), 0);
+    const sum = rows.reduce((accumulated, row) => accumulated + Number(row.net), 0);
     expect(Number((shown.summary as { total: string }).total)).toBeCloseTo(sum, 4);
     expect((shown.summary as { count: number }).count).toBe(rows.length);
   });
