@@ -4,6 +4,9 @@ import { DomainError, newId } from '@erp/contracts';
 import {
   customerMeasurements,
   parties,
+  tailoringGarmentTypes,
+  tailoringInvoicePayments,
+  tailoringInvoices,
   tailoringOptionCategories,
   tailoringOptionValues,
   tailoringOrderOptions,
@@ -19,6 +22,7 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { isUniqueViolation } from '../organization/shared/org-support.js';
 import { SequencesService } from '../platform-services/index.js';
+import { TreasuryService } from '../treasury/treasury.service.js';
 
 /**
  * 🧵 طلب التفصيل — the port of `Form_WPF/frmOrders.xaml` («إدارة طلبات التفصيل»),
@@ -167,6 +171,8 @@ export class TailoringService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly sequences: SequencesService,
+    /** «💵 إستلام دفعة» writes a سند قبض through the treasury, as `frmSandQ` does. */
+    private readonly treasury: TreasuryService,
   ) {}
 
   async ensureEnabled(tenantId: string) {
@@ -1046,4 +1052,529 @@ export class TailoringService {
       });
     }
   }
+
+  // ─────────────────────────────── 👔 أنواع الثوب ───────────────────────────────
+
+  /** `typeCB` in `AddNewSizes.xaml` L423 — «👔 نوع الثوب». */
+  async listGarmentTypes(tenantId: string): Promise<{ data: GarmentTypeRow[] }> {
+    await this.ensureEnabled(tenantId);
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(tailoringGarmentTypes)
+        .where(
+          and(
+            eq(tailoringGarmentTypes.tenantId, tenantId),
+            eq(tailoringGarmentTypes.active, true),
+            isNull(tailoringGarmentTypes.deletedAt),
+          ),
+        )
+        .orderBy(asc(tailoringGarmentTypes.displayOrder), asc(tailoringGarmentTypes.nameAr)),
+    );
+    return {
+      data: rows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        nameAr: row.nameAr,
+        displayOrder: row.displayOrder,
+        active: row.active,
+      })),
+    };
+  }
+
+  // ─────────────────────────────── 🧾 الفواتير ───────────────────────────────
+
+  /**
+   * `frmViewOrders.SearchInData` L55 — `Inv_Tailor` filtered by
+   * `phone_num LIKE @search OR name LIKE @search`, ordered by `code`.
+   */
+  async listInvoices(tenantId: string, query: InvoiceQuery = {}): Promise<{ data: InvoiceRow[]; meta: { total: number } }> {
+    await this.ensureEnabled(tenantId);
+    const limit = Math.min(Math.max(query.limit ?? 200, 1), 500);
+    const offset = Math.max(query.offset ?? 0, 0);
+    const filters: SQL[] = [eq(tailoringInvoices.tenantId, tenantId), isNull(tailoringInvoices.deletedAt)];
+    if (query.partyId) filters.push(eq(tailoringInvoices.partyId, query.partyId));
+    if (query.statusId) filters.push(eq(tailoringInvoices.statusId, query.statusId));
+    if (query.from) filters.push(gte(tailoringInvoices.invoiceDate, query.from));
+    if (query.to) filters.push(lte(tailoringInvoices.invoiceDate, query.to));
+    const search = query.search?.trim();
+    if (search) {
+      filters.push(
+        or(ilike(tailoringInvoices.phone, `%${search}%`), ilike(tailoringInvoices.customerName, `%${search}%`)) as SQL,
+      );
+    }
+    const where = and(...filters);
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ invoice: tailoringInvoices, statusName: tailoringOrderStatuses.nameAr, garmentTypeName: tailoringGarmentTypes.nameAr })
+        .from(tailoringInvoices)
+        .innerJoin(tailoringOrderStatuses, eq(tailoringOrderStatuses.id, tailoringInvoices.statusId))
+        .leftJoin(tailoringGarmentTypes, eq(tailoringGarmentTypes.id, tailoringInvoices.garmentTypeId))
+        .where(where)
+        .orderBy(desc(tailoringInvoices.invoiceDate), desc(tailoringInvoices.number))
+        .limit(limit)
+        .offset(offset),
+    );
+    const [counted] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.select({ total: count() }).from(tailoringInvoices).where(where),
+    );
+    const data: InvoiceRow[] = [];
+    for (const row of rows) data.push(await this.shapeInvoice(tenantId, row));
+    return { data, meta: { total: Number(counted?.total ?? 0) } };
+  }
+
+  /** `👁️ عرض` — `AddNewSizes.showResult(code)` (`frmViewOrders` L156). */
+  async getInvoice(tenantId: string, id: string): Promise<InvoiceRow> {
+    await this.ensureEnabled(tenantId);
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ invoice: tailoringInvoices, statusName: tailoringOrderStatuses.nameAr, garmentTypeName: tailoringGarmentTypes.nameAr })
+        .from(tailoringInvoices)
+        .innerJoin(tailoringOrderStatuses, eq(tailoringOrderStatuses.id, tailoringInvoices.statusId))
+        .leftJoin(tailoringGarmentTypes, eq(tailoringGarmentTypes.id, tailoringInvoices.garmentTypeId))
+        .where(and(eq(tailoringInvoices.tenantId, tenantId), eq(tailoringInvoices.id, id), isNull(tailoringInvoices.deletedAt)))
+        .limit(1),
+    );
+    if (!row) throw new DomainError('TAILORING_INVOICE_NOT_FOUND', 'فاتورة التفصيل غير موجودة', 404);
+    return this.shapeInvoice(tenantId, row);
+  }
+
+  private async shapeInvoice(
+    tenantId: string,
+    row: {
+      invoice: typeof tailoringInvoices.$inferSelect;
+      statusName: string;
+      garmentTypeName: string | null;
+    },
+  ): Promise<InvoiceRow> {
+    const payments = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(tailoringInvoicePayments)
+        .where(and(eq(tailoringInvoicePayments.tenantId, tenantId), eq(tailoringInvoicePayments.invoiceId, row.invoice.id)))
+        .orderBy(desc(tailoringInvoicePayments.paidAt), desc(tailoringInvoicePayments.createdAt)),
+    );
+    const invoiceTotal = decimal(row.invoice.total);
+    // 💰 الإجمالي في `frmViewOrders` = sale_price × 1.05 (L88).
+    const grossTotal = invoiceTotal + invoiceTotal * TAX_RATE;
+    return {
+      id: row.invoice.id,
+      number: row.invoice.number,
+      partyId: row.invoice.partyId,
+      customerName: row.invoice.customerName,
+      phone: row.invoice.phone,
+      invoiceDate: row.invoice.invoiceDate,
+      quantity: row.invoice.quantity,
+      unitPrice: row.invoice.unitPrice,
+      total: row.invoice.total,
+      totalWithTax: four(grossTotal),
+      paidAmount: row.invoice.paidAmount,
+      // ⏳ الباقي = الإجمالي بالضريبة − المدفوع (L90).
+      remainingAmount: four(grossTotal - decimal(row.invoice.paidAmount)),
+      statusId: row.invoice.statusId,
+      statusName: row.statusName,
+      garmentTypeId: row.invoice.garmentTypeId,
+      garmentTypeName: row.garmentTypeName,
+      billed: row.invoice.billed,
+      measurements: row.invoice.measurements ?? {},
+      notes: row.invoice.notes,
+      version: row.invoice.version,
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        amount: payment.amount,
+        paidAt: payment.paidAt,
+        note: payment.note,
+        voucherId: payment.voucherId,
+      })),
+    };
+  }
+
+  /** «💾 حفظ» — `AddNewSizes.btnSave_Click` L191. */
+  async createInvoice(tenantId: string, input: InvoiceInput, userId?: string): Promise<InvoiceRow> {
+    await this.ensureEnabled(tenantId);
+    const customerName = (input.customerName ?? '').trim();
+    // «برجاء اختيار العميل» — the desktop's own words for a blank customer (L197).
+    if (!customerName) throw new DomainError('TAILORING_INVOICE_CUSTOMER_REQUIRED', 'برجاء اختيار العميل', 422);
+    const unitPrice = decimal(input.unitPrice);
+    const quantity = decimal(input.quantity, 1);
+    // «يرجي إدخال السعر» — the desktop tests الإجمالي against the string "0" (L193).
+    if (unitPrice * quantity <= 0) throw new DomainError('TAILORING_INVOICE_PRICE_REQUIRED', 'يرجي إدخال السعر', 422);
+    if (quantity < 0) throw new DomainError('TAILORING_QUANTITY_INVALID', 'الكمية غير صحيحة', 422);
+    const status = await this.statusOrThrow(tenantId, input.statusId);
+    if (input.partyId) await this.assertParty(tenantId, input.partyId);
+    if (input.garmentTypeId) await this.assertGarmentType(tenantId, input.garmentTypeId);
+    const measurements = this.measurementsOrThrow(input.measurements);
+    const id = newId();
+    const number = await withTenantTx(this.database.db, tenantId, (tx) =>
+      this.sequences.next({ tenantId, docType: 'tailoring_invoice' }, tx, INVOICE_SEQUENCE).then((allocated) => allocated.display),
+    );
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.insert(tailoringInvoices).values({
+        id,
+        tenantId,
+        number,
+        partyId: input.partyId ?? null,
+        customerName,
+        phone: input.phone?.trim() || null,
+        invoiceDate: input.invoiceDate && isISODate(input.invoiceDate) ? input.invoiceDate : todayISO(),
+        quantity: four(quantity),
+        unitPrice: four(unitPrice),
+        // 💵 الإجمالي = 💰 السعر × 🔢 العدد (`CalculateTotalPrice` L860).
+        total: four(unitPrice * quantity),
+        statusId: status.id,
+        garmentTypeId: input.garmentTypeId ?? null,
+        billed: input.billed ?? false,
+        measurements,
+        notes: input.notes?.trim() || null,
+        createdBy: userId ?? null,
+      }),
+    );
+    return this.getInvoice(tenantId, id);
+  }
+
+  async updateInvoice(tenantId: string, id: string, patch: InvoicePatch, userId?: string): Promise<InvoiceRow> {
+    await this.ensureEnabled(tenantId);
+    const [current] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(tailoringInvoices)
+        .where(and(eq(tailoringInvoices.tenantId, tenantId), eq(tailoringInvoices.id, id), isNull(tailoringInvoices.deletedAt)))
+        .limit(1),
+    );
+    if (!current) throw new DomainError('TAILORING_INVOICE_NOT_FOUND', 'فاتورة التفصيل غير موجودة', 404);
+    if (patch.version !== undefined && patch.version !== current.version)
+      throw new DomainError('VERSION_CONFLICT', 'تم تعديل الفاتورة من جهة أخرى', 409);
+
+    const customerName = patch.customerName === undefined ? current.customerName : patch.customerName.trim();
+    if (!customerName) throw new DomainError('TAILORING_INVOICE_CUSTOMER_REQUIRED', 'برجاء اختيار العميل', 422);
+    const unitPrice = patch.unitPrice === undefined ? decimal(current.unitPrice) : decimal(patch.unitPrice);
+    const quantity = patch.quantity === undefined ? decimal(current.quantity) : decimal(patch.quantity, 1);
+    if (unitPrice * quantity <= 0) throw new DomainError('TAILORING_INVOICE_PRICE_REQUIRED', 'يرجي إدخال السعر', 422);
+    if (quantity < 0) throw new DomainError('TAILORING_QUANTITY_INVALID', 'الكمية غير صحيحة', 422);
+    if (patch.partyId) await this.assertParty(tenantId, patch.partyId);
+    if (patch.garmentTypeId) await this.assertGarmentType(tenantId, patch.garmentTypeId);
+    const statusId = patch.statusId === undefined ? current.statusId : (await this.statusOrThrow(tenantId, patch.statusId)).id;
+
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(tailoringInvoices)
+        .set({
+          ...(patch.partyId === undefined ? {} : { partyId: patch.partyId }),
+          customerName,
+          ...(patch.phone === undefined ? {} : { phone: patch.phone?.trim() || null }),
+          ...(patch.invoiceDate === undefined || !isISODate(patch.invoiceDate) ? {} : { invoiceDate: patch.invoiceDate }),
+          quantity: four(quantity),
+          unitPrice: four(unitPrice),
+          total: four(unitPrice * quantity),
+          statusId,
+          ...(patch.garmentTypeId === undefined ? {} : { garmentTypeId: patch.garmentTypeId }),
+          ...(patch.billed === undefined ? {} : { billed: patch.billed }),
+          ...(patch.measurements === undefined ? {} : { measurements: this.measurementsOrThrow(patch.measurements) }),
+          ...(patch.notes === undefined ? {} : { notes: patch.notes?.trim() || null }),
+          updatedAt: new Date(),
+          updatedBy: userId ?? null,
+          version: current.version + 1,
+        })
+        .where(and(eq(tailoringInvoices.tenantId, tenantId), eq(tailoringInvoices.id, id))),
+    );
+    return this.getInvoice(tenantId, id);
+  }
+
+  /** ✅ الحالة — the `✔` beside `stateCB` (`stateSaveBtN_Click` L761). */
+  async changeInvoiceStatus(tenantId: string, id: string, statusId: string, userId?: string): Promise<InvoiceRow> {
+    await this.ensureEnabled(tenantId);
+    const status = await this.statusOrThrow(tenantId, statusId);
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(tailoringInvoices)
+        .set({ statusId: status.id, updatedAt: new Date(), updatedBy: userId ?? null, version: sql`${tailoringInvoices.version} + 1` })
+        .where(and(eq(tailoringInvoices.tenantId, tenantId), eq(tailoringInvoices.id, id), isNull(tailoringInvoices.deletedAt)))
+        .returning({ id: tailoringInvoices.id }),
+    );
+    if (!row) throw new DomainError('TAILORING_INVOICE_NOT_FOUND', 'فاتورة التفصيل غير موجودة', 404);
+    return this.getInvoice(tenantId, id);
+  }
+
+  /**
+   * 💵 إستلام دفعة — `AddNewSizes.btnRecievePaid_Click` L664 opens the treasury window
+   * (`frmSandQ` with `ISTailor = true`) pre-filled with المتبقي and the note
+   * «تم استلام دفعة من عملية رقم {code}» (L683). Given a صندوق, the cloud writes that
+   * سند قبض for real and links it; without one it records the payment on the invoice
+   * only, which is all `Inv_Sub_Tailor.paid` ever held.
+   */
+  async addPayment(tenantId: string, id: string, input: PaymentInput, userId?: string): Promise<InvoiceRow> {
+    await this.ensureEnabled(tenantId);
+    const current = await this.getInvoice(tenantId, id);
+    const received = decimal(input.amount);
+    if (received <= 0) throw new DomainError('TAILORING_PAYMENT_AMOUNT_INVALID', 'مبلغ الدفعة غير صحيح', 422);
+    const paidAt = input.date && isISODate(input.date) ? input.date : todayISO();
+    const note = input.note?.trim() || `تم استلام دفعة من عملية رقم ${current.number}`;
+
+    let voucherId: string | null = null;
+    if (input.cashLocationId) {
+      const voucher = await this.treasury.createVoucher(tenantId, {
+        branchId: input.branchId ?? '',
+        kind: 'receipt',
+        subtype: 'customer',
+        date: paidAt,
+        partyId: current.partyId ?? undefined,
+        cashLocationId: input.cashLocationId,
+        method: input.method ?? 'cash',
+        amount: four(received),
+        description: note,
+      });
+      voucherId = voucher!.id;
+    }
+
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx.insert(tailoringInvoicePayments).values({
+        id: newId(),
+        tenantId,
+        invoiceId: id,
+        voucherId,
+        amount: four(received),
+        paidAt,
+        note,
+        createdBy: userId ?? null,
+      }),
+    );
+    await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(tailoringInvoices)
+        .set({
+          paidAmount: four(decimal(current.paidAmount) + received),
+          updatedAt: new Date(),
+          updatedBy: userId ?? null,
+          version: sql`${tailoringInvoices.version} + 1`,
+        })
+        .where(and(eq(tailoringInvoices.tenantId, tenantId), eq(tailoringInvoices.id, id))),
+    );
+    return this.getInvoice(tenantId, id);
+  }
+
+  async deleteInvoice(tenantId: string, id: string, userId?: string): Promise<{ deleted: true }> {
+    await this.ensureEnabled(tenantId);
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .update(tailoringInvoices)
+        .set({ deletedAt: new Date(), deletedBy: userId ?? null })
+        .where(and(eq(tailoringInvoices.tenantId, tenantId), eq(tailoringInvoices.id, id), isNull(tailoringInvoices.deletedAt)))
+        .returning({ id: tailoringInvoices.id }),
+    );
+    if (!row) throw new DomainError('TAILORING_INVOICE_NOT_FOUND', 'فاتورة التفصيل غير موجودة', 404);
+    return { deleted: true };
+  }
+
+  private async assertGarmentType(tenantId: string, garmentTypeId: string | null) {
+    if (!garmentTypeId) return;
+    const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({ id: tailoringGarmentTypes.id })
+        .from(tailoringGarmentTypes)
+        .where(
+          and(
+            eq(tailoringGarmentTypes.tenantId, tenantId),
+            eq(tailoringGarmentTypes.id, garmentTypeId),
+            isNull(tailoringGarmentTypes.deletedAt),
+          ),
+        )
+        .limit(1),
+    );
+    if (!row) throw new DomainError('TAILORING_GARMENT_TYPE_NOT_FOUND', 'نوع الثوب غير موجود', 404);
+  }
+
+  /**
+   * The 39 columns of `Inv_Sub_Tailor` are the field names; anything else is a typo the
+   * screen cannot render, and a measurement nobody can read is a measurement lost.
+   */
+  private measurementsOrThrow(input: Record<string, string> | undefined): Record<string, string> {
+    if (!input) return {};
+    const clean: Record<string, string> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (!MEASUREMENT_KEYS.has(key))
+        throw new DomainError('TAILORING_MEASUREMENT_FIELD_UNKNOWN', `قياس غير معروف: ${key}`, 422, { field: key });
+      clean[key] = String(value ?? '');
+    }
+    return clean;
+  }
+
 }
+
+// ---------------------------------------------------------------------------
+// 🧾 فاتورة التفصيل — `Inv_Tailor` (`frmViewOrders` + `AddNewSizes`)
+//
+// The tailoring invoice is a different document from the tailoring order of part two:
+// the order is what the tailor promises, the invoice is what he bills and gets paid
+// against. `frmViewOrders` reads `Inv_Tailor` and computes two numbers the table never
+// stores — 💰 الإجمالي is `sale_price × 1.05` (L88, the same 5% that
+// `AddNewSizes.CreateInvoice` L419 hands to the point of sale) and ⏳ الباقي is that
+// minus `Inv_Sub_Tailor.paid` (L130).
+// ---------------------------------------------------------------------------
+
+/**
+ * 📐 المقاسات — the 39 columns of `Inv_Sub_Tailor`, named as the desktop names them and
+ * labelled as `AddNewSizes.xaml` labels them. The labels are not data in the desktop
+ * (they are XAML), so they live here as the field catalogue the screen renders.
+ */
+export type MeasurementField = {
+  key: string;
+  label: string;
+  group: 'measurements' | 'shapes' | 'extra';
+  kind: 'number' | 'text' | 'select' | 'flag';
+  options?: string[];
+};
+
+export const MEASUREMENT_FIELDS: MeasurementField[] = [
+  // 📐 المقاسات
+  { key: 'height1', label: 'الطول (س)', group: 'measurements', kind: 'number' },
+  { key: 'height2', label: 'الطول (ك)', group: 'measurements', kind: 'number' },
+  { key: 'shoulder', label: 'الكتف', group: 'measurements', kind: 'number' },
+  { key: 'hand1', label: 'اليد (س)', group: 'measurements', kind: 'number' },
+  { key: 'hand2', label: 'اليد (ص)', group: 'measurements', kind: 'number' },
+  { key: 'neck1', label: 'الرقبه (س)', group: 'measurements', kind: 'number' },
+  { key: 'neck2', label: 'الرقبه (ص)', group: 'measurements', kind: 'number' },
+  { key: 'expand1', label: 'الوسع (1)', group: 'measurements', kind: 'number' },
+  { key: 'expand2', label: 'الوسع (2)', group: 'measurements', kind: 'number' },
+  { key: 'expand3', label: 'الوسع (3)', group: 'measurements', kind: 'number' },
+  { key: 'expandHand1', label: 'وسع الكم (1)', group: 'measurements', kind: 'number' },
+  { key: 'expandHand2', label: 'وسع الكم (2)', group: 'measurements', kind: 'number' },
+  { key: 'pocketShape', label: '🔍 نوع الجيب', group: 'measurements', kind: 'text' },
+  { key: 'txtPoketSize1', label: 'مقاس الجيب (1)', group: 'measurements', kind: 'number' },
+  { key: 'txtPoketSize2', label: 'مقاس الجيب (2)', group: 'measurements', kind: 'number' },
+  { key: 'txtPoketLong', label: 'بعد الجيب', group: 'measurements', kind: 'number' },
+  // ✨ الأشكال والتفاصيل
+  {
+    key: 'characterShape',
+    label: 'شكل الجبزور',
+    group: 'shapes',
+    kind: 'select',
+    options: ['حرف صدف', 'مخفي صدف', 'مخفي صدف + تركيبة', 'مخفي بائن جديد', 'حرف سحاب بائن', 'حرف تحت سحاب'],
+  },
+  { key: 'txtCahrSize', label: 'مقاس الجبزور', group: 'shapes', kind: 'number' },
+  { key: 'shoulderCB', label: 'الكتف', group: 'shapes', kind: 'select', options: ['نازل', 'مستوي', 'وسط'] },
+  { key: 'PocketCB', label: 'الجيب', group: 'shapes', kind: 'select', options: ['مخفي', 'بائن', 'تبنيط'] },
+  {
+    key: 'neckShape',
+    label: 'شكل الرقبه',
+    group: 'shapes',
+    kind: 'select',
+    options: ['رقبه ساده', 'رقبه صينى', 'رقبه قلاب'],
+  },
+  {
+    key: 'nickShape',
+    label: 'طقطق',
+    group: 'shapes',
+    kind: 'select',
+    options: ['طقطق مع زر', 'طقطق بدون زر'],
+  },
+  { key: 'txtNeckShape1', label: 'مقاس الرقبه (1)', group: 'shapes', kind: 'number' },
+  { key: 'txtNeckShape2', label: 'مقاس الرقبه (2)', group: 'shapes', kind: 'number' },
+  {
+    key: 'handShape',
+    label: 'شكل اليد',
+    group: 'shapes',
+    kind: 'select',
+    options: ['يد ساده', 'يد ساده مثل الكبك', 'كبك قلاب', 'كبك مربع', 'كبك مشتول', 'كبك مدور'],
+  },
+  {
+    key: 'handShapecb',
+    label: 'كسرة اليد',
+    group: 'shapes',
+    kind: 'select',
+    options: ['بدون كسرة', 'كسرة', 'كسرتين', 'بدون كسرة جبذور'],
+  },
+  { key: 'txtHandShape1', label: 'مقاس اليد (1)', group: 'shapes', kind: 'number' },
+  { key: 'txtHandShape2', label: 'مقاس اليد (2)', group: 'shapes', kind: 'number' },
+  { key: 'trangle', label: 'شكل الحافة — مثلث', group: 'shapes', kind: 'flag' },
+  { key: 'square', label: 'شكل الحافة — مربع', group: 'shapes', kind: 'flag' },
+  { key: 'pocketPen', label: 'جيب قلم', group: 'shapes', kind: 'flag' },
+  { key: 'disappear', label: 'جيب مخفي', group: 'shapes', kind: 'flag' },
+  // 📏 مقاسات إضافية
+  { key: 'handDownTB', label: 'كفة تحت', group: 'extra', kind: 'text' },
+  { key: 'pho1', label: 'جوال (1)', group: 'extra', kind: 'text' },
+  { key: 'pho2', label: 'جوال (2)', group: 'extra', kind: 'text' },
+  { key: 'save1', label: 'محفظة (1)', group: 'extra', kind: 'text' },
+  { key: 'save2', label: 'محفظة (2)', group: 'extra', kind: 'text' },
+  { key: 'down', label: 'أسفل', group: 'extra', kind: 'text' },
+  { key: 'pocketCheck', label: 'رقابة', group: 'extra', kind: 'text' },
+];
+
+const MEASUREMENT_KEYS = new Set(MEASUREMENT_FIELDS.map((field) => field.key));
+
+/** 👔 نوع الثوب — `typeCB`: سعودي · بحريني · اماراتي · كويتي. */
+export type GarmentTypeRow = { id: string; code: string; nameAr: string; displayOrder: number; active: boolean };
+
+export type InvoicePaymentRow = {
+  id: string;
+  amount: string;
+  paidAt: string;
+  note: string | null;
+  voucherId: string | null;
+};
+
+export type InvoiceRow = {
+  id: string;
+  number: string;
+  partyId: string | null;
+  customerName: string;
+  phone: string | null;
+  invoiceDate: string;
+  quantity: string;
+  unitPrice: string;
+  /** 💵 الإجمالي = 💰 السعر × 🔢 العدد (`CalculateTotalPrice` L860) — بلا الضريبة. */
+  total: string;
+  /** 💰 الإجمالي كما يعرضه `frmViewOrders`: الإجمالي × 1.05 (L88). */
+  totalWithTax: string;
+  /** ✅ المدفوع — `Inv_Sub_Tailor.paid` (L130). */
+  paidAmount: string;
+  /** ⏳ الباقي = الإجمالي بالضريبة − المدفوع (L90). */
+  remainingAmount: string;
+  statusId: string;
+  statusName: string;
+  garmentTypeId: string | null;
+  garmentTypeName: string | null;
+  billed: boolean;
+  measurements: Record<string, string>;
+  notes: string | null;
+  version: number;
+  payments: InvoicePaymentRow[];
+};
+
+export type InvoiceInput = {
+  partyId?: string | null;
+  customerName: string;
+  phone?: string | null;
+  invoiceDate?: string;
+  quantity?: number | string;
+  unitPrice: number | string;
+  statusId?: string;
+  garmentTypeId?: string | null;
+  billed?: boolean;
+  measurements?: Record<string, string>;
+  notes?: string | null;
+};
+
+export type InvoicePatch = Partial<InvoiceInput> & { version?: number };
+
+export type InvoiceQuery = {
+  search?: string;
+  partyId?: string;
+  statusId?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type PaymentInput = {
+  amount: number | string;
+  date?: string;
+  note?: string | null;
+  /** صندوق أو بنك — «إستلام دفعة» يفتح سند قبض في الخزينة (`frmSandQ`, L664). */
+  cashLocationId?: string | null;
+  branchId?: string | null;
+  method?: 'cash' | 'cheque' | 'bank_transfer' | 'card';
+};
+
+const INVOICE_SEQUENCE = { prefix: 'TI-', padding: 6 } as const;
+const TAX_RATE = 0.05;

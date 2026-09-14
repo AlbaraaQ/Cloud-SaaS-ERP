@@ -793,6 +793,40 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة أنواع التفصيل مع شاشة القياسات،
   وتاريخُ الحالات (لا شاشة تقرأه).
 
+* **المرحلة 09 — الوحدات الرأسية، الجزء الثالث: 🧾 فاتورة التفصيل**
+  (`Form_WPF/frmViewOrders.xaml` «عرض الطلبات - ViewOrders» و`Form_WPF/AddNewSizes.xaml`
+  «إضافة مقاس جديد» و`Form_WPF/frmSandQ.xaml` بـ`ISTailor = true`). **«عرض الطلبات»
+  لا يقرأ `TailoringOrders`: `SearchInData` L55 يقرأ `Inv_Tailor` — وثيقةٌ أخرى برقمها
+  وإجماليها ومدفوعها وباقيها.** ترحيل 0054 يضيف ثلاثة جداول: `tailoring_invoices`
+  (رقم · العميل · الجوال · التاريخ · العدد · السعر · الإجمالي · المدفوع · الحالة ·
+  نوع الثوب · `measurements jsonb` · ملاحظات) و`tailoring_invoice_payments`
+  (`voucher_id` → سند القبض، `ON DELETE set null`) و`tailoring_garment_types`
+  (سعودي · بحريني · اماراتي · كويتي، مبذورة كما في `typeCB` L423). والحساب منقولٌ
+  بنصّه: 💵 الإجمالي = 💰 السعر × 🔢 العدد (`CalculateTotalPrice` L860)، و💰 الإجمالي في
+  الشبكة هو الصافي × 1.05 (L88) — نسبة الـ5% نفسها التي يمرّرها `CreateInvoice` L419 إلى
+  نقطة البيع — و⏳ الباقي = الصافي − المدفوع (L90)، والرفضان «برجاء اختيار العميل»
+  و«يرجي إدخال السعر» (`btnSave_Click` L191). والـ39 عموداً من `Inv_Sub_Tailor` تصير
+  `measurements jsonb` بمفاتيحها كما في الديسكتوب (`height1` · `shoulder` ·
+  `handShape` …)، وتسمياتها تُخدم في `GET /tailoring/measurement-fields` بمجموعاتها
+  الثلاث (📐 المقاسات · ✨ الأشكال والتفاصيل · 📏 مقاسات إضافية) فترسمها الشاشة من
+  السجلّ، ويُرفض أي مفتاحٍ ليس فيه. النهايات: `GET /tailoring/garment-types` و
+  `GET /tailoring/measurement-fields` و`GET/POST /tailoring/invoices` و
+  `GET/PATCH/DELETE /tailoring/invoices/{id}` و`POST …/status` و`POST …/payments` —
+  القراءة `tailoring.view` والكتابة `tailoring.manage` — وشاشة `/tailoring/invoices`:
+  شبكة `frmViewOrders` بصندوق بحثها «🔍 الهاتف أو اسم العميل...» و«النتائج: N»، ونافذة
+  «👁️ عرض» ببطاقة `AddNewSizes` كاملة، ونافذتا «🔄 تغيير الحالة» و«💵 إستلام دفعة».
+  وقراراتٌ مُعلَّلة في `PHASE_09_VERTICALS.md` §6.3 — أهمّها: **الحالة من صفوف
+  `tailoring_order_statuses` نفسها** فدورةٌ واحدة تُسمّى مرةً واحدة؛ و👔 نوع الثوب جدولٌ
+  جديد غير `tailoring_types`؛ ورقم الفاتورة `TI-000001` من سلسلة الوثائق؛
+  و**«إستلام دفعة» تُسجَّل دائماً، وتكتب سند قبض حقيقياً بعبارة «تم استلام دفعة من
+  عملية رقم {code}» (L683) إن أُرسل الصندوق** — والسند `ON DELETE set null` يبقى في
+  الخزينة إن حُذفت الفاتورة. ومؤجَّل عن قصد: زرّ «فاتورة» في «⚙️ لوحة التحكم» (يملأ
+  سلّة ويستدعي نقطة البيع) و`frmSandQ` كاملاً وشاشة القياسات.
+  `apps/api/test/tailoring-invoices.spec.ts` (**11** اختباراً) و
+  `scripts/verify-tailoring-invoices.mjs` (**41** نقطة تحقّق حيّة؛ تشغيلان متتاليان
+  أخضران والثاني يبدأ من قاعدة بلا فواتير وينتهي بلا أثر، والسند باقٍ). **707** اختبار
+  API (كان 696) · 36 staff · 71 contract · 17 database · tsc وlint أخضران.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

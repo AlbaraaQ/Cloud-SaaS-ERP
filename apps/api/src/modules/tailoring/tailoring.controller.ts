@@ -4,12 +4,18 @@ import { getTenantContext, tryGetAuthContext } from '../platform/context/tenant-
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
 import {
+  MEASUREMENT_FIELDS,
   TailoringService,
   type CategoryInput,
+  type InvoiceInput,
+  type InvoicePatch,
+  type InvoiceQuery,
+  type MeasurementField,
   type MeasurementInput,
   type OrderInput,
   type OrderPatch,
   type OrderQuery,
+  type PaymentInput,
   type TypeInput,
   type TypePatch,
   type ValueInput,
@@ -220,5 +226,90 @@ export class TailoringController {
   @RequiresPermission('tailoring.manage')
   deleteOrder(@Param('id') id: string) {
     return this.tailoring.deleteOrder(this.tenantId, id, this.userId);
+  }
+
+  // ─────────────────────────────── 🧾 فاتورة التفصيل ───────────────────────────────
+
+  /** 👔 نوع الثوب — `typeCB` in `AddNewSizes.xaml` L423. */
+  @Get('garment-types')
+  @RequiresPermission('tailoring.view')
+  listGarmentTypes() {
+    return this.tailoring.listGarmentTypes(this.tenantId);
+  }
+
+  /**
+   * 📐 المقاسات — the field catalogue of `Inv_Sub_Tailor`. The labels are the
+   * `Label Content` of `AddNewSizes.xaml`, not data, so they are served rather than
+   * seeded: the screen renders «الطول (س)» · «شكل اليد» · «كفة تحت» as the tailor
+   * reads them.
+   */
+  @Get('measurement-fields')
+  @RequiresPermission('tailoring.view')
+  measurementFields(): { data: MeasurementField[] } {
+    return { data: MEASUREMENT_FIELDS };
+  }
+
+  /** «🔍 الهاتف أو اسم العميل...» + «🔍 عرض» (`frmViewOrders`). */
+  @Get('invoices')
+  @RequiresPermission('tailoring.view')
+  listInvoices(
+    @Query('search') search?: string,
+    @Query('partyId') partyId?: string,
+    @Query('statusId') statusId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const query: InvoiceQuery = {
+      search: str(search),
+      partyId: str(partyId),
+      statusId: str(statusId),
+      from: str(from),
+      to: str(to),
+      limit: num(limit),
+      offset: num(offset),
+    };
+    return this.tailoring.listInvoices(this.tenantId, query);
+  }
+
+  /** `👁️ عرض` — `AddNewSizes.showResult(code)` (`frmViewOrders` L156). */
+  @Get('invoices/:id')
+  @RequiresPermission('tailoring.view')
+  getInvoice(@Param('id') id: string) {
+    return this.tailoring.getInvoice(this.tenantId, id);
+  }
+
+  /** «💾 حفظ» (`AddNewSizes` L191). */
+  @Post('invoices')
+  @RequiresPermission('tailoring.manage')
+  createInvoice(@Body() body: InvoiceInput) {
+    return this.tailoring.createInvoice(this.tenantId, body, this.userId);
+  }
+
+  @Patch('invoices/:id')
+  @RequiresPermission('tailoring.manage')
+  updateInvoice(@Param('id') id: string, @Body() body: InvoicePatch) {
+    return this.tailoring.updateInvoice(this.tenantId, id, body, this.userId);
+  }
+
+  /** ✅ الحالة — the `✔` beside `stateCB` (`stateSaveBtN_Click` L761). */
+  @Post('invoices/:id/status')
+  @RequiresPermission('tailoring.manage')
+  changeInvoiceStatus(@Param('id') id: string, @Body() body: { statusId: string }) {
+    return this.tailoring.changeInvoiceStatus(this.tenantId, id, body?.statusId, this.userId);
+  }
+
+  /** 💵 إستلام دفعة — `frmSandQ` with `ISTailor = true` (`AddNewSizes` L664). */
+  @Post('invoices/:id/payments')
+  @RequiresPermission('tailoring.manage')
+  addPayment(@Param('id') id: string, @Body() body: PaymentInput) {
+    return this.tailoring.addPayment(this.tenantId, id, body ?? { amount: 0 }, this.userId);
+  }
+
+  @Delete('invoices/:id')
+  @RequiresPermission('tailoring.manage')
+  deleteInvoice(@Param('id') id: string) {
+    return this.tailoring.deleteInvoice(this.tenantId, id, this.userId);
   }
 }

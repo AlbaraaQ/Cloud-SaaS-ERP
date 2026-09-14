@@ -12,6 +12,7 @@ import {
   newId,
   priceLists,
   salaryAdjustmentTypes,
+  tailoringGarmentTypes,
   tailoringOrderStatuses,
   tenants,
   warehouses,
@@ -84,6 +85,7 @@ export class OrgProvisioningService {
     if (await this.ensurePostingProfile(tx, tenantId, actorUserId, now)) created = true;
     if (await this.ensureSalaryAdjustmentTypes(tx, tenantId, actorUserId, now)) created = true;
     if (await this.ensureTailoringOrderStatuses(tx, tenantId, actorUserId, now)) created = true;
+    if (await this.ensureTailoringGarmentTypes(tx, tenantId, actorUserId, now)) created = true;
 
     let branchId = await firstId(
       tx
@@ -383,6 +385,47 @@ export class OrgProvisioningService {
       })),
     );
     this.logger.log({ tenantId, inserted: missing.length }, 'tailoring order statuses seeded');
+    return true;
+  }
+
+  /**
+   * 👔 أنواع الثوب — `typeCB` in `AddNewSizes.xaml` L423 names its four items in the
+   * markup (`سعودي · بحريني · اماراتي · كويتي`), unlike `OrderStatus` whose rows are
+   * only data. Migration `0054` inserts them for every tenant that already existed;
+   * this does it for every tenant created after it.
+   */
+  private async ensureTailoringGarmentTypes(
+    tx: DrizzleTx,
+    tenantId: string,
+    actorUserId: string | null,
+    now: Date,
+  ): Promise<boolean> {
+    const seed: Array<{ code: string; nameAr: string; displayOrder: number }> = [
+      { code: 'saudi', nameAr: 'سعودي', displayOrder: 1 },
+      { code: 'bahraini', nameAr: 'بحريني', displayOrder: 2 },
+      { code: 'emirati', nameAr: 'اماراتي', displayOrder: 3 },
+      { code: 'kuwaiti', nameAr: 'كويتي', displayOrder: 4 },
+    ];
+    const existing = await tx
+      .select({ code: tailoringGarmentTypes.code })
+      .from(tailoringGarmentTypes)
+      .where(and(eq(tailoringGarmentTypes.tenantId, tenantId), isNull(tailoringGarmentTypes.deletedAt)));
+    const present = new Set(existing.map((row) => row.code));
+    const missing = seed.filter((row) => !present.has(row.code));
+    if (!missing.length) return false;
+    await tx.insert(tailoringGarmentTypes).values(
+      missing.map((row) => ({
+        id: newId(),
+        tenantId,
+        code: row.code,
+        nameAr: row.nameAr,
+        displayOrder: row.displayOrder,
+        active: true,
+        createdAt: now,
+        createdBy: actorUserId,
+      })),
+    );
+    this.logger.log({ tenantId, inserted: missing.length }, 'tailoring garment types seeded');
     return true;
   }
 

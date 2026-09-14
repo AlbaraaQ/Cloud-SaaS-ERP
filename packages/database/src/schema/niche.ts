@@ -7,6 +7,7 @@ import { items } from './catalog.js';
 import { branches, warehouses } from './organization.js';
 import { parties } from './parties.js';
 import { salesInvoiceLines, salesInvoices } from './sales.js';
+import { vouchers } from './treasury.js';
 import { tenants } from './platform.js';
 
 const money = { precision: 20, scale: 4, mode: 'string' as const };
@@ -54,6 +55,29 @@ export const tailoringOptionCategories = pgTable('tailoring_option_categories', 
 export const tailoringOptionValues = pgTable('tailoring_option_values', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), categoryId: uuid('category_id').notNull().references(() => tailoringOptionCategories.id, { onDelete: 'cascade' }), nameAr: text('name_ar').notNull(), isDefault: boolean('is_default').notNull().default(false), displayOrder: integer('display_order').notNull().default(0), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
 }, (t) => ({ name: uniqueIndex('tailoring_option_values_tenant_name_key').on(t.tenantId, t.categoryId, t.nameAr).where(sql`deleted_at IS NULL`), category: index('tailoring_option_values_category_idx').on(t.tenantId, t.categoryId, t.displayOrder) }));
+
+/**
+ * 🧾 فاتورة التفصيل — `Inv_Tailor` / `Inv_Sub_Tailor`
+ * (`Form_WPF/frmViewOrders.xaml` «عرض الطلبات - ViewOrders» + `AddNewSizes.xaml`
+ * «إضافة مقاس جديد»).
+ *
+ * ⌛ الباقي و💰 الإجمالي are *not* stored: `frmViewOrders` shows
+ * `الإجمالي × 1.05` and `الباقي = (الإجمالي × 1.05) − المدفوع` (L88–L90).
+ */
+export const tailoringInvoices = pgTable('tailoring_invoices', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), number: text('number').notNull(), partyId: uuid('party_id').references(() => parties.id, { onDelete: 'restrict' }), customerName: text('customer_name').notNull(), phone: text('phone'), invoiceDate: date('invoice_date').notNull(), quantity: numeric('quantity', money).notNull().default('1'), unitPrice: numeric('unit_price', money).notNull().default('0'), total: numeric('total', money).notNull().default('0'), paidAmount: numeric('paid_amount', money).notNull().default('0'), statusId: uuid('status_id').notNull().references(() => tailoringOrderStatuses.id, { onDelete: 'restrict' }), garmentTypeId: uuid('garment_type_id').references(() => tailoringGarmentTypes.id, { onDelete: 'set null' }), billed: boolean('billed').notNull().default(false), measurements: jsonb('measurements').$type<Record<string, string>>().notNull().default({}), notes: text('notes'), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ number: uniqueIndex('tailoring_invoices_tenant_number_key').on(t.tenantId, t.number).where(sql`deleted_at IS NULL`), date: index('tailoring_invoices_tenant_date_idx').on(t.tenantId, t.invoiceDate), party: index('tailoring_invoices_tenant_party_idx').on(t.tenantId, t.partyId), name: index('tailoring_invoices_tenant_name_idx').on(t.tenantId, t.customerName), status: index('tailoring_invoices_tenant_status_idx').on(t.tenantId, t.statusId) }));
+
+/** 💵 إستلام دفعة — the link between a فاتورة تفصيل and the سند قبض that paid it. */
+/** A payment line is written once and never edited — so, as with `invoice_payments`, it carries no version. */
+export const tailoringInvoicePayments = pgTable('tailoring_invoice_payments', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), invoiceId: uuid('invoice_id').notNull().references(() => tailoringInvoices.id, { onDelete: 'cascade' }), voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }), amount: numeric('amount', money).notNull(), paidAt: date('paid_at').notNull(), note: text('note'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), createdBy: uuid('created_by'),
+}, (t) => ({ invoice: index('tailoring_invoice_payments_invoice_idx').on(t.tenantId, t.invoiceId, t.paidAt) }));
+
+/** 👔 نوع الثوب — `typeCB` in `AddNewSizes.xaml` L423 (سعودي · بحريني · اماراتي · كويتي). */
+export const tailoringGarmentTypes = pgTable('tailoring_garment_types', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), code: text('code').notNull(), nameAr: text('name_ar').notNull(), displayOrder: integer('display_order').notNull().default(0), active: boolean('active').notNull().default(true), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ code: uniqueIndex('tailoring_garment_types_tenant_code_key').on(t.tenantId, t.code).where(sql`deleted_at IS NULL`), order: index('tailoring_garment_types_tenant_idx').on(t.tenantId, t.displayOrder) }));
 
 export const vesselGroups = pgTable('vessel_groups', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), name: text('name').notNull(), code: text('code'), ...baseAuditColumns(), ...baseSoftDeleteColumns(), ...baseLegacyColumns(),
@@ -105,4 +129,4 @@ export const sallaItemSync = pgTable('salla_item_sync', { id: uuid('id').primary
 export const sallaExportLog = pgTable('salla_export_log', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'set null' }), itemId: uuid('item_id').references(() => items.id, { onDelete: 'set null' }), action: text('action').notNull(), status: text('status').notNull().default('queued'), requestPayload: jsonb('request_payload').$type<Record<string, unknown>>().notNull().default({}), responsePayload: jsonb('response_payload').$type<Record<string, unknown>>(), error: text('error'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow() }, (t) => ({ status: index('salla_export_log_status_idx').on(t.tenantId, t.status) }));
 export const sallaBranchMappings = pgTable('salla_branch_mappings', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id), cashLocationId: uuid('cash_location_id'), remoteBranchId: text('remote_branch_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ remote: uniqueIndex('salla_branch_mappings_remote_key').on(t.tenantId, t.connectionId, t.remoteBranchId).where(sql`deleted_at IS NULL`) }));
 
-export const nicheTables = { opticalPrescriptions, customerMeasurements, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };
+export const nicheTables = { opticalPrescriptions, customerMeasurements, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaBranchMappings };

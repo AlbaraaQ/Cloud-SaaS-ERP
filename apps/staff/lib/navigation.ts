@@ -879,6 +879,12 @@ const tailoring: ModuleNode = {
           permission: 'tailoring.view',
           endpoint: '/tailoring/orders',
         }),
+        // 🧾 فاتورة التفصيل — `frmViewOrders.xaml` («عرض الطلبات - ViewOrders») reads
+        // `Inv_Tailor`, a different document from the طلب of `frmOrders`.
+        screen('tailoring-invoice', 'فواتير التفصيل', 'Tailoring invoices', '/tailoring/invoices', 'ready', {
+          permission: 'tailoring.view',
+          endpoint: '/tailoring/invoices',
+        }),
       ],
     },
     {

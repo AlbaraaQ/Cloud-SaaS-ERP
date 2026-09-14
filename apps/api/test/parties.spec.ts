@@ -60,10 +60,11 @@ describe('parties phase 08 integration', () => {
     expect(created.status).toBe(201);
     const partyId = ((created.body.data ?? created.body) as { id: string }).id;
 
-    const balance = await api(ctx.server, 'get', `/api/v1/parties/${partyId}/balance`, { token: alpha.token });
-    expect(balance.status).toBe(200);
-    // `0.0000` is zero, however many decimals it carries.
-    expect(Number((balance.body.data ?? balance.body).receivable)).toBe(0);
+    const ledger = await api(ctx.server, 'get', `/api/v1/parties/${partyId}/balance`, { token: alpha.token });
+    expect(ledger.status).toBe(200);
+    // `0.0000` is zero, however many decimals it carries — comparing the *string* to
+    // `'0'` is what made every delete fail (`PARTY_HAS_OPEN_BALANCE`).
+    expect(Number((ledger.body.data ?? ledger.body).receivable)).toBe(0);
 
     const removed = await api(ctx.server, 'delete', `/api/v1/parties/${partyId}`, { token: alpha.token });
     expect(removed.status).toBe(200);
