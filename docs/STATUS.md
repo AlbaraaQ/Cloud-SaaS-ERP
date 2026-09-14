@@ -793,6 +793,28 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة أنواع التفصيل مع شاشة القياسات،
   وتاريخُ الحالات (لا شاشة تقرأه).
 
+* **المرحلة 09 — الوحدات الرأسية، الجزء الثامن: 🛒 متجر سلة**
+  (`Form_WPF/FrmSallah.xaml` «تكامل Salla API»، و`Class/SallaAPI.cs` و
+  `Class/ProductsManager.cs` و`Class/OrdersManager.cs` و`Class/CustomersManager.cs` و
+  `Class/SallaAuth.cs`). **النافذة عند الديسكتوب أربعة أزرار تُحصي ما تجلبه ولا تحفظه:
+  «📦 جلب المنتجات» → «تم جلب {n} منتج.»، و«📋 جلب الطلبات» → «تم جلب {n} طلب.»،
+  و«➕ إضافة منتج» → «تم إضافة المنتج بنجاح.»، و«📥 جلب الطلبات (2)» → `await Task.Run(() => { })`
+  وصندوق رسالة. والرمزُ مموضعٌ في الكود (`new SallaAPI("2adcaba8-…")`)， وقوائم «متجر سلة»
+  الثلاث في `Home.xaml` L394 معالجاتُها فارغة، ونوافذها (`FrmSallaProducts` · `FrmOrderSalla`
+  · `FrmSallaBranchMapping`) معلَّقة وغير موجودة.** وقراءة `Class/ManagerOnline.cs` أثبتت
+  أنه **ليس من سلة**: نبضةُ رخصةٍ (QLicense) وتاريخ ZATCA إلى
+  `app-cloud-rmxb.onrender.com`. ترحيل 0059 يضيف `salla_products` (مرآة ما في المتجر) و
+  `salla_orders` (كل طلبٍ برقمه البعيد وحالته ومرآته وارتباطه بفاتورته) — فصار للإحصاء
+  مكانٌ يوضع فيه، وصار الرقم البعيد مانعاً لتكرار الاستيراد. والنقل (`SallaTransport`)
+  محقون: `fetch` في الإنتاج، ومتجرٌ في الذاكرة حين يبدأ معرّف المتجر بـ `MOCK-` أو حين
+  تُضبط `SALLA_TRANSPORT=mock` — وبه صار مسارٌ لا يُختبر عند الديسكتوب قابلاً للاختبار.
+  و«➕ إضافة منتج» يُرسل صنفاً حقيقياً بالمفاتيح الأربعة التي يرسلها الديسكتوب
+  (`name · price · quantity · description`) لا كائناً مثبَّتاً. `apps/api/test/salla-store.spec.ts`
+  (**10** اختبارات) و`scripts/verify-salla.mjs` (**40** نقطة تحقّق حيّة، ثلاث تشغيلات
+  خضراء، والتنظيف في `finally`). **759** اختبار API (كان 749) · 36 staff · 71 contract ·
+  17 database · tsc وlint أخضران. ومؤجَّل عن قصد: منعُ تحويل منتجات المتجر إلى أصناف
+  محلية، وربطُ الطلب بعميلٍ قائم، ومزامنة الكمية مع المخزون، و`ManagerOnline`.
+
 * **المرحلة 09 — الوحدات الرأسية، الجزء السابع: ⛵ المرسى — 📋 بطاقة الفئة و⏰ فترات
   التأجير** (`Form_WPF/frmGroupM.xaml` «📋 بطاقة فئة» و`Form_WPF/frmAddPeriod.xaml`
   «⏰ فترات التأجير»). **الفئة هي تعريفة المرسى: منها يُسعَّر الحجز في `frmBookingM` —
