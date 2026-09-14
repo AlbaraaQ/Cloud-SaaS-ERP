@@ -18,6 +18,10 @@
  *      «لا يوجد رواتب مستحقة للموظف»، وسند الصرف الذي يُصرف به الراتب (`frmSalaryPay`)
  *   9. 📄 كشف حساب موظف — «اختر موظف»، الفترة والفرع، «الرصيد السابق»، «تجميعي/تفصيلي»
  *      والبطاقات الأربع (`frmEmpAccountGet`)
+ *  10. 📈 حركات الموظف — «اختر موظف»، «🔄 نوع الحركة»، «📅 من تاريخ/إلى تاريخ»، وأعمدة
+ *      «📋 بيانات الحركات» و`💰 الإجمالي` (`frmEmpInvs`)
+ *  11. 📊 تقرير الرواتب — «كل الفترة» و«الشهر:/السنة:»، «💼 بيانات الرواتب» و
+ *      «💰 إجمالي الرواتب:» (`frmRptSalary`)
  *
  * The two other refusals («لا يمكن حذف موظف مرتبط بفواتير» and the payroll one) are in
  * `apps/api/test/employee-card.spec.ts`: they leave an invoice and a payroll run behind.
@@ -503,6 +507,131 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// 10. 📈 حركات الموظف — `Form_WPF/frmEmpInvs.xaml` («مبيعات ومشتريات موظف خلال
+// الفترة»). `ShowResult` (L226) reads `Inv ⋈ Inv_Sub` on `Inv.sales_emp` over
+// `date >= @date1 AND date <= @date2` with `IS_Deleted=0`, one row per line. The cloud
+// carries that link as `sales_invoices.salesman_id`, so this section sells something —
+// a real posted فاتورة and a real مرتجع — and then reads them back through the screen.
+// ---------------------------------------------------------------------------
+console.log('\n10. 📈 حركات الموظف — مبيعات الموظف خلال الفترة');
+
+const warehouseId = (await get('/warehouses'))[0]?.id;
+/**
+ * 👤 مندوب التحقق — an employee who has appeared on a فاتورة cannot be deleted
+ * («لا يمكن حذف موظف مرتبط بفواتير»), so the script keeps one salesman of its own and
+ * reuses it on the next run instead of leaving a new one behind every time.
+ */
+const salesEmployee =
+  (await get('/hrm/employees')).find((row) => String(row.employeeNo).startsWith('VRM')) ??
+  (await post('/hrm/employees', { employeeNo: `VRM${stamp}`, name: `مندوب التحقق ${stamp}`, branchId }));
+
+const movementCategory = await post('/organization/catalog/categories', { code: `VRC${stamp}`, nameAr: `تصنيف التحقق ${stamp}` });
+const movementUnit = await post('/organization/catalog/units', { code: `VRU${stamp}`, nameAr: `وحدة التحقق ${stamp}` });
+const movementItem = await post('/organization/catalog/items', {
+  sku: `VRI${stamp}`,
+  nameAr: `صنف التحقق ${stamp}`,
+  categoryId: movementCategory.id,
+  baseUnitId: movementUnit.id,
+  salePrice: '100',
+});
+// بضاعة أول المدة — a فاتورة cannot be posted out of a warehouse that has none, so the
+// sale below is what proves the receipt landed.
+await post('/inventory/ledger/record', {
+  lines: [{ itemId: movementItem.id, warehouseId, qty: '1000', unitCost: '40', direction: 'in', docType: 'opening', docId: '00000000-0000-0000-0000-000000000001' }],
+});
+
+const sell = async (body) => {
+  const created = await post('/sales/invoices', { cashCustomerName: 'عميل نقدي', ...body });
+  return post(`/sales/invoices/${created.id}/post`, {});
+};
+const sold = await sell({
+  branchId,
+  warehouseId,
+  salesmanId: salesEmployee.id,
+  lines: [{ itemId: movementItem.id, quantity: '3', unitPrice: '100', taxRate: '0' }],
+});
+check('فاتورة بيع مرحَّلة باسم الموظف', sold.status === 'posted' && Number(sold.total) === 300, `${sold.number} ${sold.total}`);
+
+const returnDraft = await post(`/sales/invoices/${sold.id}/return`, {
+  branchId,
+  warehouseId,
+  salesmanId: salesEmployee.id,
+  cashCustomerName: 'عميل نقدي',
+  lines: [{ itemId: movementItem.id, quantity: '1', unitPrice: '100', taxRate: '0' }],
+});
+const soldReturn = await post(`/sales/invoices/${returnDraft.id}/post`, {});
+check('مرتجع بيع مرحَّل باسم الموظف', soldReturn.status === 'posted' && Number(soldReturn.total) === 100, `${soldReturn.number} ${soldReturn.total}`);
+
+const movementsPath = (query) => `/hrm/employee-movements?${query}`;
+const movementRows = await get(movementsPath(`employee_id=${salesEmployee.id}`));
+const movementLines = movementRows.rows ?? [];
+check('📋 بيانات الحركات — سطرٌ لكل سطر فاتورة', movementLines.length === 2, `${movementLines.length} صف`);
+check(
+  'نوع الحركة — «فاتورة بيع» و«فاتورة مرتجع بيع»',
+  movementLines.some((row) => row.movementType === 'فاتورة بيع') && movementLines.some((row) => row.movementType === 'فاتورة مرتجع بيع'),
+  movementLines.map((row) => row.movementType).join(' · '),
+);
+check(
+  '📦 الصنف · الكمية · 💵 السعر · 💰 الإجمالي',
+  movementLines.every((row) => row.itemName === movementItem.nameAr && Number(row.unitPrice) === 100) &&
+    movementLines.some((row) => row.quantity === '3.0000' && row.lineTotal === '300.0000'),
+  `${movementLines[0]?.itemName} ${movementLines[0]?.quantity} × ${movementLines[0]?.unitPrice}`,
+);
+// `txtSum` — the desktop adds `tot_net` once per line, so a three-line invoice is counted
+// three times; the cloud counts each invoice once.
+check('💰 الإجمالي = المبيعات − المرتجع', Number(movementRows.summary.total) === 200 && Number(movementRows.summary.salesTotal) === 300 && Number(movementRows.summary.returnsTotal) === 100, `${movementRows.summary.total} = 300 − 100`);
+check(
+  'المبيعات وحدها، والمرتجع وحده',
+  (await get(movementsPath(`employee_id=${salesEmployee.id}&movement_type=sales`))).rows.length === 1 &&
+    (await get(movementsPath(`employee_id=${salesEmployee.id}&movement_type=returns`))).rows.length === 1,
+);
+
+const noEmployeeMovements = await refused('get', movementsPath('from=2000-01-01&to=2000-01-31'));
+check('اختر موظف.', noEmployeeMovements.status === 422 && noEmployeeMovements.detail === 'اختر موظف', `${noEmployeeMovements.status} ${noEmployeeMovements.code}`);
+const movementsOutside = await get(movementsPath(`employee_id=${salesEmployee.id}&from=2000-01-01&to=2000-01-31`));
+check('📅 من تاريخ / إلى تاريخ — فترةٌ بلا حركات', (movementsOutside.rows ?? []).length === 0);
+const movementsInside = await get(movementsPath(`employee_id=${salesEmployee.id}&from=${today}&to=${today}`));
+check('اليوم الأخير داخل الفترة', (movementsInside.rows ?? []).length === 2, `${(movementsInside.rows ?? []).length} صف`);
+const movementsOtherBranch = await get(movementsPath(`employee_id=${salesEmployee.id}&branch_id=${otherBranch.id}`));
+check('🏢 الفرع — فرعٌ بلا حركات', (movementsOtherBranch.rows ?? []).length === 0, otherBranch.nameAr);
+const everyEmployee = await get(movementsPath('all_employees=1'));
+check('الكل — كل الموظفين الذين لهم حركات', (everyEmployee.rows ?? []).length >= 2, `${(everyEmployee.rows ?? []).length} صف`);
+
+// ---------------------------------------------------------------------------
+// 11. 📊 تقرير الرواتب — `Form_WPF/frmRptSalary.xaml` («💼 تقرير الرواتب»). The window
+// reads `SalaryPay` with `IS_Deleted=0` — the cloud's `salary_payments`, the إذن صرف of
+// section 8 — narrowed by `الشهر:`/`السنة:` unless «كل الفترة» is on.
+// ---------------------------------------------------------------------------
+console.log('\n11. 📊 تقرير الرواتب — كل إذن صرف عن كل شهر');
+
+const salaryPath = (query) => `/hrm/reports/salary${query ? `?${query}` : ''}`;
+const salaryReport = await get(salaryPath(''));
+const salaryRows = salaryReport.rows ?? [];
+check('💼 بيانات الرواتب — إذنٌ لكل صف', salaryRows.length >= 3 && salaryRows.every((row) => row.number && row.employeeName), `${salaryRows.length} صف`);
+check('«كل الفترة» هي الأصل', salaryReport.allPeriod === true && salaryRows.length === (await get(salaryPath('all_period=true'))).rows.length);
+check(
+  '👁️ عرض — الصفّ يحمل إذن الصرف نفسه',
+  salaryRows.some((row) => row.id === first.id) && salaryRows.some((row) => row.id === nextPayment.id),
+  `${first.number} · ${nextPayment.number}`,
+);
+
+const monthRows = (await get(salaryPath(`all_period=false&year=${today.slice(0, 4)}&month=${today.slice(5, 7)}`))).rows ?? [];
+check('الشهر والسنة يضيّقان التقرير', monthRows.length >= 1 && monthRows.every((row) => row.yearMonth === today.slice(0, 7)), `${monthRows.length} صف`);
+check('«رقم السند» و«الشهر» و«السنة»', monthRows.some((row) => row.id === first.id && row.month === today.slice(5, 7) && row.year === today.slice(0, 4)), `${first.number}`);
+
+// `gross = tot_salary + Houses + Travel + salary_add` (L104) — plus the four allowances
+// the window has no box for, so الإجمالي − الخصومات = الصافي على كل صف.
+check(
+  '💰 الإجمالي − الخصومات = 💵 صافي الراتب',
+  salaryRows.every((row) => Number(row.gross) - Number(row.deductions) === Number(row.net)),
+  salaryRows.map((row) => `${row.gross} − ${row.deductions} = ${row.net}`)[0] ?? '—',
+);
+const netSum = salaryRows.reduce((sum, row) => sum + Number(row.net), 0);
+check('💰 إجمالي الرواتب = مجموع الصافي', Number(salaryReport.summary.total) === netSum, `${salaryReport.summary.total}`);
+const draftRow = salaryRows.find((row) => row.id === draft.id);
+check('إذنٌ بلا صرف يظهر بلا سند', Boolean(draftRow) && draftRow?.posted === false && draftRow?.voucherNumber === null, draftRow?.number ?? '—');
+
+// ---------------------------------------------------------------------------
 // Cleanup — what this run created, removed again.
 // ---------------------------------------------------------------------------
 // Only what this run created — the demo tenant's own حوافز must survive a verification.
@@ -514,14 +643,24 @@ for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.e
 for (const row of (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'))) await refused('delete', `/hrm/employees/${row.id}`);
 for (const row of (await get('/hrm/departments')).filter((entry) => String(entry.code).startsWith('VR'))) await refused('delete', `/hrm/departments/${row.id}`);
 for (const row of (await get('/branches')).filter((entry) => String(entry.code ?? '').startsWith('VRB'))) await refused('delete', `/branches/${row.id}`);
-const remaining = (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR'));
+// A posted فاتورة is a document: it is voided, not deleted, and the stock follows it back.
+for (const invoice of [sold, soldReturn]) await refused('post', `/sales/invoices/${invoice.id}/void`, { reason: 'تحقق المرحلة 08' });
+await refused('delete', `/organization/catalog/items/${movementItem.id}`);
+// The مندوب of section 10 stays: «لا يمكن حذف موظف مرتبط بفواتير». Everything else goes.
+const remaining = (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VR') && !String(entry.employeeNo).startsWith('VRM'));
 check('لا يبقى أثر بعد التشغيل', remaining.length === 0, `${remaining.length} صف`);
+const keptSalesman = (await get('/hrm/employees')).filter((entry) => String(entry.employeeNo).startsWith('VRM'));
+check('يبقى مندوب التحقق ما بقيت فواتيره', keptSalesman.length === 1, `${keptSalesman[0]?.employeeNo ?? '—'}`);
 const remainingBranches = (await get('/branches')).filter((entry) => String(entry.code ?? '').startsWith('VRB'));
 check('حُذف فرع التحقق', remainingBranches.length === 0, `${remainingBranches.length} صف`);
+const voidedInvoices = await Promise.all([sold.id, soldReturn.id].map((id) => get(`/sales/invoices/${id}`)));
+check('أُلغيت فواتير التحقق', voidedInvoices.every((row) => row.status === 'voided'), voidedInvoices.map((row) => `${row.number} ${row.status}`).join(' · '));
+const leftoverMovements = await get(movementsPath(`employee_id=${salesEmployee.id}`));
+check('لا حركة بعد الإلغاء', (leftoverMovements.rows ?? []).length === 0, `${(leftoverMovements.rows ?? []).length} صف`);
 const remainingAdjustments = (await get('/hrm/adjustments')).filter((row) => madeAdjustments.includes(row.id));
 check('تبقى الحركات المرحَّلة وحدها', remainingAdjustments.every((row) => row.status === 'approved' && row.journalEntryId), `${remainingAdjustments.length} صف`);
 const remainingDrafts = (await get('/hrm/salary-payments')).filter((row) => removedDrafts.includes(row.id));
 check('حُذف الإذن المسوَّد', remainingDrafts.length === 0, `${remainingDrafts.length} صف`);
 
-console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات · 💵 دفع الرواتب · 📄 كشف حساب موظف verified' : `\n✗ ${failures} check(s) failed`);
+console.log(failures === 0 ? '\n✔ Phase 08 — 👤 بطاقة الموظف · 🏢 الإدارات والأقسام · 🎁 الحوافز والجزاءات · 💵 دفع الرواتب · 📄 كشف حساب موظف · 📈 حركات الموظف · 📊 تقرير الرواتب verified' : `\n✗ ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

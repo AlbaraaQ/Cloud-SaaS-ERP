@@ -888,14 +888,29 @@ const hrm: ModuleNode = {
       labelAr: 'التقارير',
       labelEn: 'Reports',
       items: [
+        // 📊 `Form_WPF/frmRptSalary.xaml` «تقرير الرواتب» — every إذن صرف, month by
+        // month. The row under this name used to point at `/reports/payroll-payments`,
+        // which is the مسيّر report («دفع الرواتب»), not this window.
+        screen('salary-report', 'تقرير الرواتب', 'Salary report', '/hrm/salary-report', 'ready', {
+          permission: 'hrm.view',
+          endpoint: '/hrm/reports/salary',
+        }),
+        // The مسيّر itself, from the report engine — its label is the catalog's own.
         screen(
           'salary-payments-report',
-          'تقرير الرواتب',
-          'Payroll report',
+          'دفع الرواتب',
+          'Payroll payments report',
           '/reports/payroll-payments',
           'ready',
           { permission: 'reporting.view' },
         ),
+        // 📈 `Form_WPF/frmEmpInvs.xaml` «مبيعات ومشتريات موظف خلال الفترة» — what a
+        // salesman sold, line by line. The row is named for what the cloud can actually
+        // serve: a purchase invoice carries no employee, so the مشتريات half is not here.
+        screen('employee-movements', 'حركات الموظف', 'Employee movements', '/hrm/employee-movements', 'ready', {
+          permission: 'hrm.view',
+          endpoint: '/hrm/employee-movements',
+        }),
         // 📄 `Form_WPF/frmEmpAccountGet.xaml` «كشف حساب موظف» — the employee's account
         // statement. It used to sit under `/reports/employee-account`, a route that was
         // never built; the screen lives with the employees it reports on.

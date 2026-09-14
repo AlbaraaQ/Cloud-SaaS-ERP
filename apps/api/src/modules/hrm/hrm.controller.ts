@@ -87,6 +87,45 @@ export class HrmController {
     });
   }
 
+  /** 📈 حركات الموظف — `frmEmpInvs` «مبيعات ومشتريات موظف خلال الفترة»: what a salesman sold, line by line. */
+  @Get('employee-movements')
+  @RequiresPermission('hrm.view')
+  employeeMovements(
+    @Query('employee_id') employeeId?: string,
+    @Query('all_employees') allEmployees?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('movement_type') movementType?: string,
+    @Query('branch_id') branchId?: string,
+  ) {
+    const type = movementType === 'sales' || movementType === 'returns' ? movementType : 'all';
+    return this.hrm.employeeMovements(getTenantContext().tenantId, {
+      employeeId,
+      allEmployees: flag(allEmployees),
+      from,
+      to,
+      movementType: type,
+      branchId,
+    });
+  }
+
+  /** 📊 تقرير الرواتب — `frmRptSalary` «💼 تقرير الرواتب»: every إذن صرف, month by month. */
+  @Get('reports/salary')
+  @RequiresPermission('hrm.view')
+  salaryReport(
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('all_period') allPeriod?: string,
+    @Query('branch_id') branchId?: string,
+  ) {
+    return this.hrm.salaryReport(getTenantContext().tenantId, {
+      month: month?.trim() || undefined,
+      year: year?.trim() || undefined,
+      allPeriod: flag(allPeriod),
+      branchId,
+    });
+  }
+
   /** 💵 دفع الرواتب — `frmSalaryPay` «إذن صرف راتب»: one document per employee per month. */
   @Get('salary-payments') @RequiresPermission('hrm.view') salaryPayments(
     @Query('employee_id') employeeId?: string,

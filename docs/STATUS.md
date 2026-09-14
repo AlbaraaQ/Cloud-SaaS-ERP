@@ -692,6 +692,36 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   متتالية خضراء). **652** اختبار API (كان 641) · 36 staff · 71 contract · tsc وlint
   أخضران. مؤجَّل: `👁️ معاينة` و`PaySalary.repx` إلى مرحلة التقارير.
 
+* **المرحلة 08 — الموظفون والرواتب، الجزء الخامس: 📈 حركات الموظف و📊 تقرير الرواتب**
+  (`Form_WPF/frmEmpInvs.xaml` «مبيعات ومشتريات موظف خلال الفترة» و
+  `Form_WPF/frmRptSalary.xaml` «تقرير الرواتب»). **لم يكن للموظف حركاتٌ في السحابة:
+  `sales_invoices.salesman_id` موجود ولا شيء يقرأه؛ وكان صفّ «تقرير الرواتب» في الشجرة
+  يشير إلى `/reports/payroll-payments` — تقرير المسيّر، لا تقرير الإذونات.**
+  `frmEmpInvs` — فلاتر `👤 الموظف` («اختر الموظف...» + `الكل`) · `🔄 نوع الحركة`
+  (`مبيعات` · `مرتجع` + `الكل`) · `📅 من تاريخ`/`📅 إلى تاريخ` · `🔍 عرض`، وشبكة
+  `📋 بيانات الحركات` بـ`نوع الحركة · التاريخ · رقم الفاتورة · الصنف · الكمية · السعر ·
+  إضافات · الإجمالي`، و`💰 الإجمالي`footer. و`ShowResult` L226 يقرأ `Inv ⋈ Inv_Sub`
+  على `Inv.sales_emp` بشرط `IS_Deleted=0` والتاريخين (`@date2 = txtDateTo.AddHours(24)`
+  — اليوم الأخير داخل الفترة): **صفٌّ لكل سطر فاتورة**. و`frmRptSalary` — `الشهر:` ·
+  `السنة:` · `كل الفترة` (يُعطّلهما) · `🔍 عرض` · `💰 سند استلام راتب لموظف`، وشبكة
+  `💼 بيانات الرواتب` بـ`م · SalId · رقم السند · الموظف · الراتب الأساسي · بدل سكن ·
+  بدل مواصلات · الحوافز · الإجمالي · الخصومات · صافي الراتب · 👁️ عرض` و
+  `💰 إجمالي الرواتب:`؛ و`btnShow_Click` L58 يقرأ `SalaryPay` (= `salary_payments`،
+  إذن الصرف من الجزء الثالث) بـ`IS_Deleted=0` والشهر والسنة، و
+  `gross = tot_salary + Houses + Travel + salary_add` و`net = gross − salary_sub`.
+  **لا ترحيلَ جديد**: الأولى تقرأ `sales_invoices` والثانية `salary_payments`.
+  وقراراتٌ مُعلَّلة في `PHASE_08_HRM.md` §8.4: لا «مشتريات» لأن `purchase_invoices`
+  لا تحمل موظفاً؛ ونقطة البيع يُميَّزها `orderType` كما يميّزها `inv_type=3`؛
+  و`💰 الإجمالي` يجمع الفواتير مرّة واحدة لا مرّةً لكل سطر كما تفعل النافذة؛
+  و`الإجمالي = الصافي + الخصومات` لأن حساب النافذة لا مكان فيه للبدلات الأربع؛
+  و`SalId` مفتاحٌ لا عمود. وصُحِّح عرضاً خللٌ في الجزء الثالث: إذنٌ مرفوض لعدم حساب
+  الموظف كان يبقى مسوَّداً في الدفاتر لأن شرط الحساب كان بعد الإدخال، فصار قبله.
+  `apps/api/test/employee-movements.spec.ts` (11) و`apps/api/test/salary-report.spec.ts`
+  (7) و`scripts/verify-hrm.mjs` §10 و§11 (**105** نقطة تحقّق حيّة بعد أن كانت 82،
+  أربع تشغيلات متتالية خضراء). **670** اختبار API (كان 652) · 36 staff · 71 contract ·
+  tsc وlint أخضران. مؤجَّل: «👁️ عرض» وعمود «عرض» إلى أن تُفتح شاشات السندات بـ`?id=`،
+  ونصف «مشتريات» إلى أن يحمل فاتورة الشراء موظفاً.
+
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.
 Posting a contracting return reuses `projects.bill.post` — reversing certified work is the

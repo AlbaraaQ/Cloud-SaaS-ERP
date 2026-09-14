@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { alias } from 'drizzle-orm/pg-core';
-import { and, asc, desc, eq, gte, ilike, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   accounts,
@@ -15,6 +15,9 @@ import {
   jobs,
   payrollRunLines,
   payrollRuns,
+  salesInvoiceLines,
+  salesInvoices,
+  items,
   salaryAdjustments,
   salaryAdjustmentTypes,
   salaryPayments,
@@ -68,6 +71,56 @@ export type EmployeeInput = {
 export type EmployeeStatus = 'active' | 'suspended' | 'terminated';
 export type EmployeeGender = 'male' | 'female';
 export type EmployeeQuery = { q?: string; status?: string; branchId?: string; departmentId?: string; jobId?: string };
+/** 📈 حركات الموظف — the filters of `frmEmpInvs` («مبيعات ومشتريات موظف خلال الفترة»). */
+export type EmployeeMovementsQuery = {
+  employeeId?: string;
+  /** `الكل` — every employee who has movements, as `chkAll` does. */
+  allEmployees?: boolean;
+  from?: string;
+  to?: string;
+  /** `🔄 نوع الحركة` — `مبيعات` · `مرتجع` · `الكل` (the checked default, `ckAllproc`). */
+  movementType?: 'all' | 'sales' | 'returns';
+  branchId?: string;
+};
+export type EmployeeMovementRow = {
+  seq: number;
+  movementType: string;
+  date: string;
+  invoiceId: string;
+  number: string | null;
+  itemName: string;
+  quantity: string;
+  unitPrice: string;
+  additions: string;
+  lineTotal: string;
+  branchName: string | null;
+  isReturn: boolean;
+};
+/** 📊 تقرير الرواتب — the filters of `frmRptSalary` («💼 تقرير الرواتب»). */
+export type SalaryReportQuery = { month?: string; year?: string; allPeriod?: boolean; branchId?: string };
+export type SalaryReportRow = {
+  seq: number;
+  id: string;
+  number: string;
+  employeeId: string;
+  employeeNo: string | null;
+  employeeName: string;
+  branchName: string | null;
+  yearMonth: string;
+  month: string;
+  year: string;
+  paymentDate: string;
+  basic: string;
+  housing: string;
+  transport: string;
+  otherAllowances: string;
+  additions: string;
+  gross: string;
+  deductions: string;
+  net: string;
+  posted: boolean;
+  voucherNumber: string | null;
+};
 export type DepartmentPatch = Partial<DepartmentInput>;
 export type JobPatch = Partial<JobInput>;
 export type EmployeePatch = Partial<EmployeeInput>;
@@ -901,6 +954,222 @@ export class HrmService {
   }
 
   /**
+   * 📈 حركات الموظف — `Form_WPF/frmEmpInvs.xaml` («مبيعات ومشتريات موظف خلال الفترة»).
+   *
+   * `ShowResult` (L226) reads `Inv ⋈ Inv_Sub` on `Inv.sales_emp` — the employee who made
+   * the sale — over `date >= @date1 AND date <= @date2` where `@date2` is
+   * `txtDateTo.AddHours(24)`, so the last day is inside, with `Inv.IS_Deleted=0` and
+   * `inv_type` 1 (مشتريات) or 2|3 (مبيعات ونقطة بيع), and one row per **line**
+   * (`نوع الحركة · التاريخ · رقم الفاتورة · الصنف · الكمية · السعر · إضافات · الإجمالي`).
+   *
+   * The cloud carries the same link as `sales_invoices.salesman_id` (the field the
+   * accounting journal lines also point at `employees.id`), and its نقطة بيع sales are
+   * `sales_invoices` with an `orderType`/`shiftId` — which is exactly how the desktop's
+   * `inv_type 2` and `inv_type 3` differ. The مشتريات half of the window has no cloud
+   * counterpart: a purchase invoice carries no employee at all, so it is not invented
+   * here (§9 of `PHASE_08_HRM.md`).
+   *
+   * One correction, named because it changes the footer: the desktop's `_Sum += tot_net`
+   * runs **per line**, so an invoice with three lines counts its total three times. The
+   * footer here adds each invoice once, sales positive and returns negative.
+   */
+  async employeeMovements(tenantId: string, query: EmployeeMovementsQuery = {}) {
+    await this.ensureEnabled(tenantId);
+    const employeeId = query.employeeId;
+    // «اختر موظف» (L232) — the window refuses to run without one unless «الكل» is on.
+    if (!employeeId && !query.allEmployees) throw new DomainError('EMPLOYEE_MOVEMENTS_EMPLOYEE_REQUIRED', 'اختر موظف', 422);
+    if (employeeId) {
+      const [employee] = await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx.select({ id: employees.id }).from(employees).where(and(eq(employees.tenantId, tenantId), eq(employees.id, employeeId), isNull(employees.deletedAt))).limit(1));
+      if (!employee) throw new DomainError('EMPLOYEE_MOVEMENTS_EMPLOYEE_REQUIRED', 'اختر موظف', 422);
+    }
+
+    // «من تاريخ»/«إلى تاريخ» open on today (`FrmEmpInvs_Loaded` L72) and «إلى» is inside.
+    const today = new Date().toISOString().slice(0, 10);
+    const from = query.from ?? today;
+    const to = query.to ?? today;
+    const movementType = query.movementType ?? 'all';
+
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({
+          invoiceId: salesInvoices.id,
+          number: salesInvoices.number,
+          kind: salesInvoices.kind,
+          date: sql<string>`${salesInvoices.postedAt}::date`,
+          total: salesInvoices.total,
+          isPos: sql<boolean>`(${salesInvoices.orderType} IS NOT NULL OR ${salesInvoices.shiftId} IS NOT NULL)`,
+          orderType: salesInvoices.orderType,
+          branchName: branches.nameAr,
+          itemName: items.nameAr,
+          lineDescription: salesInvoiceLines.description,
+          quantity: salesInvoiceLines.quantity,
+          unitPrice: salesInvoiceLines.unitPrice,
+          modifiers: salesInvoiceLines.modifiers,
+        })
+        .from(salesInvoiceLines)
+        .innerJoin(salesInvoices, eq(salesInvoices.id, salesInvoiceLines.invoiceId))
+        .leftJoin(items, eq(items.id, salesInvoiceLines.itemId))
+        .leftJoin(branches, eq(branches.id, salesInvoices.branchId))
+        .where(
+          and(
+            eq(salesInvoiceLines.tenantId, tenantId),
+            eq(salesInvoices.tenantId, tenantId),
+            // المرحَّل وحده — `Inv.IS_Deleted=0` plus the cloud's own «مُلغى».
+            eq(salesInvoices.status, 'posted'),
+            isNull(salesInvoices.voidedAt),
+            // «🔄 نوع الحركة» — `Inv.Proc_type`: 1 فاتورة، 2 مرتجع، و«الكل» يجمعهما.
+            movementType === 'sales'
+              ? eq(salesInvoices.kind, 'sale')
+              : movementType === 'returns'
+                ? eq(salesInvoices.kind, 'sale_return')
+                : inArray(salesInvoices.kind, ['sale', 'sale_return']),
+            gte(sql`${salesInvoices.postedAt}::date`, from),
+            lte(sql`${salesInvoices.postedAt}::date`, to),
+            employeeId ? eq(salesInvoices.salesmanId, employeeId) : isNotNull(salesInvoices.salesmanId),
+            query.branchId ? eq(salesInvoices.branchId, query.branchId) : undefined,
+          ),
+        )
+        .orderBy(asc(sql`${salesInvoices.postedAt}::date`), asc(salesInvoices.number), asc(salesInvoiceLines.lineNo)));
+
+    const movements: EmployeeMovementRow[] = [];
+    const seen = new Set<string>();
+    const signed = { sales: new Decimal(0), returns: new Decimal(0) };
+    for (const row of rows) {
+      if (!seen.has(row.invoiceId)) {
+        seen.add(row.invoiceId);
+        if (row.kind === 'sale') signed.sales = signed.sales.plus(row.total);
+        else signed.returns = signed.returns.plus(row.total);
+      }
+      const quantity = new Decimal(row.quantity ?? '0');
+      const unitPrice = new Decimal(row.unitPrice ?? '0');
+      movements.push({
+        seq: movements.length + 1,
+        movementType: movementTypeOf(row.kind, row.isPos),
+        date: row.date,
+        invoiceId: row.invoiceId,
+        number: row.number,
+        itemName: row.itemName ?? row.lineDescription ?? '—',
+        quantity: quantity.toFixed(4),
+        unitPrice: unitPrice.toFixed(4),
+        additions: modifiersTotal(row.modifiers).toFixed(4),
+        lineTotal: quantity.times(unitPrice).toFixed(4),
+        branchName: row.branchName ?? null,
+        isReturn: row.kind !== 'sale',
+      });
+    }
+
+    return {
+      data: {
+        employeeId: employeeId ?? null,
+        allEmployees: Boolean(query.allEmployees),
+        branchId: query.branchId ?? null,
+        from,
+        to,
+        movementType,
+        summary: {
+          total: signed.sales.minus(signed.returns).toFixed(4),
+          salesTotal: signed.sales.toFixed(4),
+          returnsTotal: signed.returns.toFixed(4),
+          invoices: seen.size,
+          lines: movements.length,
+        },
+        rows: movements,
+      },
+    };
+  }
+
+  /**
+   * 📊 تقرير الرواتب — `Form_WPF/frmRptSalary.xaml` («💼 تقرير الرواتب»).
+   *
+   * `btnShow_Click` (L58) reads `SalaryPay` with `IS_Deleted=0`, narrowed by
+   * `الشهر:`/`السنة:` unless «كل الفترة» is on (`ckWholePeriod`, checked — and it
+   * disables both boxes), and prints one row per إذن:
+   * `م · SalId · رقم السند · 👤 الموظف · الراتب الأساسي · بدل سكن · بدل مواصلات ·
+   * الحوافز · 💰 الإجمالي · الخصومات · 💵 صافي الراتب · 👁️ عرض`, with
+   * `💰 إجمالي الرواتب` = the sum of the nets (L113).
+   *
+   * `gross = tot_salary + Houses + Travel + salary_add` (L104) — but the cloud's إذن also
+   * carries four allowances the window has no box for (`other_allowances`, part three's
+   * decision 2), so الإجمالي here is `الصافي + الخصومات`: a report whose gross does not
+   * add up to the net printed on the very same payment would be a lie.
+   */
+  async salaryReport(tenantId: string, query: SalaryReportQuery = {}) {
+    await this.ensureEnabled(tenantId);
+    // «كل الفترة» is checked by default; both boxes are disabled until it is off, and the
+    // window only filters when it could parse *both* of them.
+    const allPeriod = query.allPeriod ?? true;
+    const yearMonth = !allPeriod && query.year && query.month ? `${query.year}-${String(query.month).padStart(2, '0')}` : undefined;
+
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select({
+          row: salaryPayments,
+          employeeName: employees.name,
+          employeeNo: employees.employeeNo,
+          branchName: branches.nameAr,
+          voucherNumber: vouchers.number,
+        })
+        .from(salaryPayments)
+        .leftJoin(employees, eq(employees.id, salaryPayments.employeeId))
+        .leftJoin(branches, eq(branches.id, salaryPayments.branchId))
+        .leftJoin(vouchers, eq(vouchers.id, salaryPayments.voucherId))
+        .where(
+          and(
+            eq(salaryPayments.tenantId, tenantId),
+            isNull(salaryPayments.deletedAt),
+            yearMonth ? eq(salaryPayments.yearMonth, yearMonth) : undefined,
+            query.branchId ? eq(salaryPayments.branchId, query.branchId) : undefined,
+          ),
+        )
+        .orderBy(asc(salaryPayments.paymentDate), asc(salaryPayments.number)));
+
+    const data: SalaryReportRow[] = rows.map((entry, index) => {
+      const net = new Decimal(entry.row.net ?? '0');
+      const deductions = new Decimal(entry.row.deductions ?? '0');
+      return {
+        seq: index + 1,
+        id: entry.row.id,
+        number: entry.row.number,
+        employeeId: entry.row.employeeId,
+        employeeNo: entry.employeeNo,
+        employeeName: entry.employeeName ?? '—',
+        branchName: entry.branchName ?? null,
+        yearMonth: entry.row.yearMonth,
+        month: entry.row.yearMonth.slice(5),
+        year: entry.row.yearMonth.slice(0, 4),
+        paymentDate: entry.row.paymentDate,
+        basic: entry.row.basic,
+        housing: entry.row.housing,
+        transport: entry.row.transport,
+        otherAllowances: entry.row.otherAllowances,
+        additions: entry.row.additions,
+        gross: net.plus(deductions).toFixed(4),
+        deductions: entry.row.deductions,
+        net: entry.row.net,
+        posted: Boolean(entry.row.voucherId),
+        voucherNumber: entry.voucherNumber ?? null,
+      };
+    });
+
+    return {
+      data: {
+        allPeriod,
+        month: query.month ?? null,
+        year: query.year ?? null,
+        branchId: query.branchId ?? null,
+        summary: {
+          total: data.reduce((sum, row) => sum.plus(row.net), new Decimal(0)).toFixed(4),
+          gross: data.reduce((sum, row) => sum.plus(row.gross), new Decimal(0)).toFixed(4),
+          deductions: data.reduce((sum, row) => sum.plus(row.deductions), new Decimal(0)).toFixed(4),
+          count: data.length,
+        },
+        rows: data,
+      },
+    };
+  }
+
+  /**
    * 💵 «💾 حفظ» — `btnSave_Click`.
    *
    * The window refuses three things before it writes («يجب اختيار الفرع.» ·
@@ -946,6 +1215,17 @@ export class HrmService {
     const amounts = await this.salaryForMonth(tenantId, employee, input.yearMonth, { runId: input.runId, unpaidDays: input.unpaidDays });
     if (new Decimal(amounts.net).lte(0)) throw new DomainError('SALARY_PAYMENT_NOTHING_DUE', 'لا يوجد رواتب مستحقة للموظف.', 422);
 
+    /**
+     * «يصرف من حساب» — the desktop debits the employee's own account
+     * (`Employees.AccCode`) and credits the صندوق; that account is what a سلفة debited
+     * and what the مسيّر owes. An employee without one cannot be paid, and the refusal
+     * belongs **before** the إذن is written: the `try` below deletes the row when the
+     * money fails to leave the till, but a row written before this check had nothing to
+     * delete it — a refused payment used to stay in the books as a draft.
+     */
+    const employeeAccountId = employee.employeeAccountId ?? employee.salaryPayableAccountId;
+    if (!employeeAccountId) throw new DomainError('SALARY_PAYMENT_EMPLOYEE_ACCOUNT_REQUIRED', 'لا يوجد حساب للموظف في دليل الحسابات', 422);
+
     const number = await withTenantTx(this.database.db, tenantId, (tx) => this.nextSalaryPaymentNumber(tx, tenantId));
     const [month, year] = [input.yearMonth.slice(5), input.yearMonth.slice(0, 4)];
     const id = newId();
@@ -974,11 +1254,6 @@ export class HrmService {
       }));
 
     if (input.postVoucher === false) return this.readSalaryPayment(tenantId, id);
-
-    // «يصرف من حساب» — the desktop debits the employee's own account (`Employees.AccCode`)
-    // and credits the صندوق; that account is what a سلفة debited and what the مسيّر owes.
-    const employeeAccountId = employee.employeeAccountId ?? employee.salaryPayableAccountId;
-    if (!employeeAccountId) throw new DomainError('SALARY_PAYMENT_EMPLOYEE_ACCOUNT_REQUIRED', 'لا يوجد حساب للموظف في دليل الحسابات', 422);
 
     try {
       const voucher = await this.treasury.createVoucher(tenantId, {
@@ -1151,6 +1426,23 @@ function maskIban(value: string | undefined) { return value ? `${value.slice(0, 
 function parseAttendance(csv: string): Array<{ machine: string; enroll: string; datetime: string; inout: string }> { const lines = csv.trim().split(/\r?\n/).filter(Boolean); return lines.slice(lines[0]?.toLowerCase().includes('machine') ? 1 : 0).map((line) => { const [rawMachine, rawEnroll, rawDatetime, rawInout] = line.split(',').map((part) => part?.trim() ?? ''); const inout = rawInout === 'out' ? 'out' : rawInout === 'in' ? 'in' : 'unknown'; return { machine: rawMachine ?? '', enroll: rawEnroll ?? '', datetime: rawDatetime ?? '', inout }; }); }
 function attendanceFingerprint(row: { machine: string; enroll: string; datetime: string; inout: string }) { return createHash('sha256').update(`${row.machine}|${row.enroll}|${row.datetime}|${row.inout}`).digest('hex'); }
 function rowsOf(result: unknown): Array<Record<string, unknown>> { return Array.isArray(result) ? result as Array<Record<string, unknown>> : ((result as { rows?: Array<Record<string, unknown>> }).rows ?? []); }
+/**
+ * `نوع الحركة` — the labels `frmEmpInvs.xaml.cs` L322–L338 builds from `proc_type` and
+ * the window's own `inv_type`: بيع، مرتجع بيع، نقطة بيع ومرتجعها.
+ */
+function movementTypeOf(kind: string, isPos: boolean) {
+  if (kind === 'sale_return') return isPos ? 'فاتورة مرتجع نقطة بيع' : 'فاتورة مرتجع بيع';
+  return isPos ? 'فاتورة نقطة بيع' : 'فاتورة بيع';
+}
+
+/**
+ * «إضافات» — the column the desktop always writes as `0` (L350). The cloud's POS line
+ * carries its additions as `modifiers`, so the column has something true to show.
+ */
+function modifiersTotal(modifiers: Array<Record<string, unknown>> | null | undefined) {
+  return (modifiers ?? []).reduce((sum, entry) => sum.plus(new Decimal(String(entry.price ?? entry.amount ?? 0) || '0')), new Decimal(0));
+}
+
 function sumLines(values: string[]): string { return values.reduce((sum, valueText) => sum.plus(new Decimal(valueText)), new Decimal(0)).toFixed(4); }
 function payslipHtml(yearMonth: string, employeeName: string, netValue: string) { return `<!doctype html><html dir="rtl"><body><h1>قسيمة راتب ${escapeHtml(yearMonth)}</h1><p>${escapeHtml(employeeName)}: ${escapeHtml(netValue)}</p></body></html>`; }
 function escapeHtml(value: string) { return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
