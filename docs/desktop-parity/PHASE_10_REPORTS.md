@@ -87,7 +87,7 @@
 | 2 | 📦 تقارير الأصناف — `frmRptItemsSalesDetails` · `frmRptItemsSalesDetailsPOS` · `frmRptItemsProfit` · `frmRptItemsProfitDetails` · `frmRptSalesByCategory` · `frmRptCategorySaleByDay` | ✅ مُنجز (§5) |
 | 3 | 🧾 تقارير الفواتير والإشعارات والحركة اليومية — `frmRptInvSalesDetails` · `frmRptInvSalesDetailsPos(Android)` · `frmRptInvNotfic` · `frmRptInvPurchaseDetails` · `frmRptDailySales` · `frmRptDailyProcess` · `frmRptInvAnalysis` · `FrmRptSalesChart` | ✅ مُنجز (§6) |
 | 4 | 📚 تقارير المخزون والأرقام التسلسلية — `frmRptInventory` · `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo` · `frmRptSerialNoSummary` · `frmRptProducedItems` | ✅ مُنجز (§7) |
-| 5 | 📒 تقارير المحاسبة — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod` | ⬜ |
+| 5 | 📒 تقارير المحاسبة — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod` | ✅ مُنجز (§8) |
 | 6 | 💰 تقارير الخزينة والرواتب والمستخدمين — `frmRptKhzna` · `frmRptSalary` · `frmRptReseved` · `frmrptUsersRecords` · `frmRptRentInvoices` · `frmInvRptType` | ⬜ |
 | 7 | 🖨️ إعدادات الطباعة — `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة) و`Reports/header.repx`/`footer.repx` لكل تقرير | ⬜ |
 
@@ -585,7 +585,122 @@
   الأرقام التسلسلية)، وما لا يُلغى **مفحوصٌ أنه يُرفض**: أمرُ إنتاجٍ مكتمل
   (`PRODUCTION_ORDER_INVALID_STATUS`) ومناقلةٌ مستلمة (`TRANSFER_INVALID_STATE`).
 
-## 8. معايير القبول لكل جزء
+## 8. الجزء الخامس — 📒 تقارير المحاسبة (`frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod`)
+
+### 8.1 النوافذ وما تقرأه
+
+| النافذة | العنوان | الملف | الأسطر | التقرير في السجل |
+|---|---|---|---|---|
+| `frmRptBalances.xaml` | «أرصدة الحسابات» (📊 أرصدة الحسابات خلال فترة) | `Form_WPF/frmRptBalances.xaml.cs` | 662 | `account-balances` |
+| `frmRptEntries.xaml` | «القيود اليومية» (📋 بيانات القيد · 🔍 البحث) | `Form_WPF/frmRptEntries.xaml.cs` | 788 | `journal-entries` |
+| `frmRptEntries.xaml` | «🧾 تفاصيل القيد» | `Form_WPF/frmRptEntries.xaml.cs` | 788 | `journal-entry-lines` |
+| `frmRptIncomeStatement.xaml` | «أرباح وخسائر حسابات رئيسية» | `Form_WPF/frmRptIncomeStatement.xaml.cs` | 637 | `income-statement-accounts` |
+| `frmRptCostCenter.xaml` | «تقرير مراكز التكلفة» | `Form_WPF/frmRptCostCenter.xaml.cs` | 842 | `cost-center-statement` |
+| `frmTaxRptPeriod.xaml` | «إقرار ضريبي» | `Form_WPF/frmTaxRptPeriod.xaml.cs` | 952 | `vat-return-period` |
+
+التقارير المطبوعة: `Reports/rptAccountBalance.repx` · `Reports/Entry.repx` ·
+`Reports/RptIncomeStatement.repx` (+ `RptIncomeStatementNew.repx` باسمٍ يبدأ بـU+200F) ·
+`Reports/RptCostCenter.repx` و`RptCostCenterDetails.repx` و`RptCostCenterStatement.repx` ·
+`Reports/TaxRptPeriod.repx` و`TaxRptPeriodNew.repx` (وهذان **XML صريح** لا حزمة zip،
+خلافاً لسائر ملفات `Reports`)، وإعدادات الطباعة `SettingPrint` بأرقام `Inv_Id` 12 · 9 · 14.
+
+### 8.2 السطح (نقاط النهاية)
+
+| التقرير | نقطة النهاية | الفلاتر |
+|---|---|---|
+| أرصدة الحسابات | `GET /api/v1/reports/account-balances` | 📊 الحساب الرئيسي · 🏢 الفرع · 🧑‍💼 المندوب · 📅 من/إلى + ⏰ من وقت/إلى وقت |
+| القيود اليومية | `GET /api/v1/reports/journal-entries` | 📅 من/إلى · 🏢 الفرع · 🧾 نوع القيد (ستة عشر) · 📋 حالة القيد · 🔢 رقم القيد · 📄 رقم المستند |
+| تفاصيل القيد | `GET /api/v1/reports/journal-entry-lines` | 📅 من/إلى · 🏢 الفرع · 🧾 نوع القيد · 📂 مركز التكلفة · 📒 الحساب |
+| أرباح وخسائر حسابات رئيسية | `GET /api/v1/reports/income-statement-accounts` | 📅 من/إلى · 🏢 الفرع |
+| تقرير مراكز التكلفة | `GET /api/v1/reports/cost-center-statement` | 📂 مركز التكلفة · 📒 الحساب · 📋 نوع التقرير (تجميعي · تفصيلي) · 🏢 الفرع · 📅 من/إلى + ⏰ وقت البداية/النهاية |
+| الإقرار الضريبي | `GET /api/v1/reports/vat-return-period` | 📅 من تاريخ/إلى تاريخ · 🏢 الفرع · 📆 ربع سنة · 📆 شهري |
+
+### 8.3 مطابقة الأعمدة والتسميات
+
+| النافذة | الأعمدة المنقولة | التسميات |
+|---|---|---|
+| `frmRptBalances` | 10 من 11 (زر «تفاصيل» شبكةٌ فرعية) | 100٪ من القابلة للنقل |
+| `frmRptEntries` «🔍 البحث» | 7 من 7 | 100٪ |
+| `frmRptEntries` «🧾 تفاصيل القيد» | 7 من 7 | 100٪ |
+| `frmRptIncomeStatement` | 4 من 4 + سطر المخزون | 100٪ |
+| `frmRptCostCenter` | 14 من 15 (زر «تفاصيل») | 100٪ |
+| `frmTaxRptPeriod` | 13 بنداً من 13 (+ عمود «القسم» — §8.5/6) | 100٪ |
+
+### 8.4 القواعد المنقولة كما هي
+
+1. **`Entry.type = 0` قيدٌ إفتتاحي (L285) وما عداه حركة (L270)** — كل نافذةٍ في الجزء
+   تقسم أرقامها على هذا الخط، فصار «رصيد افتتاحي» استعلاماً فرعياً بـ
+   `source_type = 'opening'` و«حركة» استعلاماً بـ`IS DISTINCT FROM` في التقرير نفسه.
+2. **صيغة الرصيد من وجهين (L373-L430)** — `حركة مدين = max(مدين − دائن، 0)` و
+   `حركة دائن = max(دائن − مدين، 0)`، ثم `ختامي = افتتاحي + حركة`، ثم **تصفيةٌ ثانية**
+   تُبقي وجهاً واحداً غير صفر: `ختامي مدين = max(مدين − دائن، 0)`.
+3. **`GetParent` (L206-L233)** — الحساب يظهر إذا كان «الحساب الرئيسي» أحد آبائه، والسير
+   يبدأ من **أب الصف** لا منها؛ أي أنّ المختار نفسه لا يظهر. `accounts.path` شجرة ltree
+   من الجذر، فصار الشرط `acc.path <@ <المختار> AND acc.id <> <المختار>`.
+4. **`Accounts_Index.FinalAcc = 2` (L229)** — المصروفات والإيرادات وحدهما
+   (`CrystalLiteDB.txt` L2515-L2516؛ الأصول والخصوم بقيمة 1)، والتجميع على الأب
+   (`_Type == 1`, L248-L298) هو `coalesce(parent.id, acc.id)` مع دمج المكرَّر.
+5. **الإيرادات الأخرى من `RentInvoice` (`tot_net` و`tax`, L304-L343)** —
+   `proc_type` 1 و3 زائداً و2 ناقصاً، ويقابلها في السحابة `rental_invoices.net_amount`
+   و`tax_amount` بحالة `posted`.
+6. **`CalcInvoicePart` (L345-L427)** — السطر «خاضع» إذا `taxval <> 0` و«معفى» إذا
+   `taxval = 0`؛ والسحابة تجد التمييز نفسه في `sales_invoice_lines.tax` و
+   `purchase_invoice_lines.tax`.
+7. **«سندات الصرف» = سندات الصرف + قيود الضرائب اليدوية (`Entry.type = 10 AND IsVAT = 1`)**
+   (L565-L585) — والصافي ما عدا حساب الضريبة `2222001` والضريبة ما عليه؛ والسحابة تقرأ
+   `journal_entries.is_vat` وتفرّق الحسابين بـ`tax_groups.vat_account_id`.
+8. **`SetDate` (L219-L266)** — «ربع سنة» و«شهري» يكتبان الفترة فوق صندوقي التاريخ،
+   والربع يسبق الشهر إذا عُدّا معاً.
+
+### 8.5 التحويلات عن الديسكتوب (مبرَّرة)
+
+1. **«رصيد افتتاحي» من قيدٍ لا من حقل.** الديسكتوب يقرأ قيداً إفتتاحياً
+   (`Entry.type = 0`)؛ والسحابة تُسمّيه `source_type = 'opening'` — المفتاح الذي يطبعه
+   بيان الحساب أصلاً باسم «قيد إفتتاحي» (`ENTRY_TYPE_LABELS`) — فلم يُضف التقرير حقل
+   `accounts.opening_balance` إلى الرصيد كي لا يُحسب مرّتين.
+2. **«سند قبض من عميل» و«سند صرف لمورد» (Id 5 · 6) يندمجان في «سند قبض» و«سند صرف»
+   (Id 7 · 8)** — الديسكتوب يفرّقهما بالطرف، و`entryTypeOf()` في السحابة يدمجهما أصلاً،
+   وسطر السند يحمل نوعه بنفسه.
+3. **«لاغي» هو ما عُكس.** لا حالة `void` على القيد في السحابة: الإلغاء قيدٌ عكسيّ
+   (`kind = 'reversal'`) يشير إلى أصله، ف«حالة القيد = لاغي» تعني «له قيدٌ عكسيّ»،
+   و«مسودة» هي الحالة الوحيدة غير المُرحَّلة.
+4. **أربعة بنود بلا مقابل** — «المبيعات المحلية الخاضعة للنسبة الصفرية» (Label30/31) و
+   «الاستيرادات الخاضعة للقيمة المضافة بالنسبة الأساسية» (Label51/52) و«الاستيرادات …
+   آلية الاحتساب العكسي» (Label47/48) لا تُحسب في الديسكتوب نفسه (تُترك أصفاراً)، فهي
+   في السحابة أصفارٌ أيضاً ومُعلَنة في §10.
+5. **قيمة المخزون** — `Inventory.InventoryCost(branch, toDate)` (L379) دالةٌ في قاعدة
+   الديسكتوب؛ والسحابة تحسب الرصيد المتحرك من `inventory_transactions` حتى «إلى تاريخ»،
+   وهو الرقم نفسه بزيادة `w.branch_id` بدل رقم الفرع.
+6. **عمود «القسم» في الإقرار الضريبي** — التقرير المطبوع يرسم المبيعات والمشتريات
+   كتلتين متجاورتين بعنوانَي «تفاصيل المبيعات» و«تفاصيل المشتريات»؛ وشبكة السحابة عمودٌ
+   واحد، فحمل عمود «القسم» العنوانين («ضريبة القيمة المضافة على المبيعات» · «…
+   على المشتريات») بدل أن تُرسم الكتلتان فوق بعضهما، و«الوصف» هو تسمية عمود الصفوف
+   في `.repx` نفسه.
+7. **بطاقتا «الرصيد (مدين)» و«الرصيد (دائن)»** بدل `txtBalance` و`lblStatus`
+   (L466-L480): الديسكتوب يطبع رقماً واحداً ويكتب وجهه بجانبه؛ والبطاقة تحمل الرقم،
+   فصارت بطاقتان إحداهما صفر دائماً.
+8. **«عدد القيود» و«عدد السطور» و«الفرق»** بطاقاتٌ مضافة: الأوليان نظيرُ «عدد
+   السجلات:» (`lblCount` في `frmRptCostCenter.xaml` L498) في سائر نوافذ الجزء،
+   والثالثة تحمل الرقم الذي يوازن به الديسكتوب «✅ قيد متوازن» / «❌ قيد غير متوازن»
+   (L291 · L298).
+9. **«📆 ربع سنة» و«📆 شهري» فلاتر «select»** بدل زرّي اختيار ومربّعين — المحرّك لا
+   يعرف «زر اختيار»، والسلوك واحد: الفترة تُكتب فوق صندوقي التاريخ.
+
+### 8.6 الاختبارات والتحقّق الحيّ
+
+- `apps/api/test/report-accounting.spec.ts` — 12 اختباراً: السجل بأعمدة الديسكتوب،
+  صيغة الرصيد من وجهين، «الحساب الرئيسي» شجرةً، المندوب، نوع القيد وحالته ورقم
+  المستند، سطور القيد وإجمالياه، تجميع الأرباح والخسائر على الآباء، «تجميعي» و«تفصيلي»
+  في مراكز التكلفة (والورقة بلا أبناء تُبلّغ عن نفسها في «تفصيلي» وحده)، البنود
+  الثلاثة عشر للإقرار وصافي الضريبة، «ربع سنة» و«شهري»، فترةٌ بلا حركة، وعزلُ
+  مؤسساتٍ وإذنُ `reporting.view`.
+- `scripts/verify-reports-accounting.mjs` — 77 فحصاً على المستأجر `demo` الحيّ:
+  خطّ أساس قبل الكتابة وكل رقمٍ بعده **فرقٌ عن الخط**، ستة حسابات وثلاثة مراكز تكلفة
+  وأربعة قيود وسندان موسومة بختم، القيود تُعكس في النهاية (لا تُلغى: السحابة تعكس
+  والديسكتوب كذلك)، والحسابات والمراكز التي حملت حركة تُرفض بحذفها رفضاً من قاعدة
+  الدفاتر (409) لا بخطأ. أُجري ست مراتٍ متتالية بصفر فشل.
+
+## 9. معايير القبول لكل جزء
 
 1. كل تقريرٍ منقول يُسمّي ملفه من `Desktop_ERP` (`Form_WPF/frmRpt*.xaml` و
    `Reports/*.repx`) نصّاً في الوثيقة وفي تعليق تعريفه.
@@ -596,9 +711,18 @@
 5. الشاشة تصل من طريقٍ حقيقي في الشجرة (`apps/staff/lib/navigation.ts`).
 6. تحديث هذه الوثيقة و`docs/STATUS.md` و`docs/desktop-parity/README.md`.
 
-## 9. مؤجَّل عن قصد
+## 10. مؤجَّل عن قصد
 
 - 🖨️ `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة الافتراضية) — جزءٌ سابع.
+- 🧾 «المبيعات المحلية الخاضعة للنسبة الصفرية» في `frmTaxRptPeriod` (Label30 · Label31،
+  §8.5/4) — النافذة لا تملؤهما أصلاً، ولا معدّل ضريبةٍ صفريّاً في السحابة يميّز السطر.
+- 🚢 بندا «الاستيرادات» في `frmTaxRptPeriod` (Label51 · Label52 · Label47 · Label48،
+  §8.5/4) — لا استيراد في نموذج السحابة.
+- 📋 `cost_center.type = 2` في `frmRptCostCenter` (L262) — «المركز الورقة يُبلّغ عن
+  نفسه»؛ لا عمود `type` على `cost_centers`، وسلوك النافذة بعد `GetParent` أنّه لا يُبقي
+  شيئاً على أيّ حال.
+- 🖼️ أعمدة `DgvDelete` و`DgvEdit` و«تفاصيل» في `frmRptBalances` و`frmRptCostCenter`
+  (§8.3) — أزرارٌ تنقل من تقريرٍ إلى نافذةٍ أخرى.
 - 🔄 أنواع `DoProcess2(5 … 9)` من «تقرير الحركة اليومية» — تقرأ جدول `receipts`
   (سندات القبض) ولا مقابل له في السحابة (§6.5/8).
 - 🧑‍💼 «👤 المندوب» في «تفاصيل فواتير المشتريات» — لا عمود `salesman_id` على

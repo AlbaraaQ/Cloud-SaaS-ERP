@@ -140,6 +140,44 @@ paid, «نقدي»/«شبكة» when one leg settled the invoice, «متعدد»
   التسلسلي» — مدخلٌ نصّي، نوعٌ جديد `kind: 'serial'` في المحرّك والواجهة)، و«🔄 نوع
   العملية» في «حركة صنف تفصيلي» على فلتر `kind` لأن `procType` محجوزٌ لتقارير الفواتير.
 
+## 📒 تقارير المحاسبة — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod` (phase 10, part five)
+
+| Key | النافذة | ما يقرأه |
+|---|---|---|
+| `account-balances` | `frmRptBalances` | `journal_entry_lines` مقسومةً على `source_type = 'opening'` («قيد إفتتاحي») وما عداها، لكل حسابٍ تحت «الحساب الرئيسي» |
+| `journal-entries` | `frmRptEntries` «🔍 البحث» | `journal_entries` مع رقم المستند من الجدول الذي يسمّيه `source_type` |
+| `journal-entry-lines` | `frmRptEntries` «🧾 تفاصيل القيد» | `journal_entry_lines` مع الحساب ومركز التكلفة |
+| `income-statement-accounts` | `frmRptIncomeStatement` | الحسابات ذات `type IN ('revenue','expense')` مُجمَّعةً على آبائها + سطر «قيمة مخزون بضاعة آخر المدة» |
+| `cost-center-statement` | `frmRptCostCenter` | `cost_center_id` على السطور، «تجميعي» بسطرٍ لكل حساب و«تفصيلي» بسطرٍ لكل حركة |
+| `vat-return-period` | `frmTaxRptPeriod` | `TaxRptPeriod.repx`: ثلاثة عشر بنداً — ستة مبيعات وستة مشتريات وصافي الضريبة |
+
+قرارات المحرّك في هذا الجزء:
+
+- **`Entry.type = 0` هو «قيد إفتتاحي»** (`EntryTypes` Id 0) و`type <> 0` هو الحركة؛ كلّ
+  نافذةٍ في الجزء تقسم أرقامها على هذا الخط. السحابة تُسمّي القيد نفسه
+  `source_type = 'opening'` — وهو المفتاح الذي يطبعه بيان الحساب أصلاً باسم
+  «قيد إفتتاحي» في `ENTRY_TYPE_LABELS` — فصار «رصيد افتتاحي» و«حركة» عمودين من
+  استعلامٍ واحد لا استعلامين.
+- **`Accounts_Index.FinalAcc = 2`** (المصروفات · إيرادات، `CrystalLiteDB.txt` L2515-L2516)
+  يقابله `accounts.type IN ('revenue','expense')`، والتجميع على الأب (`_Type == 1`)
+  هو `coalesce(parent.id, acc.id)` — أي «حسابات رئيسية» باسمها.
+- **الشجرتان:** `accounts.path` شجرة ltree من الجذر، فالحسابُ ابنٌ لِما اختير إذا كان
+  `path <@ <المختار>` (وهو سير `GetParent` في `ParentCode`)؛ أمّا `cost_centers` فعلى
+  `parent_id` وحده، فمشى التقرير عليها بـ`WITH RECURSIVE`. وفرّق التقرير بين الوضعين
+  كما يفرّق الديسكتوب: «تجميعي» كل الأبناء، و«تفصيلي» الأبناء المباشرون، أو المركز نفسه
+  إن لم يكن له أبناء (`DetailedResults` L276-L282).
+- **صيغة الرصيد من وجهين** كما في L373-L430: `حركة = max(مدين − دائن، 0)` على كل وجه،
+  ثم `ختامي = افتتاحي + حركة` ثم **تصفيةٌ ثانية** تُبقي وجهاً واحداً غير صفر.
+- **«🧾 نوع القيد» ستة عشر اسماً** من `EntryTypes` تُقرأ من `source_type` و`kind`؛
+  «سند قبض من عميل» و«سند صرف لمورد» (Id 5 · 6) يندمجان في «سند قبض» و«سند صرف»
+  (Id 7 · 8) كما يفعل `entryTypeOf()` أصلاً، لأنّ السطر يحمل نوعه بنفسه.
+- **فلاتر جديدة:** `accountId` (ونوعه `account` في المحرّك والواجهة — قائمةٌ من
+  `GET /accounts`) و`entryNo` و`docNo` («🔢 رقم القيد» · «📄 رقم المستند») و`quarter`
+  و`month` («📆 ربع سنة» · «📆 شهري»، اللذان يكتبان الفترة فوق صندوقي التاريخ كما تفعل
+  `SetDate` في L219-L266).
+- **«📋 حالة القيد»:** «معتمد» و«لاغي» — والملغي عندنا هو ما **عُكس** بقيدٍ يشير إليه،
+  لأنّ السحابة لا تبدّل حالة القيد بل تعكسه؛ و«مسودة» هي الحالة الوحيدة غير المُرحَّلة.
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it

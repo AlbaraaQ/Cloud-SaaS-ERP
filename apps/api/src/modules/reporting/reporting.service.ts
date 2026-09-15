@@ -66,6 +66,14 @@ const filtersSchema = z
     docType: z.string().max(40).optional(),
     /** 🔢 الرقم التسلسلي — the free text box of the two serial windows. */
     serial: z.string().max(60).optional(),
+    /** 📊 الحساب / الحساب الرئيسي — `cmbAccounts` of `frmRptBalances` · `frmRptCostCenter`. */
+    accountId: uuidish,
+    /** 🔢 رقم القيد · 📄 رقم المستند — the two free boxes of `frmRptEntries` («🔍 البحث»). */
+    entryNo: z.string().max(60).optional(),
+    docNo: z.string().max(60).optional(),
+    /** 📆 ربع سنة · شهري — the period presets of `frmTaxRptPeriod`, which overwrite من/إلى. */
+    quarter: z.string().max(2).optional(),
+    month: z.string().max(2).optional(),
   })
   .partial();
 
@@ -90,6 +98,7 @@ const FILTER_SOURCES: Record<string, { table: string; column: string } | undefin
   category: { table: 'item_categories', column: 'name_ar' },
   salesman: { table: 'salesmen', column: 'name' },
   costCenter: { table: 'cost_centers', column: 'name_ar' },
+  account: { table: 'accounts', column: 'name_ar' },
 };
 
 @Injectable()

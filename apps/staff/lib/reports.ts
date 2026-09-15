@@ -19,8 +19,11 @@ export type ReportParamKind =
   | 'category'
   | 'salesman'
   | 'costCenter'
+  | 'account'
   | 'select'
-  | 'serial';
+  | 'serial'
+  | 'entryNo'
+  | 'docNo';
 export type ReportColumnType = 'text' | 'money' | 'qty' | 'int' | 'date' | 'percent';
 
 export type ReportParam = { name: string; labelAr: string; kind: ReportParamKind; options?: Array<{ value: string; labelAr: string }> };

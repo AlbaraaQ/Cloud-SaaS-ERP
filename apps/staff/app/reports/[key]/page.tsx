@@ -7,6 +7,7 @@ import { Screen } from '../../../components/screen';
 import {
   arabicName,
   itemLabel,
+  listAccounts,
   listBranches,
   listCategories,
   listCostCenters,
@@ -15,6 +16,7 @@ import {
   listSalesmen,
   listWarehouses,
   partyLabel,
+  type Account,
   type Branch,
   type Category,
   type CostCenter,
@@ -77,6 +79,7 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
   const categories = useQuery<Category[]>(async () => (kinds.has('category') ? listCategories() : []), [reportKey, kinds.has('category')]);
   const costCenters = useQuery<CostCenter[]>(async () => (kinds.has('costCenter') ? listCostCenters() : []), [reportKey, kinds.has('costCenter')]);
   const salesmen = useQuery<Salesman[]>(async () => (kinds.has('salesman') ? listSalesmen() : []), [reportKey, kinds.has('salesman')]);
+  const accounts = useQuery<Account[]>(async () => (kinds.has('account') ? listAccounts() : []), [reportKey, kinds.has('account')]);
 
   const optionsFor = useMemo(
     () => ({
@@ -87,8 +90,9 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
       category: (categories.data ?? []).map((row) => ({ value: row.id, label: arabicName(row) })),
       costCenter: (costCenters.data ?? []).map((row) => ({ value: row.id, label: `${row.code} — ${arabicName(row)}` })),
       salesman: (salesmen.data ?? []).map((row) => ({ value: row.id, label: row.name })),
+      account: (accounts.data ?? []).map((row) => ({ value: row.id, label: `${row.code} — ${arabicName(row)}` })),
     }),
-    [branches.data, warehouses.data, parties.data, items.data, categories.data, costCenters.data, salesmen.data],
+    [branches.data, warehouses.data, parties.data, items.data, categories.data, costCenters.data, salesmen.data, accounts.data],
   );
 
   if (catalog.status === 'success' && !entry) {
@@ -236,9 +240,10 @@ function FilterField({ param, value, options, onChange }: { param: ReportParam; 
       </label>
     );
   }
-  // 🔢 الرقم التسلسلي — the free text box of `frmRptSerialNo` / `frmRptSerialNoSummary`,
-  // where the clerk types the number instead of picking it from a list.
-  if (param.kind === 'serial') {
+  // 🔢 الرقم التسلسلي · 🔢 رقم القيد · 📄 رقم المستند — the free text boxes the desktop
+  // gives these reports (`frmRptSerialNo`, `frmRptEntries`): the clerk types the number
+  // instead of picking it from a list.
+  if (param.kind === 'serial' || param.kind === 'entryNo' || param.kind === 'docNo') {
     return (
       <label className="field">
         <span>{param.labelAr}</span>
@@ -247,7 +252,7 @@ function FilterField({ param, value, options, onChange }: { param: ReportParam; 
           type="text"
           dir="ltr"
           value={value}
-          placeholder="SN-0001"
+          placeholder={param.kind === 'serial' ? 'SN-0001' : 'JE-000001'}
           onChange={(event) => onChange(event.target.value)}
         />
       </label>

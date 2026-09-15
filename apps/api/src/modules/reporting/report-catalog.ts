@@ -22,8 +22,11 @@ export type ReportParamKind =
   | 'category'
   | 'salesman'
   | 'costCenter'
+  | 'account'
   | 'select'
-  | 'serial';
+  | 'serial'
+  | 'entryNo'
+  | 'docNo';
 
 export type ReportParam = {
   name: string;
@@ -78,6 +81,18 @@ export type ReportFilters = {
   kind?: string;
   /** 🔢 الرقم التسلسلي — the free text box of `frmRptSerialNo` / `frmRptSerialNoSummary`. */
   serial?: string;
+  /**
+   * 📊 الحساب / الحساب الرئيسي — `cmbAccounts` of `frmRptBalances` («الحساب الرئيسي») and
+   * `frmRptCostCenter` («الحساب»). Both are trees: a row belongs to the report when the
+   * selected account is one of its ancestors.
+   */
+  accountId?: string;
+  /** 🔢 رقم القيد · 📄 رقم المستند — the two free boxes of `frmRptEntries` («🔍 البحث»). */
+  entryNo?: string;
+  docNo?: string;
+  /** 📆 ربع سنة · شهري — the two period presets of `frmTaxRptPeriod` overwrite the date boxes. */
+  quarter?: string;
+  month?: string;
   /**
    * 📄 نوع العملية — `cmbOperation` of `frmRptInventory.xaml.cs` L260-267: eight inventory
    * documents the desktop keeps in one `Inv.inv_type` column (`8/2`, `8/1`, `9/1`, `4/1`,
@@ -841,6 +856,303 @@ const INVOICE_PATTERN: ReportParam = {
 
 /** 🔢 الرقم التسلسلي — the free text box of the two serial windows. */
 const SERIAL_NO: ReportParam = { name: 'serial', labelAr: 'الرقم التسلسلي', kind: 'serial' };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📒 «تقارير المحاسبة» — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` ·
+//    `frmRptCostCenter` · `frmTaxRptPeriod`
+//
+// The five windows read the same two tables the desktop keeps (`Entry` + `Entry_sub`) that
+// the cloud splits into `journal_entries` + `journal_entry_lines`, and three of their rules
+// carry over unchanged:
+//
+//   • `Entry.type = 0` is the «قيد إفتتاحي» (`EntryTypes` Id 0 — `CrystalLiteDB.txt` L3341)
+//     and `Entry.type <> 0` is the حركة; every one of the five windows splits its numbers on
+//     exactly that line. The cloud names the same document `source_type = 'opening'`, the
+//     key its own statement service already prints as «قيد إفتتاحي» (`ENTRY_TYPE_LABELS`
+//     in `accounting.service.ts`).
+//   • `Accounts_Index.FinalAcc = 2` is the income statement — `CrystalLiteDB.txt` L2515 and
+//     L2516 give المصروفات and إيرادات that value and الأصول / الخصوم the value 1. The cloud
+//     says the same thing with `accounts.type IN ('revenue', 'expense')`.
+//   • «الحساب الرئيسي» and «مركز التكلفة» are trees: a row appears when the selected node is
+//     one of its ancestors, which the desktop decides by walking `ParentCode` one step at a
+//     time (`GetParent`). `accounts.path` is an ltree, root first, so the same test is
+//     `acc.path <@ <selected path>`; `cost_centers` keeps a plain `parent_id`, so the
+//     cost-centre report walks it with a recursive CTE.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 🧾 نوع القيد — the desktop's `EntryTypes` table (`CrystalLiteDB.txt` L3341-L3358), read
+ * through the `source_type` the cloud writes on a posted entry. «سند قبض من عميل» /
+ * «سند صرف لمورد» (Id 5 · 6) collapse into «سند قبض» / «سند صرف» (Id 7 · 8) exactly as the
+ * cloud's own `entryTypeOf()` does: the desktop tells the two apart by party, and a voucher
+ * row already carries its kind.
+ */
+const ENTRY_TYPE_OPTIONS: Array<{ value: string; labelAr: string }> = [
+  { value: 'opening', labelAr: 'قيد إفتتاحي' },
+  { value: 'purchase_invoice', labelAr: 'قيد مشتريات' },
+  { value: 'purchase_return', labelAr: 'مرتجع مشتريات' },
+  { value: 'sales_invoice', labelAr: 'قيد مبيعات' },
+  { value: 'sales_return', labelAr: 'مرتجع مبيعات' },
+  { value: 'pos_sale', labelAr: 'قيد نقطة بيع' },
+  { value: 'credit_note', labelAr: 'إشعار دائن' },
+  { value: 'debit_note', labelAr: 'إشعار مدين' },
+  { value: 'stock_adjustment', labelAr: 'تسوية جردية' },
+  { value: 'voucher_receipt', labelAr: 'سند قبض' },
+  { value: 'voucher_payment', labelAr: 'سند صرف' },
+  { value: 'stock_voucher', labelAr: 'إذن مخزني' },
+  { value: 'opening_stock', labelAr: 'بضاعة أول مدة' },
+  { value: 'shift_close', labelAr: 'إغلاق اليومية' },
+  { value: 'manual', labelAr: 'قيد اليومية' },
+  { value: 'reversal', labelAr: 'قيد عكسي' },
+];
+
+/** The joins that give an entry its source document — one per table `source_type` can name. */
+const journalDocumentJoins = sql`
+  LEFT JOIN sales_invoices si ON si.id = je.source_id AND je.source_type = 'sales_invoice'
+  LEFT JOIN purchase_invoices pi ON pi.id = je.source_id AND je.source_type IN ('purchase_invoice', 'purchase_return')
+  LEFT JOIN vouchers v ON v.id = je.source_id AND je.source_type = 'voucher'
+  LEFT JOIN stock_vouchers sv ON sv.id = je.source_id AND je.source_type = 'stock_voucher'
+`;
+
+/** «رقم المستند» — `Entry.doc_no`, the number of the document the entry was posted from. */
+const journalDocNumber = sql`coalesce(si.number, pi.number, v.number, sv.number, '—')`;
+
+/**
+ * 🧾 نوع القيد — the Arabic name of an entry, in the words of `EntryTypes`, mirroring
+ * `entryTypeOf()` in `accounting.service.ts` L304-311 (قيد عكسي first, then the voucher's
+ * kind, then `source_type`) so a printed report and a ledger screen never disagree.
+ */
+const entryTypeLabel = (): SQL => sql`CASE
+    WHEN je.kind = 'reversal' THEN 'قيد عكسي'
+    WHEN je.source_type = 'opening' THEN 'قيد إفتتاحي'
+    WHEN je.source_type = 'sales_invoice' THEN CASE coalesce(si.kind, 'sale')
+      WHEN 'sale' THEN CASE WHEN si.party_id IS NULL THEN 'قيد نقطة بيع' ELSE 'قيد مبيعات' END
+      WHEN 'sale_return' THEN 'مرتجع مبيعات'
+      WHEN 'credit_note' THEN 'إشعار دائن'
+      WHEN 'debit_note' THEN 'إشعار مدين'
+      ELSE 'قيد مبيعات' END
+    WHEN je.source_type = 'purchase_return' THEN 'مرتجع مشتريات'
+    WHEN je.source_type = 'purchase_invoice' THEN 'قيد مشتريات'
+    WHEN je.source_type = 'voucher' THEN CASE WHEN v.kind = 'receipt' THEN 'سند قبض' ELSE 'سند صرف' END
+    WHEN je.source_type = 'stock_adjustment' THEN 'تسوية جردية'
+    WHEN je.source_type = 'shift_close' THEN 'إغلاق اليومية'
+    WHEN je.source_type = 'stock_voucher' THEN CASE WHEN sv.kind = 'opening' THEN 'بضاعة أول مدة' ELSE 'إذن مخزني' END
+    WHEN je.source_type = 'stock_transfer' THEN 'مناقلة مرسلة'
+    WHEN je.source_type = 'stock_transfer_receipt' THEN 'مناقلة مستلمة'
+    ELSE 'قيد اليومية' END`;
+
+/** 🧾 نوع القيد — the combo of `frmRptEntries` («🔍 البحث» → `cmbType`). */
+const ENTRY_TYPE: ReportParam = { name: 'kind', labelAr: 'نوع القيد', kind: 'select', options: ENTRY_TYPE_OPTIONS };
+
+const entryTypeScope = (kind?: string): SQL => {
+  switch (kind) {
+    case 'opening':
+      return sql`je.source_type = 'opening'`;
+    case 'purchase_invoice':
+      return sql`je.source_type = 'purchase_invoice'`;
+    case 'purchase_return':
+      return sql`je.source_type = 'purchase_return'`;
+    case 'sales_invoice':
+      return sql`je.source_type = 'sales_invoice' AND coalesce(si.kind, 'sale') = 'sale' AND si.party_id IS NOT NULL`;
+    case 'sales_return':
+      return sql`je.source_type = 'sales_invoice' AND si.kind = 'sale_return'`;
+    case 'pos_sale':
+      return sql`je.source_type = 'sales_invoice' AND coalesce(si.kind, 'sale') = 'sale' AND si.party_id IS NULL`;
+    case 'credit_note':
+      return sql`je.source_type = 'sales_invoice' AND si.kind = 'credit_note'`;
+    case 'debit_note':
+      return sql`je.source_type = 'sales_invoice' AND si.kind = 'debit_note'`;
+    case 'stock_adjustment':
+      return sql`je.source_type = 'stock_adjustment'`;
+    case 'voucher_receipt':
+      return sql`je.source_type = 'voucher' AND v.kind = 'receipt'`;
+    case 'voucher_payment':
+      return sql`je.source_type = 'voucher' AND v.kind = 'payment'`;
+    case 'stock_voucher':
+      return sql`je.source_type = 'stock_voucher' AND coalesce(sv.kind, '') <> 'opening'`;
+    case 'opening_stock':
+      return sql`je.source_type = 'stock_voucher' AND sv.kind = 'opening'`;
+    case 'shift_close':
+      return sql`je.source_type = 'shift_close'`;
+    case 'manual':
+      return sql`je.source_type IS NULL AND je.kind = 'manual'`;
+    case 'reversal':
+      return sql`je.kind = 'reversal'`;
+    default:
+      return all;
+  }
+};
+
+/**
+ * 📋 حالة القيد — `cmbState` in `frmRptEntries` is «معتمد» / «لاغي» (`Entry.state` 1 · 0).
+ * The cloud posts a reversal instead of flipping a state, so «لاغي» is the entry a reversal
+ * now points at, and a draft is the only unposted state that exists at all.
+ */
+const ENTRY_STATE: ReportParam = {
+  name: 'status',
+  labelAr: 'حالة القيد',
+  kind: 'select',
+  options: [
+    { value: 'posted', labelAr: 'معتمد' },
+    { value: 'void', labelAr: 'لاغي' },
+    { value: 'draft', labelAr: 'مسودة' },
+  ],
+};
+
+const entryStateScope = (tenantId: string, status?: string): SQL => {
+  const reversed = sql`EXISTS (SELECT 1 FROM journal_entries rev WHERE rev.tenant_id = ${tenantId} AND rev.reversal_of = je.id)`;
+  if (status === 'posted') return sql`je.status = 'posted' AND NOT ${reversed}`;
+  if (status === 'void') return sql`${reversed}`;
+  if (status === 'draft') return sql`je.status = 'draft'`;
+  return all;
+};
+
+/** 🔢 رقم القيد · 📄 رقم المستند — the two free boxes of «🔍 البحث» (`txtNoSrch` · `txtReffNo`). */
+const ENTRY_NO: ReportParam = { name: 'entryNo', labelAr: 'رقم القيد', kind: 'entryNo' };
+const DOC_NO: ReportParam = { name: 'docNo', labelAr: 'رقم المستند', kind: 'docNo' };
+
+/** The scope every entry-level report shares: posted or not, period, branch, نوع القيد, حالة. */
+const journalScope = (tenantId: string, f: ReportFilters): SQL => sql`
+  je.tenant_id = ${tenantId}
+  AND ${onDate(sql`je.date`, f.from, f.to)}
+  AND ${eqIf(sql`je.branch_id`, f.branchId)}
+  AND ${entryTypeScope(f.kind)}
+  AND ${entryStateScope(tenantId, f.status)}
+  AND ${f.entryNo ? sql`je.number = ${f.entryNo}` : all}
+  AND ${f.docNo ? sql`${journalDocNumber} = ${f.docNo}` : all}
+`;
+
+/** The same scope seen from a line: the line carries the مرکز التکلفة and the مندوب. */
+const journalLineScope = (tenantId: string, f: ReportFilters): SQL => sql`
+  jel.tenant_id = ${tenantId}
+  AND ${onDate(sql`je.date`, f.from, f.to)}
+  AND ${eqIf(sql`je.branch_id`, f.branchId)}
+  AND ${eqIf(sql`jel.cost_center_id`, f.costCenterId)}
+  AND ${eqIf(sql`jel.account_id`, f.accountId)}
+  AND ${entryTypeScope(f.kind)}
+  AND ${entryStateScope(tenantId, f.status)}
+`;
+
+/**
+ * 🌳 «الحساب الرئيسي» — `frmRptBalances` refuses to run without one («يرجى اختيار حساب
+ * رئيسي») and then keeps only the accounts hanging beneath it. `accounts.path` is an ltree
+ * of ids, root first, so a descendant is `path <@ <selected path>`; the selected account
+ * itself is excluded, exactly as `GetParent` walks up from a row's own parent.
+ */
+const accountSubtree = (tenantId: string, accountId?: string): SQL =>
+  accountId
+    ? sql`acc.path <@ (SELECT root.path FROM accounts root WHERE root.id = ${accountId}::uuid AND root.tenant_id = ${tenantId})
+          AND acc.id <> ${accountId}::uuid`
+    : all;
+
+/**
+ * 🌳 «مركز التكلفة» — the same walk over `cost_centers.parent_id`, which is a plain tree,
+ * so it needs the recursive CTE `accounts.path` does not.
+ */
+const COST_CENTER_TREE = (tenantId: string, costCenterId?: string): SQL => sql`cc_tree AS (
+    SELECT c.id FROM cost_centers c
+    WHERE c.tenant_id = ${tenantId} AND c.deleted_at IS NULL AND c.id = ${costCenterId ?? null}::uuid
+    UNION ALL
+    SELECT c.id FROM cost_centers c JOIN cc_tree t ON c.parent_id = t.id
+    WHERE c.tenant_id = ${tenantId} AND c.deleted_at IS NULL
+  )`;
+
+const costCenterSubtree = (costCenterId?: string): SQL =>
+  costCenterId ? sql`cc.id IN (SELECT id FROM cc_tree WHERE id <> ${costCenterId}::uuid)` : all;
+
+/**
+ * 📂 «تفصيلي» — `DetailedResults` L276-L282: the window takes the selected centre's
+ * **children** one level down, and when the centre has none it reports the centre itself.
+ * («تجميعي» keeps every descendant instead — see `costCenterSubtree`.)
+ */
+const costCenterChildren = (tenantId: string, costCenterId?: string): SQL =>
+  costCenterId
+    ? sql`(cc.id IN (SELECT c.id FROM cost_centers c
+                     WHERE c.tenant_id = ${tenantId} AND c.deleted_at IS NULL AND c.parent_id = ${costCenterId}::uuid)
+           OR (cc.id = ${costCenterId}::uuid AND NOT EXISTS (SELECT 1 FROM cost_centers child
+                     WHERE child.tenant_id = ${tenantId} AND child.deleted_at IS NULL AND child.parent_id = ${costCenterId}::uuid)))`
+    : all;
+
+/**
+ * 📆 الفترة الضريبية — `frmTaxRptPeriod` has two checkboxes, «ريع سنة» and «شهري», each
+ * with a combo; `SetDate()` (L219-L266) lets them **overwrite** the two date boxes, and the
+ * quarter wins when both are ticked. The year comes from the date boxes, or from today.
+ */
+const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const taxPeriodRange = (f: ReportFilters): { from?: string; to?: string } => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const year = Number((f.from ?? f.to ?? '').slice(0, 4)) || new Date().getUTCFullYear();
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const length = (month: number) => (month === 2 && leap ? 29 : (MONTH_LENGTHS[month - 1] ?? 31));
+  if (f.quarter) {
+    const quarter = Math.min(4, Math.max(1, Number(f.quarter) || 1));
+    const end = quarter * 3;
+    return { from: `${year}-${pad(end - 2)}-01`, to: `${year}-${pad(end)}-${pad(length(end))}` };
+  }
+  if (f.month) {
+    const month = Math.min(12, Math.max(1, Number(f.month) || 1));
+    return { from: `${year}-${pad(month)}-01`, to: `${year}-${pad(month)}-${pad(length(month))}` };
+  }
+  return { from: f.from, to: f.to };
+};
+
+/** 📆 ربع سنة — `cmbQuartars` of `frmTaxRptPeriod` (L350-L353). */
+const TAX_QUARTER: ReportParam = {
+  name: 'quarter',
+  labelAr: 'ربع سنة',
+  kind: 'select',
+  options: [
+    { value: '1', labelAr: 'الربع الأول' },
+    { value: '2', labelAr: 'الربع الثاني' },
+    { value: '3', labelAr: 'الربع الثالث' },
+    { value: '4', labelAr: 'الربع الرابع' },
+  ],
+};
+/** 📆 شهري — `cmbMonthly` of `frmTaxRptPeriod` (L375-L386). */
+const TAX_MONTH: ReportParam = {
+  name: 'month',
+  labelAr: 'شهري',
+  kind: 'select',
+  options: Array.from({ length: 12 }, (_unused, index) => ({ value: String(index + 1), labelAr: `شهر ${index + 1}` })),
+};
+
+/** ⏰ «وقت البداية (HH:mm)» / «وقت النهاية (HH:mm)» — `frmRptCostCenter.xaml` L258 و L276. */
+const TIME_CC: ReportParam[] = [
+  { name: 'fromTime', labelAr: 'وقت البداية (HH:mm)', kind: 'time' },
+  { name: 'toTime', labelAr: 'وقت النهاية (HH:mm)', kind: 'time' },
+];
+const ACCOUNT: ReportParam = { name: 'accountId', labelAr: 'الحساب', kind: 'account' };
+/** 📊 الحساب الرئيسي — the one filter `frmRptBalances` will not run without. */
+const MAIN_ACCOUNT: ReportParam = { name: 'accountId', labelAr: 'الحساب الرئيسي', kind: 'account' };
+/** 📋 نوع التقرير — the «تفصيلي» / «تجميعي» radios of `frmRptCostCenter` (L203 · L210). */
+const COST_CENTER_MODE: ReportParam = {
+  name: 'kind',
+  labelAr: 'نوع التقرير',
+  kind: 'select',
+  options: [
+    { value: 'summary', labelAr: 'تجميعي' },
+    { value: 'detailed', labelAr: 'تفصيلي' },
+  ],
+};
+
+/**
+ * 🏦 قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ — `Inventory.InventoryCost(branch, toDate)`
+ * of `frmRptIncomeStatement.xaml.cs` L379: the stock a branch still holds at «إلى تاريخ».
+ * The cloud keeps the movement ledger, so the same figure is the running value of every
+ * movement up to that day.
+ */
+const stockValueAt = (tenantId: string, f: ReportFilters): SQL => sql`(
+  SELECT coalesce(sum(CASE WHEN it.direction = 'in' THEN it.total_cost ELSE -it.total_cost END), 0)
+  FROM inventory_transactions it
+  JOIN warehouses w ON w.id = it.warehouse_id
+  WHERE it.tenant_id = ${tenantId} AND ${onDate(sql`it.occurred_at::date`, undefined, f.to)}
+    AND ${eqIf(sql`w.branch_id`, f.branchId)}
+)`;
+
+/** 🧾 الضريبة of a voucher — `Receipts.NetVal − Payment` in the window, `vat_amount` here. */
+const voucherVat = (alias: string): SQL => sql`sum(CASE
+    WHEN ${sql.raw(alias)}.vat_amount > 0 THEN ${sql.raw(alias)}.vat_amount
+    ELSE greatest(coalesce(${sql.raw(alias)}.net_amount, 0) - ${sql.raw(alias)}.amount, 0) END)`;
 
 const definitions: ReportDefinition[] = [
   // ---------------------------------------------------------------- sales
@@ -3206,6 +3518,448 @@ const definitions: ReportDefinition[] = [
         AND po.status <> 'cancelled'
         AND ${onDate(sql`po.order_date`, f.from, f.to)}
       ORDER BY po.order_date, po.number, comp.line_no LIMIT 2000`,
+  },
+  // ------------------------------------------------ 📒 accounting — تقارير المحاسبة
+  {
+    key: 'account-balances',
+    titleAr: 'أرصدة الحسابات',
+    group: 'accounting',
+    hintAr: 'كل حساب تحت «الحساب الرئيسي» بسطر: رصيده الافتتاحي وحركته في الفترة ورصيده الختامي، على الوجهين المدين والدائن كما في `frmRptBalances`.',
+    // 📊 الحساب الرئيسي · 🏢 الفرع · 🧑‍💼 المندوب · 📅 من / إلى + ⏰ الوقت.
+    params: [MAIN_ACCOUNT, BRANCH, SALESMAN, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: [
+      text('code', 'الحساب'),
+      text('account', 'اسم الحساب'),
+      money('opening_debit', 'رصيد افتتاحي مدين'),
+      money('opening_credit', 'رصيد افتتاحي دائن'),
+      money('move_debit', 'حركة مدين'),
+      money('move_credit', 'حركة دائن'),
+      money('bal_debit', 'رصيد مدين'),
+      money('bal_credit', 'رصيد دائن'),
+      money('final_debit', 'رصيد ختامي مدين'),
+      money('final_credit', 'رصيد ختامي دائن'),
+      { key: 's_net_debit', labelAr: 'الرصيد (مدين)', type: 'money', hidden: true },
+      { key: 's_net_credit', labelAr: 'الرصيد (دائن)', type: 'money', hidden: true },
+      countCard,
+    ],
+    totals: [
+      'opening_debit',
+      'opening_credit',
+      'move_debit',
+      'move_credit',
+      'bal_debit',
+      'bal_credit',
+      'final_debit',
+      'final_credit',
+    ],
+    // «الرصيد:» + مدين/دائن — `txtBalance` و`lblStatus` in `frmRptBalances.xaml` L466-L480.
+    grandTotal: [
+      { key: 's_net_debit', labelAr: 'الرصيد (مدين)' },
+      { key: 's_net_credit', labelAr: 'الرصيد (دائن)' },
+      { key: 's_count', labelAr: 'عدد الحسابات' },
+    ],
+    emptyAr: 'لا توجد حسابات تحت هذا الحساب الرئيسي',
+    signature: true,
+    build: (tenantId, f) => sql`
+      WITH movement AS (
+        SELECT jel.account_id,
+               coalesce(sum(jel.debit) FILTER (WHERE je.source_type = 'opening'), 0) AS od,
+               coalesce(sum(jel.credit) FILTER (WHERE je.source_type = 'opening'), 0) AS oc,
+               coalesce(sum(jel.debit) FILTER (WHERE je.source_type IS DISTINCT FROM 'opening'), 0) AS md,
+               coalesce(sum(jel.credit) FILTER (WHERE je.source_type IS DISTINCT FROM 'opening'), 0) AS mc
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.entry_id
+        WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted'
+          AND ${onDate(sql`je.date`, f.from, f.to)}
+          AND ${eqIf(sql`je.branch_id`, f.branchId)}
+          AND ${eqIf(sql`jel.salesman_id`, f.salesmanId)}
+        GROUP BY jel.account_id
+      ), base AS (
+        SELECT acc.code, acc.name_ar AS account,
+               round(m.od, 2) AS opening_debit, round(m.oc, 2) AS opening_credit,
+               round(m.md, 2) AS move_debit, round(m.mc, 2) AS move_credit,
+               round(greatest(m.md - m.mc, 0), 2) AS bal_debit,
+               round(greatest(m.mc - m.md, 0), 2) AS bal_credit
+        FROM movement m
+        JOIN accounts acc ON acc.id = m.account_id
+        WHERE acc.tenant_id = ${tenantId} AND acc.deleted_at IS NULL AND ${accountSubtree(tenantId, f.accountId)}
+      ), closing AS (
+        SELECT b.*,
+               greatest((b.opening_debit + b.bal_debit) - (b.opening_credit + b.bal_credit), 0) AS final_debit,
+               greatest((b.opening_credit + b.bal_credit) - (b.opening_debit + b.bal_debit), 0) AS final_credit
+        FROM base b
+      )
+      SELECT code, account, opening_debit::text, opening_credit::text, move_debit::text, move_credit::text,
+             bal_debit::text, bal_credit::text,
+             round(final_debit, 2)::text AS final_debit, round(final_credit, 2)::text AS final_credit,
+             CASE WHEN row_number() OVER (ORDER BY code) = 1
+                  THEN greatest(sum(final_debit) OVER () - sum(final_credit) OVER (), 0)::text ELSE '0' END AS s_net_debit,
+             CASE WHEN row_number() OVER (ORDER BY code) = 1
+                  THEN greatest(sum(final_credit) OVER () - sum(final_debit) OVER (), 0)::text ELSE '0' END AS s_net_credit,
+             '1' AS s_count
+      FROM closing ORDER BY code LIMIT 2000`,
+  },
+  {
+    key: 'journal-entries',
+    titleAr: 'القيود اليومية',
+    group: 'accounting',
+    hintAr: 'سجلّ القيود كما في «🔍 البحث» في `frmRptEntries`: رقم القيد ورقم المستند وتاريخه ونوعه وحالته وبيانه.',
+    // 📅 من / إلى · 🏢 الفرع · 🧾 نوع القيد · 📋 حالة القيد · 🔢 رقم القيد · 📄 رقم المستند.
+    params: [...PERIOD, BRANCH, ENTRY_TYPE, ENTRY_STATE, ENTRY_NO, DOC_NO],
+    columns: [
+      text('global_id', 'الرقم العام'),
+      text('doc_no', 'رقم المستند'),
+      date('entry_date', 'تاريخ القيد'),
+      text('entry_type', 'نوع القيد'),
+      text('state_ar', 'حالة القيد'),
+      text('description', 'البيان'),
+      text('entry_no', 'رقم القيد'),
+      countCard,
+    ],
+    grandTotal: [{ key: 's_count', labelAr: 'عدد القيود' }],
+    emptyAr: 'لا توجد قيود في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT je.id::text AS global_id,
+             ${journalDocNumber} AS doc_no,
+             to_char(je.date, 'YYYY-MM-DD') AS entry_date,
+             ${entryTypeLabel()} AS entry_type,
+             CASE WHEN je.status <> 'posted' THEN 'مسودة'
+                  WHEN EXISTS (SELECT 1 FROM journal_entries rev
+                               WHERE rev.tenant_id = ${tenantId} AND rev.reversal_of = je.id) THEN 'لاغي'
+                  ELSE 'معتمد' END AS state_ar,
+             coalesce(je.description, '—') AS description,
+             coalesce(je.number, '—') AS entry_no,
+             '1' AS s_count
+      FROM journal_entries je
+      ${journalDocumentJoins}
+      WHERE ${journalScope(tenantId, f)}
+      ORDER BY je.id LIMIT 2000`,
+  },
+  {
+    key: 'journal-entry-lines',
+    titleAr: 'تفاصيل القيد',
+    group: 'accounting',
+    hintAr: 'سطور القيود كما في «🧾 تفاصيل القيد»: م · مدين · دائن · كود الحساب · اسم الحساب · مركز التكلفة · البيان.',
+    // 📅 من / إلى · 🏢 الفرع · 🧾 نوع القيد · 📊 مركز التكلفة · 📒 الحساب.
+    params: [...PERIOD, BRANCH, ENTRY_TYPE, COST_CENTER, ACCOUNT],
+    columns: [
+      text('entry_no', 'رقم القيد'),
+      int('seq', 'م'),
+      money('debit', 'مدين'),
+      money('credit', 'دائن'),
+      text('code', 'كود الحساب'),
+      text('account', 'اسم الحساب'),
+      text('cost_center', 'مركز التكلفة'),
+      text('description', 'البيان'),
+      { key: 's_diff', labelAr: 'الفرق', type: 'money', hidden: true },
+      countCard,
+    ],
+    totals: ['debit', 'credit'],
+    // «إجمالي المدين:» · «إجمالي الدائن:» — `frmRptEntries.xaml` L402 و L414. «الفرق» carries
+    // the number «✅ قيد متوازن» / «❌ قيد غير متوازن» (L291 و L298) compares against zero.
+    grandTotal: [
+      { key: 'debit', labelAr: 'إجمالي المدين' },
+      { key: 'credit', labelAr: 'إجمالي الدائن' },
+      { key: 's_diff', labelAr: 'الفرق' },
+      { key: 's_count', labelAr: 'عدد السطور' },
+    ],
+    emptyAr: 'لا توجد سطور قيود في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(je.number, '—') AS entry_no,
+             jel.line_no AS seq,
+             round(jel.debit, 2)::text AS debit,
+             round(jel.credit, 2)::text AS credit,
+             acc.code, acc.name_ar AS account,
+             coalesce(cc.name_ar, '—') AS cost_center,
+             coalesce(jel.description, je.description, '—') AS description,
+             round(jel.debit - jel.credit, 2)::text AS s_diff,
+             '1' AS s_count
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON je.id = jel.entry_id
+      JOIN accounts acc ON acc.id = jel.account_id
+      LEFT JOIN cost_centers cc ON cc.id = jel.cost_center_id
+      WHERE ${journalLineScope(tenantId, f)} AND je.status = 'posted'
+      ORDER BY je.date, je.number, jel.line_no LIMIT 2000`,
+  },
+  {
+    key: 'income-statement-accounts',
+    titleAr: 'أرباح وخسائر حسابات رئيسية',
+    group: 'accounting',
+    hintAr: 'حسابات `FinalAcc = 2` (الإيرادات والمصروفات) مُجمَّعة على حساباتها الرئيسية، مع قيمة مخزون آخر المدة وصافي نتيجة العام — `frmRptIncomeStatement`.',
+    // 📅 من / إلى + ⏰ الوقت · 🏢 الفرع.
+    params: [...PERIOD, BRANCH],
+    columns: [
+      text('code', 'الحساب'),
+      text('account', 'اسم الحساب'),
+      money('debit_balance', 'رصيد مدين'),
+      money('credit_balance', 'رصيد دائن'),
+      { key: 's_profit', labelAr: 'صافي أرباح العام', type: 'money', hidden: true },
+      countCard,
+    ],
+    totals: ['debit_balance', 'credit_balance'],
+    // «قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ» · «صافي أرباح العام» · المجاميع —
+    // `frmRptIncomeStatement.xaml` L402, L425 و L447-L453.
+    grandTotal: [
+      { key: 'debit_balance', labelAr: 'إجمالي مدين' },
+      { key: 'credit_balance', labelAr: 'إجمالي دائن' },
+      { key: 's_profit', labelAr: 'صافي أرباح العام' },
+      { key: 's_count', labelAr: 'عدد الحسابات' },
+    ],
+    emptyAr: 'لا توجد حسابات إيرادات أو مصروفات في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      WITH movement AS (
+        SELECT coalesce(parent.id, acc.id) AS account_id,
+               sum(jel.debit) AS debit, sum(jel.credit) AS credit
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.entry_id
+        JOIN accounts acc ON acc.id = jel.account_id
+        LEFT JOIN accounts parent ON parent.id = acc.parent_id
+        WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted' AND acc.type IN ('revenue', 'expense')
+          AND ${onDate(sql`je.date`, f.from, f.to)} AND ${eqIf(sql`je.branch_id`, f.branchId)}
+        GROUP BY 1
+      )
+      SELECT u.code, u.account, round(u.debit_balance, 2)::text AS debit_balance,
+             round(u.credit_balance, 2)::text AS credit_balance,
+             round(u.s_profit, 2)::text AS s_profit, u.s_count
+      FROM (
+        SELECT a.code, a.name_ar AS account,
+               greatest(m.debit - m.credit, 0) AS debit_balance,
+               greatest(m.credit - m.debit, 0) AS credit_balance,
+               m.credit - m.debit AS s_profit, '1' AS s_count, 1 AS ord
+        FROM movement m JOIN accounts a ON a.id = m.account_id
+        UNION ALL
+        SELECT '—', 'قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ',
+               0, ${stockValueAt(tenantId, f)}, ${stockValueAt(tenantId, f)}, '0', 2
+      ) u
+      ORDER BY u.ord, u.code LIMIT 2000`,
+  },
+  {
+    key: 'cost-center-statement',
+    titleAr: 'تقرير مراكز التكلفة',
+    group: 'accounting',
+    hintAr: 'مركز التكلفة وما تحته: الرصيد الافتتاحي والحركة والرصيد الختامي على الوجهين، «تجميعي» بسطر لكل حساب و«تفصيلي» بسطر لكل حركة — `frmRptCostCenter`.',
+    // 📂 مركز التكلفة · 📒 الحساب · 📋 نوع التقرير · 🏢 الفرع · 📅 من / إلى + ⏰ الوقت.
+    params: [
+      COST_CENTER,
+      ACCOUNT,
+      COST_CENTER_MODE,
+      BRANCH,
+      PERIOD[0]!,
+      TIME_CC[0]!,
+      PERIOD[1]!,
+      TIME_CC[1]!,
+    ],
+    columns: [
+      text('code', 'الرمز'),
+      text('cost_center', 'اسم مركز التكلفة'),
+      money('opening_debit', 'رصيد افتتاحي مدين'),
+      money('opening_credit', 'رصيد افتتاحي دائن'),
+      money('move_debit', 'حركة مدين'),
+      money('move_credit', 'حركة دائن'),
+      money('bal_debit', 'رصيد مدين'),
+      money('bal_credit', 'رصيد دائن'),
+      money('final_debit', 'رصيد ختامي مدين'),
+      money('final_credit', 'رصيد ختامي دائن'),
+      text('account_name', 'اسم الحساب'),
+      text('operation', 'العملية'),
+      text('operation_no', 'رقم العملية'),
+      date('entry_date', 'التاريخ'),
+      countCard,
+    ],
+    totals: [
+      'opening_debit',
+      'opening_credit',
+      'move_debit',
+      'move_credit',
+      'bal_debit',
+      'bal_credit',
+      'final_debit',
+      'final_credit',
+    ],
+    // «عدد السجلات:» — `lblCount` in `frmRptCostCenter.xaml` L498-L503.
+    grandTotal: [{ key: 's_count', labelAr: 'عدد السجلات' }],
+    emptyAr: 'لا توجد حركة على مراكز التكلفة في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => {
+      const detailed = f.kind === 'detailed';
+      const shared = sql`
+        jel.tenant_id = ${tenantId} AND je.status = 'posted' AND jel.cost_center_id IS NOT NULL
+        AND ${onDate(sql`je.date`, f.from, f.to)}
+        AND ${eqIf(sql`je.branch_id`, f.branchId)}
+        AND ${eqIf(sql`jel.account_id`, f.accountId)}
+      `;
+      if (!detailed) {
+        return sql`
+          WITH RECURSIVE ${COST_CENTER_TREE(tenantId, f.costCenterId)}, agg AS (
+            SELECT jel.cost_center_id AS cc_id, jel.account_id,
+                   coalesce(sum(jel.debit) FILTER (WHERE je.source_type = 'opening'), 0) AS od,
+                   coalesce(sum(jel.credit) FILTER (WHERE je.source_type = 'opening'), 0) AS oc,
+                   coalesce(sum(jel.debit) FILTER (WHERE je.source_type IS DISTINCT FROM 'opening'), 0) AS md,
+                   coalesce(sum(jel.credit) FILTER (WHERE je.source_type IS DISTINCT FROM 'opening'), 0) AS mc
+            FROM journal_entry_lines jel
+            JOIN journal_entries je ON je.id = jel.entry_id
+            WHERE ${shared}
+            GROUP BY 1, 2
+          )
+          SELECT cc.code, cc.name_ar AS cost_center,
+                 round(a.od, 2)::text AS opening_debit, round(a.oc, 2)::text AS opening_credit,
+                 round(a.md, 2)::text AS move_debit, round(a.mc, 2)::text AS move_credit,
+                 round(greatest(a.md - a.mc, 0), 2)::text AS bal_debit,
+                 round(greatest(a.mc - a.md, 0), 2)::text AS bal_credit,
+                 round(greatest((a.od + greatest(a.md - a.mc, 0)) - (a.oc + greatest(a.mc - a.md, 0)), 0), 2)::text AS final_debit,
+                 round(greatest((a.oc + greatest(a.mc - a.md, 0)) - (a.od + greatest(a.md - a.mc, 0)), 0), 2)::text AS final_credit,
+                 acc.name_ar AS account_name,
+                 '' AS operation, '' AS operation_no, NULL::date AS entry_date,
+                 '1' AS s_count
+          FROM agg a
+          JOIN cost_centers cc ON cc.id = a.cc_id
+          JOIN accounts acc ON acc.id = a.account_id
+          WHERE ${costCenterSubtree(f.costCenterId)}
+          ORDER BY cc.code, acc.code LIMIT 2000`;
+      }
+      return sql`
+        WITH movements AS (
+          SELECT jel.cost_center_id AS cc_id, jel.account_id, jel.line_no, jel.debit, jel.credit,
+                 je.id AS entry_id,
+                 coalesce(sum(jel.debit) FILTER (WHERE je.source_type = 'opening')
+                          OVER (PARTITION BY jel.cost_center_id), 0) AS od,
+                 coalesce(sum(jel.credit) FILTER (WHERE je.source_type = 'opening')
+                          OVER (PARTITION BY jel.cost_center_id), 0) AS oc
+          FROM journal_entry_lines jel
+          JOIN journal_entries je ON je.id = jel.entry_id
+          WHERE ${shared}
+        )
+        SELECT cc.code, cc.name_ar AS cost_center,
+               round(m.od, 2)::text AS opening_debit, round(m.oc, 2)::text AS opening_credit,
+               round(m.debit, 2)::text AS move_debit, round(m.credit, 2)::text AS move_credit,
+               round(greatest(m.debit - m.credit, 0), 2)::text AS bal_debit,
+               round(greatest(m.credit - m.debit, 0), 2)::text AS bal_credit,
+               round(greatest((m.od + greatest(m.debit - m.credit, 0)) - (m.oc + greatest(m.credit - m.debit, 0)), 0), 2)::text AS final_debit,
+               round(greatest((m.oc + greatest(m.credit - m.debit, 0)) - (m.od + greatest(m.debit - m.credit, 0)), 0), 2)::text AS final_credit,
+               acc.name_ar AS account_name,
+               ${entryTypeLabel()} AS operation,
+               ${journalDocNumber} AS operation_no,
+               je.date AS entry_date,
+               '1' AS s_count
+        FROM movements m
+        JOIN journal_entries je ON je.id = m.entry_id
+        JOIN cost_centers cc ON cc.id = m.cc_id
+        JOIN accounts acc ON acc.id = m.account_id
+        ${journalDocumentJoins}
+        WHERE ${costCenterChildren(tenantId, f.costCenterId)}
+        ORDER BY je.date, je.number, m.line_no LIMIT 2000`;
+    },
+  },
+  {
+    key: 'vat-return-period',
+    titleAr: 'إقرار ضريبي',
+    group: 'accounting',
+    hintAr: 'الإقرار الضريبي للفترة كما يطبعه `TaxRptPeriod.repx`: المبيعات والمشتريات ببنودهما الستة، وصافي الضريبة المستحقة.',
+    // 📅 من تاريخ / إلى تاريخ · 🏢 الفرع · 📆 ربع سنة · 📆 شهري.
+    params: [...PERIOD, BRANCH, TAX_QUARTER, TAX_MONTH],
+    columns: [
+      text('section', 'القسم'),
+      text('line', 'الوصف'),
+      money('net', 'الصافي'),
+      money('vat', 'الضريبة'),
+      { key: 's_net_vat', labelAr: 'صافي ضريبة القيمة المضافة', type: 'money', hidden: true },
+    ],
+    // «صافي ضريبة القيمة المضافة» — `TaxRptPeriod.repx` L700-L744, the one number the
+    // window prints in red («مستحق الدفع للهيئة») or green («غير مستحق»).
+    grandTotal: [{ key: 's_net_vat', labelAr: 'صافي ضريبة القيمة المضافة' }],
+    emptyAr: 'لا توجد بيانات ضريبية في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => {
+      const range = taxPeriodRange(f);
+      const period = onDate(sql`je.date`, range.from, range.to);
+      const date = (column: SQL) => onDate(column, range.from, range.to);
+      return sql`
+        WITH sale_lines AS (
+          SELECT si.kind AS kind, sil.net AS net, sil.tax AS tax
+          FROM sales_invoice_lines sil
+          JOIN sales_invoices si ON si.id = sil.invoice_id
+          WHERE si.tenant_id = ${tenantId} AND si.status = 'posted' AND si.kind IN ('sale', 'sale_return')
+            AND ${date(sql`si.posted_at::date`)} AND ${eqIf(sql`si.branch_id`, f.branchId)}
+        ), purchase_lines AS (
+          SELECT pi.kind AS kind, pil.net AS net, pil.tax AS tax
+          FROM purchase_invoice_lines pil
+          JOIN purchase_invoices pi ON pi.id = pil.invoice_id
+          WHERE pi.tenant_id = ${tenantId} AND pi.status = 'posted' AND pi.kind IN ('purchase', 'purchase_return')
+            AND ${date(sql`pi.posted_at::date`)} AND ${eqIf(sql`pi.branch_id`, f.branchId)}
+        ), s AS (
+          SELECT coalesce(sum(net) FILTER (WHERE tax <> 0 AND kind = 'sale'), 0)
+               - coalesce(sum(net) FILTER (WHERE tax <> 0 AND kind = 'sale_return'), 0) AS taxed_net,
+                 coalesce(sum(tax) FILTER (WHERE tax <> 0 AND kind = 'sale'), 0)
+               - coalesce(sum(tax) FILTER (WHERE tax <> 0 AND kind = 'sale_return'), 0) AS taxed_vat,
+                 coalesce(sum(net) FILTER (WHERE tax = 0 AND kind = 'sale'), 0)
+               - coalesce(sum(net) FILTER (WHERE tax = 0 AND kind = 'sale_return'), 0) AS exempt_net
+          FROM sale_lines
+        ), p AS (
+          SELECT coalesce(sum(net) FILTER (WHERE tax <> 0 AND kind = 'purchase'), 0)
+               - coalesce(sum(net) FILTER (WHERE tax <> 0 AND kind = 'purchase_return'), 0) AS taxed_net,
+                 coalesce(sum(tax) FILTER (WHERE tax <> 0 AND kind = 'purchase'), 0)
+               - coalesce(sum(tax) FILTER (WHERE tax <> 0 AND kind = 'purchase_return'), 0) AS taxed_vat,
+                 coalesce(sum(net) FILTER (WHERE tax = 0 AND kind = 'purchase'), 0)
+               - coalesce(sum(net) FILTER (WHERE tax = 0 AND kind = 'purchase_return'), 0) AS exempt_net
+          FROM purchase_lines
+        ), r AS (
+          SELECT coalesce(sum(ri.net_amount), 0) AS net_total, coalesce(sum(ri.tax_amount), 0) AS vat_total
+          FROM rental_invoices ri
+          WHERE ri.tenant_id = ${tenantId} AND ri.status = 'posted' AND ${date(sql`ri.document_date`)}
+        ), v AS (
+          SELECT coalesce(sum(vr.amount) FILTER (WHERE vr.kind = 'receipt'), 0) AS receipts_net,
+                 coalesce(${voucherVat('vr')} FILTER (WHERE vr.kind = 'receipt'), 0) AS receipts_vat,
+                 coalesce(sum(vr.amount) FILTER (WHERE vr.kind = 'payment'), 0) AS payments_net,
+                 coalesce(${voucherVat('vr')} FILTER (WHERE vr.kind = 'payment'), 0) AS payments_vat
+          FROM vouchers vr
+          WHERE vr.tenant_id = ${tenantId} AND vr.status = 'posted' AND ${date(sql`vr.date`)}
+            AND ${eqIf(sql`vr.branch_id`, f.branchId)}
+        ), vat_accounts AS (
+          SELECT tg.vat_account_id FROM tax_groups tg
+          WHERE tg.tenant_id = ${tenantId} AND tg.vat_account_id IS NOT NULL
+        ), j AS (
+          SELECT coalesce(sum(jel.debit) FILTER (WHERE jel.account_id NOT IN (SELECT vat_account_id FROM vat_accounts)), 0) AS net_total,
+                 coalesce(sum(jel.debit) FILTER (WHERE jel.account_id IN (SELECT vat_account_id FROM vat_accounts)), 0) AS vat_total
+          FROM journal_entry_lines jel
+          JOIN journal_entries je ON je.id = jel.entry_id
+          WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted' AND je.is_vat
+            AND ${period} AND ${eqIf(sql`je.branch_id`, f.branchId)}
+        )
+        SELECT u.section, u.line, round(u.net, 2)::text AS net, round(u.vat, 2)::text AS vat,
+               round(u.s_net_vat, 2)::text AS s_net_vat
+        FROM s CROSS JOIN p CROSS JOIN r CROSS JOIN v CROSS JOIN j
+        CROSS JOIN LATERAL (VALUES
+          (1, 'ضريبة القيمة المضافة على المبيعات', 'المبيعات الخاضعة للنسبة الأساسية', s.taxed_net::numeric, s.taxed_vat::numeric, s.taxed_vat::numeric),
+          (2, 'ضريبة القيمة المضافة على المبيعات', 'الإيرادات الأخرى', r.net_total::numeric, r.vat_total::numeric, r.vat_total::numeric),
+          (3, 'ضريبة القيمة المضافة على المبيعات', 'سندات القبض', v.receipts_net::numeric, v.receipts_vat::numeric, v.receipts_vat::numeric),
+          (4, 'ضريبة القيمة المضافة على المبيعات', 'المبيعات المحلية الخاضعة للنسبة الصفرية', 0::numeric, 0::numeric, 0::numeric),
+          (5, 'ضريبة القيمة المضافة على المبيعات', 'المبيعات المعفاة', s.exempt_net::numeric, 0::numeric, 0::numeric),
+          (6, 'ضريبة القيمة المضافة على المبيعات', 'صافي المبيعات',
+             (s.taxed_net + r.net_total + v.receipts_net)::numeric,
+             (s.taxed_vat + r.vat_total + v.receipts_vat)::numeric, 0::numeric),
+          (7, 'ضريبة القيمة المضافة على المشتريات', 'المشتريات الخاضعة للنسبة الأساسية', p.taxed_net::numeric, p.taxed_vat::numeric, -p.taxed_vat::numeric),
+          (8, 'ضريبة القيمة المضافة على المشتريات', 'الإستيرادات الخاضعة للقيمة المضافة بالنسبة الأساسية', 0::numeric, 0::numeric, 0::numeric),
+          (9, 'ضريبة القيمة المضافة على المشتريات', 'سندات الصرف',
+             (v.payments_net + j.net_total)::numeric,
+             (v.payments_vat + j.vat_total)::numeric,
+             -(v.payments_vat + j.vat_total)::numeric),
+          (10, 'ضريبة القيمة المضافة على المشتريات', 'الإستيرادات الخاضعة للقيمة المضافة التي تطبق عليها آلية الاحتساب العكسي', 0::numeric, 0::numeric, 0::numeric),
+          (11, 'ضريبة القيمة المضافة على المشتريات', 'المشتريات المعفاة', p.exempt_net::numeric, 0::numeric, 0::numeric),
+          (12, 'ضريبة القيمة المضافة على المشتريات', 'صافي المشتريات',
+             (p.taxed_net + v.payments_net + j.net_total)::numeric,
+             (p.taxed_vat + v.payments_vat + j.vat_total)::numeric, 0::numeric),
+          (13, 'صافي ضريبة القيمة المضافة',
+             CASE WHEN (s.taxed_vat + r.vat_total + v.receipts_vat) - (p.taxed_vat + v.payments_vat + j.vat_total) > 0
+                  THEN 'مستحق الدفع للهيئة' ELSE 'غير مستحق' END,
+             0::numeric,
+             ((s.taxed_vat + r.vat_total + v.receipts_vat) - (p.taxed_vat + v.payments_vat + j.vat_total))::numeric,
+             0::numeric)
+        ) AS u(ord, section, line, net, vat, s_net_vat)
+        ORDER BY u.ord`;
+    },
   },
 
 ];

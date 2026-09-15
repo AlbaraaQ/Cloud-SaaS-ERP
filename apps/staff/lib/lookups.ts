@@ -106,6 +106,18 @@ export type CostCenter = {
   parentId?: string | null;
   branchId?: string | null;
 };
+/** 📒 الحساب — the chart of accounts behind the «الحساب» / «الحساب الرئيسي» filters. */
+export type Account = {
+  id: string;
+  code: string;
+  nameAr?: string;
+  name_ar?: string;
+  nameEn?: string | null;
+  type?: string;
+  level?: number;
+  isPostable?: boolean;
+  is_postable?: boolean;
+};
 export type FiscalPeriod = {
   id: string;
   name: string;
@@ -359,6 +371,7 @@ export const listParties = (kind?: string) => apiList<Party>(`/parties${kind ? `
 export const listCashLocations = () => apiList<CashLocation>('/cash-locations');
 export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');
 export const listCostCenters = () => apiList<CostCenter>('/cost-centers');
+export const listAccounts = () => apiList<Account>('/accounts');
 export const listPeriods = () => apiList<FiscalPeriod>('/fiscal-periods');
 export const listEmployees = () => apiList<Employee>('/hrm/employees');
 export const listLots = (filters: { itemId?: string; q?: string } = {}) => {
