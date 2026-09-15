@@ -86,7 +86,7 @@
 | 1 | 📊 تقارير المبيعات — `frmRptSalesInPeriod` (`RptSalesInPeriod1/2`) | ✅ مُنجز (§4) |
 | 2 | 📦 تقارير الأصناف — `frmRptItemsSalesDetails` · `frmRptItemsSalesDetailsPOS` · `frmRptItemsProfit` · `frmRptItemsProfitDetails` · `frmRptSalesByCategory` · `frmRptCategorySaleByDay` | ✅ مُنجز (§5) |
 | 3 | 🧾 تقارير الفواتير والإشعارات والحركة اليومية — `frmRptInvSalesDetails` · `frmRptInvSalesDetailsPos(Android)` · `frmRptInvNotfic` · `frmRptInvPurchaseDetails` · `frmRptDailySales` · `frmRptDailyProcess` · `frmRptInvAnalysis` · `FrmRptSalesChart` | ✅ مُنجز (§6) |
-| 4 | 📚 تقارير المخزون والأرقام التسلسلية — `frmRptInventory` · `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo` · `frmRptSerialNoSummary` · `frmRptProducedItems` | ⬜ |
+| 4 | 📚 تقارير المخزون والأرقام التسلسلية — `frmRptInventory` · `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo` · `frmRptSerialNoSummary` · `frmRptProducedItems` | ✅ مُنجز (§7) |
 | 5 | 📒 تقارير المحاسبة — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod` | ⬜ |
 | 6 | 💰 تقارير الخزينة والرواتب والمستخدمين — `frmRptKhzna` · `frmRptSalary` · `frmRptReseved` · `frmrptUsersRecords` · `frmRptRentInvoices` · `frmInvRptType` | ⬜ |
 | 7 | 🖨️ إعدادات الطباعة — `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة) و`Reports/header.repx`/`footer.repx` لكل تقرير | ⬜ |
@@ -470,7 +470,122 @@
   (`SALES_VOID_HAS_PAYMENTS`) — وهو بندٌ مفحوص لا مُهمَل، وهو عينُ ما يفعله
   `scripts/verify-reports-sales.mjs` في الجزء الأول.
 
-## 7. معايير القبول لكل جزء
+## 7. الجزء الرابع — 📚 تقارير المخزون والأرقام التسلسلية (`frmRptInventory` · `frmRptItems*` · `frmRptSerial*` · `frmRptProducedItems`)
+
+### 7.1 النوافذ وما تقرأه
+
+| النافذة | العنوان | الملف | الأسطر | التقرير في السجل |
+|---|---|---|---|---|
+| `frmRptInventory.xaml` | «📋 الفواتير» (مستندات المخزون) | `Form_WPF/frmRptInventory.xaml.cs` | 769 | `inventory-documents` |
+| `frmRptItemsActivity.xaml` | «مادة باجمالي الحركات» | `Form_WPF/frmRptItemsActivity.xaml.cs` | 964 | `item-movement-totals` |
+| `frmRptItemsActivityDetailed.xaml` | «حركة صنف تفصيلي» | `Form_WPF/frmRptItemsActivityDetailed.xaml.cs` | 1195 | `item-movement-details` |
+| `frmRptItemsExpiration.xaml` | «صلاحية المواد» | `Form_WPF/frmRptItemsExpiration.xaml.cs` | 448 | `item-expiry` |
+| `frmRptSerialNo.xaml` | «حركة الأرقام التسلسلية» | `Form_WPF/frmRptSerialNo.xaml.cs` | 491 | `serial-movements` |
+| `frmRptSerialNoSummary.xaml` | «أرصدة الأرقام التسلسلية» | `Form_WPF/frmRptSerialNoSummary.xaml.cs` | 324 | `serial-balances` |
+| `frmRptProducedItems.xaml` | «تقرير مواد المنتجة» | `Form_WPF/frmRptProducedItems.xaml.cs` | 376 | `produced-items` + `produced-components` |
+
+- `frmRptInventory` يقرأ `Inv` بثمانية أنواع عملية (L260-267): «مناقلة مرسلة» 8/2 ·
+  «مناقلة مستلمة» 8/1 · «بضاعة أول مدة» 9/1 · «أمر توريد» 4/1 · «أمر صرف» 5/1 ·
+  «أمر إنتاج» 6/1 · «طلب بضاعة» 14/1 · «تسوية جردية» 7/1، ويطبعها في
+  `Reports/rptInventoryReport.repx`. **عنوان النافذة في الديسكتوب نفسه يقول «تفاصيل
+  فواتير المشتريات»** (نسخٌ ولصقٌ من نافذة المشتريات) — والعنوان المعتمد هنا هو عنوان
+  شبكتها «📋 الفواتير» مع اسم تقريرها `rptInventoryReport`.
+- `frmRptItemsActivity` يستدعي `GetSumVal(itemId, inv_type, proc_type, …)` ثلاث عشرة مرة
+  (L232-244) ويحسب الرصيد يدويّاً (L248)، ومتوسط التكلفة من `CalcAvgCost` (L363-415).
+- `frmRptItemsActivityDetailed` يقرأ `Inv, Inv_Sub` مرتّباً بالتاريخ ويُراكم الرصيد سطراً
+  سطراً (L355-365)، واسم النوع من جدول `InvTypes` (L334-345) مع إسقاط `IsInput = 0`.
+- `frmRptItemsExpiration` يستدعي `Inventory.ItemsExpirationStock(cond)`
+  (`Class/Inventory.cs:352`) وهي `dbo.ItemsExpirationStock()` في `AlterDb.txt:2157`.
+- `frmRptSerialNoSummary` يستدعي `dbo.funCalculateSerialNoSummary` (`AlterDb.txt:3615`)
+  من جدول `InvoiceItemDetail` بشرطي `InvertoryImpact` 1 و2.
+- `frmRptProducedItems` شبكتان في نافذة واحدة: «🔧 المكونات» و«🏭 المواد المنتجة».
+
+### 7.2 السطح (نقاط النهاية)
+
+| التقرير | نقطة النهاية | الفلاتر |
+|---|---|---|
+| مستندات المخزون | `GET /api/v1/reports/inventory-documents` | 📄 نوع العملية (ثمانية) · 🏭 المستودع · 🏢 الفرع · 📅 من/إلى + ⏰ وقت |
+| مادة باجمالي الحركات | `GET /api/v1/reports/item-movement-totals` | 🏢 الفرع · 📦 الصنف · 📅 من/إلى · 🏪 المستودع · 👥 العميل/المورد · 🗂️ المجموعة |
+| حركة صنف تفصيلي | `GET /api/v1/reports/item-movement-details` | 🏬 الفرع · 🏭 المستودع · 📦 الصنف · 📅 من/إلى · 👥 عميل/مورد · 🔄 نوع العملية (أحد عشر) · 📋 أنماط الفواتير |
+| صلاحية المواد | `GET /api/v1/reports/item-expiry` | 🏪 المستودع · 🗂️ المجموعة · 📦 الصنف · 🏢 الفرع |
+| حركة الأرقام التسلسلية | `GET /api/v1/reports/serial-movements` | 🏬 الفرع · 📦 الصنف · 🔢 الرقم التسلسلي · 📅 من/إلى |
+| أرصدة الأرقام التسلسلية | `GET /api/v1/reports/serial-balances` | 🏬 الفرع · 📦 الصنف · 🔢 الرقم التسلسلي |
+| تقرير مواد المنتجة | `GET /api/v1/reports/produced-items` | 📅 من/إلى |
+| مكونات المواد المنتجة | `GET /api/v1/reports/produced-components` | 📅 من/إلى |
+
+كلها بـ `reporting.view`، والطباعة `/api/v1/reports/print/:key`، والتصدير
+`POST /api/v1/reports/:key/export` (CSV · XLSX · PDF).
+
+### 7.3 مطابقة الأعمدة والتسميات
+
+| النافذة | الأعمدة المنقولة | التسميات |
+|---|---|---|
+| `frmRptInventory` | 10 من 12 (المستخدم · الخصم · الضريبة · الصافي لا مقابل لها — §7.5) | 100٪ من القابلة للنقل |
+| `frmRptItemsActivity` | 18 من 18 | 100٪ |
+| `frmRptItemsActivityDetailed` | 18 من 19 (زر «📄 الفاتورة» شبكةٌ فرعية) | 100٪ |
+| `frmRptItemsExpiration` | 9 من 9 | 100٪ |
+| `frmRptSerialNo` | 9 من 12 (ثلاثة أعمدة معرّفات + زر «👁️ عرض») | 100٪ |
+| `frmRptSerialNoSummary` | 5 من 5 | 100٪ |
+| `frmRptProducedItems` | 10 من 6 (الشبكة + رقم الأمر + المرجع + الحالة) | 100٪ |
+
+### 7.4 القواعد المنقولة كما هي
+
+1. **صيغة الرصيد** (`frmRptItemsActivity.xaml.cs` L248) — الرصيد = أول مدة + مشتريات
+   − مرتجع مشتريات − مبيعات + مرتجع مبيعات − نقطة البيع + مرتجع POS + مناقلة − مناقلة
+   + فاتورة إدخال − فاتورة إخراج + تسوية إدخال − تسوية إخراج. كل عمودٍ «حجم حركة»
+   والإشارة تأتي من اسم العمود لا من قيمته، وعلى ذلك جاء التحقّق: 100 + 20 − 5 − 10 + 2
+   − 1 − 25 + 3 − 2 + 7 − 4 − 8 = **77**.
+2. **إجمالي التكلفة = الرصيد × متوسط التكلفة** (L271) ومتوسط التكلفة من
+   `CalcAvgCost` (L363-415) — والسحابة تحفظه على صف الرصيد (`stock_balances`).
+3. **الرصيد المتحرك** في «حركة صنف تفصيلي» (L355-365) يُراكم داخل الفترة فقط.
+4. **إسقاط `IsInput = 0`** (L344) — لا يظهر في التقرير إلا ما حرّك المخزون.
+5. **`dbo.ItemsExpirationStock`** — الأصناف المراقَبة بصلاحية وحدها (`ItemProperty = 8` →
+   `track_lot`)، و«باقي سنوات/أشهر/أيام» بـ `DATEDIFF` نفسه.
+6. **`funCalculateSerialNoSummary`** — العدد رصيدٌ لا عددُ صفوف: ما خرج من الرفّ ليس رصيداً
+   (مُختبَر: استهلاك رقمٍ يُخرجه ثم إرجاعه يُعيده).
+
+### 7.5 التحويلات عن الديسكتوب (مبرَّرة)
+
+1. **المعرّفات والأزرار** (`InvGlobalID` · `ProcType` · `InvTypeNo` · «👁️ عرض») — لا تُعرض؛
+   وهي محفوظةٌ أعمدةً مخفيّة (`doc_id` · `doc_type`) ليُبنى عليها رابط المستند لاحقاً.
+2. **👤 المستخدم** في `frmRptInventory` — ليس على كل رؤوس مستندات المخزون عمود `created_by`
+   موحّد؛ مؤجَّل (§9).
+3. **المجموع · الخصم · الإجمالي · الضريبة · الصافي** في `frmRptInventory` — مستندات
+   المخزون في السحابة تحمل **تكلفة** و**كمية** لا سعراً وضريبة، فانضغطت البطاقات الخمس في
+   «إجمالي الكمية · إجمالي التكلفة · عدد المستندات».
+4. **أمر توريد وطلب بضاعة فارغان** — السحابة تحفظهما وثيقتين (`stock_deliveries` ·
+   `goods_requests`) لا تُحرّكان رصيد المخزون، فلا سطر لهما في دفتر الحركات؛ الخياران
+   باقيان في القائمة كما في الديسكتوب، والفرق مُختبَر ومُوثَّق.
+5. **«نوع الفاتورة» من جدول `InvTypes`** — لا جدول مقابل في السحابة، فاشتُقّ الاسم من
+   `doc_type` بأسماء النوافذ نفسها: «فاتورة إدخال/إخراج» و«تسوية إدخال/إخراج» و«نقطة
+   البيع» (بلا عميل) و«إذن مخزني» للمستند الذي يحمل الاتجاهين.
+6. **الصلاحية بالدُفعات** — الديسكتوب يجمّع حركات الصنف على تاريخ انتهاء، والسحابة تحفظ
+   الصلاحية على الدفعة (`item_lots.expiry_date`)؛ ورُصيد الدفعة من دفتر الحركات، مع
+   `HAVING … <> 0` لأن دفعةً استُنفدت لا صلاحية لها.
+7. **أعمدة الاتجاه** — `proc_type` الديسكتوب صار `direction` (`in`/`out`)، وعمود
+   «الإتجاه» في حركة الأرقام التسلسلية يقرأه نصّاً («داخل»/«خارج»).
+8. **«🔄 نوع العملية» على فلتر `kind`** — لأن `procType` محجوزٌ لتقارير الفواتير
+   («مبيعات»/«مرتجع»)، و«أنماط الفواتير» على فلتر `status`.
+9. **🔢 الرقم التسلسلي مدخلٌ نصّي** — نوعٌ جديد `kind: 'serial'` في المحرّك والواجهة،
+   لأن صندوق الديسكتوب حرّ (`@ItemSerialNo`) لا قائمة منسدلة.
+10. **🔧 المكونات تقريرٌ ثانٍ** — شبكتان في نافذة واحدة عند الديسكتوب، وتقريران في
+    السجل هنا، كلٌّ بنقطة نهايته وفلاتره.
+
+### 7.6 الاختبارات والتحقّق الحيّ
+
+- `apps/api/test/report-inventory.spec.ts` — **10** اختبارات: السجل (ثمانية تقارير
+  بأعمدتها) · مستندات المخزون (سطرٌ لكل مستند وثمانية أنواع) · مادة باجمالي الحركات
+  (ثلاثة عشر عموداً وصيغة الرصيد ومتوسط التكلفة) · حركة صنف تفصيلي (رصيدٌ متحرك · نوع
+  الفاتورة · أنماط الفواتير) · صلاحية المواد (باقي سنوات/أشهر/أيام) · حركة الأرقام
+  التسلسلية · أرصدة الأرقام التسلسلية (استهلاكٌ وإرجاع) · مواد مُنتَجة ومكوّناتها ·
+  فترةٌ فارغة · عزل المؤسسات و`reporting.view`.
+- `scripts/verify-reports-inventory.mjs` — **150** نقطة تحقّق حيّة: أحدَ عشرَ مستنداً
+  ودُفعات وثلاثة أرقام تسلسلية وأمر إنتاج، وكل رقمٍ مستأجَرٍ واسع **فارقٌ عن خطّ أساس**
+  يُؤخذ قبل الكتابة، وكل ما يُلغى أُلغي في `finally` (السندات · الفواتير · الدفعات ·
+  الأرقام التسلسلية)، وما لا يُلغى **مفحوصٌ أنه يُرفض**: أمرُ إنتاجٍ مكتمل
+  (`PRODUCTION_ORDER_INVALID_STATUS`) ومناقلةٌ مستلمة (`TRANSFER_INVALID_STATE`).
+
+## 8. معايير القبول لكل جزء
 
 1. كل تقريرٍ منقول يُسمّي ملفه من `Desktop_ERP` (`Form_WPF/frmRpt*.xaml` و
    `Reports/*.repx`) نصّاً في الوثيقة وفي تعليق تعريفه.
@@ -481,7 +596,7 @@
 5. الشاشة تصل من طريقٍ حقيقي في الشجرة (`apps/staff/lib/navigation.ts`).
 6. تحديث هذه الوثيقة و`docs/STATUS.md` و`docs/desktop-parity/README.md`.
 
-## 8. مؤجَّل عن قصد
+## 9. مؤجَّل عن قصد
 
 - 🖨️ `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة الافتراضية) — جزءٌ سابع.
 - 🔄 أنواع `DoProcess2(5 … 9)` من «تقرير الحركة اليومية» — تقرأ جدول `receipts`
@@ -493,6 +608,11 @@
 - 🔗 «رقم المرجع» نصّاً حرّاً (`inv.Reff_No`) — السحابة تحفظ الرابط لا الصندوق (§6.5/1).
 - 👤 المستخدم و🧑‍💼 المندوب في `frmRptItemsSalesDetailsPOS` و`frmRptSalesByCategory`
   (§5.5/6) — حتى يوجد مرشِّح `kind: 'membership'` في السجل.
+- 👤 «المستخدم» في «تقرير مستندات المخزون» `frmRptInventory` (§7.5/2) — حتى يُوحَّد عمود
+  `created_by` على رؤوس مستندات المخزون.
+- 🔧 «المكونات» شبكةً داخل «تقرير مواد المنتجة» بدل تقريرٍ ثانٍ (§7.5/10).
+- 🚚 «مرتجع مناقلة» و«إلغاء مناقلة» عمودين مستقلّين في «مادة باجمالي الحركات» (§7.4/1)
+  — الديسكتوب يحسب المناقلة بعمودين اثنين لا أربعة.
 - «الأصناف الخاضعة للضريبة الإضافية» وعمود `DgvItemAdditionalTax` (§5.5/5).
 - زرّا «تفاصيل» و«📄 الفاتورة» اللذان ينقلان من تقريرٍ إلى نافذةٍ أخرى (§5.5/4).
 - صور الرأس والتذييل والختم (`HeaderImage` · `FooterImage` · `StampImage`).

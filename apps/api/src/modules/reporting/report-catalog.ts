@@ -8,7 +8,22 @@ import { sql, type SQL } from 'drizzle-orm';
  * column and which columns to total. The admin app therefore ships **one** report screen
  * instead of forty hand-written ones, and adding a report here makes it appear there.
  */
-export type ReportParamKind = 'date' | 'time' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
+/**
+ * 🔢 الرقم التسلسلي — `frmRptSerialNo.xaml` L<filter> is a free box the clerk types a
+ * number into (`@ItemSerialNo`), so it needs a plain text input rather than a lookup.
+ */
+export type ReportParamKind =
+  | 'date'
+  | 'time'
+  | 'branch'
+  | 'warehouse'
+  | 'party'
+  | 'item'
+  | 'category'
+  | 'salesman'
+  | 'costCenter'
+  | 'select'
+  | 'serial';
 
 export type ReportParam = {
   name: string;
@@ -61,6 +76,15 @@ export type ReportFilters = {
   costCenterId?: string;
   status?: string;
   kind?: string;
+  /** 🔢 الرقم التسلسلي — the free text box of `frmRptSerialNo` / `frmRptSerialNoSummary`. */
+  serial?: string;
+  /**
+   * 📄 نوع العملية — `cmbOperation` of `frmRptInventory.xaml.cs` L260-267: eight inventory
+   * documents the desktop keeps in one `Inv.inv_type` column (`8/2`, `8/1`, `9/1`, `4/1`,
+   * `5/1`, `6/1`, `14/1`, `7/1`). The cloud splits them into real document tables, so the
+   * report reads the movement ledger's `doc_type` instead.
+   */
+  docType?: string;
 };
 
 export type ReportDefinition = {
@@ -591,6 +615,232 @@ const purchaseScope = (tenantId: string, f: ReportFilters, kind: string): SQL =>
   AND ${eqIf(sql`pi.branch_id`, f.branchId)}
   AND ${eqIf(sql`pi.party_id`, f.partyId)}
 `;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📚 «تقارير المخزون والأرقام التسلسلية» — `frmRptInventory` · `frmRptItemsActivity` ·
+//    `frmRptItemsActivityDetailed` · `frmRptItemsExpiration` · `frmRptSerialNo` ·
+//    `frmRptSerialNoSummary` · `frmRptProducedItems`
+//
+// The desktop keeps every stock movement in two tables (`Inv` + `Inv_Sub`) and tells the
+// documents apart with `inv_type` / `proc_type`. The cloud keeps one movement ledger —
+// `inventory_transactions` — whose `doc_type` is the desktop's `inv_type` and whose
+// `direction` is its `proc_type`; `base_qty` is always positive, exactly like the `val`
+// column `frmRptItemsActivity.xaml.cs` L248 adds and subtracts by hand.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The scope every ledger-backed report shares. `wh` is joined so that the 🏢 الفرع filter
+ * works: `inventory_transactions` carries a warehouse, and the warehouse carries the branch.
+ */
+const ledgerScope = (tenantId: string, f: ReportFilters): SQL => sql`
+  it.tenant_id = ${tenantId}
+  AND ${onDateTime(sql`it.occurred_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${eqIf(sql`it.warehouse_id`, f.warehouseId)}
+  AND ${eqIf(sql`it.item_id`, f.itemId)}
+  AND ${eqIf(sql`item.category_id`, f.categoryId)}
+  AND ${eqIf(sql`wh.branch_id`, f.branchId)}
+  AND ${f.partyId ? sql`coalesce(si.party_id, pi.party_id) = ${f.partyId}::uuid` : all}
+`;
+
+/** The joins that give a ledger row its document number — one per inventory document table. */
+const documentJoins = sql`
+  LEFT JOIN stock_transfers tr ON tr.id = it.doc_id AND it.doc_type IN ('stock_transfer', 'stock_transfer_receipt', 'stock_transfer_return', 'stock_transfer_cancel')
+  LEFT JOIN stock_deliveries dl ON dl.id = it.doc_id AND it.doc_type = 'stock_delivery'
+  LEFT JOIN goods_requests rq ON rq.id = it.doc_id AND it.doc_type = 'goods_request'
+  LEFT JOIN stock_adjustments aj ON aj.id = it.doc_id AND it.doc_type = 'stock_adjustment'
+  LEFT JOIN stock_vouchers sv ON sv.id = it.doc_id AND it.doc_type IN ('stock_voucher', 'stock_voucher_void', 'opening')
+  LEFT JOIN production_orders mo ON mo.id = it.doc_id AND it.doc_type = 'production_order'
+  LEFT JOIN sales_invoices si ON si.id = it.doc_id AND it.doc_type IN ('sales_invoice', 'sales_return', 'sales_void')
+  LEFT JOIN purchase_invoices pi ON pi.id = it.doc_id AND it.doc_type IN ('purchase_invoice', 'purchase_return', 'purchase_void')
+`;
+
+/**
+ * 📄 نوع العملية — `frmRptInventory.xaml.cs` L260-267 maps its combo to
+ * `Inv.inv_type`/`proc_type` pairs: «مناقلة مرسلة» 8/2 · «مناقلة مستلمة» 8/1 ·
+ * «بضاعة أول مدة» 9/1 · «أمر توريد» 4/1 · «أمر صرف» 5/1 · «أمر إنتاج» 6/1 ·
+ * «طلب بضاعة» 14/1 · «تسوية جردية» 7/1. The cloud names the documents instead.
+ */
+const docTypeScope = (docType?: string): SQL => {
+  switch (docType) {
+    case 'transfer_out':
+      return sql`it.doc_type = 'stock_transfer'`;
+    case 'transfer_in':
+      return sql`it.doc_type = 'stock_transfer_receipt'`;
+    case 'opening':
+      return sql`it.doc_type = 'opening'`;
+    case 'delivery':
+      return sql`it.doc_type = 'stock_delivery'`;
+    case 'issue':
+      return sql`it.doc_type = 'stock_voucher' AND it.direction = 'out'`;
+    case 'production':
+      return sql`it.doc_type = 'production_order'`;
+    case 'request':
+      return sql`it.doc_type = 'goods_request'`;
+    case 'adjustment':
+      return sql`it.doc_type = 'stock_adjustment'`;
+    default:
+      return all;
+  }
+};
+
+/**
+ * 🔄 نوع العملية — `frmRptItemsActivityDetailed.xaml.cs` L426-455 (`BuildProcTypeCondition`),
+ * one branch per `Inv.inv_type`. The cloud reads the same documents by `doc_type`.
+ */
+const movementProcTypeScope = (procType?: string): SQL => {
+  switch (procType) {
+    case 'purchase':
+      return sql`it.doc_type IN ('purchase_invoice', 'purchase_return')`;
+    case 'sale':
+      return sql`it.doc_type IN ('sales_invoice', 'sales_return') AND si.party_id IS NOT NULL`;
+    case 'pos':
+      return sql`it.doc_type IN ('sales_invoice', 'sales_return') AND si.party_id IS NULL`;
+    case 'delivery':
+      return sql`it.doc_type = 'stock_delivery'`;
+    case 'issue':
+      return sql`it.doc_type = 'stock_voucher' AND it.direction = 'out'`;
+    case 'production':
+      return sql`it.doc_type = 'production_order'`;
+    case 'transfer':
+      return sql`it.doc_type IN ('stock_transfer', 'stock_transfer_receipt', 'stock_transfer_return', 'stock_transfer_cancel')`;
+    case 'adjustment':
+      return sql`it.doc_type = 'stock_adjustment'`;
+    case 'opening':
+      return sql`it.doc_type = 'opening'`;
+    case 'note_credit':
+      return sql`si.kind = 'credit_note'`;
+    case 'note_debit':
+      return sql`si.kind = 'debit_note'`;
+    default:
+      return all;
+  }
+};
+
+/**
+ * 📋 أنماط الفواتير — the three radios of `frmRptItemsActivityDetailed.xaml` L446-460:
+ * «الكل» · «مشتريات» · «مرتجع مشتريات», which the desktop applies to `inv_type = 1`.
+ */
+const invoicePatternScope = (pattern?: string): SQL =>
+  pattern === 'purchase'
+    ? sql`it.doc_type = 'purchase_invoice'`
+    : pattern === 'purchase_return'
+      ? sql`it.doc_type = 'purchase_return'`
+      : all;
+
+/**
+ * «نوع الفاتورة» — the desktop reads `InvTypes.name` per `inv_type` (`IsInput` decides the
+ * sign, L334-345). The cloud has no such table, so the label is derived from `doc_type`
+ * with the Arabic names those very windows print: «فاتورة إدخال» / «فاتورة إخراج» and
+ * «تسوية إدخال» / «تسوية إخراج» in `frmRptItemsActivity`, «نقطة البيع» in `frmRptPos`.
+ */
+/**
+ * `direction` is passed when the label is built from a single movement row (so an إذن reads
+ * «إذن إدخال» or «إذن إخراج») and left out when it is built from a whole document, which can
+ * carry both directions and therefore reads «إذن مخزني» / «تسوية جردية».
+ */
+const docTypeLabel = (column: SQL = sql`it.doc_type`, sales = false, direction?: SQL): SQL => sql`CASE ${column}
+    WHEN 'opening' THEN 'بضاعة أول مدة'
+    WHEN 'purchase_invoice' THEN 'مشتريات'
+    WHEN 'purchase_return' THEN 'مرتجع مشتريات'
+    WHEN 'purchase_void' THEN 'إلغاء فاتورة مشتريات'
+    WHEN 'sales_invoice' THEN ${
+      sales ? sql`CASE WHEN si.party_id IS NULL THEN 'نقطة البيع' ELSE 'مبيعات' END` : sql`'مبيعات'`
+    }
+    WHEN 'sales_return' THEN ${
+      sales ? sql`CASE WHEN si.party_id IS NULL THEN 'مرتجع نقطة البيع' ELSE 'مرتجع مبيعات' END` : sql`'مرتجع مبيعات'`
+    }
+    WHEN 'sales_void' THEN 'إلغاء فاتورة مبيعات'
+    WHEN 'stock_transfer' THEN 'مناقلة مرسلة'
+    WHEN 'stock_transfer_receipt' THEN 'مناقلة مستلمة'
+    WHEN 'stock_transfer_return' THEN 'مرتجع مناقلة'
+    WHEN 'stock_transfer_cancel' THEN 'إلغاء مناقلة'
+    WHEN 'stock_voucher' THEN ${direction ? sql`CASE WHEN ${direction} = 'in' THEN 'إذن إدخال' ELSE 'إذن إخراج' END` : sql`'إذن مخزني'`}
+    WHEN 'stock_voucher_void' THEN 'إلغاء إذن'
+    WHEN 'stock_adjustment' THEN ${direction ? sql`CASE WHEN ${direction} = 'in' THEN 'تسوية إدخال' ELSE 'تسوية إخراج' END` : sql`'تسوية جردية'`}
+    WHEN 'production_order' THEN 'أمر إنتاج'
+    WHEN 'goods_request' THEN 'طلب بضاعة'
+    WHEN 'stock_delivery' THEN 'أمر توريد'
+    ELSE ${column}
+  END`;
+
+/** «رقم الفاتورة» — whichever document table the movement belongs to. */
+const docNumber = sql`coalesce(tr.number, dl.number, rq.number, aj.number, sv.number, mo.number, si.number, pi.number, '—')`;
+
+/**
+ * «رقم المرجع» — `Inv.Reff_No` in the desktop. Part three established the cloud reading of
+ * that column: a purchase's `supplier_reference_no`, a sale's referenced invoice number, and
+ * 📄 رقم المرجع of `production_orders` for an أمر إنتاج.
+ */
+const docReference = sql`coalesce(
+  mo.reference_no,
+  pi.supplier_reference_no,
+  (SELECT ref.number FROM sales_invoices ref WHERE ref.id = si.reference_invoice_id),
+  '—')`;
+
+/** «التاريخ» — the document's own date, falling back to the moment the movement was posted. */
+const docDate = sql`to_char(coalesce(tr.sent_at, dl.delivered_at, rq.requested_at, aj.approved_at, sv.posted_at, mo.order_date, si.posted_at, pi.posted_at, it.occurred_at), 'YYYY-MM-DD')`;
+
+/** 🏭 المستودع · 🏢 الفرع · 👥 الحساب of a movement row. */
+const warehouseName = sql`coalesce(wh.name, '—')`;
+const movementBranch = sql`coalesce(br.name_ar, '—')`;
+const movementParty = sql`coalesce(pt.name, '—')`;
+
+const countCard: ReportColumn = { key: 's_count', labelAr: 'العدد', type: 'int', hidden: true };
+
+/** 📄 نوع العملية — the eight inventory documents of `frmRptInventory`. */
+const INVENTORY_OPERATION: ReportParam = {
+  name: 'docType',
+  labelAr: 'نوع العملية',
+  kind: 'select',
+  options: [
+    { value: 'transfer_out', labelAr: 'مناقلة مرسلة' },
+    { value: 'transfer_in', labelAr: 'مناقلة مستلمة' },
+    { value: 'opening', labelAr: 'بضاعة أول مدة' },
+    { value: 'delivery', labelAr: 'أمر توريد' },
+    { value: 'issue', labelAr: 'أمر صرف' },
+    { value: 'production', labelAr: 'أمر إنتاج' },
+    { value: 'request', labelAr: 'طلب بضاعة' },
+    { value: 'adjustment', labelAr: 'تسوية جردية' },
+  ],
+};
+
+/**
+ * 🔄 نوع العملية — `cmbProcType` of «حركة صنف تفصيلي». It rides on the generic `kind`
+ * filter because `procType` is taken: every فاتورة window in this catalogue reads it as
+ * «مبيعات» / «مرتجع» (`proc_type` 1 · 2), which is a different axis altogether.
+ */
+const MOVEMENT_PROC_TYPE: ReportParam = {
+  name: 'kind',
+  labelAr: 'نوع العملية',
+  kind: 'select',
+  options: [
+    { value: 'purchase', labelAr: 'مشتريات' },
+    { value: 'sale', labelAr: 'مبيعات' },
+    { value: 'pos', labelAr: 'نقطة البيع' },
+    { value: 'delivery', labelAr: 'أمر توريد' },
+    { value: 'issue', labelAr: 'أمر صرف' },
+    { value: 'production', labelAr: 'أمر إنتاج' },
+    { value: 'transfer', labelAr: 'مناقلة' },
+    { value: 'adjustment', labelAr: 'تسوية جردية' },
+    { value: 'opening', labelAr: 'بضاعة أول مدة' },
+    { value: 'note_credit', labelAr: 'إشعار دائن' },
+    { value: 'note_debit', labelAr: 'إشعار مدين' },
+  ],
+};
+
+/** 📋 أنماط الفواتير — the «الكل / مشتريات / مرتجع مشتريات» radios. */
+const INVOICE_PATTERN: ReportParam = {
+  name: 'status',
+  labelAr: 'أنماط الفواتير',
+  kind: 'select',
+  options: [
+    { value: 'purchase', labelAr: 'مشتريات' },
+    { value: 'purchase_return', labelAr: 'مرتجع مشتريات' },
+  ],
+};
+
+/** 🔢 الرقم التسلسلي — the free text box of the two serial windows. */
+const SERIAL_NO: ReportParam = { name: 'serial', labelAr: 'الرقم التسلسلي', kind: 'serial' };
 
 const definitions: ReportDefinition[] = [
   // ---------------------------------------------------------------- sales
@@ -2474,7 +2724,490 @@ const definitions: ReportDefinition[] = [
       UNION ALL
       SELECT 'صافي الربح', (coalesce((SELECT net FROM movement WHERE type = 'revenue'), 0)
                             + coalesce((SELECT net FROM movement WHERE type = 'expense'), 0))::text`,
+  },  // ------------------------------------------- 📚 inventory — تقارير المخزون والأرقام التسلسلية
+  {
+    key: 'inventory-documents',
+    titleAr: 'تقرير مستندات المخزون',
+    group: 'inventory',
+    hintAr: 'كل مستند مخزون بسطر: نوعه ورقمه وتاريخه ومستودعه وفرعه، وعدد أصنافه وكميته وتكلفته — «📋 الفواتير» في `frmRptInventory`.',
+    // 📄 نوع العملية · 🏭 المستودع · 🏢 الفرع · 📅 من / إلى + ⏰ الوقت.
+    params: [INVENTORY_OPERATION, WAREHOUSE, BRANCH, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: [
+      int('seq', 'م'),
+      text('operation', 'نوع العملية'),
+      text('doc_number', 'رقم المستند'),
+      date('doc_date', 'التاريخ'),
+      text('party_name', 'العميل/المورد'),
+      text('warehouse_name', 'المستودع'),
+      text('branch_name', 'الفرع'),
+      int('lines_count', 'عدد الأصناف'),
+      qty('qty', 'الكمية'),
+      money('cost', 'التكلفة'),
+      { key: 'doc_id', labelAr: 'معرّف المستند', type: 'text', hidden: true },
+      countCard,
+    ],
+    totals: ['lines_count', 'qty', 'cost'],
+    // «المجموع:» · «الصافي:» · «عدد الفواتير:» — an inventory document carries a cost and a
+    // quantity, not a price and a tax, so the five money cards of the desktop collapse into
+    // إجمالي الكمية · إجمالي التكلفة · عدد المستندات.
+    grandTotal: [
+      { key: 'qty', labelAr: 'إجمالي الكمية' },
+      { key: 'cost', labelAr: 'إجمالي التكلفة' },
+      { key: 's_count', labelAr: 'عدد المستندات' },
+    ],
+    emptyAr: 'لا توجد مستندات في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY agg.occurred_at, agg.doc_id)::text AS seq,
+             ${docTypeLabel(sql`agg.doc_type`)} AS operation,
+             ${docNumber} AS doc_number,
+             to_char(agg.occurred_at, 'YYYY-MM-DD') AS doc_date,
+             ${movementParty} AS party_name,
+             ${warehouseName} AS warehouse_name,
+             ${movementBranch} AS branch_name,
+             agg.lines_count, agg.qty, agg.cost,
+             agg.doc_id::text AS doc_id, '1' AS s_count
+      FROM (
+        SELECT it.doc_type, it.doc_id, it.warehouse_id,
+               min(it.occurred_at) AS occurred_at,
+               count(DISTINCT it.item_id)::text AS lines_count,
+               round(sum(CASE WHEN it.direction = 'in' THEN it.base_qty ELSE -it.base_qty END), 2)::text AS qty,
+               round(sum(CASE WHEN it.direction = 'in' THEN it.total_cost ELSE -it.total_cost END), 2)::text AS cost
+        FROM inventory_transactions it
+        JOIN items item ON item.id = it.item_id
+        JOIN warehouses wh ON wh.id = it.warehouse_id
+        WHERE ${ledgerScope(tenantId, f)} AND ${docTypeScope(f.docType)}
+        GROUP BY it.doc_type, it.doc_id, it.warehouse_id
+      ) agg
+      LEFT JOIN warehouses wh ON wh.id = agg.warehouse_id
+      LEFT JOIN branches br ON br.id = wh.branch_id
+      LEFT JOIN stock_transfers tr ON tr.id = agg.doc_id AND agg.doc_type IN ('stock_transfer', 'stock_transfer_receipt', 'stock_transfer_return', 'stock_transfer_cancel')
+      LEFT JOIN stock_deliveries dl ON dl.id = agg.doc_id AND agg.doc_type = 'stock_delivery'
+      LEFT JOIN goods_requests rq ON rq.id = agg.doc_id AND agg.doc_type = 'goods_request'
+      LEFT JOIN stock_adjustments aj ON aj.id = agg.doc_id AND agg.doc_type = 'stock_adjustment'
+      LEFT JOIN stock_vouchers sv ON sv.id = agg.doc_id AND agg.doc_type IN ('stock_voucher', 'stock_voucher_void', 'opening')
+      LEFT JOIN production_orders mo ON mo.id = agg.doc_id AND agg.doc_type = 'production_order'
+      LEFT JOIN sales_invoices si ON si.id = agg.doc_id AND agg.doc_type IN ('sales_invoice', 'sales_return', 'sales_void')
+      LEFT JOIN purchase_invoices pi ON pi.id = agg.doc_id AND agg.doc_type IN ('purchase_invoice', 'purchase_return', 'purchase_void')
+      LEFT JOIN parties pt ON pt.id = coalesce(si.party_id, pi.party_id, dl.party_id)
+      ORDER BY agg.occurred_at, agg.doc_id LIMIT 2000`,
   },
+  {
+    key: 'item-movement-totals',
+    titleAr: 'مادة باجمالي الحركات',
+    group: 'inventory',
+    hintAr: 'كل صنف بسطر: رصيده ومتوسط تكلفته وإجمالي تكلفته، ثم حركته في الفترة مقسّمة على ثلاثة عشر نوعاً كما في `frmRptItemsActivity`.',
+    // 🏢 الفرع · 📦 الصنف · 📅 من / إلى · 🏪 المستودع · 👥 العملاء / الموردون · 🗂️ المجموعة.
+    params: [BRANCH, ITEM, PERIOD[0]!, PERIOD[1]!, WAREHOUSE, PARTY, CATEGORY],
+    columns: [
+      text('code', 'الرمز'),
+      text('item_name', 'الصنف'),
+      qty('balance', 'الرصيد'),
+      money('avg_cost', 'متوسط التكلفة'),
+      money('total_cost', 'إجمالي التكلفة'),
+      qty('opening_qty', 'أول مدة'),
+      qty('purchase_qty', 'مشتريات'),
+      qty('purchase_return_qty', 'مرتجع مشتريات'),
+      qty('sale_qty', 'المبيعات'),
+      qty('sale_return_qty', 'مرتجع المبيعات'),
+      qty('pos_qty', 'نقطة البيع'),
+      qty('pos_return_qty', 'مرتجع POS'),
+      qty('transfer_sent_qty', 'مناقلة مرسلة'),
+      qty('transfer_received_qty', 'مناقلة مستلمة'),
+      qty('entry_qty', 'فاتورة إدخال'),
+      qty('issue_qty', 'فاتورة إخراج'),
+      qty('adjust_in_qty', 'تسوية إدخال'),
+      qty('adjust_out_qty', 'تسوية إخراج'),
+      countCard,
+    ],
+    totals: [
+      'balance',
+      'total_cost',
+      'opening_qty',
+      'purchase_qty',
+      'purchase_return_qty',
+      'sale_qty',
+      'sale_return_qty',
+      'pos_qty',
+      'pos_return_qty',
+      'transfer_sent_qty',
+      'transfer_received_qty',
+      'entry_qty',
+      'issue_qty',
+      'adjust_in_qty',
+      'adjust_out_qty',
+    ],
+    // «📦 إجمالي الرصيد» · «💰 إجمالي التكلفة» · «🔢 عدد الأصناف».
+    grandTotal: [
+      { key: 'balance', labelAr: 'إجمالي الرصيد' },
+      { key: 'total_cost', labelAr: 'إجمالي التكلفة' },
+      { key: 's_count', labelAr: 'عدد الأصناف' },
+    ],
+    emptyAr: 'لا توجد حركة لهذه الأصناف في الفترة المحددة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(item.sku, '—') AS code, ${itemName} AS item_name,
+             round(bal.balance, 2)::text AS balance,
+             round(coalesce(sb.value / nullif(sb.quantity, 0), 0), 4)::text AS avg_cost,
+             round(bal.balance * coalesce(sb.value / nullif(sb.quantity, 0), 0), 2)::text AS total_cost,
+             round(bal.opening_qty, 2)::text AS opening_qty,
+             round(bal.purchase_qty, 2)::text AS purchase_qty,
+             round(bal.purchase_return_qty, 2)::text AS purchase_return_qty,
+             round(bal.sale_qty, 2)::text AS sale_qty,
+             round(bal.sale_return_qty, 2)::text AS sale_return_qty,
+             round(bal.pos_qty, 2)::text AS pos_qty,
+             round(bal.pos_return_qty, 2)::text AS pos_return_qty,
+             round(bal.transfer_sent_qty, 2)::text AS transfer_sent_qty,
+             round(bal.transfer_received_qty, 2)::text AS transfer_received_qty,
+             round(bal.entry_qty, 2)::text AS entry_qty,
+             round(bal.issue_qty, 2)::text AS issue_qty,
+             round(bal.adjust_in_qty, 2)::text AS adjust_in_qty,
+             round(bal.adjust_out_qty, 2)::text AS adjust_out_qty,
+             '1' AS s_count
+      FROM (
+        SELECT it.item_id AS item_id,
+               sum(CASE WHEN it.direction = 'in' THEN it.base_qty ELSE -it.base_qty END) AS balance,
+               sum(CASE WHEN it.doc_type = 'opening' THEN it.base_qty ELSE 0 END) AS opening_qty,
+               sum(CASE WHEN it.doc_type = 'purchase_invoice' THEN it.base_qty ELSE 0 END) AS purchase_qty,
+               sum(CASE WHEN it.doc_type = 'purchase_return' THEN it.base_qty ELSE 0 END) AS purchase_return_qty,
+               sum(CASE WHEN it.doc_type = 'sales_invoice' AND si.party_id IS NOT NULL THEN it.base_qty ELSE 0 END) AS sale_qty,
+               sum(CASE WHEN it.doc_type = 'sales_return' AND si.party_id IS NOT NULL THEN it.base_qty ELSE 0 END) AS sale_return_qty,
+               sum(CASE WHEN it.doc_type = 'sales_invoice' AND si.party_id IS NULL THEN it.base_qty ELSE 0 END) AS pos_qty,
+               sum(CASE WHEN it.doc_type = 'sales_return' AND si.party_id IS NULL THEN it.base_qty ELSE 0 END) AS pos_return_qty,
+               sum(CASE WHEN it.doc_type = 'stock_transfer_receipt' THEN it.base_qty ELSE 0 END) AS transfer_sent_qty,
+               sum(CASE WHEN it.doc_type = 'stock_transfer' THEN it.base_qty ELSE 0 END) AS transfer_received_qty,
+               sum(CASE WHEN it.doc_type = 'stock_voucher' AND it.direction = 'in' THEN it.base_qty ELSE 0 END) AS entry_qty,
+               sum(CASE WHEN it.doc_type = 'stock_voucher' AND it.direction = 'out' THEN it.base_qty ELSE 0 END) AS issue_qty,
+               sum(CASE WHEN it.doc_type = 'stock_adjustment' AND it.direction = 'in' THEN it.base_qty ELSE 0 END) AS adjust_in_qty,
+               sum(CASE WHEN it.doc_type = 'stock_adjustment' AND it.direction = 'out' THEN it.base_qty ELSE 0 END) AS adjust_out_qty
+        FROM inventory_transactions it
+        JOIN items item ON item.id = it.item_id
+        JOIN warehouses wh ON wh.id = it.warehouse_id
+        LEFT JOIN sales_invoices si ON si.id = it.doc_id AND it.doc_type IN ('sales_invoice', 'sales_return')
+        LEFT JOIN purchase_invoices pi ON pi.id = it.doc_id AND it.doc_type IN ('purchase_invoice', 'purchase_return')
+        WHERE ${ledgerScope(tenantId, f)}
+        GROUP BY it.item_id
+        HAVING sum(abs(it.base_qty)) <> 0
+      ) bal
+      JOIN items item ON item.id = bal.item_id
+      LEFT JOIN (
+        SELECT sb.tenant_id, sb.item_id,
+               sum(sb.quantity) AS quantity, sum(sb.value) AS value
+        FROM stock_balances sb
+        WHERE sb.tenant_id = ${tenantId} AND ${eqIf(sql`sb.warehouse_id`, f.warehouseId)}
+        GROUP BY sb.tenant_id, sb.item_id
+      ) sb ON sb.item_id = bal.item_id
+      ORDER BY item.name_ar LIMIT 2000`,
+  },
+  {
+    key: 'item-movement-details',
+    titleAr: 'حركة صنف تفصيلي',
+    group: 'inventory',
+    hintAr: 'كل سطر حركة: نوع المستند ورقمه ومرجعه وتاريخه وحسابه، كميته الداخلة أو الخارجة ورصيده المتحرك بعدها — `frmRptItemsActivityDetailed`.',
+    // 🏬 الفرع · 🏭 المستودع · 📦 الصنف · 📅 من / إلى · 👥 عميل / مورد · 🔄 نوع العملية · 📋 أنماط الفواتير.
+    params: [BRANCH, WAREHOUSE, ITEM, PERIOD[0]!, PERIOD[1]!, PARTY, MOVEMENT_PROC_TYPE, INVOICE_PATTERN],
+    columns: [
+      int('seq', 'م'),
+      text('operation', 'نوع الفاتورة'),
+      text('warehouse_name', 'المستودع'),
+      text('code', 'رمز الصنف'),
+      text('item_name', 'الصنف'),
+      text('doc_number', 'رقم الفاتورة'),
+      text('ref_no', 'رقم المرجع'),
+      date('doc_date', 'التاريخ'),
+      text('party_name', 'الحساب'),
+      text('unit_name', 'الوحدة'),
+      qty('qty_doc', 'الكمية في الفاتورة'),
+      money('price_doc', 'السعر في الفاتورة'),
+      money('total_doc', 'الإجمالي في الفاتورة'),
+      qty('qty_in', 'الكمية الداخلة'),
+      qty('qty_out', 'الكمية الخارجة'),
+      qty('balance', 'الرصيد'),
+      money('price', 'السعر'),
+      money('total', 'الإجمالي'),
+      { key: 'doc_id', labelAr: 'معرّف المستند', type: 'text', hidden: true },
+      { key: 's_qty', labelAr: 'الرصيد الموقّع', type: 'qty', hidden: true },
+    ],
+    totals: ['qty_doc', 'total_doc', 'qty_in', 'qty_out', 'total'],
+    // «⚖️ إجمالي الرصيد:» — the last row's running balance, which is the signed sum of every
+    // movement on screen, exactly as the desktop accumulates `balance` row by row (L355-365).
+    grandTotal: [{ key: 's_qty', labelAr: 'إجمالي الرصيد' }],
+    emptyAr: 'لا توجد حركة لهذا الصنف في الفترة المحددة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY it.occurred_at, it.id)::text AS seq,
+             ${docTypeLabel(sql`it.doc_type`, true, sql`it.direction`)} AS operation,
+             ${warehouseName} AS warehouse_name,
+             coalesce(item.sku, '—') AS code, ${itemName} AS item_name,
+             ${docNumber} AS doc_number, ${docReference} AS ref_no, ${docDate} AS doc_date,
+             ${movementParty} AS party_name, coalesce(uom.name_ar, '—') AS unit_name,
+             round(it.qty, 2)::text AS qty_doc,
+             round(it.unit_cost * it.factor, 4)::text AS price_doc,
+             round(it.qty * it.unit_cost * it.factor, 2)::text AS total_doc,
+             round(CASE WHEN it.direction = 'in' THEN it.base_qty ELSE 0 END, 2)::text AS qty_in,
+             round(CASE WHEN it.direction = 'out' THEN it.base_qty ELSE 0 END, 2)::text AS qty_out,
+             round(sum(CASE WHEN it.direction = 'in' THEN it.base_qty ELSE -it.base_qty END)
+                   OVER (ORDER BY it.occurred_at, it.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2)::text AS balance,
+             round(it.unit_cost, 4)::text AS price,
+             round(it.total_cost, 2)::text AS total,
+             it.doc_id::text AS doc_id,
+             (CASE WHEN it.direction = 'in' THEN it.base_qty ELSE -it.base_qty END)::text AS s_qty
+      FROM inventory_transactions it
+      JOIN items item ON item.id = it.item_id
+      JOIN warehouses wh ON wh.id = it.warehouse_id
+      LEFT JOIN branches br ON br.id = wh.branch_id
+      LEFT JOIN units_of_measure uom ON uom.id = it.unit_id
+      ${documentJoins}
+      LEFT JOIN parties pt ON pt.id = coalesce(si.party_id, pi.party_id, dl.party_id)
+      WHERE ${ledgerScope(tenantId, f)}
+        AND ${movementProcTypeScope(f.kind)}
+        AND ${invoicePatternScope(f.status)}
+      ORDER BY it.occurred_at, it.id LIMIT 2000`,
+  },
+  {
+    key: 'item-expiry',
+    titleAr: 'صلاحية المواد',
+    group: 'inventory',
+    hintAr: 'كل دفعة لها تاريخ انتهاء بسطر: رصيدها الحالي وما بقي من سنوات وأشهر وأيام — `dbo.ItemsExpirationStock()` خلف `frmRptItemsExpiration`.',
+    // 🏪 المستودع · 🗂️ المجموعة · 📦 الصنف · 🏢 الفرع.
+    params: [WAREHOUSE, CATEGORY, ITEM, BRANCH],
+    columns: [
+      int('seq', 'م'),
+      text('code', 'رمز الصنف'),
+      text('item_name', 'الصنف'),
+      text('warehouse_name', 'المستودع'),
+      qty('qty', 'الكمية الحالية'),
+      date('expiry_date', 'تاريخ الإنتهاء'),
+      int('years_left', 'باقي سنوات'),
+      int('months_left', 'باقي أشهر'),
+      int('days_left', 'باقي أيام'),
+      { key: 's_expired', labelAr: 'منتهي', type: 'int', hidden: true },
+      countCard,
+    ],
+    totals: ['qty'],
+    // «📦 عدد الأصناف» · «⚠️ منتهي الصلاحية» — the second is a count of rows whose date has
+    // already passed, which `UpdateSummary()` L206-210 does over the grid it just filled.
+    grandTotal: [
+      { key: 's_count', labelAr: 'عدد الأصناف' },
+      { key: 's_expired', labelAr: 'منتهي الصلاحية' },
+    ],
+    emptyAr: 'لا توجد أصناف مراقبة بتواريخ صلاحية',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY lot.expiry_date, item.name_ar)::text AS seq,
+             coalesce(item.sku, '—') AS code, ${itemName} AS item_name,
+             ${warehouseName} AS warehouse_name,
+             round(stock.qty, 2)::text AS qty,
+             to_char(lot.expiry_date, 'YYYY-MM-DD') AS expiry_date,
+             (extract(year from lot.expiry_date)::int - extract(year from current_date)::int)::text AS years_left,
+             ((extract(year from lot.expiry_date)::int - extract(year from current_date)::int) * 12
+               + (extract(month from lot.expiry_date)::int - extract(month from current_date)::int))::text AS months_left,
+             (lot.expiry_date - current_date)::text AS days_left,
+             CASE WHEN lot.expiry_date < current_date THEN 1 ELSE 0 END::text AS s_expired,
+             '1' AS s_count
+      FROM item_lots lot
+      JOIN items item ON item.id = lot.item_id
+      JOIN (
+        SELECT it.tenant_id, it.lot_id, it.warehouse_id,
+               sum(CASE WHEN it.direction = 'in' THEN it.base_qty ELSE -it.base_qty END) AS qty
+        FROM inventory_transactions it
+        JOIN warehouses wh ON wh.id = it.warehouse_id
+        WHERE it.tenant_id = ${tenantId}
+          AND it.lot_id IS NOT NULL
+          AND ${eqIf(sql`it.warehouse_id`, f.warehouseId)}
+          AND ${eqIf(sql`it.item_id`, f.itemId)}
+          AND ${eqIf(sql`wh.branch_id`, f.branchId)}
+        GROUP BY it.tenant_id, it.lot_id, it.warehouse_id
+        HAVING sum(CASE WHEN it.direction = 'in' THEN it.base_qty ELSE -it.base_qty END) <> 0
+      ) stock ON stock.lot_id = lot.id AND stock.tenant_id = lot.tenant_id
+      JOIN warehouses wh ON wh.id = stock.warehouse_id
+      WHERE lot.tenant_id = ${tenantId}
+        AND lot.expiry_date IS NOT NULL
+        AND ${eqIf(sql`lot.item_id`, f.itemId)}
+        AND ${eqIf(sql`item.category_id`, f.categoryId)}
+        AND ${eqIf(sql`wh.branch_id`, f.branchId)}
+      ORDER BY lot.expiry_date, item.name_ar LIMIT 2000`,
+  },
+  {
+    key: 'serial-movements',
+    titleAr: 'حركة الأرقام التسلسلية',
+    group: 'inventory',
+    hintAr: 'أين مرّ كل رقم تسلسلي: مستنداً بمستند مع نوعه ورقمه وتاريخه وفرعه — `frmRptSerialNo`.',
+    // 🏬 الفرع · 📦 الصنف · 🔢 الرقم التسلسلي · 📅 من / إلى.
+    params: [BRANCH, ITEM, SERIAL_NO, PERIOD[0]!, PERIOD[1]!],
+    columns: [
+      int('seq', 'م'),
+      text('item_name', 'الصنف'),
+      text('code', 'رمز الصنف'),
+      text('serial_no', 'التسلسل'),
+      text('operation', 'نوع الفاتورة'),
+      text('doc_number', 'رقم الفاتورة'),
+      date('doc_date', 'التاريخ'),
+      text('branch_name', 'الفرع'),
+      text('direction', 'الإتجاه'),
+      { key: 'doc_id', labelAr: 'معرّف المستند', type: 'text', hidden: true },
+    ],
+    totals: [],
+    emptyAr: 'لا توجد حركة أرقام تسلسلية في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY it.occurred_at, it.id)::text AS seq,
+             ${itemName} AS item_name, coalesce(item.sku, '—') AS code,
+             ser.serial_no AS serial_no,
+             ${docTypeLabel(sql`it.doc_type`, true, sql`it.direction`)} AS operation,
+             ${docNumber} AS doc_number, ${docDate} AS doc_date,
+             ${movementBranch} AS branch_name,
+             CASE it.direction WHEN 'in' THEN 'داخل' ELSE 'خارج' END AS direction,
+             it.doc_id::text AS doc_id
+      FROM inventory_transactions it
+      JOIN item_serials ser ON ser.id = it.serial_id
+      JOIN items item ON item.id = it.item_id
+      JOIN warehouses wh ON wh.id = it.warehouse_id
+      LEFT JOIN branches br ON br.id = wh.branch_id
+      ${documentJoins}
+      WHERE it.tenant_id = ${tenantId}
+        AND it.serial_id IS NOT NULL
+        AND ${onDateTime(sql`it.occurred_at`, f.from, f.to, f.fromTime, f.toTime)}
+        AND ${eqIf(sql`it.item_id`, f.itemId)}
+        AND ${eqIf(sql`wh.branch_id`, f.branchId)}
+        AND ${f.serial ? sql`ser.serial_no = ${f.serial}` : all}
+      ORDER BY it.occurred_at, it.id LIMIT 2000`,
+  },
+  {
+    key: 'serial-balances',
+    titleAr: 'أرصدة الأرقام التسلسلية',
+    group: 'inventory',
+    hintAr: 'كم وحدة ما زالت في المخزون لكل رقم تسلسلي — `dbo.funCalculateSerialNoSummary()` خلف `frmRptSerialNoSummary`.',
+    // 🏬 الفرع · 📦 الصنف · 🔢 الرقم التسلسلي.
+    params: [BRANCH, ITEM, SERIAL_NO],
+    columns: [
+      int('seq', 'م'),
+      text('item_name', 'الصنف'),
+      text('code', 'رمز الصنف'),
+      text('serial_no', 'التسلسل'),
+      qty('count', 'العدد'),
+      countCard,
+    ],
+    totals: ['count'],
+    grandTotal: [
+      { key: 'count', labelAr: 'إجمالي العدد' },
+      { key: 's_count', labelAr: 'عدد الأرقام التسلسلية' },
+    ],
+    emptyAr: 'لا توجد أرقام تسلسلية في المخزون',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY item.name_ar, ser.serial_no)::text AS seq,
+             ${itemName} AS item_name, coalesce(item.sku, '—') AS code,
+             ser.serial_no AS serial_no, count(*)::text AS count, '1' AS s_count
+      FROM item_serials ser
+      JOIN items item ON item.id = ser.item_id
+      LEFT JOIN warehouses wh ON wh.id = ser.warehouse_id
+      WHERE ser.tenant_id = ${tenantId}
+        AND ser.deleted_at IS NULL
+        AND ser.status IN ('available', 'reserved')
+        AND ${eqIf(sql`ser.item_id`, f.itemId)}
+        AND ${eqIf(sql`wh.branch_id`, f.branchId)}
+        AND ${f.serial ? sql`ser.serial_no = ${f.serial}` : all}
+      GROUP BY item.name_ar, item.sku, ser.serial_no
+      ORDER BY item.name_ar, ser.serial_no LIMIT 2000`,
+  },
+  {
+    key: 'produced-items',
+    titleAr: 'تقرير مواد المنتجة',
+    group: 'inventory',
+    hintAr: 'كل أمر إنتاج بسطر: المنتج ووحدته وكميته وتكلفته، مع إجمالي التكلفة وإجمالي البيع — «🏭 المواد المنتجة» في `frmRptProducedItems`.',
+    // 📅 من تاريخ / إلى تاريخ.
+    params: [...PERIOD],
+    columns: [
+      int('seq', '#'),
+      text('order_no', 'رقم الأمر'),
+      date('order_date', 'التاريخ'),
+      text('item_name', 'الصنف'),
+      text('unit_name', 'الوحدة'),
+      qty('qty', 'الكمية'),
+      money('price', 'السعر'),
+      money('total', 'المجموع'),
+      text('ref_no', 'رقم المرجع'),
+      text('status_ar', 'الحالة'),
+      { key: 'cost', labelAr: 'تكلفة المكونات', type: 'money', hidden: true },
+      { key: 'sale', labelAr: 'قيمة البيع', type: 'money', hidden: true },
+      countCard,
+    ],
+    totals: ['qty', 'total'],
+    // «🏭 إجمالي المواد» · «📦 إجمالي الرصيد» · «💰 إجمالي التكلفة» · «💵 إجمالي البيع».
+    grandTotal: [
+      { key: 's_count', labelAr: 'إجمالي المواد' },
+      { key: 'qty', labelAr: 'إجمالي الرصيد' },
+      { key: 'cost', labelAr: 'إجمالي التكلفة' },
+      { key: 'sale', labelAr: 'إجمالي البيع' },
+    ],
+    emptyAr: 'لا توجد أوامر إنتاج في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY po.order_date, po.number)::text AS seq,
+             po.number AS order_no, to_char(po.order_date, 'YYYY-MM-DD') AS order_date,
+             ${itemName} AS item_name, coalesce(uom.name_ar, bu.name_ar, '—') AS unit_name,
+             round(po.output_qty, 2)::text AS qty,
+             round(po.unit_cost, 4)::text AS price,
+             round(po.output_qty * po.unit_cost, 2)::text AS total,
+             coalesce(po.reference_no, '—') AS ref_no,
+             CASE po.status
+               WHEN 'draft' THEN 'مسودة'
+               WHEN 'completed' THEN 'مكتمل'
+               WHEN 'cancelled' THEN 'ملغي'
+               ELSE po.status
+             END AS status_ar,
+             '1' AS s_count,
+             round(po.component_cost, 2)::text AS cost,
+             round(po.output_qty * coalesce(item.sale_price, 0), 2)::text AS sale
+      FROM production_orders po
+      JOIN items item ON item.id = po.output_item_id
+      LEFT JOIN units_of_measure uom ON uom.id = po.unit_id
+      LEFT JOIN units_of_measure bu ON bu.id = item.base_unit_id
+      WHERE po.tenant_id = ${tenantId}
+        AND po.status <> 'cancelled'
+        AND ${onDate(sql`po.order_date`, f.from, f.to)}
+      ORDER BY po.order_date, po.number LIMIT 2000`,
+  },
+  {
+    key: 'produced-components',
+    titleAr: 'مكونات المواد المنتجة',
+    group: 'inventory',
+    hintAr: 'ما استهلكه كل أمر إنتاج: مكوّناً بمكوّن مع كميته وسعره وتكلفته — «🔧 المكونات» في `frmRptProducedItems`.',
+    // 📅 من تاريخ / إلى تاريخ.
+    params: [...PERIOD],
+    columns: [
+      int('seq', '#'),
+      text('order_no', 'رقم الأمر'),
+      date('order_date', 'التاريخ'),
+      text('item_name', 'الصنف'),
+      text('unit_name', 'الوحدة'),
+      qty('qty', 'الكمية'),
+      money('price', 'السعر'),
+      money('total', 'المجموع'),
+    ],
+    totals: ['qty', 'total'],
+    grandTotal: [{ key: 'total', labelAr: 'إجمالي التكلفة' }],
+    emptyAr: 'لا توجد مكونات مستهلكة في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY po.order_date, po.number, comp.line_no)::text AS seq,
+             po.number AS order_no, to_char(po.order_date, 'YYYY-MM-DD') AS order_date,
+             ${itemName} AS item_name, coalesce(uom.name_ar, bu.name_ar, '—') AS unit_name,
+             round(comp.qty, 2)::text AS qty,
+             round(comp.unit_cost, 4)::text AS price,
+             round(coalesce(nullif(comp.line_cost, 0), comp.qty * comp.unit_cost), 2)::text AS total
+      FROM production_order_components comp
+      JOIN production_orders po ON po.id = comp.order_id
+      JOIN items item ON item.id = comp.item_id
+      LEFT JOIN units_of_measure uom ON uom.id = comp.unit_id
+      LEFT JOIN units_of_measure bu ON bu.id = item.base_unit_id
+      WHERE comp.tenant_id = ${tenantId}
+        AND po.status <> 'cancelled'
+        AND ${onDate(sql`po.order_date`, f.from, f.to)}
+      ORDER BY po.order_date, po.number, comp.line_no LIMIT 2000`,
+  },
+
 ];
 
 export const REPORT_DEFINITIONS: ReportDefinition[] = definitions;

@@ -236,6 +236,23 @@ function FilterField({ param, value, options, onChange }: { param: ReportParam; 
       </label>
     );
   }
+  // 🔢 الرقم التسلسلي — the free text box of `frmRptSerialNo` / `frmRptSerialNoSummary`,
+  // where the clerk types the number instead of picking it from a list.
+  if (param.kind === 'serial') {
+    return (
+      <label className="field">
+        <span>{param.labelAr}</span>
+        <input
+          className="input"
+          type="text"
+          dir="ltr"
+          value={value}
+          placeholder="SN-0001"
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+    );
+  }
   // ⏰ الوقت (HH:mm:ss) — the time box beside each date box in `frmRptSalesInPeriod`.
   if (param.kind === 'time') {
     return (

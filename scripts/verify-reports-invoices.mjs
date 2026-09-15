@@ -253,6 +253,9 @@ try {
   const basePos = await posReport();
   const baseNotifications = await notificationsReport();
   const basePurchases = await purchasesReport();
+  // 🔄 «مرتجع» وحده — خطّ أساسٌ **بنفس المرشِّح**: الفرق بين تقريرٍ مُرشَّح وخطِّ أساسٍ
+  // بلا مرشِّح يختلط فيه مرتجع القديم بمشترياته، فيقيس التقريرُ القديمَ لا الجديد.
+  const basePurchaseReturns = await purchasesReport('&procType=return');
   const baseDailySales = await dailySalesReport();
   const baseDailyPos = await dailySalesReport('&invType=pos');
   const baseDailyProcess = await dailyProcessReport();
@@ -513,7 +516,11 @@ try {
   check('🧾 الضريبة — 180 − 45 = 135', delta(cardOf(purchaseRun, 's_tax'), cardOf(basePurchases, 's_tax')) === 135, money(delta(cardOf(purchaseRun, 's_tax'), cardOf(basePurchases, 's_tax'))));
   check('💰 الصافي — 1380 − 345 = 1035', delta(cardOf(purchaseRun, 's_net'), cardOf(basePurchases, 's_net')) === 1035, money(delta(cardOf(purchaseRun, 's_net'), cardOf(basePurchases, 's_net'))));
   const returnsOnly = await purchasesReport('&procType=return');
-  check('🔄 «مرتجع» وحده — الصافي −345', delta(cardOf(returnsOnly, 's_net'), cardOf(basePurchases, 's_net')) === -345, money(delta(cardOf(returnsOnly, 's_net'), cardOf(basePurchases, 's_net'))));
+  check(
+    '🔄 «مرتجع» وحده — الصافي −345',
+    delta(cardOf(returnsOnly, 's_net'), cardOf(basePurchaseReturns, 's_net')) === -345,
+    money(delta(cardOf(returnsOnly, 's_net'), cardOf(basePurchaseReturns, 's_net'))),
+  );
   check('🧾 «بدون ضريبة» لا شيء', mineSuppliers(await purchasesReport('&vat=without')).length === 0, `${mineSuppliers(await purchasesReport('&vat=without')).length} سطر`);
 
   // ---------------------------------------------------------------------------

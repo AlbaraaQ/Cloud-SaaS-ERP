@@ -62,6 +62,10 @@ const filtersSchema = z
     costCenterId: uuidish,
     status: z.string().max(40).optional(),
     kind: z.string().max(40).optional(),
+    /** 📄 نوع العملية — one of `frmRptInventory`'s eight inventory documents. */
+    docType: z.string().max(40).optional(),
+    /** 🔢 الرقم التسلسلي — the free text box of the two serial windows. */
+    serial: z.string().max(60).optional(),
   })
   .partial();
 

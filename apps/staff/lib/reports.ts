@@ -8,7 +8,19 @@
 import { apiData, apiFetch, apiPatch, apiPost } from './api';
 import { money, quantity, shortDate } from './lookups';
 
-export type ReportParamKind = 'date' | 'time' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
+/** 🔢 الرقم التسلسلي — the free text box of the two serial windows; everything else is a lookup. */
+export type ReportParamKind =
+  | 'date'
+  | 'time'
+  | 'branch'
+  | 'warehouse'
+  | 'party'
+  | 'item'
+  | 'category'
+  | 'salesman'
+  | 'costCenter'
+  | 'select'
+  | 'serial';
 export type ReportColumnType = 'text' | 'money' | 'qty' | 'int' | 'date' | 'percent';
 
 export type ReportParam = { name: string; labelAr: string; kind: ReportParamKind; options?: Array<{ value: string; labelAr: string }> };

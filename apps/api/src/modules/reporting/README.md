@@ -115,6 +115,31 @@ paid, «نقدي»/«شبكة» when one leg settled the invoice, «متعدد»
 **Purchases settle by سند صرف**, not by a `pay_type` flag: `payment_allocations` →
 `vouchers` gives the same three legs for «💳 نوع الدفع».
 
+## 📚 تقارير المخزون والأرقام التسلسلية — `frmRptInventory` · `frmRptItems*` · `frmRptSerial*` · `frmRptProducedItems` (phase 10, part four)
+
+| Key | النافذة | ما يقرأه |
+|---|---|---|
+| `inventory-documents` | `frmRptInventory` | `inventory_transactions` مجمَّعةً على `(doc_type, doc_id)` — ثمانية أنواع مستندات بـ«📄 نوع العملية» |
+| `item-movement-totals` | `frmRptItemsActivity` | ثلاثة عشر عمود `SUM` مشروطاً بـ`doc_type` (+`party_id IS NULL` لنقطة البيع) وصيغة الرصيد L248 |
+| `item-movement-details` | `frmRptItemsActivityDetailed` | صفٌّ لكل حركة مع رصيدٍ متحرك بنافذة تراكمية، واسم النوع من `docTypeLabel` |
+| `item-expiry` | `frmRptItemsExpiration` | `item_lots` × رصيد الدفعة من الدفتر — `dbo.ItemsExpirationStock` |
+| `serial-movements` | `frmRptSerialNo` | الحركات التي تحمل `serial_id` |
+| `serial-balances` | `frmRptSerialNoSummary` | `item_serials` بحالة `available`/`reserved` — `funCalculateSerialNoSummary` |
+| `produced-items` / `produced-components` | `frmRptProducedItems` | `production_orders` ومكوّناته |
+
+قرارات المحرّك في هذا الجزء:
+
+- **`base_qty` موجبٌ دائماً** والإشارة في `direction` — تماماً كعمود `val` في الديسكتوب
+  الذي تجمعه `GetSumVal` وتطرحه صيغةُ الرصيد؛ لذلك كل عمود حركة هو `SUM(base_qty)`
+  مشروطاً، و«الرصيد» هو المجموع الموقّع.
+- **`docTypeLabel`** بديلُ جدول `InvTypes` (L334-345): اسمٌ عربيٌّ مشتقٌّ من `doc_type`
+  بأسماء النوافذ نفسها، مع «نقطة البيع» حين لا عميل للفاتورة.
+- **معرّف المستند و`doc_type`** عمودان مخفيّان على «مستندات المخزون» و«حركة صنف تفصيلي»
+  ليُبنى عليهما رابط المستند لاحقاً، كما بُنيت بطاقات الجزء الثالث على أعمدة `s_*`.
+- **فلتران جديدان:** `docType` («📄 نوع العملية» الثمانية) و`serial` («🔢 الرقم
+  التسلسلي» — مدخلٌ نصّي، نوعٌ جديد `kind: 'serial'` في المحرّك والواجهة)، و«🔄 نوع
+  العملية» في «حركة صنف تفصيلي» على فلتر `kind` لأن `procType` محجوزٌ لتقارير الفواتير.
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it
