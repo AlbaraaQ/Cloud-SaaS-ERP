@@ -23,7 +23,10 @@ export type ReportParamKind =
   | 'select'
   | 'serial'
   | 'entryNo'
-  | 'docNo';
+  | 'docNo'
+  | 'cashLocation'
+  | 'vesselGroup'
+  | 'year';
 export type ReportColumnType = 'text' | 'money' | 'qty' | 'int' | 'date' | 'percent';
 
 export type ReportParam = { name: string; labelAr: string; kind: ReportParamKind; options?: Array<{ value: string; labelAr: string }> };

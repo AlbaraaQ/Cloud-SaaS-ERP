@@ -26,7 +26,10 @@ export type ReportParamKind =
   | 'select'
   | 'serial'
   | 'entryNo'
-  | 'docNo';
+  | 'docNo'
+  | 'cashLocation'
+  | 'vesselGroup'
+  | 'year';
 
 export type ReportParam = {
   name: string;
@@ -93,6 +96,12 @@ export type ReportFilters = {
   /** 📆 ربع سنة · شهري — the two period presets of `frmTaxRptPeriod` overwrite the date boxes. */
   quarter?: string;
   month?: string;
+  /** 🏦 الصندوق — `cmbSafe` of `frmRptKhzna` (`SELECT id, name FROM Stocks WHERE branch=…`). */
+  cashLocationId?: string;
+  /** 📅 السنة — `txtYear` of `frmRptSalary`; it only filters together with الشهر. */
+  year?: string;
+  /** 📁 الفئة — `cmbGroups` of `frmRptRentInvoices` (`GroupMarine`). */
+  groupId?: string;
   /**
    * 📄 نوع العملية — `cmbOperation` of `frmRptInventory.xaml.cs` L260-267: eight inventory
    * documents the desktop keeps in one `Inv.inv_type` column (`8/2`, `8/1`, `9/1`, `4/1`,
@@ -1153,6 +1162,110 @@ const stockValueAt = (tenantId: string, f: ReportFilters): SQL => sql`(
 const voucherVat = (alias: string): SQL => sql`sum(CASE
     WHEN ${sql.raw(alias)}.vat_amount > 0 THEN ${sql.raw(alias)}.vat_amount
     ELSE greatest(coalesce(${sql.raw(alias)}.net_amount, 0) - ${sql.raw(alias)}.amount, 0) END)`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 💰 «تقارير الخزينة والرواتب والمستخدمين» — `frmRptKhzna` · `frmRptSalary` ·
+//    `frmRptReseved` · `frmrptUsersRecords` · `frmRptRentInvoices`
+//
+// Five windows, five reports. The sixth window of the part, `frmInvRptType`
+// «🖨️ افتراضي طباعة الفواتير», is a settings dialog (`UPDATE sett SET val = 1|2 WHERE
+// id = 1`) and belongs to the printing part, not to this catalogue.
+//
+// Two of the five read a table the cloud built in an earlier phase and therefore keep its
+// own vocabulary rather than the desktop's:
+//   • `frmRptKhzna` — the desktop finds the safe's account by matching its name to an
+//     account (`Accounts_Index.AName = Stocks.name AND Type = 2`, L159-L164) and refuses
+//     when it finds none; the cloud hangs the account on the box itself
+//     (`cash_locations.account_id`) and refuses with the same sentence
+//     («لم يتم العثور على حساب مرتبط بهذا الصندوق», `CASH_ACCOUNT_REQUIRED`).
+//   • `frmRptSalary` — `SalaryPay`'s `tot_salary · Houses · Travel · salary_add ·
+//     salary_sub · salary_net` are `salary_payments.basic · housing · transport ·
+//     additions · deductions · net`, and «💰 الإجمالي» stays the number the window
+//     recomputes: الإجمالي = الصافي + الخصومات.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 🏦 الصندوق — `cmbSafe` of `frmRptKhzna` (`SELECT id, name FROM Stocks WHERE branch=…`). */
+const CASH_LOCATION: ReportParam = { name: 'cashLocationId', labelAr: 'الصندوق', kind: 'cashLocation' };
+
+/** 📅 الشهر — `txtMonth` of `frmRptSalary`, a number the window formats itself. */
+const SALARY_MONTH: ReportParam = {
+  name: 'month',
+  labelAr: 'الشهر',
+  kind: 'select',
+  options: Array.from({ length: 12 }, (_unused, index) => ({ value: String(index + 1), labelAr: `شهر ${index + 1}` })),
+};
+
+/** 📅 السنة — `txtYear` of `frmRptSalary`; the window filters only when it reads **both**. */
+const SALARY_YEAR: ReportParam = { name: 'year', labelAr: 'السنة', kind: 'year' };
+
+/** 👤 المستخدم — the two windows that pick a person (`cmbUsers` of `frmRptRentInvoices`, `frmrptUsersRecords`). */
+const ACTOR: ReportParam = { name: 'salesmanId', labelAr: 'المستخدم', kind: 'salesman' };
+
+/** 📁 الفئة — `cmbGroups` of `frmRptRentInvoices` (`GroupMarine`). */
+const VESSEL_GROUP: ReportParam = { name: 'groupId', labelAr: 'الفئة', kind: 'vesselGroup' };
+
+/** 🔢 رقم الفاتورة — `txtInvNo`; the window drops every other filter when it is filled. */
+const RENT_INVOICE_NO: ReportParam = { name: 'docNo', labelAr: 'رقم الفاتورة', kind: 'docNo' };
+
+/** 👥 العميل — `cmbCustomers` of `frmRptRentInvoices`. */
+const RENT_CUSTOMER: ReportParam = { name: 'partyId', labelAr: 'العميل', kind: 'party' };
+
+/**
+ * ⚙️ نوع العملية — `cmbProcType` of `frmRptRentInvoices` (`LoadProcesses`, L232-L239):
+ * «الكل · تأجير · مرتجع · معلق · حجوزات», which the desktop applies to `proc_type`
+ * (1 تأجير · 2 مرتجع · 3 معلق · 4 حجوزات — `CalcIncome` L263-L270 counts 1 و3 as
+ * إيرادات, 2 as مرتجع, and leaves 4 out). The cloud has no `proc_type`: a فاتورة تأجير
+ * is a `rental_invoices` row, a مرتجع is one whose فاتورة مبيعات is a `sale_return`,
+ * a معلق is one whose فاتورة مبيعات لم تُرحَّل بعد, and a حجوزات is a حجز that has no
+ * فاتورة تأجير yet.
+ */
+const RENT_PROCESS: ReportParam = {
+  name: 'kind',
+  labelAr: 'نوع العملية',
+  kind: 'select',
+  options: [
+    { value: 'rent', labelAr: 'تأجير' },
+    { value: 'return', labelAr: 'مرتجع' },
+    { value: 'pending', labelAr: 'معلق' },
+    { value: 'reservation', labelAr: 'حجوزات' },
+  ],
+};
+
+/** 📋 الخطة — the three radios `rdAll` · `rdInPlan` · `rdOutPlan` (L319-L333). */
+const RENT_PLAN: ReportParam = {
+  name: 'status',
+  labelAr: 'الخطة',
+  kind: 'select',
+  options: [
+    { value: 'in_plan', labelAr: 'ضمن الخطة' },
+    { value: 'out_plan', labelAr: 'خارج الخطة' },
+  ],
+};
+
+const rentProcessScope = (kind?: string): SQL => {
+  switch (kind) {
+    case 'rent':
+      return sql`u.proc_type = 1`;
+    case 'return':
+      return sql`u.proc_type = 2`;
+    case 'pending':
+      return sql`u.proc_type = 3`;
+    case 'reservation':
+      return sql`u.proc_type = 4`;
+    default:
+      return all;
+  }
+};
+
+/** 👤 المستخدم — an audit row names its actor, the desktop names an employee; the way from one to the other is the membership. */
+const actorUserScope = (employeeId?: string): SQL =>
+  employeeId
+    ? sql`log.actor_user_id IN (SELECT m.user_id FROM memberships m
+          WHERE m.id = (SELECT emp.membership_id FROM employees emp WHERE emp.id = ${employeeId}::uuid))`
+    : all;
+
+/** 🖥️ الجهاز — `Log4NetLog.Logger` names the class that logged; the cloud names the caller. */
+const auditDevice = sql`coalesce(log.meta->>'ip', log.meta->>'ua', log.meta->>'userAgent', log.entity, '—')`;
 
 const definitions: ReportDefinition[] = [
   // ---------------------------------------------------------------- sales
@@ -3959,6 +4072,351 @@ const definitions: ReportDefinition[] = [
              0::numeric)
         ) AS u(ord, section, line, net, vat, s_net_vat)
         ORDER BY u.ord`;
+    },
+  },
+  // ---------------------------------------------- 💰 treasury · hrm · users · marina
+  {
+    key: 'cash-statement',
+    titleAr: 'حركة الصندوق',
+    group: 'accounting',
+    hintAr: 'كشفُ الصندوق كما في `frmRptKhzna`: سطر «رصيد سابق» يفتح الفترة، ثم حركةٌ بسطر مع رصيدٍ متحرك، ثم بطاقتا «الرصيد الإجمالي» و«رصيد الفترة المحددة».',
+    // 🏦 الصندوق · 📅 الفترة (من تاريخ · من وقت · إلى تاريخ · إلى وقت) — ☑ كل الفترة is the absence of both dates.
+    params: [CASH_LOCATION, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: [
+      int('seq', 'م'),
+      text('operation', 'العملية'),
+      text('doc_no', 'الرقم'),
+      date('day', '📅 التاريخ'),
+      money('income', '📥 وارد'),
+      money('outcome', '📤 صادر'),
+      money('balance', '⚖️ الرصيد'),
+      text('note', '📝 البيان'),
+      { key: 's_all', labelAr: 'الرصيد الإجمالي', type: 'money', hidden: true },
+      { key: 's_period', labelAr: 'رصيد الفترة المحددة', type: 'money', hidden: true },
+      countCard,
+    ],
+    totals: ['income', 'outcome'],
+    // ⚖️ الرصيد الإجمالي · 📅 رصيد الفترة المحددة — `frmRptKhzna.xaml` L482 و L502.
+    grandTotal: [
+      { key: 's_all', labelAr: 'الرصيد الإجمالي' },
+      { key: 's_period', labelAr: 'رصيد الفترة المحددة' },
+      { key: 's_count', labelAr: 'عدد الحركات' },
+    ],
+    emptyAr: 'لا توجد حركة على هذا الصندوق في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => {
+      const fromTime = f.fromTime || '00:00';
+      const toTime = f.toTime || '23:59';
+      const box = sql`(SELECT cl.account_id FROM cash_locations cl
+                       WHERE cl.id = ${f.cashLocationId ?? null}::uuid AND cl.tenant_id = ${tenantId})`;
+      const opening = Boolean(f.from);
+      return sql`
+        WITH prior AS (
+          SELECT coalesce(sum(jel.debit), 0) AS income, coalesce(sum(jel.credit), 0) AS outcome
+          FROM journal_entry_lines jel
+          JOIN journal_entries je ON je.id = jel.entry_id
+          LEFT JOIN vouchers v ON v.id = je.source_id AND je.source_type = 'voucher'
+          WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted' AND jel.account_id = ${box}
+            AND ${f.from ? sql`je.date < ${f.from}::date
+                 OR (je.date = ${f.from}::date AND coalesce(v.voucher_time, '00:00') < ${fromTime}::time)` : sql`false`}
+        ), movements AS (
+          SELECT je.id AS entry_id, je.date AS day, coalesce(je.number, '—') AS doc_no,
+                 coalesce(je.description, '') AS note,
+                 sum(jel.debit) AS income, sum(jel.credit) AS outcome
+          FROM journal_entry_lines jel
+          JOIN journal_entries je ON je.id = jel.entry_id
+          LEFT JOIN vouchers v ON v.id = je.source_id AND je.source_type = 'voucher'
+          WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted' AND jel.account_id = ${box}
+            AND ${onDate(sql`je.date`, f.from, f.to)}
+            AND coalesce(v.voucher_time, '00:00') BETWEEN ${fromTime}::time AND ${toTime}::time
+          GROUP BY je.id, je.date, je.number, je.description
+        ), ledger AS (
+          SELECT 1 AS ord, 'رصيد سابق' AS operation, '—' AS doc_no,
+                 ${f.from ? sql`(${f.from}::date - 1)` : sql`NULL::date`} AS day,
+                 p.income, p.outcome, '' AS note, NULL::uuid AS entry_id
+          FROM prior p WHERE ${opening ? all : sql`false`}
+          UNION ALL
+          SELECT 2, ${entryTypeLabel()}, m.doc_no, m.day, m.income, m.outcome, m.note, m.entry_id
+          FROM movements m
+          JOIN journal_entries je ON je.id = m.entry_id
+          ${journalDocumentJoins}
+        )
+        SELECT row_number() OVER (ORDER BY l.ord, l.day NULLS LAST, l.doc_no) AS seq,
+               l.operation, l.doc_no, l.day,
+               round(l.income, 2)::text AS income, round(l.outcome, 2)::text AS outcome,
+               round(sum(l.income - l.outcome) OVER (ORDER BY l.ord, l.day NULLS LAST, l.doc_no
+                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 2)::text AS balance,
+               l.note,
+               CASE WHEN row_number() OVER (ORDER BY l.ord, l.day NULLS LAST, l.doc_no) = 1
+                    THEN round(sum(l.income - l.outcome) OVER (), 2)::text ELSE '0' END AS s_all,
+               CASE WHEN row_number() OVER (ORDER BY l.ord, l.day NULLS LAST, l.doc_no) = 1
+                    THEN round(sum(CASE WHEN l.ord = 2 THEN l.income - l.outcome ELSE 0 END) OVER (), 2)::text ELSE '0' END AS s_period,
+               '1' AS s_count
+        FROM ledger l ORDER BY l.ord, l.day NULLS LAST, l.doc_no LIMIT 2000`;
+    },
+  },
+  {
+    key: 'salary-statement',
+    titleAr: 'تقرير الرواتب',
+    group: 'hrm',
+    hintAr: 'كل إذن صرف راتب بسطر: الراتب الأساسي وبدلاه والحوافز والإجمالي والخصومات والصافي — `frmRptSalary`.',
+    // 📅 الشهر · السنة (☑ كل الفترة when either is left empty) · 🏢 الفرع.
+    params: [SALARY_MONTH, SALARY_YEAR, BRANCH],
+    columns: [
+      int('seq', 'م'),
+      text('doc_no', 'رقم السند'),
+      text('employee', '👤 الموظف'),
+      money('basic', 'الراتب الأساسي'),
+      money('housing', 'بدل سكن'),
+      money('transport', 'بدل مواصلات'),
+      money('additions', 'الحوافز'),
+      money('gross', '💰 الإجمالي'),
+      money('deductions', 'الخصومات'),
+      money('net', '💵 صافي الراتب'),
+      countCard,
+    ],
+    totals: ['basic', 'housing', 'transport', 'additions', 'gross', 'deductions', 'net'],
+    // «💰 إجمالي الرواتب:» — `frmRptSalary.xaml` L440; the window sums الصافي, not الإجمالي.
+    grandTotal: [
+      { key: 'net', labelAr: 'إجمالي الرواتب' },
+      { key: 's_count', labelAr: 'عدد الإيذونات' },
+    ],
+    emptyAr: 'لا توجد إيذونات صرف راتب في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => {
+      const pad = (value: number) => String(value).padStart(2, '0');
+      // The window filters only when it could parse **both** boxes (`frmRptSalary.xaml.cs` L74-L82).
+      const yearMonth =
+        f.year && f.month && Number(f.year) > 0 && Number(f.month) > 0
+          ? `${f.year}-${pad(Number(f.month))}`
+          : undefined;
+      return sql`
+        SELECT row_number() OVER (ORDER BY sp.payment_date, sp.number) AS seq,
+               coalesce(sp.number, '—') AS doc_no,
+               coalesce(emp.name, '—') AS employee,
+               round(sp.basic, 2)::text AS basic,
+               round(sp.housing, 2)::text AS housing,
+               round(sp.transport, 2)::text AS transport,
+               round(sp.additions, 2)::text AS additions,
+               round(sp.net + sp.deductions, 2)::text AS gross,
+               round(sp.deductions, 2)::text AS deductions,
+               round(sp.net, 2)::text AS net,
+               '1' AS s_count
+        FROM salary_payments sp
+        LEFT JOIN employees emp ON emp.id = sp.employee_id
+        WHERE sp.tenant_id = ${tenantId} AND sp.deleted_at IS NULL
+          AND ${yearMonth ? sql`sp.year_month = ${yearMonth}` : all}
+          AND ${eqIf(sql`sp.branch_id`, f.branchId)}
+        ORDER BY sp.payment_date, sp.number LIMIT 2000`;
+    },
+  },
+  {
+    key: 'salary-reserved',
+    titleAr: 'تقرير الرواتب المستحقة',
+    group: 'hrm',
+    hintAr: 'كل مسيّر رواتب مستحق بسطر: رقم سنده وتاريخه وفرعه وشهره وسنته وملاحظاته، مع عداد موظفيه ومستحقه — `frmRptReseved`.',
+    // 📅 من · إلى — the window's only two filters.
+    params: [...PERIOD],
+    columns: [
+      int('seq', 'م'),
+      text('doc_no', 'رقم السند'),
+      date('day', '📅 التاريخ'),
+      text('branch', '🏬 الفرع'),
+      text('month', 'الشهر'),
+      text('year', 'السنة'),
+      int('employees', 'عدد الموظفين'),
+      money('gross', 'الإجمالي'),
+      money('deductions', 'الخصومات'),
+      money('net', 'صافي المستحق'),
+      text('notes', '📝 ملاحظات'),
+      countCard,
+    ],
+    totals: ['employees', 'gross', 'deductions', 'net'],
+    // 💰 The desktop's footer is the detail grid it opens with 👁️ عرض
+    // (`Salary_Res_Details`: Basic · Houses · travel · sal_add · Total · Sal_Sub · Net_Sal),
+    // so the report carries its sum here instead of behind a button.
+    grandTotal: [
+      { key: 'net', labelAr: 'إجمالي المستحق' },
+      { key: 's_count', labelAr: 'عدد المسيرات' },
+    ],
+    emptyAr: 'لا توجد رواتب مستحقة في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY run.year_month DESC) AS seq,
+             coalesce(je.number, run.year_month) AS doc_no,
+             coalesce(run.posted_at, run.created_at)::date AS day,
+             coalesce(br.name_ar, '—') AS branch,
+             split_part(run.year_month, '-', 2) AS month,
+             split_part(run.year_month, '-', 1) AS year,
+             count(line.employee_id)::text AS employees,
+             round(coalesce(sum(line.gross), 0), 2)::text AS gross,
+             round(coalesce(sum(line.deductions), 0), 2)::text AS deductions,
+             round(coalesce(sum(line.net), 0), 2)::text AS net,
+             coalesce(run.reversal_reason, '') AS notes,
+             '1' AS s_count
+      FROM payroll_runs run
+      LEFT JOIN payroll_run_lines line ON line.run_id = run.id
+      LEFT JOIN journal_entries je ON je.id = run.journal_entry_id
+      LEFT JOIN branches br ON br.id = je.branch_id
+      WHERE run.tenant_id = ${tenantId}
+        AND ${onDate(sql`coalesce(run.posted_at, run.created_at)::date`, f.from, f.to)}
+      GROUP BY run.id, run.year_month, run.reversal_reason, run.posted_at, run.created_at, je.number, br.name_ar
+      ORDER BY run.year_month DESC LIMIT 1000`,
+  },
+  {
+    key: 'user-records',
+    titleAr: 'سجلات المستخدمين',
+    group: 'hrm',
+    hintAr: 'سجلّ عمليات المستخدمين كما في `frmrptUsersRecords`: التاريخ والجهاز والعملية والمستخدم، من `Log4NetLog` الذي يقابله سجلّ التدقيق.',
+    // 👤 المستخدم (☑ الكل when it is left empty) · 📅 من/إلى.
+    params: [ACTOR, ...PERIOD],
+    columns: [
+      int('seq', 'م'),
+      text('at', '📅 التاريخ'),
+      text('device', '🖥️ الجهاز'),
+      text('operation', '📝 العملية'),
+      text('actor', '👤 المستخدم'),
+      countCard,
+    ],
+    grandTotal: [{ key: 's_count', labelAr: 'عدد السجلات' }],
+    emptyAr: 'لا توجد سجلات لهذا المستخدم',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY log.created_at DESC) AS seq,
+             to_char(log.created_at, 'YYYY-MM-DD HH24:MI') AS at,
+             ${auditDevice} AS device,
+             log.action AS operation,
+             coalesce(log.actor_label, '—') AS actor,
+             '1' AS s_count
+      FROM audit_log log
+      WHERE log.tenant_id = ${tenantId}
+        AND ${onDate(sql`log.created_at::date`, f.from, f.to)}
+        AND ${actorUserScope(f.salesmanId)}
+      ORDER BY log.created_at DESC LIMIT 1000`,
+  },
+  {
+    key: 'rent-invoices',
+    titleAr: 'تقرير فواتير التأجير',
+    group: 'marina',
+    hintAr: 'فواتير التأجير ببنودها كما في `frmRptRentInvoices`، و«حجوزات» ما لم يُصدر له فاتورة بعد، مع إيرادات الفترة ومرتجعها وصافيها.',
+    // 👤 المستخدم · 📁 الفئة · 👥 العميل · 📅 من/إلى · 🔢 رقم الفاتورة · ⚙️ نوع العملية · 📋 الخطة.
+    params: [...PERIOD, BRANCH, RENT_CUSTOMER, ACTOR, VESSEL_GROUP, RENT_INVOICE_NO, RENT_PROCESS, RENT_PLAN],
+    columns: [
+      text('number', 'الرقم'),
+      text('vessel', 'المركب'),
+      text('category', 'الفئة'),
+      money('net', 'الصافي'),
+      date('day', 'التاريخ'),
+      text('customer', 'العميل'),
+      text('actor', 'المستخدم'),
+      text('mobile', 'الجوال'),
+      text('in_plan', 'ضمن الخطة'),
+      money('period_amount', 'قيمة الفترة'),
+      money('additions_amount', 'الإضافات'),
+      money('insurance_amount', 'التأمين'),
+      money('total', 'الإجمالي'),
+      int('companions', 'المرافقون'),
+      { key: 's_income', labelAr: 'إيرادات', type: 'money', hidden: true },
+      { key: 's_return', labelAr: 'مرتجع', type: 'money', hidden: true },
+      { key: 's_net', labelAr: 'الصافي', type: 'money', hidden: true },
+    ],
+    totals: ['net', 'period_amount', 'additions_amount', 'insurance_amount', 'total', 'companions'],
+    // «إيرادات:» · «مرتجع:» · «الصافي:» — `frmRptRentInvoices.xaml` L510 · L521 · L532, summed
+    // the way `CalcIncome` (L258-L274) sums them: 1 و3 إيرادات، و2 مرتجع، و4 خارج الحساب.
+    grandTotal: [
+      { key: 's_income', labelAr: 'إيرادات' },
+      { key: 's_return', labelAr: 'مرتجع' },
+      { key: 's_net', labelAr: 'الصافي' },
+    ],
+    emptyAr: 'لا توجد فواتير تأجير في هذه الفترة',
+    signature: true,
+    build: (tenantId, f) => {
+      const inPlan = (vessel: SQL, day: SQL) => sql`EXISTS (
+        SELECT 1 FROM marina_operation_plan_lines pl
+        JOIN marina_operation_plans op ON op.id = pl.plan_id
+        WHERE pl.tenant_id = ${tenantId} AND pl.vessel_id = ${vessel} AND op.plan_date = ${day})`;
+      const planScope = (vessel: SQL, day: SQL) =>
+        f.status === 'in_plan'
+          ? inPlan(vessel, day)
+          : f.status === 'out_plan'
+            ? sql`NOT ${inPlan(vessel, day)}`
+            : all;
+      return sql`
+        WITH invoices AS (
+          SELECT ri.id AS row_id, 1 AS ord,
+                 CASE WHEN si.kind = 'sale_return' THEN 2
+                      WHEN si.status = 'draft' THEN 3
+                      ELSE 1 END AS proc_type,
+                 coalesce(bk.number, ri.id::text) AS number,
+                 coalesce(ves.name, '—') AS vessel,
+                 coalesce(grp.code, grp.name, '—') AS category,
+                 ri.net_amount AS net, ri.document_date AS day,
+                 ${partyName} AS customer,
+                 coalesce(usr.full_name, '—') AS actor,
+                 coalesce(party.phone, '—') AS mobile,
+                 ri.additions_amount, ri.insurance_amount, ri.period_amount, ri.total,
+                 bk.companions, bk.vessel_id
+          FROM rental_invoices ri
+          JOIN marina_bookings bk ON bk.id = ri.booking_id
+          LEFT JOIN sales_invoices si ON si.id = ri.sales_invoice_id
+          LEFT JOIN vessels ves ON ves.id = bk.vessel_id
+          LEFT JOIN vessel_groups grp ON grp.id = ves.group_id
+          LEFT JOIN parties party ON party.id = bk.party_id
+          LEFT JOIN users usr ON usr.id = ri.created_by
+          WHERE ri.tenant_id = ${tenantId}
+            AND ${onDate(sql`ri.document_date`, f.from, f.to)}
+            AND ${eqIf(sql`bk.branch_id`, f.branchId)}
+            AND ${eqIf(sql`bk.party_id`, f.partyId)}
+            AND ${eqIf(sql`ves.group_id`, f.groupId)}
+            AND ${f.docNo ? sql`coalesce(bk.number, '') = ${f.docNo}` : all}
+            AND ${f.salesmanId ? sql`ri.created_by IN (SELECT m.user_id FROM memberships m
+                 WHERE m.id = (SELECT emp.membership_id FROM employees emp WHERE emp.id = ${f.salesmanId}::uuid))` : all}
+        ), reservations AS (
+          SELECT bk.id AS row_id, 2 AS ord, 4 AS proc_type,
+                 coalesce(bk.number, '—') AS number,
+                 coalesce(ves.name, '—') AS vessel,
+                 coalesce(grp.code, grp.name, '—') AS category,
+                 bk.rental_amount + bk.insurance_amount
+                   + (SELECT coalesce(sum(ba.amount), 0) FROM marina_booking_additions ba
+                      WHERE ba.tenant_id = ${tenantId} AND ba.booking_id = bk.id) AS net,
+                 bk.document_date AS day,
+                 ${partyName} AS customer,
+                 coalesce(usr.full_name, '—') AS actor,
+                 coalesce(party.phone, '—') AS mobile,
+                 0::numeric AS additions_amount, bk.insurance_amount, bk.rental_amount,
+                 bk.rental_amount + bk.insurance_amount AS total,
+                 bk.companions, bk.vessel_id
+          FROM marina_bookings bk
+          LEFT JOIN rental_invoices ri ON ri.booking_id = bk.id AND ri.tenant_id = ${tenantId}
+          LEFT JOIN vessels ves ON ves.id = bk.vessel_id
+          LEFT JOIN vessel_groups grp ON grp.id = ves.group_id
+          LEFT JOIN parties party ON party.id = bk.party_id
+          LEFT JOIN users usr ON usr.id = bk.created_by
+          WHERE bk.tenant_id = ${tenantId} AND bk.deleted_at IS NULL AND ri.id IS NULL
+            AND ${onDate(sql`bk.document_date`, f.from, f.to)}
+            AND ${eqIf(sql`bk.branch_id`, f.branchId)}
+            AND ${eqIf(sql`bk.party_id`, f.partyId)}
+            AND ${eqIf(sql`ves.group_id`, f.groupId)}
+            AND ${f.docNo ? sql`coalesce(bk.number, '') = ${f.docNo}` : all}
+        ), rows AS (
+          SELECT * FROM invoices
+          UNION ALL
+          SELECT * FROM reservations
+        )
+        SELECT u.number, u.vessel, u.category, round(u.net, 2)::text AS net, u.day, u.customer,
+               u.actor, u.mobile,
+               CASE WHEN ${inPlan(sql`u.vessel_id`, sql`u.day`)} THEN 'نعم' ELSE 'لا' END AS in_plan,
+               round(u.period_amount, 2)::text AS period_amount,
+               round(u.additions_amount, 2)::text AS additions_amount,
+               round(u.insurance_amount, 2)::text AS insurance_amount,
+               round(u.total, 2)::text AS total,
+               u.companions::text AS companions,
+               round(CASE WHEN u.proc_type IN (1, 3) THEN u.net ELSE 0 END, 2)::text AS s_income,
+               round(CASE WHEN u.proc_type = 2 THEN u.net ELSE 0 END, 2)::text AS s_return,
+               round(CASE WHEN u.proc_type IN (1, 3) THEN u.net WHEN u.proc_type = 2 THEN -u.net ELSE 0 END, 2)::text AS s_net
+        FROM rows u
+        WHERE ${rentProcessScope(f.kind)} AND ${planScope(sql`u.vessel_id`, sql`u.day`)}
+        ORDER BY u.day DESC, u.number LIMIT 1000`;
     },
   },
 

@@ -74,6 +74,12 @@ const filtersSchema = z
     /** 📆 ربع سنة · شهري — the period presets of `frmTaxRptPeriod`, which overwrite من/إلى. */
     quarter: z.string().max(2).optional(),
     month: z.string().max(2).optional(),
+    /** 🏦 الصندوق — `cmbSafe` of `frmRptKhzna`: the box whose ledger account is stated. */
+    cashLocationId: uuidish,
+    /** 📅 السنة — `txtYear` of `frmRptSalary`; it only filters together with الشهر. */
+    year: z.string().max(4).optional(),
+    /** 📁 الفئة — `cmbGroups` of `frmRptRentInvoices` (`GroupMarine`). */
+    groupId: uuidish,
   })
   .partial();
 
@@ -99,6 +105,8 @@ const FILTER_SOURCES: Record<string, { table: string; column: string } | undefin
   salesman: { table: 'salesmen', column: 'name' },
   costCenter: { table: 'cost_centers', column: 'name_ar' },
   account: { table: 'accounts', column: 'name_ar' },
+  cashLocation: { table: 'cash_locations', column: 'name' },
+  vesselGroup: { table: 'vessel_groups', column: 'name' },
 };
 
 @Injectable()

@@ -97,6 +97,7 @@ export type TaxGroup = {
   isInclusiveDefault?: boolean;
 };
 export type Salesman = { id: string; name: string; active?: boolean };
+export type VesselGroup = { id: string; name: string; code?: string | null; number?: number | null };
 export type CostCenter = {
   id: string;
   code: string;
@@ -369,6 +370,8 @@ export const movements = (params: {
 };
 export const listParties = (kind?: string) => apiList<Party>(`/parties${kind ? `?kind=${kind}` : ''}`);
 export const listCashLocations = () => apiList<CashLocation>('/cash-locations');
+/** 📁 الفئة — the مركب's group (`GroupMarine` in the desktop). */
+export const listVesselGroups = () => apiList<VesselGroup>('/marina/groups');
 export const listSalesmen = () => apiList<Salesman>('/sales/salesmen');
 export const listCostCenters = () => apiList<CostCenter>('/cost-centers');
 export const listAccounts = () => apiList<Account>('/accounts');

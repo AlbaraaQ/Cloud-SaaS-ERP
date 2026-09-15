@@ -9,20 +9,24 @@ import {
   itemLabel,
   listAccounts,
   listBranches,
+  listCashLocations,
   listCategories,
   listCostCenters,
   listItems,
   listParties,
   listSalesmen,
+  listVesselGroups,
   listWarehouses,
   partyLabel,
   type Account,
   type Branch,
+  type CashLocation,
   type Category,
   type CostCenter,
   type Item,
   type Party,
   type Salesman,
+  type VesselGroup,
   type Warehouse,
 } from '../../../lib/lookups';
 import {
@@ -80,6 +84,14 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
   const costCenters = useQuery<CostCenter[]>(async () => (kinds.has('costCenter') ? listCostCenters() : []), [reportKey, kinds.has('costCenter')]);
   const salesmen = useQuery<Salesman[]>(async () => (kinds.has('salesman') ? listSalesmen() : []), [reportKey, kinds.has('salesman')]);
   const accounts = useQuery<Account[]>(async () => (kinds.has('account') ? listAccounts() : []), [reportKey, kinds.has('account')]);
+  const cashLocations = useQuery<CashLocation[]>(
+    async () => (kinds.has('cashLocation') ? listCashLocations() : []),
+    [reportKey, kinds.has('cashLocation')],
+  );
+  const vesselGroups = useQuery<VesselGroup[]>(
+    async () => (kinds.has('vesselGroup') ? listVesselGroups() : []),
+    [reportKey, kinds.has('vesselGroup')],
+  );
 
   const optionsFor = useMemo(
     () => ({
@@ -91,8 +103,21 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
       costCenter: (costCenters.data ?? []).map((row) => ({ value: row.id, label: `${row.code} — ${arabicName(row)}` })),
       salesman: (salesmen.data ?? []).map((row) => ({ value: row.id, label: row.name })),
       account: (accounts.data ?? []).map((row) => ({ value: row.id, label: `${row.code} — ${arabicName(row)}` })),
+      cashLocation: (cashLocations.data ?? []).map((row) => ({ value: row.id, label: row.name })),
+      vesselGroup: (vesselGroups.data ?? []).map((row) => ({ value: row.id, label: row.name })),
     }),
-    [branches.data, warehouses.data, parties.data, items.data, categories.data, costCenters.data, salesmen.data, accounts.data],
+    [
+      branches.data,
+      warehouses.data,
+      parties.data,
+      items.data,
+      categories.data,
+      costCenters.data,
+      salesmen.data,
+      accounts.data,
+      cashLocations.data,
+      vesselGroups.data,
+    ],
   );
 
   if (catalog.status === 'success' && !entry) {
@@ -243,7 +268,12 @@ function FilterField({ param, value, options, onChange }: { param: ReportParam; 
   // 🔢 الرقم التسلسلي · 🔢 رقم القيد · 📄 رقم المستند — the free text boxes the desktop
   // gives these reports (`frmRptSerialNo`, `frmRptEntries`): the clerk types the number
   // instead of picking it from a list.
-  if (param.kind === 'serial' || param.kind === 'entryNo' || param.kind === 'docNo') {
+  if (
+    param.kind === 'serial' ||
+    param.kind === 'entryNo' ||
+    param.kind === 'docNo' ||
+    param.kind === 'year'
+  ) {
     return (
       <label className="field">
         <span>{param.labelAr}</span>
@@ -252,7 +282,7 @@ function FilterField({ param, value, options, onChange }: { param: ReportParam; 
           type="text"
           dir="ltr"
           value={value}
-          placeholder={param.kind === 'serial' ? 'SN-0001' : 'JE-000001'}
+          placeholder={param.kind === 'serial' ? 'SN-0001' : param.kind === 'year' ? '2026' : 'JE-000001'}
           onChange={(event) => onChange(event.target.value)}
         />
       </label>
