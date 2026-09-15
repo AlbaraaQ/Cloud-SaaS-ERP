@@ -263,7 +263,7 @@ describe('التقارير — frmRptSalesInPeriod · حركة المبيعات'
     await seedDocuments();
     const run = await runReport('sales-movement-items');
     expect(run.status).toBe(200);
-    const body = data(run.body) as { rows: Array<Record<string, string>>; grandTotal: { labelAr: string; amount: string } | null };
+    const body = data(run.body) as { rows: Array<Record<string, string>>; grandTotal: Array<{ key: string; labelAr: string; amount: string }> };
     const byName = new Map(body.rows.map((row) => [row.item_name, row]));
 
     // وقود: 10 مباعة − 2 مرتجعة = 8 · (1000+150) − (200+30) = 920
@@ -276,14 +276,14 @@ describe('التقارير — frmRptSalesInPeriod · حركة المبيعات'
     expect(byName.has('حبل')).toBe(false);
 
     // 💰 إجمالي المبيعات = txtSumSale = Σ(الإجمالي الصافي)
-    expect(body.grandTotal).toEqual({ labelAr: 'إجمالي المبيعات', amount: '1150.00' });
+    expect(body.grandTotal).toEqual([{ key: 'total', labelAr: 'إجمالي المبيعات', amount: '1150.00' }]);
   });
 
   it('عرض «🧾 عرض الفواتير» البيع والمرتجع بوقتهما ونقدهما وشبكتهما وآجلهما', async () => {
     await seedDocuments();
     const run = await runReport('sales-movement-invoices');
     expect(run.status).toBe(200);
-    const body = data(run.body) as { rows: Array<Record<string, string>>; grandTotal: { amount: string } | null };
+    const body = data(run.body) as { rows: Array<Record<string, string>>; grandTotal: Array<{ key: string; labelAr: string; amount: string }> };
     const byNumber = new Map(body.rows.map((row) => [row.number, row]));
 
     const sale = byNumber.get(saleInvoice!.number)!;
@@ -305,7 +305,7 @@ describe('التقارير — frmRptSalesInPeriod · حركة المبيعات'
     expect(byNumber.get(posInvoice!.number)?.kind_name).toBe('بيع');
 
     // 💰 إجمالي المبيعات = txtSumSale2 = المبيعات − المردودات = 1322.5 − 230 + 57.5
-    expect(Number(body.grandTotal?.amount)).toBeCloseTo(1150, 2);
+    expect(Number(body.grandTotal?.[0]?.amount)).toBeCloseTo(1150, 2);
   });
 
   it('🧾 نوع الفاتورة يفرز مبيعات نقطة البيع عن المبيعات العادية', async () => {
@@ -380,8 +380,8 @@ describe('التقارير — frmRptSalesInPeriod · حركة المبيعات'
     await seedDocuments();
     const run = await runReport('sales-movement-items', '', stranger.token);
     expect(run.status).toBe(200);
-    const body = data(run.body) as { rows: unknown[]; grandTotal: { amount: string } | null };
+    const body = data(run.body) as { rows: unknown[]; grandTotal: Array<{ amount: string }> };
     expect(body.rows).toHaveLength(0);
-    expect(Number(body.grandTotal?.amount)).toBe(0);
+    expect(Number(body.grandTotal?.[0]?.amount)).toBe(0);
   });
 });

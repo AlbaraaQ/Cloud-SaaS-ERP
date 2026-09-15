@@ -95,6 +95,8 @@ const del = (path) => call('delete', path);
 const list = (value) => (Array.isArray(value) ? value : (value?.data ?? []));
 const money = (value) => Number(value ?? 0).toFixed(2);
 const delta = (after, before) => Number((Number(after ?? 0) - Number(before ?? 0)).toFixed(2));
+/** One of the 💰 summary cards under the grid, by the column it sums. */
+const cardOf = (report, key) => (report.grandTotal ?? []).find((total) => total.key === key)?.amount ?? '0';
 
 const today = new Date();
 const iso = (offsetDays) => new Date(today.getTime() + offsetDays * 86_400_000).toISOString().slice(0, 10);
@@ -143,8 +145,8 @@ try {
   // خطّ الأساس — every number below is asserted as a difference from here.
   const baseItems = await itemsReport();
   const baseInvoices = await invoicesReport();
-  const baseItemsTotal = baseItems.grandTotal?.amount ?? '0';
-  const baseInvoicesTotal = baseInvoices.grandTotal?.amount ?? '0';
+  const baseItemsTotal = cardOf(baseItems, 'total');
+  const baseInvoicesTotal = cardOf(baseInvoices, 'net_signed');
   check('📏 خطّ الأساس', true, `الأصناف ${money(baseItemsTotal)} · الفواتير ${money(baseInvoicesTotal)}`);
 
   // ---------------------------------------------------------------------------
@@ -288,13 +290,14 @@ try {
   const afterInvoices = await invoicesReport();
   check(
     '💰 إجمالي المبيعات — الأصناف (920 + 57.50)',
-    afterItems.grandTotal?.labelAr === 'إجمالي المبيعات' && delta(afterItems.grandTotal?.amount, baseItemsTotal) === 977.5,
-    `${money(baseItemsTotal)} → ${money(afterItems.grandTotal?.amount)}`,
+    (afterItems.grandTotal ?? []).some((total) => total.labelAr === 'إجمالي المبيعات') &&
+      delta(cardOf(afterItems, 'total'), baseItemsTotal) === 977.5,
+    `${money(baseItemsTotal)} → ${money(cardOf(afterItems, 'total'))}`,
   );
   check(
     '💰 إجمالي المبيعات — الفواتير (1150 − 230 + 57.50)',
-    delta(afterInvoices.grandTotal?.amount, baseInvoicesTotal) === 977.5,
-    `${money(baseInvoicesTotal)} → ${money(afterInvoices.grandTotal?.amount)}`,
+    delta(cardOf(afterInvoices, 'net_signed'), baseInvoicesTotal) === 977.5,
+    `${money(baseInvoicesTotal)} → ${money(cardOf(afterInvoices, 'net_signed'))}`,
   );
   check(
     '🧮 «صافي الحركة» محسوب لا معروض',

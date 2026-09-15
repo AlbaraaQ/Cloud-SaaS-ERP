@@ -8,7 +8,14 @@ import { withTenantTx, type DatabaseHandle } from '@erp/database';
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 
 import { PrintTemplatesService } from './print-templates.service.js';
-import { REPORT_DEFINITIONS, reportByKey, type ReportColumn, type ReportFilters, type ReportParam } from './report-catalog.js';
+import {
+  REPORT_DEFINITIONS,
+  reportByKey,
+  type ReportColumn,
+  type ReportFilters,
+  type ReportGrandTotal,
+  type ReportParam,
+} from './report-catalog.js';
 import { ReportLayoutsService } from './report-layouts.service.js';
 import { buildXlsx } from './xlsx.js';
 
@@ -42,6 +49,10 @@ const filtersSchema = z
     kind: z.string().max(40).optional(),
   })
   .partial();
+
+/** A report declares one card or several; internally it is always a list. */
+const grandTotalsOf = (definition: { grandTotal?: ReportGrandTotal | ReportGrandTotal[] }): ReportGrandTotal[] =>
+  definition.grandTotal ? (Array.isArray(definition.grandTotal) ? definition.grandTotal : [definition.grandTotal]) : [];
 
 const NUMERIC_TYPES = new Set(['money', 'qty', 'int', 'percent']);
 
@@ -84,7 +95,8 @@ export class ReportingService {
       // catalogue is what the screen draws from, so it never sees it.
       columns: definition.columns.filter((column) => !column.hidden),
       totals: definition.totals ?? [],
-      grandTotal: definition.grandTotal?.labelAr ?? null,
+      grandTotal: grandTotalsOf(definition).map((card) => card.labelAr),
+      grandTotalCards: grandTotalsOf(definition).map((card) => ({ key: card.key, labelAr: card.labelAr })),
       chart: definition.chart ?? null,
       asyncExport: false,
     }));
@@ -115,11 +127,14 @@ export class ReportingService {
       columns,
       rows: normalized,
       totals: sumColumns(normalized, definition.totals ?? []),
-      // 💰 إجمالي المبيعات — one number under the grid, exactly as `frmRptSalesInPeriod`
-      // prints it beside the rows. Rows, not SQL: it must agree with what is on screen.
-      grandTotal: definition.grandTotal
-        ? { labelAr: definition.grandTotal.labelAr, amount: sumColumns(normalized, [definition.grandTotal.key])[definition.grandTotal.key] ?? '0' }
-        : null,
+      // 💰 The summary cards under the grid — «💵 إجمالي صافي البيع» · «📦 إجمالي
+      // الكميات» · «💰 إجمالي الربح». Summed from the rows, never re-queried: a card has
+      // to agree with the grid above it.
+      grandTotal: grandTotalsOf(definition).map((card) => ({
+        key: card.key,
+        labelAr: card.labelAr,
+        amount: sumColumns(normalized, [card.key])[card.key] ?? '0',
+      })),
       rowCount: normalized.length,
       generatedAt: new Date().toISOString(),
     };
@@ -142,7 +157,7 @@ export class ReportingService {
         columns: report.columns.map((column) => ({ key: column.key, labelAr: column.labelAr, numeric: isNumericColumn(column) })),
         rows: report.rows,
         totals: report.totals,
-        grandTotal: report.grandTotal ?? null,
+        grandTotal: report.grandTotal,
         captions,
         generatedAt: report.generatedAt,
         emptyAr: definition.emptyAr,

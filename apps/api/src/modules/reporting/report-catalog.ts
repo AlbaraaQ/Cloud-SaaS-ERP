@@ -27,6 +27,9 @@ export type ReportColumnType = 'text' | 'money' | 'qty' | 'int' | 'date' | 'perc
  */
 export type ReportColumn = { key: string; labelAr: string; type: ReportColumnType; hidden?: boolean };
 
+/** One summary card under the grid: the column it sums and the label it prints. */
+export type ReportGrandTotal = { key: string; labelAr: string };
+
 export type ReportGroup = 'sales' | 'purchases' | 'inventory' | 'accounting' | 'pos' | 'hrm' | 'projects' | 'marina';
 
 export type ReportFilters = {
@@ -59,11 +62,13 @@ export type ReportDefinition = {
   /** Column keys that get a grand total in the footer. */
   totals?: string[];
   /**
-   * 💰 The one number under the grid — `txtSumSale` / `txtSumSale2` in
-   * `frmRptSalesInPeriod`, labelled «💰 إجمالي المبيعات:». Summed from one column, which
-   * may be a hidden signed one.
+   * 💰 The number(s) under the grid — the summary cards of the `frmRpt*` windows:
+   * «💵 إجمالي صافي البيع» و«📦 إجمالي الكميات» in `frmRptItemsSalesDetails`,
+   * «💵 إجمالي صافي البيع» و«💰 إجمالي الربح» in `frmRptItemsProfit`. Summed from the
+   * rows, so they always agree with what is on screen, and each may point at a hidden
+   * signed column.
    */
-  grandTotal?: { key: string; labelAr: string };
+  grandTotal?: ReportGrandTotal | ReportGrandTotal[];
   /** What an empty report says — `frmRptSalesInPeriod` says «لا توجد عمليات بالجدول». */
   emptyAr?: string;
   /** «أعده · راجعه · المدير» — the signature strip of `RptSalesInPeriod1/2.repx`. */
@@ -96,6 +101,39 @@ const INVOICE_KIND: ReportParam = {
     { value: 'sale', labelAr: 'مبيعات عادية' },
   ],
 };
+/**
+ * 🧾 نوع الفاتورة — `frmRptSalesByCategory.xaml.cs` L80 وL81 fill the combo with
+ * «مبيعات» (`inv.inv_type = 2`) و«نقطة بيع» (`inv.inv_type = 3`).
+ */
+const INVOICE_KIND_SALES: ReportParam = {
+  name: 'invType',
+  labelAr: 'نوع الفاتورة',
+  kind: 'select',
+  options: [
+    { value: 'sale', labelAr: 'مبيعات' },
+    { value: 'pos', labelAr: 'نقطة بيع' },
+  ],
+};
+/** 🧾 `frmRptCategorySaleByDay.xaml` L25 وL26 — «فاتورة مبيعات» · «فاتورة نقطة بيع». */
+const INVOICE_KIND_DOCS: ReportParam = {
+  name: 'invType',
+  labelAr: 'نوع الفاتورة',
+  kind: 'select',
+  options: [
+    { value: 'sale', labelAr: 'فاتورة مبيعات' },
+    { value: 'pos', labelAr: 'فاتورة نقطة بيع' },
+  ],
+};
+/** ⏰ «وقت البدء (HH:mm)» / «وقت الانتهاء (HH:mm)» — `frmRptItemsSalesDetails.xaml` L397 وL413. */
+const TIME_START_END: ReportParam[] = [
+  { name: 'fromTime', labelAr: 'وقت البدء (HH:mm)', kind: 'time' },
+  { name: 'toTime', labelAr: 'وقت الانتهاء (HH:mm)', kind: 'time' },
+];
+/** ⏰ «من وقت (HH:mm)» / «إلى وقت (HH:mm)» — `frmRptItemsProfitDetails.xaml` L340 وL356. */
+const TIME_FROM_TO: ReportParam[] = [
+  { name: 'fromTime', labelAr: 'من وقت (HH:mm)', kind: 'time' },
+  { name: 'toTime', labelAr: 'إلى وقت (HH:mm)', kind: 'time' },
+];
 const BRANCH: ReportParam = { name: 'branchId', labelAr: 'الفرع', kind: 'branch' };
 const WAREHOUSE: ReportParam = { name: 'warehouseId', labelAr: 'المستودع', kind: 'warehouse' };
 const PARTY: ReportParam = { name: 'partyId', labelAr: 'الطرف', kind: 'party' };
@@ -129,6 +167,51 @@ const onDateTime = (column: SQL, from?: string, to?: string, fromTime?: string, 
  * 🧾 نوع الفاتورة — «مبيعات نقطة البيع» are the cash sales (`party_id IS NULL`);
  * «مبيعات عادية» are the ones with a عميل. No choice means both.
  */
+/**
+ * 🧾 POS or not — `inv_type=3` at the desktop. The cloud has no such column: a فاتورة
+ * نقطة البيع is the cash sale with no عميل, which is what every other POS report here
+ * already reads. `null` means "both".
+ */
+const posScope = (pos: boolean | null): SQL => (pos === null ? all : pos ? sql`si.party_id IS NULL` : sql`si.party_id IS NOT NULL`);
+
+/**
+ * 📦 The item-movement scope every تجميعي report shares: posted documents only —
+ * `IS_Deleted=0` — and the filters of the 🔧 خيارات البحث panel.
+ */
+/**
+ * The `opts` switches decide which of the 🔧 خيارات البحث boxes this window actually
+ * owns — «أرباح المواد تفصيلي» has a مستودع box and a صنف box and neither a فرع nor a
+ * مجموعة, so a shared scope has to be able to leave those two out.
+ */
+const movementLinesScope = (
+  tenantId: string,
+  f: ReportFilters,
+  pos: boolean | null,
+  opts: { invType?: boolean; branch?: boolean; category?: boolean } = {},
+): SQL => sql`
+  si.tenant_id = ${tenantId}
+  AND si.status = 'posted'
+  AND si.kind IN ('sale', 'sale_return')
+  AND ${onDateTime(sql`si.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${posScope(pos)}
+  AND ${opts.invType ? kindScope(f.invType) : all}
+  AND ${opts.branch === false ? all : eqIf(sql`si.branch_id`, f.branchId)}
+  AND ${eqIf(sql`si.warehouse_id`, f.warehouseId)}
+  AND ${eqIf(sql`line.item_id`, f.itemId)}
+  AND ${opts.category === false ? all : eqIf(sql`item.category_id`, f.categoryId)}
+`;
+
+const purchaseLinesScope = (tenantId: string, f: ReportFilters): SQL => sql`
+  pi.tenant_id = ${tenantId}
+  AND pi.status = 'posted'
+  AND pi.kind IN ('purchase', 'purchase_return')
+  AND ${onDateTime(sql`pi.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${eqIf(sql`pi.branch_id`, f.branchId)}
+  AND ${eqIf(sql`pi.warehouse_id`, f.warehouseId)}
+  AND ${eqIf(sql`line.item_id`, f.itemId)}
+  AND ${eqIf(sql`item.category_id`, f.categoryId)}
+`;
+
 const kindScope = (invType?: string): SQL =>
   invType === 'pos' ? sql`si.party_id IS NULL` : invType === 'sale' ? sql`si.party_id IS NOT NULL` : all;
 const eqIf = (column: SQL, value?: string): SQL => (value ? sql`${column} = ${value}::uuid` : all);
@@ -513,6 +596,334 @@ const definitions: ReportDefinition[] = [
       ) paid ON paid.invoice_id = si.id
       WHERE ${movementScope(tenantId, f)}
       ORDER BY si.posted_at, si.number LIMIT 2000`,
+  },
+  {
+    key: 'items-sales-summary',
+    titleAr: 'مبيعات الأصناف تجميعي',
+    group: 'sales',
+    hintAr: 'كل صنفٍ بكميّته الصافية وصافي بيعه (`OperType = 1`): المبيعات والمردودات معاً، نقطة البيع والبيع العادي معاً.',
+    // 🏪 المستودع · 🗂️ المجموعة · 📦 الصنف · 🏢 الفرع · 📅 الفترة الزمنية — the order of the
+    // 🔧 خيارات البحث panel itself (L263 … L413).
+    params: [WAREHOUSE, CATEGORY, ITEM, BRANCH, PERIOD[0]!, TIME_START_END[0]!, PERIOD[1]!, TIME_START_END[1]!],
+    columns: [
+      text('item_code', 'رمز الصنف'),
+      text('item_name', 'الصنف'),
+      text('category', 'المجموعة'),
+      qty('quantity', 'الكمية'),
+      money('net_sales', 'صافي البيع'),
+    ],
+    totals: ['quantity', 'net_sales'],
+    grandTotal: [
+      { key: 'net_sales', labelAr: 'إجمالي صافي البيع' },
+      { key: 'quantity', labelAr: 'إجمالي الكميات' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(item.sku, '—') AS item_code, coalesce(item.name_ar, '—') AS item_name,
+             coalesce(cat.name_ar, '—') AS category,
+             sum(CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END)::text AS quantity,
+             round(sum(CASE WHEN si.kind = 'sale' THEN line.total ELSE -line.total END), 2)::text AS net_sales
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      WHERE ${movementLinesScope(tenantId, f, null)}
+      GROUP BY item.id, item.sku, item.name_ar, cat.name_ar
+      -- «لا حركة → تجاهل» — if (!hasMovement) continue; in frmRptItemsSalesDetails.xaml.cs L282.
+      HAVING sum(line.quantity) <> 0
+      ORDER BY item_name LIMIT 2000`,
+  },
+  {
+    key: 'items-pos-sales-summary',
+    titleAr: 'مبيعات الأصناف تجميعي - نقطة البيع',
+    group: 'sales',
+    hintAr: 'النافذة نفسها مقيَّدة بـ`inv.inv_type=3`: فواتير نقطة البيع وحدها (`PosVal − PosRetVal`).',
+    // 👤 المستخدم (مؤجَّل) و📅 الفترة الزمنية وحدها — that panel has no مستودع ولا مجموعة.
+    params: [PERIOD[0]!, TIME_START_END[0]!, PERIOD[1]!, TIME_START_END[1]!],
+    columns: [
+      text('item_code', 'رمز الصنف'),
+      text('item_name', 'الصنف'),
+      text('category', 'المجموعة'),
+      qty('quantity', 'الكمية'),
+      money('net_sales', 'صافي البيع'),
+    ],
+    totals: ['quantity', 'net_sales'],
+    grandTotal: [
+      { key: 'net_sales', labelAr: 'إجمالي صافي البيع' },
+      { key: 'quantity', labelAr: 'إجمالي الكميات' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(item.sku, '—') AS item_code, coalesce(item.name_ar, '—') AS item_name,
+             coalesce(cat.name_ar, '—') AS category,
+             sum(CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END)::text AS quantity,
+             round(sum(CASE WHEN si.kind = 'sale' THEN line.total ELSE -line.total END), 2)::text AS net_sales
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      WHERE ${movementLinesScope(tenantId, f, true)}
+      GROUP BY item.id, item.sku, item.name_ar, cat.name_ar
+      -- «لا حركة → تجاهل» — if (!hasMovement) continue; in frmRptItemsSalesDetailsPOS.xaml.cs L223.
+      HAVING sum(line.quantity) <> 0
+      ORDER BY item_name LIMIT 2000`,
+  },
+  {
+    key: 'items-profit-summary',
+    titleAr: 'أرباح المواد تجميعي',
+    group: 'sales',
+    hintAr: '«صافي البيع» بعد خصم السطر والخصم الموزَّع من رأس الفاتورة، و«الربح» = صافي البيع − إجمالي التكلفة، و«نسبة الربح» = الربح ÷ التكلفة × 100.',
+    // 🏪 المستودع · 🗂️ المجموعة · 📦 الصنف · 📅 الفترة الزمنية (من · حتى, no time box).
+    params: [WAREHOUSE, CATEGORY, ITEM, { name: 'from', labelAr: 'من', kind: 'date' } satisfies ReportParam, { name: 'to', labelAr: 'حتى', kind: 'date' } satisfies ReportParam],
+    columns: [
+      text('item_code', 'رمز المادة'),
+      text('item_name', 'المادة'),
+      qty('quantity', 'الكمية'),
+      money('total_cost', 'متوسط التكلفة'),
+      money('net_sales', 'صافي البيع'),
+      money('profit', 'الربح'),
+      percent('profit_ratio', 'نسبة الربح'),
+    ],
+    totals: ['quantity', 'total_cost', 'net_sales', 'profit'],
+    grandTotal: [
+      { key: 'net_sales', labelAr: 'إجمالي صافي البيع' },
+      { key: 'profit', labelAr: 'إجمالي الربح' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(item.sku, '—') AS item_code, coalesce(item.name_ar, '—') AS item_name,
+             sum(signed.line_qty)::text AS quantity,
+             round(sum(signed.line_cost), 2)::text AS total_cost,
+             -- «صافي البيع»: صافي السطر بعد خصم السطر وبعد نصيبه من خصم رأس الفاتورة.
+             -- The desktop does that distribution in the report itself —
+             -- SUM(ROUND((ItemPriceWithoutVAT * minus / NULLIF(InvSum,0)),2)) in
+             -- frmRptItemsProfit.GetSaleData — while the cloud distributes it at save
+             -- time: calculateInvoiceTotals spreads invoice_discount pro-rata by gross
+             -- into every line.net, which is why the report reads line.net as it stands.
+             round(sum(signed.line_net), 2)::text AS net_sales,
+             round(sum(signed.line_net) - sum(signed.line_cost), 2)::text AS profit,
+             round(
+               CASE WHEN sum(signed.line_cost) = 0 THEN 0
+                    ELSE (sum(signed.line_net) - sum(signed.line_cost)) / sum(signed.line_cost) * 100 END,
+               2)::text AS profit_ratio
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      -- One row per line, already signed: proc_type 1 (بيع) موجب و2 (مرتجع) سالب، لنمطي
+      -- البيع ونقطة البيع معاً — r1 − r2 + r3 − r4 in ShowResults.
+      CROSS JOIN LATERAL (
+        SELECT CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END AS line_qty,
+               CASE WHEN si.kind = 'sale' THEN line.net ELSE -line.net END AS line_net,
+               CASE WHEN si.kind = 'sale' THEN line.cost_total ELSE -line.cost_total END AS line_cost
+      ) signed
+      WHERE ${movementLinesScope(tenantId, f, null)}
+      GROUP BY item.id, item.sku, item.name_ar
+      -- «تجاهل الصنف إذا لم تكن له حركة» — frmRptItemsProfit.xaml.cs L220: a item with any
+      -- of the four quantities non-zero is a row, even when the net comes out at zero.
+      HAVING sum(line.quantity) <> 0
+      ORDER BY item_name LIMIT 2000`,
+  },
+  {
+    key: 'items-purchases-summary',
+    titleAr: 'مشتريات الأصناف تجميعي',
+    group: 'purchases',
+    hintAr: 'النافذة نفسها بـ`OperType = 2`: المشتريات ناقص مردوداتها (`PurchVal − RePurchVal`).',
+    params: [WAREHOUSE, CATEGORY, ITEM, BRANCH, PERIOD[0]!, TIME_START_END[0]!, PERIOD[1]!, TIME_START_END[1]!],
+    columns: [
+      text('item_code', 'رمز الصنف'),
+      text('item_name', 'الصنف'),
+      text('category', 'المجموعة'),
+      qty('quantity', 'الكمية'),
+      money('net_purchases', 'صافي الشراء'),
+    ],
+    totals: ['quantity', 'net_purchases'],
+    grandTotal: [
+      { key: 'net_purchases', labelAr: 'إجمالي صافي الشراء' },
+      { key: 'quantity', labelAr: 'إجمالي الكميات' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(item.sku, '—') AS item_code, coalesce(item.name_ar, '—') AS item_name,
+             coalesce(cat.name_ar, '—') AS category,
+             sum(CASE WHEN pi.kind = 'purchase' THEN line.quantity ELSE -line.quantity END)::text AS quantity,
+             round(sum(CASE WHEN pi.kind = 'purchase' THEN line.total ELSE -line.total END), 2)::text AS net_purchases
+      FROM purchase_invoice_lines line
+      JOIN purchase_invoices pi ON pi.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      WHERE ${purchaseLinesScope(tenantId, f)}
+      GROUP BY item.id, item.sku, item.name_ar, cat.name_ar
+      -- The desktop shares the loop with the sales window, so its hasMovement test still
+      -- reads the sale columns even when OperType = 2; the cloud keeps the sane predicate.
+      HAVING sum(line.quantity) <> 0
+      ORDER BY item_name LIMIT 2000`,
+  },
+  {
+    key: 'items-profit-details',
+    titleAr: 'أرباح المواد تفصيلي',
+    group: 'sales',
+    hintAr: 'سطرٌ لكل حركة: الفاتورة وتاريخها ونوعها ومستودعها، ثم المادة وكميتها وتكلفتها وسعرها ومجموعها وخصمها وربحها ونسبته.',
+    // 🏭 المستودع · 📦 الصنف · 📅 الفترة (من تاريخ · من وقت · إلى تاريخ · إلى وقت).
+    params: [WAREHOUSE, ITEM, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: [
+      text('number', 'الرقم'),
+      date('day', 'التاريخ'),
+      text('operation', 'نوع العملية'),
+      text('warehouse', 'المستودع'),
+      text('item_code', 'رمز المادة'),
+      text('item_name', 'المادة'),
+      text('unit', 'الوحدة'),
+      qty('quantity', 'الكمية'),
+      money('unit_cost', 'متوسط التكلفة'),
+      money('total_cost', 'إجمالي التكلفة'),
+      money('unit_price', 'السعر'),
+      money('gross', 'المجموع'),
+      money('net', 'الإجمالي'),
+      money('discount', 'الخصم'),
+      money('profit', 'الربح'),
+      percent('profit_ratio', 'نسبة الربح %'),
+    ],
+    totals: ['quantity', 'total_cost', 'gross', 'net', 'discount', 'profit'],
+    // 📊 ملخص الأرباح — «إجمالي التكلفة · المجموع · الإجمالي · الخصم · 💹 إجمالي الربح»
+    // (L655 … L716); «عدد السجلات» هو عدد صفوف الشبكة الذي يطبعه الرأس أصلاً.
+    grandTotal: [
+      { key: 'total_cost', labelAr: 'إجمالي التكلفة' },
+      { key: 'gross', labelAr: 'المجموع' },
+      { key: 'net', labelAr: 'الإجمالي' },
+      { key: 'discount', labelAr: 'الخصم' },
+      { key: 'profit', labelAr: 'إجمالي الربح' },
+    ],
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(si.number, '—') AS number, si.posted_at::date AS day,
+             CASE si.kind WHEN 'sale' THEN 'بيع' WHEN 'sale_return' THEN 'مرتجع' ELSE si.kind END AS operation,
+             coalesce(wh.name, '—') AS warehouse,
+             coalesce(item.sku, '—') AS item_code, coalesce(item.name_ar, '—') AS item_name,
+             coalesce(unit.name_ar, '—') AS unit,
+             signed.qty::text AS quantity,
+             -- DgvAvgCost / DgvTotAvg — the cost of the حركة divided by its كمية, and the
+             -- cost of the whole line (val * AvrgCost at the desktop).
+             round(signed.cost / nullif(signed.qty, 0), 2)::text AS unit_cost,
+             round(signed.cost, 2)::text AS total_cost,
+             line.unit_price::text AS unit_price,
+             round(signed.gross, 2)::text AS gross, round(signed.net, 2)::text AS net,
+             round(signed.gross - signed.net, 2)::text AS discount,
+             round(signed.net - signed.cost, 2)::text AS profit,
+             round(CASE WHEN signed.cost = 0 THEN 0 ELSE (signed.net - signed.cost) / signed.cost * 100 END, 2)::text AS profit_ratio
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN units_of_measure unit ON unit.id = item.base_unit_id
+      LEFT JOIN warehouses wh ON wh.id = si.warehouse_id
+      -- proc_type 1 (بيع) موجب و2 (مرتجع) سالب — val1 · val · AvrgCost · exchange_price
+      -- and ((val1*exchange_price)/InvSum)*minus in frmRptItemsProfitDetails.xaml.cs.
+      CROSS JOIN LATERAL (
+        SELECT CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END AS qty,
+               CASE WHEN si.kind = 'sale' THEN line.cost_total ELSE -line.cost_total END AS cost,
+               CASE WHEN si.kind = 'sale' THEN line.quantity * line.unit_price ELSE -line.quantity * line.unit_price END AS gross,
+               CASE WHEN si.kind = 'sale' THEN line.net ELSE -line.net END AS net
+      ) signed
+      WHERE ${movementLinesScope(tenantId, f, null, { branch: false, category: false })}
+        -- AND Inv_Sub.ItemId > 0 — a وصف line with no صنف is not a row of a أرباح المواد report.
+        AND line.item_id IS NOT NULL
+      ORDER BY si.posted_at DESC, si.number DESC LIMIT 2000`,
+  },
+  {
+    // The cloud already had a `sales-by-category` («مبيعات بحسب الفئة», one row per فئة with
+    // a bar chart); this one is the desktop's tree of أصناف under their مجموعات.
+    key: 'items-sales-by-category',
+    titleAr: 'تقرير مبيعات الأصناف حسب المجموعة',
+    group: 'sales',
+    hintAr: 'كل صنفٍ تحت مجموعته: إجمالي كميّته وإجماليه وضريبته وصافيه وخصمه؛ ومجاميع المجموعات في البطاقات.',
+    // 📄 نوع الفاتورة · 📅 الفترة (من تاريخ / إلى تاريخ) · 📂 المجموعة · 🏬 الفرع — the
+    // 👤 المستخدم and 🧑‍💼 المندوب boxes are deferred (§5.5).
+    params: [INVOICE_KIND_SALES, PERIOD[0]!, PERIOD[1]!, CATEGORY, BRANCH],
+    columns: [
+      text('category', 'المجموعة'),
+      text('item_name', 'اسم المجموعة / الصنف'),
+      text('item_code', 'الرمز'),
+      qty('quantity', 'إجمالي الكمية'),
+      money('total', 'الإجمالي'),
+      money('tax', 'الضريبة'),
+      money('net', 'الصافي'),
+      money('discount', 'الخصم'),
+    ],
+    totals: ['quantity', 'total', 'tax', 'net', 'discount'],
+    // «إجمالي الكمية · الإجمالي · الضريبة · الصافي» — lblTotQty · lblTotTotal · lblTotVat · lblTotNet.
+    grandTotal: [
+      { key: 'quantity', labelAr: 'إجمالي الكمية' },
+      { key: 'total', labelAr: 'الإجمالي' },
+      { key: 'tax', labelAr: 'الضريبة' },
+      { key: 'net', labelAr: 'الصافي' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(cat.name_ar, '—') AS category,
+             coalesce(item.name_ar, '—') AS item_name, coalesce(item.sku, '—') AS item_code,
+             sum(signed.qty)::text AS quantity,
+             round(sum(signed.net), 2)::text AS total,
+             -- The desktop hard-codes 15% (total * 0.15 and total * 1.15); the cloud reads
+             -- the tax the line was actually posted with.
+             round(sum(signed.tax), 2)::text AS tax,
+             round(sum(signed.total), 2)::text AS net,
+             round(sum(signed.gross - signed.net), 2)::text AS discount
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      -- proc_type 1 (بيع) minus proc_type 2 (مرتجع) — the two UNION ALL halves of the
+      -- item query in frmRptSalesByCategory.xaml.cs L203 … L240.
+      CROSS JOIN LATERAL (
+        SELECT CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END AS qty,
+               CASE WHEN si.kind = 'sale' THEN line.net ELSE -line.net END AS net,
+               CASE WHEN si.kind = 'sale' THEN line.tax ELSE -line.tax END AS tax,
+               CASE WHEN si.kind = 'sale' THEN line.total ELSE -line.total END AS total,
+               CASE WHEN si.kind = 'sale' THEN line.quantity * line.unit_price ELSE -line.quantity * line.unit_price END AS gross
+      ) signed
+      WHERE ${movementLinesScope(tenantId, f, null, { invType: true })}
+        AND line.item_id IS NOT NULL
+      GROUP BY cat.id, cat.name_ar, item.id, item.sku, item.name_ar
+      HAVING sum(line.quantity) <> 0
+      ORDER BY cat.name_ar, item.name_ar LIMIT 2000`,
+  },
+  {
+    key: 'category-sales-by-day',
+    titleAr: 'تقرير المبيعات اليومية للمجموعة',
+    group: 'sales',
+    hintAr: 'كل مجموعةٍ في يوم: رمزها واسمها واسم اليوم وتاريخها وإجمالي مبيعاتها، ثم «إجمالي المبيعات» تحت الشبكة.',
+    // 📄 نوع الفاتورة · 🏢 الفرع · 📦 المجموعة · 📅 من / إلى — the order of the panel (L21 … L92).
+    params: [INVOICE_KIND_DOCS, BRANCH, CATEGORY, PERIOD[0]!, PERIOD[1]!],
+    columns: [
+      text('category_code', 'الرمز'),
+      text('category', 'المجموعة'),
+      text('day_name', 'اليوم'),
+      date('day', 'التاريخ'),
+      money('total', 'الإجمالي'),
+    ],
+    totals: ['total'],
+    // «إجمالي المبيعات:» — lblTotal in frmRptCategorySaleByDay.xaml L385.
+    grandTotal: { key: 'total', labelAr: 'إجمالي المبيعات' },
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(cat.code, '—') AS category_code, coalesce(cat.name_ar, '—') AS category,
+             -- SaleDay — parsedDate.ToString("ddd", culture ar) in the .xaml.cs L201.
+             CASE extract(dow FROM si.posted_at::date)::int
+               WHEN 0 THEN 'الأحد' WHEN 1 THEN 'الاثنين' WHEN 2 THEN 'الثلاثاء'
+               WHEN 3 THEN 'الأربعاء' WHEN 4 THEN 'الخميس' WHEN 5 THEN 'الجمعة'
+               ELSE 'السبت' END AS day_name,
+             si.posted_at::date AS day,
+             round(sum(CASE WHEN si.kind = 'sale' THEN line.total ELSE -line.total END), 2)::text AS total
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      WHERE ${movementLinesScope(tenantId, f, null, { invType: true })}
+        AND line.item_id IS NOT NULL
+      GROUP BY cat.id, cat.code, cat.name_ar, si.posted_at::date
+      ORDER BY si.posted_at::date DESC, cat.name_ar LIMIT 2000`,
   },
   // ------------------------------------------------------------ purchases
   {

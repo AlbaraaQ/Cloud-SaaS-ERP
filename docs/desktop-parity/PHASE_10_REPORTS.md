@@ -84,7 +84,7 @@
 | الجزء | النوافذ | الحالة |
 |---|---|---|
 | 1 | 📊 تقارير المبيعات — `frmRptSalesInPeriod` (`RptSalesInPeriod1/2`) | ✅ مُنجز (§4) |
-| 2 | 📦 تقارير الأصناف — `frmRptItemsSalesDetails` · `frmRptItemsSalesDetailsPOS` · `frmRptItemsProfit` · `frmRptItemsProfitDetails` · `frmRptSalesByCategory` · `frmRptCategorySaleByDay` | ⬜ |
+| 2 | 📦 تقارير الأصناف — `frmRptItemsSalesDetails` · `frmRptItemsSalesDetailsPOS` · `frmRptItemsProfit` · `frmRptItemsProfitDetails` · `frmRptSalesByCategory` · `frmRptCategorySaleByDay` | ✅ مُنجز (§5) |
 | 3 | 🧾 تقارير الفواتير والإشعارات والحركة اليومية — `frmRptInvSalesDetails` · `frmRptInvSalesDetailsPos(Android)` · `frmRptInvNotfic` · `frmRptInvPurchaseDetails` · `frmRptDailySales` · `frmRptDailyProcess` · `frmRptInvAnalysis` · `FrmRptSalesChart` | ⬜ |
 | 4 | 📚 تقارير المخزون والأرقام التسلسلية — `frmRptInventory` · `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo` · `frmRptSerialNoSummary` · `frmRptProducedItems` | ⬜ |
 | 5 | 📒 تقارير المحاسبة — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod` | ⬜ |
@@ -214,7 +214,140 @@
   متتالية)، كل رقمٍ فيها **فارقٌ عن خطّ أساس** يُؤخذ قبل الكتابة، والتنظيف في
   `finally`.
 
-## 5. معايير القبول لكل جزء
+## 5. الجزء الثاني — 📦 تقارير الأصناف (`frmRptItems*`)
+
+سبع نوافذ تُقرأ كلها من `inv_sub` المجموعة على `Items`، وأربع نقاط نهاية جديدة:
+
+### 5.1 النوافذ وما تقرأه
+
+| الملف (السطور) | العنوان | الشبكة | 💰 البطاقات | 🔧 خيارات البحث |
+|---|---|---|---|---|
+| `frmRptItemsSalesDetails.xaml` (688) + `.cs` (730) | «مبيعات الأصناف تجميعي» و«مشتريات الأصناف تجميعي» (`OperType = 2`) | م · رمز الصنف · الصنف · الكمية · صافي البيع · نسبة البيع · تفاصيل | 🔢 عدد الأصناف · 💵 إجمالي صافي البيع · 📦 إجمالي الكميات | 🏪 المستودع · 🗂️ المجموعة · 📦 الصنف · 🏢 الفرع · 📅 الفترة الزمنية (من تاريخ · وقت البدء · إلى تاريخ · وقت الانتهاء) |
+| `frmRptItemsSalesDetailsPOS.xaml` (586) + `.cs` (496) | «مبيعات الأصناف تجميعي - نقطة البيع» | الشبكة نفسها + `DgvItemAdditionalTax` | البطاقات نفسها | 👤 المستخدم · 📅 الفترة الزمنية · ⚙️ الأصناف الخاضعة للضريبة الإضافية |
+| `frmRptItemsProfit.xaml` (643) + `.cs` (714) | «أرباح المواد تجميعي» | م · رمز المادة · المادة · الكمية · متوسط التكلفة · صافي البيع · الربح · نسبة الربح | 💵 إجمالي صافي البيع · 💰 إجمالي الربح · 🔢 عدد الأصناف | 🏪 المستودع · 🗂️ المجموعة · 📦 الصنف · 📅 الفترة الزمنية (من · حتى) |
+| `frmRptItemsProfitDetails.xaml` (768) + `.cs` (861) | «أرباح المواد تفصيلي» | م · المستودع · نوع العملية · التاريخ · الرقم · رمز المادة · المادة · الوحدة · الكمية · متوسط التكلفة · إجمالي التكلفة · السعر · المجموع · الإجمالي · الخصم · الربح · نسبة الربح % · الفاتورة | 📊 ملخص الأرباح: عدد السجلات · الكمية الإجمالية · إجمالي التكلفة · المجموع · الإجمالي · الخصم · 💹 إجمالي الربح | 🏭 المستودع · 📦 الصنف · 📅 الفترة (من تاريخ · من وقت · إلى تاريخ · إلى وقت) |
+| `frmRptSalesByCategory.xaml` (677) + `.cs` (528) | «تقرير مبيعات الأصناف حسب المجموعة» | شجرة: المجموعة ← أصنافها (اسم المجموعة / الصنف · الرمز · إجمالي الكمية · الإجمالي · الضريبة · الصافي · الخصم) | إجمالي الكمية · الإجمالي · الضريبة · الصافي | 📄 نوع الفاتورة (مبيعات · نقطة بيع) · 👤 المستخدم · 📅 الفترة · 📂 المجموعة · 🏬 الفرع · 🧑‍💼 المندوب |
+| `frmRptCategorySaleByDay.xaml` (444) + `.cs` (393) | «تقرير المبيعات اليومية للمجموعة» | # · الرمز · المجموعة · اليوم · التاريخ · الإجمالي | عدد السجلات · إجمالي المبيعات | 📄 نوع الفاتورة (فاتورة مبيعات · فاتورة نقطة بيع) · 🏢 الفرع · 📦 المجموعة · 📅 من · إلى |
+
+القواعد المشتركة في الملفات:
+
+- `ShowResults()` — `netQty = saleVal − retSaleVal + posVal − posRetVal` و
+  `netValue = sumSale + sumPos − sumRetSale − sumPosRet` للمبيعات، و
+  `netQty = purchVal − rePurchVal` و`netValue = sumPurch − sumRePurch` للمشتريات
+  (`frmRptItemsSalesDetails.xaml.cs` L285 … L295).
+- `if (!hasMovement) continue;` — **أيّ** حركة (L282 · L223 · L220) لا صافٍ غير صفر:
+  صنفٌ بيع ثم أُعيد كلّه يبقى سطراً. هذا يخالف الجزء الأول الذي يسقط ما صافيه صفر
+  (`if (qty == 0.0) continue;`)، فالتقريران لا يتصرفان بالطريقة نفسها عن قصد.
+- `GetSaleData` في `frmRptItemsProfit.xaml.cs` يوزّع خصم رأس الفاتورة على السطور:
+  `SUM(ROUND((ItemPriceWithoutVAT * minus / NULLIF(InvSum,0)),2))`، ومثله
+  `((val1*exchange_price)/InvSum)*minus` في التفصيلي.
+- «نسبة الربح» = (صافي البيع − التكلفة) ÷ التكلفة × 100، وصفر عند تكلفةٍ صفر.
+- `frmRptCategorySaleByDay` يستدعي الإجراء المخزَّن `proGetCategorySaleByDay`
+  (`@branch` · `@inv_type` · `@StartDate` · `@EndDate` · `@CategoryID`) ويسمّي اليوم بـ
+  `parsedDate.ToString("ddd", culture ar)`.
+
+### 5.2 السطح (نقاط النهاية)
+
+| الطريقة | المسار | الإذن |
+|---|---|---|
+| `GET` | `/api/v1/reports/items-sales-summary` | `reporting.view` — مبيعات الأصناف تجميعي |
+| `GET` | `/api/v1/reports/items-pos-sales-summary` | `reporting.view` — … نقطة البيع |
+| `GET` | `/api/v1/reports/items-profit-summary` | `reporting.view` — أرباح المواد تجميعي |
+| `GET` | `/api/v1/reports/items-profit-details` | `reporting.view` — أرباح المواد تفصيلي |
+| `GET` | `/api/v1/reports/items-sales-by-category` | `reporting.view` — مبيعات الأصناف حسب المجموعة |
+| `GET` | `/api/v1/reports/category-sales-by-day` | `reporting.view` — المبيعات اليومية للمجموعة |
+| `GET` | `/api/v1/reports/items-purchases-summary` | `reporting.view` — مشتريات الأصناف تجميعي |
+| `GET` | `/api/v1/reports/print/:key` | `reporting.view` — 🖨️ الطباعة |
+| `POST` | `/api/v1/reports/:key/export` | `reporting.export.execute` |
+
+الفلاتر: `from` · `to` · `fromTime` · `toTime` · `warehouseId` · `categoryId` · `itemId` ·
+`branchId` · `invType` — لكل نافذةٍ منها ما تملكه عند الديسكتوب فقط (§5.1).
+
+### 5.3 مطابقة الأعمدة والتسميات
+
+| التقرير | العمود | حقل الديسكتوب | الحقل في السحابة |
+|---|---|---|---|
+| التجميعية الثلاثة | رمز الصنف · الصنف · المجموعة | `Items.code` · `Items.name` · `ItemsCategory.name` | `items.sku` · `items.name_ar` · `item_categories.name_ar` |
+| | الكمية · صافي البيع / الشراء | `saleVal − retSaleVal + posVal − posRetVal` · `sumSale + sumPos − …` | `sum(signed line.quantity)` · `sum(signed line.total)` |
+| أرباح المواد تجميعي | رمز المادة · المادة · الكمية | `Items.code` · `Items.name` · `salesQty` | `items.sku` · `items.name_ar` · `sum(signed quantity)` |
+| | متوسط التكلفة · صافي البيع · الربح · نسبة الربح | `SUM(val1*AvrgCost)` · `salesTotal − salesDiscount − salesInvDisc` · `netSale − salesTotalCost` · `(netSale − cost)/cost*100` | `sum(signed cost_total)` · `sum(signed line.net)` · `net − cost` · نفسه |
+| أرباح المواد تفصيلي | الرقم · التاريخ · نوع العملية · المستودع | `Inv.id` · `date` · `proc_type` · `Inv_sub.store` | `sales_invoices.number` · `posted_at::date` · `kind` (بيع/مرتجع) · `warehouses.name` |
+| | الوحدة · السعر · المجموع · الإجمالي · الخصم · الربح | `inv_sub.unit` · `exchange_price` · `val1*exchange_price` · `netSum` · `discount + InvDiscount` · `netSum − totAvg` | `units_of_measure.name_ar` · `unit_price` · `quantity × unit_price` · `line.net` · `gross − net` · `net − cost` |
+| حسب المجموعة | إجمالي الكمية · الإجمالي · الضريبة · الصافي · الخصم | `stockin − stockout` · `ItemTotal − InvoiceDiscount` · `× 0.15` · `× 1.15` · `InvDiscount` | `signed quantity` · `signed line.net` · `signed line.tax` · `signed line.total` · `gross − net` |
+| اليومية للمجموعة | الرمز · المجموعة · اليوم · التاريخ · الإجمالي | `CtgyCode` · `CategoryName` · `ToString("ddd", ar)` · `InvDate` · `SaleNet` | `item_categories.code` · `name_ar` · `CASE extract(dow …)` · `posted_at::date` · `sum(signed line.total)` |
+
+### 5.4 💰 البطاقات — تغييرٌ في المحرّك
+
+كل نافذةٍ هنا تضع **أكثر من رقم** تحت الشبكة (إجمالي صافي البيع + إجمالي الكميات، أو
+خمس بطاقات في التفصيلي). فصار `grandTotal` يقبل **بطاقةً أو قائمة بطاقات**:
+
+- `ReportDefinition.grandTotal: ReportGrandTotal | ReportGrandTotal[]` —
+  `{ key, labelAr }`، والـ`key` عمودٌ من أعمدة التقرير (قد يكون مخفياً).
+- `run()` يعيد `grandTotal: Array<{ key, labelAr, amount }>` محسوباً من الصفوف
+  المعروضة نفسها (لا تمريرة SQL ثانية)، فالبطاقة لا تخالف الشبكة أبداً.
+- سجل التقارير يعرض `grandTotal: string[]` (التسميات، كما كانت) **و**
+  `grandTotalCards: Array<{ key, labelAr }>` للشاشة.
+- `reportSheet()` يرسم الشريط `.totals-strip` بصفٍّ من `<span>`: بطاقةٌ لكل رقم،
+  تتلفّف عند ضيق الصفحة.
+
+هذا تغييرٌ في شكل الاستجابة، و`apps/staff/lib/reports.ts` و
+`apps/staff/app/reports/[key]/page.tsx` و`test/report-sales-movement.spec.ts` و
+`scripts/verify-reports-sales.mjs` تبعته (الجزء الأول كان بطاقةً واحدة).
+
+### 5.5 التحويلات عن الديسكتوب (مبرَّرة)
+
+1. **✂️ خصم رأس الفاتورة** — الديسكتوب يوزّعه داخل التقرير
+   (`ItemPriceWithoutVAT * minus / NULLIF(InvSum,0)`)؛ والسحابة توزّعه عند **الحفظ**
+   (`calculateInvoiceTotals` في `packages/contracts/src/invoice-math.ts`، بنسبة إجمالي
+   السطر من إجمالي الفاتورة) فصار «صافي البيع» يقرأ `line.net` كما هو، و«الخصم» هو
+   `gross − net`. النتيجة واحدة والضريبة أصحّ (وهو ما تشترطه الزكاة والضريبة).
+2. **📚 متوسط التكلفة** — عمود `AvrgCost` لكل سطر عند الديسكتوب؛ ولا مقابل له في
+   `sales_invoice_lines`، فالتكلفة تُختم على السطر عند الترحيل من متوسط حركة المخزون
+   (`sales.service.ts@recordAutoStock`)؛ واسم العمود بقي كما هو عند الديسكتوب لأنه
+   يعبّر عن المعنى: «متوسط التكلفة» = التكلفة ÷ الكمية، و«إجمالي التكلفة» = المجموع.
+3. **نسبة البيع** — عمودٌ في شبكة `frmRptItemsSalesDetails` قيمته صفر دائماً في الكود
+   وغائب عن `RptItemsSalesDetails.repx`، فأُسقط (لا معنى لعمودٍ فارغ).
+4. **تفاصيل** و**📄 الفاتورة** — زرّان يفتحان نافذةً أخرى؛ ولا مقابل لزرٍّ في صفّ
+   تقرير، وهما مؤجَّلان إلى جزءٍ يبني مسارات التنقّل بين التقارير.
+5. **`DgvItemAdditionalTax` و`chkOnlyItemAdditionalTax`** («الأصناف الخاضعة للضريبة
+   الإضافية») — لا عمود `additional_tax` على سطور الفواتير في السحابة؛ مؤجَّل.
+6. **👤 المستخدم و🧑‍💼 المندوب** (`frmRptItemsSalesDetailsPOS` · `frmRptSalesByCategory`)
+   — مستخدمو السحابة يُقرأون من `GET /api/v1/memberships` (عرض · حالة · أدوار) لا من
+   جدول `Employees`، ولا مرشِّح `kind: 'membership'` في السجل بعد؛ مؤجَّل.
+7. **المجموعة ← أصنافها** — شجرة Master-Detail عند الديسكتوب، وشبكةٌ مسطّحة في
+   السحابة (عمود «المجموعة» مضاف، والصفوف مرتّبة بها)، لأن لا شجرة في محرّك التقارير.
+8. **الضريبة 15%** — الديسكتوب يحسبها `total * 0.15` و`total * 1.15`؛ والسحابة تقرأ
+   `line.tax` و`line.total` كما رُحِّلت، فتصحّ مع نسبةٍ أخرى أو سطرٍ معفى.
+9. **🔢 عدد الأصناف / عدد السجلات** — بطاقةٌ ثالثة عند الديسكتوب؛ ورأس الصفحة المطبوعة
+   في السحابة يقول «عدد السجلات:» أصلاً، فالبطاقات تحمل الأرقام الماليّة وحدها.
+10. **📅 نوع الفاتورة** — `inv.inv_type` (2 مبيعات / 3 نقطة بيع) صار
+    `party_id IS NOT NULL` / `IS NULL` كما في الجزء الأول؛ وترتيب الخيارات وصيغها من
+    كل نافذة: «مبيعات · نقطة بيع» في `frmRptSalesByCategory`،
+    و«فاتورة مبيعات · فاتورة نقطة بيع» في `frmRptCategorySaleByDay`،
+    و«مبيعات نقطة البيع · مبيعات عادية» في الجزء الأول. والديسكتوب يبدأ بأول خيار،
+    والسحابة تبدأ بالكل حتى يختار المستخدم.
+11. **⏰ الوقت** — صناديق الديسكتوب بالدقائق (`HH:mm`) وصيغتها محفوظة في التسميات؛
+    والمرشِّح `kind: 'time'` نفسه يقبل الثواني (كما في الجزء الأول).
+12. **الرموز التعبيرية في العناوين** (🏭 📦 💹 🗂️) أُسقطت من أسماء الأعمدة كما في
+    الجزء الأول: الشبكة والملف المصدَّر يستعملان العربية وحدها.
+13. **`if (!hasMovement)` في المشتريات** — الديسكتوب يشترك في الحلقة نفسها فيختبر
+    أعمدة **البيع** حتى في وضع `OperType = 2` (أي لا يستبعد شيئاً)؛ والسحابة تختبر
+    حركة الشراء نفسها (`HAVING sum(line.quantity) <> 0`).
+
+### 5.6 الاختبارات والتحقّق الحيّ
+
+- `apps/api/test/report-items-summary.spec.ts` — **14** اختباراً: السجل (سبعة تقارير
+  بأعمدتها وفلاترها وبطاقاتها) · 📦 التجميعي صافياً من المردود و«حبل» الذي لم يتحرك ·
+  🏪🏗️📦 الفلاتر الثلاثة · 🧾 نقطة البيع وحدها · 💰 الأرباح (التكلفة · الربح · النسبة ·
+  خصم الرأس) · 📥 المشتريات · 💰 التفصيلي (ستة أسطر · التكلفة · السعر · الخصم · الربح) ·
+  🗂️ حسب المجموعة (المجاميع الأربعة · نوع الفاتورة) · 📅 اليومية للمجموعة (اسم اليوم ·
+  الفلاتر) · 📅 فترةٌ فارغة · 🖨️ الطباعة · 📊 التصدير · `reporting.view` · عزل المؤسسات.
+- `scripts/verify-reports-items.mjs` — **126** نقطة تحقّق حيّة (أربع تشغلات خضراء
+  متتالية): كل رقمٍ **فارقٌ عن خطّ أساس**، وكل ما كُتب أُلغي في `finally` (البيع ·
+  المرتجع · نقطة البيع · بيع المستودع الثاني · فاتورة خصم الرأس · الشراء · مردود
+  الشراء · الأصناف · المستودع · الوحدة · المجموعتان)، فلا أثر للتشغيل بعده.
+
+## 6. معايير القبول لكل جزء
 
 1. كل تقريرٍ منقول يُسمّي ملفه من `Desktop_ERP` (`Form_WPF/frmRpt*.xaml` و
    `Reports/*.repx`) نصّاً في الوثيقة وفي تعليق تعريفه.
@@ -225,9 +358,13 @@
 5. الشاشة تصل من طريقٍ حقيقي في الشجرة (`apps/staff/lib/navigation.ts`).
 6. تحديث هذه الوثيقة و`docs/STATUS.md` و`docs/desktop-parity/README.md`.
 
-## 6. مؤجَّل عن قصد
+## 7. مؤجَّل عن قصد
 
 - 🖨️ `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة الافتراضية) — جزءٌ سابع.
+- 👤 المستخدم و🧑‍💼 المندوب في `frmRptItemsSalesDetailsPOS` و`frmRptSalesByCategory`
+  (§5.5/6) — حتى يوجد مرشِّح `kind: 'membership'` في السجل.
+- «الأصناف الخاضعة للضريبة الإضافية» وعمود `DgvItemAdditionalTax` (§5.5/5).
+- زرّا «تفاصيل» و«📄 الفاتورة» اللذان ينقلان من تقريرٍ إلى نافذةٍ أخرى (§5.5/4).
 - صور الرأس والتذييل والختم (`HeaderImage` · `FooterImage` · `StampImage`).
 - التقارير التي ترسم بيانياً (`FrmRptSalesChart`) حتى يُبتَ في مكتبة الرسوم.
 - تصدير PDF من الخادم (الطباعة تمرّ بطابعة المتصفّح اليوم).

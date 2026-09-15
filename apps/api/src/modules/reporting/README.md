@@ -39,6 +39,44 @@ And two filter kinds: **`time`** (⏰ الوقت (HH:mm:ss), glued to the date b
 resolved from the caller. It is declared before `@Get(':key')` for the same reason
 `layouts` is.
 
+## 📦 تقارير الأصناف — `frmRptItems*` (phase 10, part two)
+
+Six desktop windows that all read `inv_sub` grouped over `Items`, registered here as seven
+ordinary catalogue definitions:
+
+| Key | Window (`Form_WPF`) | Columns |
+|---|---|---|
+| `items-sales-summary` | `frmRptItemsSalesDetails` — «مبيعات الأصناف تجميعي» | رمز الصنف · الصنف · المجموعة · الكمية · صافي البيع |
+| `items-purchases-summary` | the same window at `OperType = 2` — «مشتريات الأصناف تجميعي» | … · صافي الشراء |
+| `items-pos-sales-summary` | `frmRptItemsSalesDetailsPOS` — «…- نقطة البيع» | the same five, restricted to فواتير نقطة البيع |
+| `items-profit-summary` | `frmRptItemsProfit` — «أرباح المواد تجميعي» | رمز المادة · المادة · الكمية · متوسط التكلفة · صافي البيع · الربح · نسبة الربح |
+| `items-profit-details` | `frmRptItemsProfitDetails` — «أرباح المواد تفصيلي» | الرقم · التاريخ · نوع العملية · المستودع · رمز المادة · المادة · الوحدة · الكمية · متوسط التكلفة · إجمالي التكلفة · السعر · المجموع · الإجمالي · الخصم · الربح · نسبة الربح % |
+| `items-sales-by-category` | `frmRptSalesByCategory` — «تقرير مبيعات الأصناف حسب المجموعة» | المجموعة · اسم المجموعة / الصنف · الرمز · إجمالي الكمية · الإجمالي · الضريبة · الصافي · الخصم |
+| `category-sales-by-day` | `frmRptCategorySaleByDay` — «تقرير المبيعات اليومية للمجموعة» | الرمز · المجموعة · اليوم · التاريخ · الإجمالي |
+
+**`grandTotal` is now one card or many.** Every one of these windows prints several numbers
+under its grid, so the catalogue field takes `ReportGrandTotal | ReportGrandTotal[]` and
+`run()` answers `grandTotal: Array<{ key, labelAr, amount }>` — each card summed from the
+rows on screen, each `key` a column of the report (hidden ones included). The catalogue
+listing carries both `grandTotal: string[]` (labels, as before) and
+`grandTotalCards: Array<{ key, labelAr }>`, and `reportSheet()` draws the `.totals-strip` as
+a wrapping row of `<span>`s, one per card.
+
+Two rules the desktop files state and the SQL keeps:
+
+- **`if (!hasMovement) continue;`** (`frmRptItemsSalesDetails.xaml.cs` L282,
+  `…POS` L223, `frmRptItemsProfit` L220) — *any* movement, not a non-zero net, so
+  `HAVING sum(line.quantity) <> 0`. An item sold out and fully returned is still a row,
+  which is deliberately the opposite of `sales-movement-items` (`if (qty == 0.0) continue;`).
+- **The header discount is already on the line.** `frmRptItemsProfit.GetSaleData` divides it
+  in the report (`ItemPriceWithoutVAT * minus / NULLIF(InvSum,0)`); the cloud divides it at
+  save time (`calculateInvoiceTotals` spreads `invoiceDiscount` pro-rata by gross into every
+  `line.net`), so these reports read `line.net` as it stands and «الخصم» is `gross − net`.
+
+Shared scopes: `movementLinesScope(tenantId, f, pos, opts)` and `purchaseLinesScope`
+carry «وثيقةٌ مرحَّلة فقط» plus the 🔧 خيارات البحث boxes each window actually owns — the
+`opts` switches leave out the فرع and مجموعة boxes a window does not have.
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it

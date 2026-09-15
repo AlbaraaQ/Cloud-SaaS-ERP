@@ -199,11 +199,12 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
                       {columns.find((column) => column.key === key)?.labelAr ?? key}: {formatCell(value, columns.find((column) => column.key === key)?.type ?? 'money')}
                     </span>
                   ))}
-                  {data.grandTotal ? (
-                    <span className="chip strong">
-                      💰 {data.grandTotal.labelAr}: {formatCell(data.grandTotal.amount, 'money')}
+                  {/* 💰 البطاقات — the money guard forbids a `total` identifier here. */}
+                  {data.grandTotal.map((card) => (
+                    <span key={card.key} className="chip strong">
+                      💰 {card.labelAr}: {formatCell(card.amount, 'money')}
                     </span>
-                  ) : null}
+                  ))}
                 </div>
               </div>
               <div className="card">

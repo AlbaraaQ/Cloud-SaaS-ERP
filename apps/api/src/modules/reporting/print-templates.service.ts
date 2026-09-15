@@ -383,8 +383,11 @@ export class PrintTemplatesService {
       columns: Array<{ key: string; labelAr: string; numeric: boolean }>;
       rows: Array<Record<string, string>>;
       totals: Record<string, string>;
-      /** 💰 إجمالي المبيعات — one labelled number under the grid (`txtSumSale`). */
-      grandTotal?: { labelAr: string; amount: string } | null;
+      /**
+       * 💰 The summary cards under the grid — `txtSumSale` in `frmRptSalesInPeriod` and
+       * the 🔢 · 💵 · 📦 · 💰 cards of `frmRptItemsSalesDetails` / `frmRptItemsProfit`.
+       */
+      grandTotal?: Array<{ labelAr: string; amount: string }>;
       captions: string[];
       generatedAt: string;
       /** What an empty report says; the desktop's own sentence when the report has one. */
@@ -442,9 +445,13 @@ export class PrintTemplatesService {
           <tbody>${body}</tbody>
           ${footer}
         </table>
-        ${report.grandTotal
-          ? `<div class="totals-strip"><span><b>${escapeHtml(report.grandTotal.labelAr)}:</b> ${escapeHtml(money(report.grandTotal.amount))}</span></div>`
-          : ''}
+        ${
+          report.grandTotal?.length
+            ? `<div class="totals-strip">${report.grandTotal
+                .map((card) => `<span><b>${escapeHtml(card.labelAr)}:</b> ${escapeHtml(money(card.amount))}</span>`)
+                .join('')}</div>`
+            : ''
+        }
         ${
           report.signature
             ? `<table class="signatures"><tr><td>أعده</td><td>راجعه</td><td>المدير</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></table>`
@@ -657,7 +664,8 @@ export class PrintTemplatesService {
   table.lines thead th { background: #f0f1f4; font-weight: 600; }
   table.lines tfoot th { background: #f0f1f4; }
   /* 💰 إجمالي المبيعات — the one number frmRptSalesInPeriod prints under the grid. */
-  .totals-strip { margin-top: 8px; padding: 6px 10px; border: 2px solid #111; font-size: 14px; text-align: left; direction: ltr; }
+  .totals-strip { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 8px; padding: 6px 10px; border: 2px solid #111; font-size: 14px; }
+  .totals-strip span { direction: ltr; }
   /* أعده · راجعه · المدير — the signature strip of RptSalesInPeriod1/2.repx. */
   table.signatures { width: 100%; border-collapse: collapse; margin-top: 18px; page-break-inside: avoid; }
   table.signatures td { border: 1px solid #ccc; padding: 14px 6px 6px; text-align: center; width: 33%; color: #555; }

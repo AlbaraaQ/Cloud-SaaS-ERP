@@ -35,8 +35,8 @@ export type ReportResult = {
   columns: ReportColumn[];
   rows: Array<Record<string, string>>;
   totals: Record<string, string>;
-  /** 💰 إجمالي المبيعات — the one number `frmRptSalesInPeriod` prints under the grid. */
-  grandTotal: { labelAr: string; amount: string } | null;
+  /** 💰 The summary cards under the grid — the 🔢 · 💵 · 📦 · 💰 cards of the `frmRpt*`. */
+  grandTotal: Array<{ key: string; labelAr: string; amount: string }>;
   rowCount: number;
   generatedAt: string;
 };
