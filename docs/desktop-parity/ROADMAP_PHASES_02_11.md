@@ -137,13 +137,35 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Salla/online: `SallaAPI.cs`, `ManagerOnline.cs`, `ClListManagerOnline.cs`.
 - [ ] Accept per vertical: desktop flow reproducible end-to-end on the cloud screen.
 
-## Phase 10 — Reports (95 `.repx`)
+## Phase 10 — Reports (94 `.repx`) 🟡 part 1 done (2026-09, `PHASE_10_REPORTS.md`)
 
-- [ ] Desktop: `Reports/*.repx` + `Class/Report.cs` + `frmRpt*` (35 viewer/filter forms).
-- [ ] Cloud: report engine TBD (first task of the phase: pick renderer — e.g. stored
-  query + React print templates — then port in batches: sales → inventory → accounting
-  → treasury → HRM → verticals).
-- [ ] Accept: every ported report matches desktop columns/filters; print-ready Arabic RTL.
+- [x] Desktop: `Reports/*.repx` (94) + `Class/Report.cs` (610) + `Class/Print.cs` +
+  `frmRpt*` (32 viewer/filter forms) + `Reports/header.repx`/`footer.repx` +
+  `SettingPrint` (`CrystalLiteDB.txt` L2260).
+- [x] Cloud engine (already there before this phase): `modules/reporting/**` —
+  `report-catalog.ts` (67 definitions), `reporting.service.ts`, `print-templates.service.ts`,
+  `report-layouts.service.ts` (مصمّم التقارير), `xlsx.ts`, `tafqeet.ts`; staff
+  `/reports` centre + `/reports/[key]` runner.
+- [x] Part one — 📊 حركة المبيعات: `frmRptSalesInPeriod` + `RptSalesInPeriod1/2.repx`
+  (both tabs, both «💰 إجمالي المبيعات», ⏰ الوقت, 🧾 نوع الفاتورة, 🖨️ طباعة).
+- [ ] Part two — 📦 reports of الأصناف: `frmRptItemsSalesDetails` ·
+  `frmRptItemsSalesDetailsPOS` · `frmRptItemsProfit(Details)` · `frmRptSalesByCategory` ·
+  `frmRptCategorySaleByDay`.
+- [ ] Part three — 🧾 reports of الفواتير والإشعارات والحركة اليومية:
+  `frmRptInvSalesDetails(Pos|PosAndroid)` · `frmRptInvNotfic` ·
+  `frmRptInvPurchaseDetails` · `frmRptDailySales` · `frmRptDailyProcess` ·
+  `frmRptInvAnalysis` · `FrmRptSalesChart`.
+- [ ] Part four — 📚 inventory + serials: `frmRptInventory` ·
+  `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo(Summary)` ·
+  `frmRptProducedItems`.
+- [ ] Part five — 📒 accounting: `frmRptBalances` · `frmRptEntries` ·
+  `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod`.
+- [ ] Part six — 💰 treasury · payroll · verticals: `frmRptKhzna` · `frmRptSalary` ·
+  `frmRptReseved` · `frmrptUsersRecords` · `frmRptRentInvoices` · `frmInvRptType`.
+- [ ] Part seven — 🖨️ `SettingPrint`: print header/footer/stamp, copies and the default
+  printer per report; `HeaderImage` · `FooterImage` · `StampImage`.
+- [ ] Accept (each part): every ported report matches desktop columns/filters; print-ready
+  Arabic RTL; new tests + a re-runnable live script; a real route in the staff tree.
 
 ## Phase 11 — Zatca / ETA / integrations
 

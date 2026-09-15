@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
-import { getTenantContext } from '../platform/context/tenant-context.js';
+import { getTenantContext, tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
 import { PrintTemplatesService } from './print-templates.service.js';
@@ -26,6 +26,12 @@ export class ReportingController {
   @Get('print/vouchers/:id') @RequiresPermission('reporting.view') async voucherPrint(@Param('id') id: string) { return { html: await this.print.voucher(getTenantContext().tenantId, id) }; }
   @Get('print/journal-entries/:id') @RequiresPermission('reporting.view') async journalPrint(@Param('id') id: string) { return { html: await this.print.journalEntry(getTenantContext().tenantId, id) }; }
   @Get('print/shifts/:id') @RequiresPermission('reporting.view') async shiftPrint(@Param('id') id: string) { return { html: await this.print.shiftClose(getTenantContext().tenantId, id) }; }
+  // 🖨️ طباعة / 👁️ معاينة — the print-ready page of a report (`frmRpt*` has both buttons).
+  // Declared before `:key` for the same reason `layouts` is.
+  @Get('print/:key') @RequiresPermission('reporting.view') async printReport(@Param('key') key: string, @Query() query: Record<string, string | undefined>) {
+    return this.reporting.printable(getTenantContext().tenantId, key, query, tryGetAuthContext()?.userId);
+  }
+
   @Get(':key') @RequiresPermission('reporting.view') run(@Param('key') key: string, @Query() query: Record<string, string | undefined>) { return this.reporting.run(getTenantContext().tenantId, key, query); }
   @Post(':key/export') @RequiresPermission('reporting.export.execute') export(@Param('key') key: string, @Query() query: Record<string, string | undefined>, @Body() body: { format?: ExportFormat }) { return this.reporting.export(getTenantContext().tenantId, key, query, body.format ?? 'csv'); }
 }

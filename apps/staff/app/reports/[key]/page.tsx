@@ -199,6 +199,11 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
                       {columns.find((column) => column.key === key)?.labelAr ?? key}: {formatCell(value, columns.find((column) => column.key === key)?.type ?? 'money')}
                     </span>
                   ))}
+                  {data.grandTotal ? (
+                    <span className="chip strong">
+                      💰 {data.grandTotal.labelAr}: {formatCell(data.grandTotal.amount, 'money')}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="card">
@@ -227,6 +232,15 @@ function FilterField({ param, value, options, onChange }: { param: ReportParam; 
       <label className="field">
         <span>{param.labelAr}</span>
         <input className="input" type="date" value={value} onChange={(event) => onChange(event.target.value)} />
+      </label>
+    );
+  }
+  // ⏰ الوقت (HH:mm:ss) — the time box beside each date box in `frmRptSalesInPeriod`.
+  if (param.kind === 'time') {
+    return (
+      <label className="field">
+        <span>{param.labelAr}</span>
+        <input className="input" type="time" step="1" value={value} onChange={(event) => onChange(event.target.value)} />
       </label>
     );
   }

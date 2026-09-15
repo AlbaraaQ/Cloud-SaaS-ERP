@@ -358,12 +358,23 @@ export class PrintTemplatesService {
   }
 
   /**
-   * A printable page for any report in the catalogue.
+   * A printable page for any report in the catalogue — «🖨️ طباعة» و«👁️ معاينة» of the
+   * `frmRpt*` windows.
    *
    * Reports are wide and unpredictable, so this uses the same letterhead as the documents
    * but lays the table out in landscape and repeats the header band on every printed page
    * (`thead` + `page-break-inside: avoid`), which is what an accountant expects when a trial
    * balance runs to nine pages.
+   *
+   * `Reports/header.repx` is the المنشأة block (الاسم · الرقم الضريبي · السجل التجاري ·
+   * الهاتف والجوال) and `Reports/footer.repx` is the العنوان والهاتف; between them
+   * `RptSalesInPeriod1/2.repx` print the filters, the grid, «إجمالي المبيعات», «المستخدم»
+   * and the strip «أعده · راجعه · المدير».
+   *
+   * `Reports/header.repx` is the المنشأة block (الاسم · الرقم الضريبي · السجل التجاري ·
+   * الهاتف والجوال) and `Reports/footer.repx` is the العنوان والهاتف; between them
+   * `RptSalesInPeriod1/2.repx` print «فاتورة » + the filters, the grid, «إجمالي
+   * المبيعات», «المستخدم» and the strip «أعده · راجعه · المدير».
    */
   async reportSheet(
     tenantId: string,
@@ -372,11 +383,20 @@ export class PrintTemplatesService {
       columns: Array<{ key: string; labelAr: string; numeric: boolean }>;
       rows: Array<Record<string, string>>;
       totals: Record<string, string>;
+      /** 💰 إجمالي المبيعات — one labelled number under the grid (`txtSumSale`). */
+      grandTotal?: { labelAr: string; amount: string } | null;
       captions: string[];
       generatedAt: string;
+      /** What an empty report says; the desktop's own sentence when the report has one. */
+      emptyAr?: string;
+      /** «أعده · راجعه · المدير» — the signature strip of the desktop's report footer. */
+      signature?: boolean;
     },
+    /** 👤 المستخدم — `Common.GetEmpName(MainClass.EmpNo)` at the desktop. */
+    userId?: string,
   ) {
     const company = await withTenantTx(this.database.db, tenantId, async (tx) => this.company(tx, tenantId));
+    const userName = userId ? await this.userName(tenantId, userId) : null;
     const contact = [company.phones.join(' / '), company.email, addressText(company.address)].filter(Boolean).join(' — ');
     const head = report.columns.map((column) => `<th>${escapeHtml(column.labelAr)}</th>`).join('');
     const body = report.rows.length
@@ -388,7 +408,7 @@ export class PrintTemplatesService {
                 .join('')}</tr>`,
           )
           .join('')
-      : `<tr><td class="empty" colspan="${report.columns.length + 1}">لا توجد بيانات ضمن معايير البحث المحددة.</td></tr>`;
+      : `<tr><td class="empty" colspan="${report.columns.length + 1}">${escapeHtml(report.emptyAr ?? 'لا توجد بيانات ضمن معايير البحث المحددة.')}</td></tr>`;
     const hasTotals = Object.keys(report.totals).length > 0;
     const footer = hasTotals
       ? `<tfoot><tr><th>الإجمالي</th>${report.columns
@@ -412,6 +432,7 @@ export class PrintTemplatesService {
             <table class="doc-meta">
               ${report.captions.map((caption) => `<tr><td>${escapeHtml(caption)}</td></tr>`).join('')}
               <tr><td>عدد السجلات: ${report.rows.length}</td></tr>
+              ${userName ? `<tr><td>المستخدم: ${escapeHtml(userName)}</td></tr>` : ''}
               <tr><td>طُبع في: ${escapeHtml(dateTimeText(report.generatedAt))}</td></tr>
             </table>
           </div>
@@ -421,8 +442,30 @@ export class PrintTemplatesService {
           <tbody>${body}</tbody>
           ${footer}
         </table>
+        ${report.grandTotal
+          ? `<div class="totals-strip"><span><b>${escapeHtml(report.grandTotal.labelAr)}:</b> ${escapeHtml(money(report.grandTotal.amount))}</span></div>`
+          : ''}
+        ${
+          report.signature
+            ? `<table class="signatures"><tr><td>أعده</td><td>راجعه</td><td>المدير</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></table>`
+            : ''
+        }
       `,
     });
+  }
+
+  /** 👤 المستخدم — the name printed on the report, `Common.GetEmpName(EmpNo)` at the desktop. */
+  private async userName(tenantId: string, userId: string): Promise<string | null> {
+    try {
+      const row = first(
+        await withTenantTx(this.database.db, tenantId, async (tx) =>
+          rows(await tx.execute(sql`SELECT coalesce(full_name, email) AS name FROM users WHERE id = ${userId} LIMIT 1`)),
+        ),
+      );
+      return row?.name ? str(row.name) : null;
+    } catch {
+      return null; // a caption is decoration; it must never fail a print
+    }
   }
 
   // -------------------------------------------------------------------- pieces
@@ -613,6 +656,11 @@ export class PrintTemplatesService {
   table.lines th, table.lines td { border: 1px solid #ccc; padding: 4px 6px; }
   table.lines thead th { background: #f0f1f4; font-weight: 600; }
   table.lines tfoot th { background: #f0f1f4; }
+  /* 💰 إجمالي المبيعات — the one number frmRptSalesInPeriod prints under the grid. */
+  .totals-strip { margin-top: 8px; padding: 6px 10px; border: 2px solid #111; font-size: 14px; text-align: left; direction: ltr; }
+  /* أعده · راجعه · المدير — the signature strip of RptSalesInPeriod1/2.repx. */
+  table.signatures { width: 100%; border-collapse: collapse; margin-top: 18px; page-break-inside: avoid; }
+  table.signatures td { border: 1px solid #ccc; padding: 14px 6px 6px; text-align: center; width: 33%; color: #555; }
   .num { text-align: left; font-variant-numeric: tabular-nums; direction: ltr; }
   .sku { display: block; color: #777; font-size: 10px; }
   .totals { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }

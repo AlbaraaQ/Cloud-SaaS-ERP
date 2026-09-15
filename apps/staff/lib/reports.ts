@@ -8,7 +8,7 @@
 import { apiData, apiFetch, apiPatch, apiPost } from './api';
 import { money, quantity, shortDate } from './lookups';
 
-export type ReportParamKind = 'date' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
+export type ReportParamKind = 'date' | 'time' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
 export type ReportColumnType = 'text' | 'money' | 'qty' | 'int' | 'date' | 'percent';
 
 export type ReportParam = { name: string; labelAr: string; kind: ReportParamKind; options?: Array<{ value: string; labelAr: string }> };
@@ -35,6 +35,8 @@ export type ReportResult = {
   columns: ReportColumn[];
   rows: Array<Record<string, string>>;
   totals: Record<string, string>;
+  /** 💰 إجمالي المبيعات — the one number `frmRptSalesInPeriod` prints under the grid. */
+  grandTotal: { labelAr: string; amount: string } | null;
   rowCount: number;
   generatedAt: string;
 };

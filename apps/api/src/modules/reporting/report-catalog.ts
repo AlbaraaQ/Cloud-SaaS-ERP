@@ -8,7 +8,7 @@ import { sql, type SQL } from 'drizzle-orm';
  * column and which columns to total. The admin app therefore ships **one** report screen
  * instead of forty hand-written ones, and adding a report here makes it appear there.
  */
-export type ReportParamKind = 'date' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
+export type ReportParamKind = 'date' | 'time' | 'branch' | 'warehouse' | 'party' | 'item' | 'category' | 'salesman' | 'costCenter' | 'select';
 
 export type ReportParam = {
   name: string;
@@ -19,13 +19,24 @@ export type ReportParam = {
 
 export type ReportColumnType = 'text' | 'money' | 'qty' | 'int' | 'date' | 'percent';
 
-export type ReportColumn = { key: string; labelAr: string; type: ReportColumnType };
+/**
+ * A column the report **computes** but never shows — the signed twin of a money column,
+ * whose only purpose is the one number under the grid. `Form_WPF/frmRptSalesInPeriod`
+ * prints «💰 إجمالي المبيعات:» as `المبيعات − المردودات`, while every row of its grid is
+ * positive: the hidden column carries the sign, and `grandTotal` sums it.
+ */
+export type ReportColumn = { key: string; labelAr: string; type: ReportColumnType; hidden?: boolean };
 
 export type ReportGroup = 'sales' | 'purchases' | 'inventory' | 'accounting' | 'pos' | 'hrm' | 'projects' | 'marina';
 
 export type ReportFilters = {
   from?: string;
   to?: string;
+  /** ⏰ الوقت (HH:mm:ss) — `frmRptSalesInPeriod` builds a datetime from a date box + a time box. */
+  fromTime?: string;
+  toTime?: string;
+  /** 🧾 نوع الفاتورة — «مبيعات نقطة البيع» · «مبيعات عادية» (`cmbInvType`). */
+  invType?: string;
   branchId?: string;
   warehouseId?: string;
   partyId?: string;
@@ -47,6 +58,16 @@ export type ReportDefinition = {
   columns: ReportColumn[];
   /** Column keys that get a grand total in the footer. */
   totals?: string[];
+  /**
+   * 💰 The one number under the grid — `txtSumSale` / `txtSumSale2` in
+   * `frmRptSalesInPeriod`, labelled «💰 إجمالي المبيعات:». Summed from one column, which
+   * may be a hidden signed one.
+   */
+  grandTotal?: { key: string; labelAr: string };
+  /** What an empty report says — `frmRptSalesInPeriod` says «لا توجد عمليات بالجدول». */
+  emptyAr?: string;
+  /** «أعده · راجعه · المدير» — the signature strip of `RptSalesInPeriod1/2.repx`. */
+  signature?: boolean;
   chart?: 'bar' | 'line';
   build: (tenantId: string, filters: ReportFilters) => SQL;
 };
@@ -55,6 +76,26 @@ const PERIOD: ReportParam[] = [
   { name: 'from', labelAr: 'من تاريخ', kind: 'date' },
   { name: 'to', labelAr: 'إلى تاريخ', kind: 'date' },
 ];
+/** ⏰ الوقت (HH:mm:ss) — `frmRptSalesInPeriod.xaml` L235 وL246, next to each date box. */
+const TIME: ReportParam[] = [
+  { name: 'fromTime', labelAr: 'الوقت (HH:mm:ss)', kind: 'time' },
+  { name: 'toTime', labelAr: 'الوقت (HH:mm:ss)', kind: 'time' },
+];
+/**
+ * 🧾 نوع الفاتورة — `cmbInvType` L210: «مبيعات نقطة البيع» (index 0) و«مبيعات عادية»
+ * (index 1). The desktop reads them as `inv.inv_type = 3` / `= 2`; here a فاتورة نقطة
+ * البيع is the cash sale with no عميل (`party_id IS NULL`), which is what every other
+ * POS report in this catalogue already reads.
+ */
+const INVOICE_KIND: ReportParam = {
+  name: 'invType',
+  labelAr: 'نوع الفاتورة',
+  kind: 'select',
+  options: [
+    { value: 'pos', labelAr: 'مبيعات نقطة البيع' },
+    { value: 'sale', labelAr: 'مبيعات عادية' },
+  ],
+};
 const BRANCH: ReportParam = { name: 'branchId', labelAr: 'الفرع', kind: 'branch' };
 const WAREHOUSE: ReportParam = { name: 'warehouseId', labelAr: 'المستودع', kind: 'warehouse' };
 const PARTY: ReportParam = { name: 'partyId', labelAr: 'الطرف', kind: 'party' };
@@ -74,6 +115,22 @@ const percent = (key: string, labelAr: string): ReportColumn => ({ key, labelAr,
 const all = sql`true`;
 const onDate = (column: SQL, from?: string, to?: string): SQL =>
   sql`${from ? sql`${column} >= ${from}::date` : all} AND ${to ? sql`${column} <= ${to}::date` : all}`;
+
+/**
+ * 📅 التاريخ + ⏰ الوقت — `BuildDateTime` in `frmRptSalesInPeriod.xaml.cs` glues the date
+ * box to the time box, defaulting to `00:00:00` at the start of the range and `23:59:59`
+ * at its end. Reports that have no time box keep `onDate`.
+ */
+const onDateTime = (column: SQL, from?: string, to?: string, fromTime?: string, toTime?: string): SQL =>
+  sql`${from ? sql`${column} >= ((${from}::date) + coalesce(${fromTime ?? null}::time, '00:00:00'::time))::timestamptz` : all}
+  AND ${to ? sql`${column} <= ((${to}::date) + coalesce(${toTime ?? null}::time, '23:59:59'::time))::timestamptz` : all}`;
+
+/**
+ * 🧾 نوع الفاتورة — «مبيعات نقطة البيع» are the cash sales (`party_id IS NULL`);
+ * «مبيعات عادية» are the ones with a عميل. No choice means both.
+ */
+const kindScope = (invType?: string): SQL =>
+  invType === 'pos' ? sql`si.party_id IS NULL` : invType === 'sale' ? sql`si.party_id IS NOT NULL` : all;
 const eqIf = (column: SQL, value?: string): SQL => (value ? sql`${column} = ${value}::uuid` : all);
 
 // Party display name, tolerant of the cash-customer case where no party row exists.
@@ -89,6 +146,20 @@ const salesScope = (tenantId: string, f: ReportFilters, kind: string): SQL => sq
   AND ${eqIf(sql`si.branch_id`, f.branchId)}
   AND ${eqIf(sql`si.party_id`, f.partyId)}
   AND ${eqIf(sql`si.salesman_id`, f.salesmanId)}
+`;
+
+/**
+ * ⛵ «حركة المبيعات» — `Form_WPF/frmRptSalesInPeriod.xaml.cs`: both tabs read the same
+ * documents (`inv_type` 3/2 through `cmbInvType`, `proc_type` 1 بيع / 2 مرتجع,
+ * `Proc_Type<>3 AND Proc_Type<>4`, `IS_Buy=0`, `IS_Deleted=0`), only grouped differently.
+ */
+const movementScope = (tenantId: string, f: ReportFilters): SQL => sql`
+  si.tenant_id = ${tenantId}
+  AND si.status = 'posted'
+  AND si.kind IN ('sale', 'sale_return')
+  AND ${onDateTime(sql`si.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${eqIf(sql`si.branch_id`, f.branchId)}
+  AND ${kindScope(f.invType)}
 `;
 
 const purchaseScope = (tenantId: string, f: ReportFilters, kind: string): SQL => sql`
@@ -373,6 +444,76 @@ const definitions: ReportDefinition[] = [
       GROUP BY si.payment_status ORDER BY si.payment_status`,
   },
 
+  {
+    key: 'sales-movement-items',
+    titleAr: 'حركة المبيعات — إجمالي المبيعات',
+    group: 'sales',
+    hintAr: '«📊 إجمالي المبيعات» من `frmRptSalesInPeriod`: كل صنفٍ بكميّته الصافية وإجماليه الصافي (المبيعات − المرتجع)، وصنفٌ لم يُبع أصلاً لا يظهر.',
+    params: [PERIOD[0]!, TIME[0]!, PERIOD[1]!, TIME[1]!, INVOICE_KIND, BRANCH],
+    columns: [text('item_code', 'رقم الصنف'), text('item_name', 'الصنف'), qty('quantity', 'الكمية'), money('total', 'الإجمالي')],
+    // 💰 إجمالي المبيعات — `txtSumSale` = Σ(الإجمالي الصافي) كما يجمعها `CalcStock`.
+    grandTotal: { key: 'total', labelAr: 'إجمالي المبيعات' },
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(item.sku, '—') AS item_code, coalesce(item.name_ar, '—') AS item_name,
+             sum(CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END)::text AS quantity,
+             round(sum(CASE WHEN si.kind = 'sale' THEN line.total ELSE -line.total END), 2)::text AS total
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      WHERE ${movementScope(tenantId, f)}
+      GROUP BY item.id, item.sku, item.name_ar
+      -- if (qty == 0.0) continue; — an صنف with no بيع at all is not a row, even when it was returned.
+      HAVING sum(CASE WHEN si.kind = 'sale' THEN line.quantity ELSE 0 END) <> 0
+      ORDER BY item.id LIMIT 2000`,
+  },
+  {
+    key: 'sales-movement-invoices',
+    titleAr: 'حركة المبيعات — عرض الفواتير',
+    group: 'sales',
+    hintAr: '«🧾 عرض الفواتير» من `frmRptSalesInPeriod`: فاتورةٌ بيع أو مرتجع بسطر، بوقتها ونقدها وشبكتها ومجاميعها الأربعة؛ و«آجل» علامة `pay_type = -1`.',
+    params: [PERIOD[0]!, TIME[0]!, PERIOD[1]!, TIME[1]!, INVOICE_KIND, BRANCH],
+    columns: [
+      text('movement_no', 'رقم الحركة'),
+      text('number', 'رقم الفاتورة'),
+      text('kind_name', 'نوع الفاتورة'),
+      date('day', 'التاريخ'),
+      text('time', 'الوقت'),
+      text('postponed', 'آجل'),
+      money('cash', 'نقدي'),
+      money('network', 'شبكة'),
+      money('subtotal', 'الإجمالي'),
+      money('tax', 'الضريبة'),
+      money('discount', 'الخصم'),
+      money('net', 'الصافي'),
+      // المبيعات ناقص المردودات — what «💰 إجمالي المبيعات:» prints (`_sumSale2`).
+      { key: 'net_signed', labelAr: 'صافي الحركة', type: 'money', hidden: true },
+    ],
+    grandTotal: { key: 'net_signed', labelAr: 'إجمالي المبيعات' },
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT si.id::text AS movement_no, coalesce(si.number, '—') AS number,
+             CASE si.kind WHEN 'sale' THEN 'بيع' WHEN 'sale_return' THEN 'مرتجع' ELSE si.kind END AS kind_name,
+             si.posted_at::date AS day, to_char(si.posted_at, 'HH24:MI:SS') AS time,
+             CASE WHEN si.payment_status = 'unpaid' THEN 'نعم' ELSE '—' END AS postponed,
+             coalesce(paid.cash, 0)::text AS cash, coalesce(paid.network, 0)::text AS network,
+             si.subtotal::text AS subtotal, si.tax_total::text AS tax,
+             si.invoice_discount::text AS discount, si.total::text AS net,
+             (CASE WHEN si.kind = 'sale' THEN si.total ELSE -si.total END)::text AS net_signed
+      FROM sales_invoices si
+      LEFT JOIN (
+        SELECT p.invoice_id,
+               sum(CASE WHEN p.method = 'cash' THEN p.amount ELSE 0 END) AS cash,
+               sum(CASE WHEN p.method = 'card' THEN p.amount ELSE 0 END) AS network
+        FROM invoice_payments p
+        WHERE p.tenant_id = ${tenantId}
+        GROUP BY p.invoice_id
+      ) paid ON paid.invoice_id = si.id
+      WHERE ${movementScope(tenantId, f)}
+      ORDER BY si.posted_at, si.number LIMIT 2000`,
+  },
   // ------------------------------------------------------------ purchases
   {
     key: 'purchase-invoices',

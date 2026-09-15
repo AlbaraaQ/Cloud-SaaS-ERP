@@ -598,6 +598,13 @@ th.num {
   color: #fff;
   border-color: var(--brand);
 }
+/* 💰 إجمالي المبيعات — the report's one headline number, as `frmRptSalesInPeriod` shows it. */
+.chip.strong {
+  border-width: 2px;
+  border-color: var(--brand);
+  font-weight: 700;
+  font-size: 13px;
+}
 .kv {
   display: grid;
   grid-template-columns: auto 1fr;

@@ -17,12 +17,20 @@ export type ReportKey = string;
 
 const uuidish = z.string().uuid().optional();
 const dayish = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD').optional();
+// ⏰ الوقت (HH:mm:ss) — the time box beside each date box in `frmRptSalesInPeriod`.
+// Hours 00–23 and minutes/seconds 00–59: a looser regex lets `99:99` through to Postgres,
+// which answers with a 500 instead of the 422 a wrong filter deserves.
+const timeish = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Expected HH:mm or HH:mm:ss').optional();
+const invTypeish = z.enum(['pos', 'sale']).optional();
 
 /** Only these filters reach SQL; anything else in the query string is ignored on purpose. */
 const filtersSchema = z
   .object({
     from: dayish,
     to: dayish,
+    fromTime: timeish,
+    toTime: timeish,
+    invType: invTypeish,
     branchId: uuidish,
     warehouseId: uuidish,
     partyId: uuidish,
@@ -72,8 +80,11 @@ export class ReportingService {
       group: definition.group,
       hintAr: definition.hintAr,
       params: definition.params,
-      columns: definition.columns,
+      // A hidden column carries a number the report *prints* but does not draw; the
+      // catalogue is what the screen draws from, so it never sees it.
+      columns: definition.columns.filter((column) => !column.hidden),
       totals: definition.totals ?? [],
+      grandTotal: definition.grandTotal?.labelAr ?? null,
       chart: definition.chart ?? null,
       asyncExport: false,
     }));
@@ -104,9 +115,42 @@ export class ReportingService {
       columns,
       rows: normalized,
       totals: sumColumns(normalized, definition.totals ?? []),
+      // 💰 إجمالي المبيعات — one number under the grid, exactly as `frmRptSalesInPeriod`
+      // prints it beside the rows. Rows, not SQL: it must agree with what is on screen.
+      grandTotal: definition.grandTotal
+        ? { labelAr: definition.grandTotal.labelAr, amount: sumColumns(normalized, [definition.grandTotal.key])[definition.grandTotal.key] ?? '0' }
+        : null,
       rowCount: normalized.length,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * 🖨️ طباعة — the print-ready page of one report, the way «👁️ معاينة» و«🖨️ طباعة»
+   * open it at the desktop: المنشأة في الرأس (`header.repx`), then the report title, the
+   * filters, the grid, «💰 إجمالي…» and the signature strip «أعده · راجعه · المدير»
+   * (`footer.repx` inside `RptSalesInPeriod1/2.repx`).
+   */
+  async printable(tenantId: string, key: string, params: Record<string, string | undefined> = {}, userId?: string): Promise<{ html: string }> {
+    const report = await this.run(tenantId, key, params);
+    const definition = reportByKey.get(key)!;
+    const captions = await this.filterCaptions(tenantId, definition.params, report.params as Record<string, string>);
+    const html = await this.print.reportSheet(
+      tenantId,
+      {
+        titleAr: report.titleAr,
+        columns: report.columns.map((column) => ({ key: column.key, labelAr: column.labelAr, numeric: isNumericColumn(column) })),
+        rows: report.rows,
+        totals: report.totals,
+        grandTotal: report.grandTotal ?? null,
+        captions,
+        generatedAt: report.generatedAt,
+        emptyAr: definition.emptyAr,
+        signature: definition.signature ?? false,
+      },
+      userId,
+    );
+    return { html };
   }
 
   /**
@@ -160,8 +204,11 @@ export class ReportingService {
         columns: report.columns.map((column) => ({ key: column.key, labelAr: column.labelAr, numeric: isNumericColumn(column) })),
         rows: report.rows,
         totals: report.totals,
+        grandTotal: report.grandTotal,
         captions,
         generatedAt: report.generatedAt,
+        emptyAr: definition.emptyAr,
+        signature: definition.signature ?? false,
       });
       return { ...base, filename: `${key}-${stamp}.html`, mimeType: 'text/html; charset=utf-8', encoding: 'utf-8' as const, content: html, printable: true as const };
     }
@@ -216,7 +263,7 @@ export class ReportingService {
  * that a user re-enables later does not need the report to be run again.
  */
 export function applyLayoutColumns(columns: ReportColumn[], layout?: Array<{ key: string; labelAr?: string; visible: boolean }> | null) {
-  if (!layout?.length) return columns;
+  if (!layout?.length) return columns.filter((column) => !column.hidden);
   const byKey = new Map(columns.map((column) => [column.key, column]));
   const chosen = layout
     .filter((entry) => entry.visible && byKey.has(entry.key))

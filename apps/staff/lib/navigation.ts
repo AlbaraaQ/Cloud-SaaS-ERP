@@ -691,6 +691,22 @@ const sales: ModuleNode = {
           'ready',
           { permission: 'reporting.view' },
         ),
+        screen(
+          'sales-movement-items',
+          'إجمالي حركة المواد',
+          'Sales item movement',
+          '/reports/sales-movement-items',
+          'ready',
+          { permission: 'reporting.view', endpoint: '/reports/sales-movement-items' },
+        ),
+        screen(
+          'sales-movement-invoices',
+          'عرض الفواتير',
+          'Sales invoice movement',
+          '/reports/sales-movement-invoices',
+          'ready',
+          { permission: 'reporting.view', endpoint: '/reports/sales-movement-invoices' },
+        ),
         screen('net-sales', 'صافي المبيعات', 'Net sales', '/reports/net-sales', 'ready', {
           permission: 'reporting.view',
         }),

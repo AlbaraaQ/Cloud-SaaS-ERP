@@ -10,6 +10,35 @@ facts. They do not mutate business state or cache totals on master records.
 Async exports return a `reports-export` queue token; later worker/rendering phases can
 attach generated CSV/XLSX/PDF artifacts to the files table.
 
+## 📊 حركة المبيعات — `frmRptSalesInPeriod` (phase 10, part one)
+
+`Form_WPF/frmRptSalesInPeriod.xaml` (Title «حركة المبيعات») is one window with two tabs and
+one number under each grid. Both are registered here as ordinary catalogue definitions:
+
+| Key | Tab | Columns |
+|---|---|---|
+| `sales-movement-items` | 📊 إجمالي المبيعات | رقم الصنف · الصنف · الكمية · الإجمالي |
+| `sales-movement-invoices` | 🧾 عرض الفواتير | رقم الحركة · رقم الفاتورة · نوع الفاتورة · التاريخ · الوقت · آجل · نقدي · شبكة · الإجمالي · الضريبة · الخصم · الصافي |
+
+Three catalogue features carry what the desktop's `Reports/*.repx` files carried and this
+catalogue did not have:
+
+- **`grandTotal: { key, labelAr }`** — 💰 «إجمالي المبيعات», the `txtSumSale`/`txtSumSale2`
+  box under the grid. It is summed from the rows on screen, so it can never disagree with
+  them. `key` may point at a **hidden** column (`net_signed`), which is how «المبيعات −
+  المردودات» is totalled while every row stays positive like the desktop's grid.
+- **`emptyAr`** — what an empty report says; `frmRptSalesInPeriod` says
+  «لا توجد عمليات بالجدول».
+- **`signature: true`** — «أعده · راجعه · المدير», the strip of `RptSalesInPeriod1/2.repx`.
+
+And two filter kinds: **`time`** (⏰ الوقت (HH:mm:ss), glued to the date box by
+`BuildDateTime`) and **`invType`** (🧾 نوع الفاتورة: `pos` = cash sale with no عميل,
+`sale` = with one — the desktop's `inv_type` 3/2).
+
+`GET /reports/print/:key` answers `{ html }` — the same print-ready page, with «المستخدم»
+resolved from the caller. It is declared before `@Get(':key')` for the same reason
+`layouts` is.
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it
