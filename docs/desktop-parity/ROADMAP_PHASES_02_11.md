@@ -137,13 +137,13 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Salla/online: `SallaAPI.cs`, `ManagerOnline.cs`, `ClListManagerOnline.cs`.
 - [ ] Accept per vertical: desktop flow reproducible end-to-end on the cloud screen.
 
-## Phase 10 — Reports (94 `.repx`) 🟡 parts 1–2 done (2026-09, `PHASE_10_REPORTS.md`)
+## Phase 10 — Reports (94 `.repx`) 🟡 parts 1–3 done (2026-09, `PHASE_10_REPORTS.md`)
 
 - [x] Desktop: `Reports/*.repx` (94) + `Class/Report.cs` (610) + `Class/Print.cs` +
   `frmRpt*` (32 viewer/filter forms) + `Reports/header.repx`/`footer.repx` +
   `SettingPrint` (`CrystalLiteDB.txt` L2260).
 - [x] Cloud engine (already there before this phase): `modules/reporting/**` —
-  `report-catalog.ts` (74 definitions), `reporting.service.ts`, `print-templates.service.ts`,
+  `report-catalog.ts` (81 definitions), `reporting.service.ts`, `print-templates.service.ts`,
   `report-layouts.service.ts` (مصمّم التقارير), `xlsx.ts`, `tafqeet.ts`; staff
   `/reports` centre + `/reports/[key]` runner.
 - [x] Part one — 📊 حركة المبيعات: `frmRptSalesInPeriod` + `RptSalesInPeriod1/2.repx`
@@ -153,10 +153,13 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   `frmRptCategorySaleByDay` — seven cloud reports (مبيعات · نقطة البيع · أرباح تجميعي ·
   أرباح تفصيلي · حسب المجموعة · اليومية للمجموعة · مشتريات), 💰 summary cards now come in
   lists, 14 API tests + `scripts/verify-reports-items.mjs` (126 checks).
-- [ ] Part three — 🧾 reports of الفواتير والإشعارات والحركة اليومية:
-  `frmRptInvSalesDetails(Pos|PosAndroid)` · `frmRptInvNotfic` ·
-  `frmRptInvPurchaseDetails` · `frmRptDailySales` · `frmRptDailyProcess` ·
-  `frmRptInvAnalysis` · `FrmRptSalesChart`.
+- [x] Part three — 🧾 reports of الفواتير والإشعارات والحركة اليومية:
+  `frmRptInvSalesDetails` · `frmRptInvSalesDetailsPos` (+`PosAndroid` merged into the
+  «أندرويد» arm of نوع الفاتورة) · `frmRptInvNotfic` · `frmRptInvPurchaseDetails` ·
+  `frmRptDailySales` · `frmRptDailyProcess` · `frmRptInvAnalysis` — seven cloud reports
+  (one invoice row shared by three windows, signed 📊 ملخص النتائج cards where a مرتجع
+  and an إشعار دائن subtract), 15 API tests + `scripts/verify-reports-invoices.mjs`
+  (159 live checks).
 - [ ] Part four — 📚 inventory + serials: `frmRptInventory` ·
   `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo(Summary)` ·
   `frmRptProducedItems`.

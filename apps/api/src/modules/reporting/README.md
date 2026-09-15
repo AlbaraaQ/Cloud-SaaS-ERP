@@ -77,6 +77,44 @@ Shared scopes: `movementLinesScope(tenantId, f, pos, opts)` and `purchaseLinesSc
 carry «وثيقةٌ مرحَّلة فقط» plus the 🔧 خيارات البحث boxes each window actually owns — the
 `opts` switches leave out the فرع and مجموعة boxes a window does not have.
 
+## 🧾 تقارير الفواتير والإشعارات والحركة اليومية — `frmRptInv*` (phase 10, part three)
+
+Seven definitions out of eight desktop windows; all of them read the **invoice header**,
+not its lines:
+
+| Key | Window (`Form_WPF`) | Notes |
+|---|---|---|
+| `sales-invoices-details` | `frmRptInvSalesDetails` — «تقرير فواتير المبيعات» | 21 columns, 10 cards (the «المدفوع» one included) |
+| `pos-sales-invoices-details` | `frmRptInvSalesDetailsPos` — «تقرير مبيعات الفواتير» | the same row, `inv.inv_type = 3` hard-coded; 9 cards |
+| `sales-notifications` | `frmRptInvNotfic` — «تقرير الإشعارات» | the same row, `inv_type` 21/22; «نوع الإشعار · رقم الإشعار · تاريخ الإشعار» |
+| `purchase-invoices-details` | `frmRptInvPurchaseDetails` — «تفاصيل فواتير المشتريات» | 17 columns, «المدفوع · المتبقي», 5 cards |
+| `daily-sales` | `frmRptDailySales` — «تقرير مبيعات حسب اليوم» | `dbo.SalesByDay`, day named `ToString("ddd", ar)` |
+| `daily-process` | `frmRptDailyProcess` — «تقرير الحركة اليومية» | six `DoProcess` rows in a fixed order |
+| `sales-inv-analysis` | `frmRptInvAnalysis` — «تقرير تحليل المبيعات» | eight `ANALYSIS_DIMENSION` radios |
+
+`frmRptInvSalesDetailsPosAndroid` («تقرير مبيعات أندرويد») is **not** a separate definition:
+it is the `inv_type = 20` arm of the same «📄 نوع الفاتورة» combo and prints the very same
+`rptInvSumtPos.repx`.
+
+**One row shared by three windows.** `invoiceRow` is the SELECT list of all three; the SQL
+that differs is `invoiceScope(tenantId, f, pos, { notifications })`, which swaps
+`kind IN ('sale','sale_return')` for `kind IN ('credit_note','debit_note')` and applies
+`procScope` or `notificationScope` instead.
+
+**Signed cards.** `UpdateSummaryCards()` at the desktop sums with
+`Calc(x) = purchases.Sum(x) − returns.Sum(x)`, so the ten cards read the `s_*` mirrored
+columns (`s_sum_price` … `s_paid`), each multiplied by
+`invoiceSign = CASE WHEN si.kind IN ('sale','debit_note') THEN 1 ELSE -1 END`. A مرتجع
+subtracts, and so does an إشعار دائن. The `s_*` columns are `hidden: true` — they are
+printed in the 💰 strip, never drawn in the grid.
+
+**`GetPaymentText`** is one CASE over `payment_status` and the three payment legs
+(`paymentLegs` is a `LEFT JOIN LATERAL` over `invoice_payments`): «آجل» when nothing was
+paid, «نقدي»/«شبكة» when one leg settled the invoice, «متعدد» when several did.
+
+**Purchases settle by سند صرف**, not by a `pay_type` flag: `payment_allocations` →
+`vouchers` gives the same three legs for «💳 نوع الدفع».
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it

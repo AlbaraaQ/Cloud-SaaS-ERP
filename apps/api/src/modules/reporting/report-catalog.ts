@@ -38,8 +38,20 @@ export type ReportFilters = {
   /** ⏰ الوقت (HH:mm:ss) — `frmRptSalesInPeriod` builds a datetime from a date box + a time box. */
   fromTime?: string;
   toTime?: string;
-  /** 🧾 نوع الفاتورة — «مبيعات نقطة البيع» · «مبيعات عادية» (`cmbInvType`). */
+  /** 🧾 نوع الفاتورة — «مبيعات نقطة البيع» · «مبيعات عادية» · «مبيعات» (`cmbInvType`). */
   invType?: string;
+  /** 🔄 نوع العملية — «مبيعات» · «مرتجع» (`proc_type` 1 · 2). */
+  procType?: string;
+  /** 💵 حالة الدفع — «مدفوع» · «غير مدفوع» · «مدفوع جزئي» (`PaymentStatus` 1 · 0 · 2). */
+  paymentStatus?: string;
+  /** 💳 نوع الدفع — «نقدية» · «آجلة» · «شبكة» · «بنك» (`pay_type` 1 · −1 · 2). */
+  payType?: string;
+  /** 🧾 الضريبة — «مع ضريبة» · «بدون ضريبة». */
+  vat?: string;
+  /** 📄 نوع الإشعار — «إشعار دائن» · «إشعار مدين» (`inv_type` 21 · 22). */
+  notificationType?: string;
+  /** 📋 نوع التقرير — البعد الذي يُجمَّع عليه «تحليل المبيعات». */
+  dimension?: string;
   branchId?: string;
   warehouseId?: string;
   partyId?: string;
@@ -134,6 +146,81 @@ const TIME_FROM_TO: ReportParam[] = [
   { name: 'fromTime', labelAr: 'من وقت (HH:mm)', kind: 'time' },
   { name: 'toTime', labelAr: 'إلى وقت (HH:mm)', kind: 'time' },
 ];
+/**
+ * 🔄 نوع العملية — the ثلاثة أزرار `rbAllSales` · `rbSales` · `rbReturn` in every
+ * invoice window: `proc_type` 1 (مبيعات) و2 (مرتجع).
+ */
+const OPERATION_KIND: ReportParam = {
+  name: 'procType',
+  labelAr: 'نوع العملية',
+  kind: 'select',
+  options: [
+    { value: 'sale', labelAr: 'مبيعات' },
+    { value: 'return', labelAr: 'مرتجع' },
+  ],
+};
+/** 💵 حالة الدفع — `PaymentStatus` 1 مدفوع · 0 غير مدفوع · 2 مدفوع جزئي. */
+const PAYMENT_STATE: ReportParam = {
+  name: 'paymentStatus',
+  labelAr: 'حالة الدفع',
+  kind: 'select',
+  options: [
+    { value: 'paid', labelAr: 'مدفوع' },
+    { value: 'unpaid', labelAr: 'غير مدفوع' },
+    { value: 'partial', labelAr: 'مدفوع جزئي' },
+  ],
+};
+/** 💳 نوع الدفع — «نقدية · آجلة · شبكة · بنك»: `pay_type` 1 · −1 · 2 · 2+bank. */
+const PAY_METHOD: ReportParam = {
+  name: 'payType',
+  labelAr: 'نوع الدفع',
+  kind: 'select',
+  options: [
+    { value: 'cash', labelAr: 'نقدية' },
+    { value: 'credit', labelAr: 'آجلة' },
+    { value: 'card', labelAr: 'شبكة' },
+    { value: 'bank', labelAr: 'بنك' },
+  ],
+};
+/** 🧾 الضريبة — `rbAllVat` · `rbWithVat` · `rbNoVAT`. */
+const VAT_FILTER: ReportParam = {
+  name: 'vat',
+  labelAr: 'الضريبة',
+  kind: 'select',
+  options: [
+    { value: 'with', labelAr: 'مع ضريبة' },
+    { value: 'without', labelAr: 'بدون ضريبة' },
+  ],
+};
+/** 📄 نوع الإشعار — `frmRptInvNotfic.xaml.cs` L237 وL239: `inv_type` 21 و22. */
+const NOTIFICATION_KIND: ReportParam = {
+  name: 'notificationType',
+  labelAr: 'نوع الإشعار',
+  kind: 'select',
+  options: [
+    { value: 'credit', labelAr: 'إشعار دائن' },
+    { value: 'debit', labelAr: 'إشعار مدين' },
+  ],
+};
+/**
+ * 📋 نوع التقرير — the eight radios of `frmRptInvAnalysis.xaml` L254 … L300: المخزن ·
+ * العميل · الصنف · مندوب البيع · المستخدم · الأيام · الشهور · مجموعة الصنف.
+ */
+const ANALYSIS_DIMENSION: ReportParam = {
+  name: 'dimension',
+  labelAr: 'نوع التقرير',
+  kind: 'select',
+  options: [
+    { value: 'warehouse', labelAr: 'المخزن' },
+    { value: 'customer', labelAr: 'العميل' },
+    { value: 'item', labelAr: 'الصنف' },
+    { value: 'salesman', labelAr: 'مندوب البيع' },
+    { value: 'user', labelAr: 'المستخدم' },
+    { value: 'day', labelAr: 'الأيام' },
+    { value: 'month', labelAr: 'الشهور' },
+    { value: 'category', labelAr: 'مجموعة الصنف' },
+  ],
+};
 const BRANCH: ReportParam = { name: 'branchId', labelAr: 'الفرع', kind: 'branch' };
 const WAREHOUSE: ReportParam = { name: 'warehouseId', labelAr: 'المستودع', kind: 'warehouse' };
 const PARTY: ReportParam = { name: 'partyId', labelAr: 'الطرف', kind: 'party' };
@@ -199,7 +286,258 @@ const movementLinesScope = (
   AND ${eqIf(sql`si.warehouse_id`, f.warehouseId)}
   AND ${eqIf(sql`line.item_id`, f.itemId)}
   AND ${opts.category === false ? all : eqIf(sql`item.category_id`, f.categoryId)}
+  AND ${eqIf(sql`si.party_id`, f.partyId)}
+  AND ${eqIf(sql`si.salesman_id`, f.salesmanId)}
 `;
+
+/**
+ * 🔄 نوع العملية — `proc_type` 1 (مبيعات) و2 (مرتجع) at the desktop, `kind` here: a بيع
+ * adds to the 💰 ملخص and a مرتجع subtracts from it, which is also why the summary cards
+ * read the signed columns rather than the ones on screen.
+ */
+const procScope = (saleKind: string, returnKind: string, procType?: string): SQL =>
+  procType === 'sale'
+    ? sql`si.kind = ${saleKind}`
+    : procType === 'return'
+      ? sql`si.kind = ${returnKind}`
+      : sql`si.kind IN (${saleKind}, ${returnKind})`;
+/** 💵 حالة الدفع — `inv.PaymentStatus` 1 · 0 · 2, and `payment_status` is spelled out. */
+const paymentScope = (status?: string): SQL =>
+  status === 'paid' || status === 'unpaid' || status === 'partial' ? sql`si.payment_status = ${status}` : all;
+/** 💳 نوع الدفع — the four legs of `inv.pay_type`; «آجلة» is the فاتورة nothing was paid on. */
+const payScope = (payType?: string): SQL =>
+  payType === 'cash'
+    ? sql`coalesce(pay.cash, 0) > 0`
+    : payType === 'card'
+      ? sql`coalesce(pay.card, 0) > 0`
+      : payType === 'bank'
+        ? sql`coalesce(pay.bank, 0) > 0`
+        : payType === 'credit'
+          ? sql`si.payment_status = 'unpaid'`
+          : all;
+/** 🧾 الضريبة — «مع ضريبة» و«بدون ضريبة» read the invoice's own tax, main and extra alike. */
+const vatScope = (vat?: string, alias: SQL = sql`si`): SQL =>
+  vat === 'with'
+    ? sql`(${alias}.tax_total + ${alias}.extra_tax) > 0`
+    : vat === 'without'
+      ? sql`(${alias}.tax_total + ${alias}.extra_tax) = 0`
+      : all;
+/**
+ * 💳 The three payment legs of one فاتورة — `inv.cash` · `inv.visa` · `inv.bank` at the
+ * desktop, one row per method in `invoice_payments` here.
+ */
+const paymentLegs = sql`
+  LEFT JOIN LATERAL (
+    SELECT sum(CASE WHEN p.method = 'cash' THEN p.amount ELSE 0 END) AS cash,
+           sum(CASE WHEN p.method = 'card' THEN p.amount ELSE 0 END) AS card,
+           sum(CASE WHEN p.method = 'bank' THEN p.amount ELSE 0 END) AS bank
+    FROM invoice_payments p
+    WHERE p.tenant_id = si.tenant_id AND p.invoice_id = si.id
+  ) pay ON true`;
+/** «المجموع» — Σ(quantity × unit_price), the gross the خصم is measured against. */
+const lineGross = sql`
+  LEFT JOIN LATERAL (
+    SELECT sum(l.quantity * l.unit_price) AS gross
+    FROM sales_invoice_lines l
+    WHERE l.tenant_id = si.tenant_id AND l.invoice_id = si.id
+  ) lines ON true`;
+
+/** 🧾 «المجموع» و«الخصم» … the one row of a فاتورة مبيعات, as every invoice window draws it. */
+const invoiceSign = sql`(CASE WHEN si.kind IN ('sale', 'debit_note') THEN 1 ELSE -1 END)`;
+const invoiceRow = sql`
+  si.id::text AS movement_id,
+  -- نوع الفاتورة — InvoiceOper.GetInvoiceTypeAr(inv_type, proc_type, pay_type, TaxType):
+  -- TaxType is 2 when the عميل carries a رقم ضريبي and 1 when it does not.
+  CASE si.kind
+    WHEN 'sale' THEN CASE WHEN coalesce(party.tax_no, '') <> '' THEN 'فاتورة ضريبية' ELSE 'فاتورة ضريبية مبسطة' END
+    WHEN 'sale_return' THEN CASE WHEN coalesce(party.tax_no, '') <> '' THEN 'إشعار دائن للفاتورة الضريبية' ELSE 'إشعار دائن للفاتورة الضريبية المبسطة' END
+    WHEN 'credit_note' THEN 'إشعار دائن'
+    WHEN 'debit_note' THEN 'إشعار مدين'
+    ELSE si.kind END AS invoice_type,
+  coalesce(si.number, '—') AS number,
+  -- 🔗 رقم المرجع — inv.Reff_No at the desktop is a free-text box the cloud does
+  -- not carry; what it does carry is the link itself (reference_invoice_id), so the
+  -- number of the فاتورة this one refers to is what the column prints.
+  coalesce((SELECT ref.number FROM sales_invoices ref WHERE ref.id = si.reference_invoice_id), '—') AS reference,
+  si.posted_at::date AS day,
+  to_char(si.posted_at, 'HH24:MI:SS') AS time,
+  -- نوع الدفع — «آجل · نقدي · شبكة · متعدد · ضيافة» in GetPaymentText; ضيافة has no
+  -- counterpart in the cloud's payments, so an unpaid فاتورة is «آجل» and a settled one
+  -- is named after the leg that settled it, or «متعدد» when several did.
+  CASE si.payment_status
+    WHEN 'unpaid' THEN 'آجل'
+    WHEN 'paid' THEN CASE
+      WHEN coalesce(pay.cash, 0) > 0 AND coalesce(pay.card, 0) = 0 AND coalesce(pay.bank, 0) = 0 THEN 'نقدي'
+      WHEN coalesce(pay.card, 0) > 0 AND coalesce(pay.cash, 0) = 0 AND coalesce(pay.bank, 0) = 0 THEN 'شبكة'
+      ELSE 'متعدد' END
+    ELSE 'متعدد' END AS payment_method,
+  si.paid_total::text AS paid,
+  coalesce(party.name, si.cash_customer_name, '—') AS customer,
+  coalesce(pay.cash, 0)::text AS cash,
+  coalesce(pay.card, 0)::text AS network,
+  round(coalesce(lines.gross, 0), 2)::text AS sum_price,
+  round(coalesce(lines.gross, 0) - si.subtotal, 2)::text AS discount,
+  si.subtotal::text AS subtotal,
+  si.tax_total::text AS tax,
+  si.extra_tax::text AS extra_tax,
+  (si.tax_total + si.extra_tax)::text AS total_tax,
+  si.total::text AS net,
+  coalesce(warehouse.name, '—') AS warehouse,
+  coalesce(branch.name_ar, '—') AS branch,
+  coalesce(salesman.name, '—') AS salesman,
+  coalesce("user".full_name, '—') AS user_name,
+  -- 📊 ملخص النتائج — the same ten numbers, signed: a مرتجع or an إشعار دائن subtracts.
+  (${invoiceSign} * round(coalesce(lines.gross, 0), 2))::text AS s_sum_price,
+  (${invoiceSign} * round(coalesce(lines.gross, 0) - si.subtotal, 2))::text AS s_discount,
+  (${invoiceSign} * si.subtotal)::text AS s_subtotal,
+  (${invoiceSign} * si.tax_total)::text AS s_tax,
+  (${invoiceSign} * si.extra_tax)::text AS s_extra_tax,
+  (${invoiceSign} * (si.tax_total + si.extra_tax))::text AS s_total_tax,
+  (${invoiceSign} * si.total)::text AS s_net,
+  (${invoiceSign} * coalesce(pay.cash, 0))::text AS s_cash,
+  (${invoiceSign} * coalesce(pay.card, 0))::text AS s_network,
+  (${invoiceSign} * si.paid_total)::text AS s_paid
+`;
+
+/** 🧾 The 21 columns of an invoice window — «📄 تفاصيل» و«👁️ عرض» and the four technical ones aside. */
+const invoiceColumns = (typeLabel: string, numberLabel: string, dateLabel: string): ReportColumn[] => [
+  text('invoice_type', typeLabel),
+  text('number', numberLabel),
+  text('reference', 'رقم المرجع'),
+  date('day', dateLabel),
+  text('time', 'الوقت'),
+  text('payment_method', 'نوع الدفع'),
+  money('paid', 'المدفوع'),
+  text('customer', 'العميل'),
+  money('cash', 'نقدي'),
+  money('network', 'شبكة'),
+  money('sum_price', 'المجموع'),
+  money('discount', 'الخصم'),
+  money('subtotal', 'الإجمالي'),
+  money('tax', 'الضريبة'),
+  money('extra_tax', 'ضريبة إضافية'),
+  money('total_tax', 'إجمالي الضريبة'),
+  money('net', 'الصافي'),
+  text('warehouse', 'المستودع'),
+  text('branch', 'الفرع'),
+  text('salesman', 'المندوب'),
+  text('user_name', 'المستخدم'),
+  { key: 's_sum_price', labelAr: 'المجموع', type: 'money', hidden: true },
+  { key: 's_discount', labelAr: 'الخصم', type: 'money', hidden: true },
+  { key: 's_subtotal', labelAr: 'الإجمالي', type: 'money', hidden: true },
+  { key: 's_tax', labelAr: 'الضريبة', type: 'money', hidden: true },
+  { key: 's_extra_tax', labelAr: 'ضريبة إضافية', type: 'money', hidden: true },
+  { key: 's_total_tax', labelAr: 'إجمالي الضريبة', type: 'money', hidden: true },
+  { key: 's_net', labelAr: 'الصافي', type: 'money', hidden: true },
+  { key: 's_cash', labelAr: 'نقدي', type: 'money', hidden: true },
+  { key: 's_network', labelAr: 'شبكة', type: 'money', hidden: true },
+  { key: 's_paid', labelAr: 'المدفوع', type: 'money', hidden: true },
+];
+
+/** 📊 ملخص النتائج — «المجموع · الخصم · الإجمالي · الضريبة · ضريبة إضافية · إجمالي الضريبة · الصافي · نقدي · شبكة» و«المدفوع» حيث يكون. */
+const summaryCards = (withPaid: boolean): ReportGrandTotal[] => [
+  { key: 's_sum_price', labelAr: 'المجموع' },
+  { key: 's_discount', labelAr: 'الخصم' },
+  { key: 's_subtotal', labelAr: 'الإجمالي' },
+  { key: 's_tax', labelAr: 'الضريبة' },
+  { key: 's_extra_tax', labelAr: 'ضريبة إضافية' },
+  { key: 's_total_tax', labelAr: 'إجمالي الضريبة' },
+  { key: 's_net', labelAr: 'الصافي' },
+  { key: 's_cash', labelAr: 'نقدي' },
+  { key: 's_network', labelAr: 'شبكة' },
+  ...(withPaid ? [{ key: 's_paid', labelAr: 'المدفوع' } satisfies ReportGrandTotal] : []),
+];
+
+/** 📄 نوع الإشعار — `inv_type` 21 (مدين) و22 (دائن), `credit_note` و`debit_note` here. */
+const notificationScope = (kind?: string): SQL =>
+  kind === 'credit' ? sql`si.kind = 'credit_note'` : kind === 'debit' ? sql`si.kind = 'debit_note'` : all;
+
+/**
+ * 🔍 خيارات البحث of a فاتورة window — `showInvoice()` in `frmRptInvSalesDetails.xaml.cs`
+ * L352 … L432, and the same ten boxes in the POS and الإشعارات windows.
+ */
+const invoiceScope = (
+  tenantId: string,
+  f: ReportFilters,
+  pos: boolean | null,
+  opts: { notifications?: boolean } = {},
+): SQL => sql`
+  si.tenant_id = ${tenantId}
+  AND si.status = 'posted'
+  AND si.kind IN ('sale', 'sale_return', 'credit_note', 'debit_note')
+  AND ${onDateTime(sql`si.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${posScope(pos)}
+  -- 📄 نوع الفاتورة — «مبيعات» (inv_type = 2) و«نقطة بيع» (inv_type = 3) in cmbInvType;
+  -- the POS window hard-codes 3 already, so the box is its own.
+  AND ${pos === null ? kindScope(f.invType) : all}
+  AND ${opts.notifications ? sql`si.kind IN ('credit_note', 'debit_note')` : sql`si.kind IN ('sale', 'sale_return')`}
+  AND ${opts.notifications ? notificationScope(f.notificationType) : procScope('sale', 'sale_return', f.procType)}
+  AND ${eqIf(sql`si.branch_id`, f.branchId)}
+  AND ${eqIf(sql`si.warehouse_id`, f.warehouseId)}
+  AND ${eqIf(sql`si.party_id`, f.partyId)}
+  AND ${eqIf(sql`si.salesman_id`, f.salesmanId)}
+  AND ${paymentScope(f.paymentStatus)}
+  AND ${payScope(f.payType)}
+  AND ${vatScope(f.vat)}
+`;
+
+/** 📅 اسم اليوم بالعربية — `ToString("ddd", culture ar)` in the two «حسب اليوم» windows. */
+const dayName = sql`
+  CASE extract(dow FROM si.posted_at::date)::int
+    WHEN 0 THEN 'الأحد' WHEN 1 THEN 'الاثنين' WHEN 2 THEN 'الثلاثاء'
+    WHEN 3 THEN 'الأربعاء' WHEN 4 THEN 'الخميس' WHEN 5 THEN 'الجمعة'
+    ELSE 'السبت' END`;
+
+/** 🔄 `proc_type` 1 شراء و2 مردود شراء في `frmRptInvPurchaseDetails`. */
+const purchaseProcScope = (procType?: string): SQL =>
+  procType === 'sale' ? sql`pi.kind = 'purchase'` : procType === 'return' ? sql`pi.kind = 'purchase_return'` : all;
+const purchaseSign = sql`(CASE WHEN pi.kind = 'purchase' THEN 1 ELSE -1 END)`;
+const purchaseInvoiceScope = (tenantId: string, f: ReportFilters): SQL => sql`
+  pi.tenant_id = ${tenantId}
+  AND pi.status = 'posted'
+  AND pi.kind IN ('purchase', 'purchase_return')
+  AND ${onDateTime(sql`pi.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${eqIf(sql`pi.branch_id`, f.branchId)}
+  AND ${eqIf(sql`pi.warehouse_id`, f.warehouseId)}
+  AND ${eqIf(sql`pi.party_id`, f.partyId)}
+  AND ${purchaseProcScope(f.procType)}
+  AND ${vatScope(f.vat, sql`pi`)}
+`;
+
+/** 🏢 One arm of «تقرير الحركة اليومية» — `DoProcess(name, type1, type2)` in frmRptDailyProcess. */
+const dailyScope = (tenantId: string, f: ReportFilters, kind: string, withParty: boolean): SQL => sql`
+  si.tenant_id = ${tenantId}
+  AND si.status = 'posted'
+  AND si.kind = ${kind}
+  AND ${onDateTime(sql`si.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${withParty ? sql`si.party_id IS NOT NULL` : sql`si.party_id IS NULL`}
+  AND ${eqIf(sql`si.branch_id`, f.branchId)}
+`;
+const dailyPurchaseScope = (tenantId: string, f: ReportFilters, kind: string): SQL => sql`
+  pi.tenant_id = ${tenantId}
+  AND pi.status = 'posted'
+  AND pi.kind = ${kind}
+  AND ${onDateTime(sql`pi.posted_at`, f.from, f.to, f.fromTime, f.toTime)}
+  AND ${eqIf(sql`pi.branch_id`, f.branchId)}
+`;
+
+/** 📋 نوع التقرير — the dimension every «تحليل المبيعات» row is grouped by. */
+const analysisDimension = (dimension?: string): SQL =>
+  dimension === 'customer'
+    ? sql`coalesce(party.name, si.cash_customer_name, '—')`
+    : dimension === 'item'
+      ? sql`coalesce(item.name_ar, '—')`
+      : dimension === 'salesman'
+        ? sql`coalesce(salesman.name, '—')`
+        : dimension === 'user'
+          ? sql`coalesce("user".full_name, '—')`
+          : dimension === 'day'
+            ? sql`si.posted_at::date::text`
+            : dimension === 'month'
+              ? sql`to_char(si.posted_at, 'YYYY-MM')`
+              : dimension === 'category'
+                ? sql`coalesce(cat.name_ar, '—')`
+                : sql`coalesce(warehouse.name, '—')`;
 
 const purchaseLinesScope = (tenantId: string, f: ReportFilters): SQL => sql`
   pi.tenant_id = ${tenantId}
@@ -910,10 +1248,7 @@ const definitions: ReportDefinition[] = [
     build: (tenantId, f) => sql`
       SELECT coalesce(cat.code, '—') AS category_code, coalesce(cat.name_ar, '—') AS category,
              -- SaleDay — parsedDate.ToString("ddd", culture ar) in the .xaml.cs L201.
-             CASE extract(dow FROM si.posted_at::date)::int
-               WHEN 0 THEN 'الأحد' WHEN 1 THEN 'الاثنين' WHEN 2 THEN 'الثلاثاء'
-               WHEN 3 THEN 'الأربعاء' WHEN 4 THEN 'الخميس' WHEN 5 THEN 'الجمعة'
-               ELSE 'السبت' END AS day_name,
+             ${dayName} AS day_name,
              si.posted_at::date AS day,
              round(sum(CASE WHEN si.kind = 'sale' THEN line.total ELSE -line.total END), 2)::text AS total
       FROM sales_invoice_lines line
@@ -924,6 +1259,326 @@ const definitions: ReportDefinition[] = [
         AND line.item_id IS NOT NULL
       GROUP BY cat.id, cat.code, cat.name_ar, si.posted_at::date
       ORDER BY si.posted_at::date DESC, cat.name_ar LIMIT 2000`,
+  },
+  {
+    key: 'sales-invoices-details',
+    titleAr: 'تقرير فواتير المبيعات',
+    group: 'sales',
+    hintAr: 'كل فاتورةٍ بيعٍ أو مرتجع بسطر: نوعها ورقمها وتاريخها ووقتها وطريقة دفعها وعميلها ونقدها وشبكتها ومجاميعها السبعة ومستودعها وفرعها ومندوبها ومستخدمها.',
+    // 🔍 خيارات البحث — 📄 نوع الفاتورة · 💳 نوع الدفع · 🏭 المستودع · 🧑‍💼 المندوب ·
+    // 👥 العميل · 🏬 الفرع · 📅 الفترة الزمنية · 🧾 الضريبة · 💵 حالة الدفع · 🔄 نوع العملية.
+    params: [INVOICE_KIND_SALES, PAY_METHOD, WAREHOUSE, SALESMAN, PARTY, BRANCH, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!, VAT_FILTER, PAYMENT_STATE, OPERATION_KIND],
+    columns: invoiceColumns('نوع الفاتورة', 'رقم الفاتورة', 'تاريخ الفاتورة'),
+    // 📊 ملخص النتائج — «عدد الفواتير · المجموع · الخصم · الإجمالي · الضريبة · ضريبة
+    // إضافية · إجمالي الضريبة · الصافي · نقدي · شبكة · المدفوع» (L1023 … L1110); عدد
+    // الفواتير هو عدد سطور الشبكة الذي يطبعه رأس الصفحة أصلاً.
+    grandTotal: summaryCards(true),
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT ${invoiceRow}
+      FROM sales_invoices si
+      LEFT JOIN parties party ON party.id = si.party_id
+      LEFT JOIN warehouses warehouse ON warehouse.id = si.warehouse_id
+      LEFT JOIN branches branch ON branch.id = si.branch_id
+      LEFT JOIN salesmen salesman ON salesman.id = si.salesman_id
+      LEFT JOIN users "user" ON "user".id = si.created_by
+      ${paymentLegs}
+      ${lineGross}
+      WHERE ${invoiceScope(tenantId, f, null)}
+      ORDER BY si.posted_at DESC, si.number DESC LIMIT 2000`,
+  },
+  {
+    key: 'pos-sales-invoices-details',
+    titleAr: 'تقرير مبيعات الفواتير',
+    group: 'sales',
+    hintAr: 'الشبكة نفسها مقيَّدة بـ`inv.inv_type=3`: فواتير نقطة البيع ومردوداتها وحدها.',
+    // 🔍 خيارات البحث عند الديسكتوب: 🔄 نوع العملية · 💵 حالة الدفع · 🏭 المستودع ·
+    // 👤 المستخدم · 📅 الفترة الزمنية (المستخدم مؤجَّل: لا مرشِّح عضوية بعد).
+    params: [OPERATION_KIND, PAYMENT_STATE, WAREHOUSE, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: invoiceColumns('نوع الفاتورة', 'رقم الفاتورة', 'تاريخ الفاتورة'),
+    grandTotal: summaryCards(false),
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT ${invoiceRow}
+      FROM sales_invoices si
+      LEFT JOIN parties party ON party.id = si.party_id
+      LEFT JOIN warehouses warehouse ON warehouse.id = si.warehouse_id
+      LEFT JOIN branches branch ON branch.id = si.branch_id
+      LEFT JOIN salesmen salesman ON salesman.id = si.salesman_id
+      LEFT JOIN users "user" ON "user".id = si.created_by
+      ${paymentLegs}
+      ${lineGross}
+      WHERE ${invoiceScope(tenantId, f, true)}
+      ORDER BY si.posted_at DESC, si.number DESC LIMIT 2000`,
+  },
+  {
+    key: 'sales-notifications',
+    titleAr: 'تقرير الإشعارات',
+    group: 'sales',
+    hintAr: 'كل إشعارٍ دائن أو مدين بسطر: رقمه وتاريخه ووقته وعميله ونقده وشبكته ومجاميعه، ثم «عدد الإشعارات» ومجاميع الأسفل.',
+    // 📄 نوع الإشعار · 🔄 نوع العملية · 👤 المستخدم · 👤 المندوب · 🏢 العميل · 📅 من / إلى.
+    params: [NOTIFICATION_KIND, OPERATION_KIND, SALESMAN, PARTY, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: invoiceColumns('نوع الإشعار', 'رقم الإشعار', 'تاريخ الإشعار'),
+    grandTotal: summaryCards(false),
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT ${invoiceRow}
+      FROM sales_invoices si
+      LEFT JOIN parties party ON party.id = si.party_id
+      LEFT JOIN warehouses warehouse ON warehouse.id = si.warehouse_id
+      LEFT JOIN branches branch ON branch.id = si.branch_id
+      LEFT JOIN salesmen salesman ON salesman.id = si.salesman_id
+      LEFT JOIN users "user" ON "user".id = si.created_by
+      ${paymentLegs}
+      ${lineGross}
+      WHERE ${invoiceScope(tenantId, f, null, { notifications: true })}
+      ORDER BY si.posted_at DESC, si.number DESC LIMIT 2000`,
+  },
+  {
+    key: 'purchase-invoices-details',
+    titleAr: 'تفاصيل فواتير المشتريات',
+    group: 'purchases',
+    hintAr: 'كل فاتورة شراء أو مردود بسطر: نوعها ورقمها وتاريخها وموردها ومجاميعها الخمسة ومستودعها وفرعها، ثم «المدفوع» و«المتبقي».',
+    // 💰 الضريبة · 🔄 نوع العملية · 🏬 الفرع · 🏢 المورد · 🏪 المستودع · 📅 الفترة.
+    params: [VAT_FILTER, OPERATION_KIND, BRANCH, PARTY, WAREHOUSE, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: [
+      text('invoice_type', 'نوع الفاتورة'),
+      text('number', 'رقم الفاتورة'),
+      text('reference', 'رقم المرجع'),
+      date('day', 'التاريخ'),
+      text('time', 'الوقت'),
+      text('payment_method', 'نوع الدفع'),
+      text('supplier', 'المورد'),
+      money('sum_price', 'المجموع'),
+      money('discount', 'الخصم'),
+      money('subtotal', 'الإجمالي'),
+      money('tax', 'الضريبة'),
+      money('net', 'الصافي'),
+      money('paid', 'المدفوع'),
+      money('due', 'المتبقي'),
+      text('warehouse', 'المستودع'),
+      text('branch', 'الفرع'),
+      text('user_name', 'المستخدم'),
+      // 💰 مجاميع الفواتير — netted the way CalculateSummary nets them (proc_type 1 − 2).
+      { key: 's_sum_price', labelAr: 'المجموع', type: 'money', hidden: true },
+      { key: 's_discount', labelAr: 'الخصم', type: 'money', hidden: true },
+      { key: 's_subtotal', labelAr: 'الإجمالي', type: 'money', hidden: true },
+      { key: 's_tax', labelAr: 'الضريبة', type: 'money', hidden: true },
+      { key: 's_net', labelAr: 'الصافي', type: 'money', hidden: true },
+    ],
+    grandTotal: [
+      { key: 's_sum_price', labelAr: 'المجموع' },
+      { key: 's_discount', labelAr: 'الخصم' },
+      { key: 's_subtotal', labelAr: 'الإجمالي' },
+      { key: 's_tax', labelAr: 'الضريبة' },
+      { key: 's_net', labelAr: 'الصافي' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT CASE pi.kind WHEN 'purchase' THEN 'فاتورة مشتريات' WHEN 'purchase_return' THEN 'مردود مشتريات' ELSE pi.kind END AS invoice_type,
+             coalesce(pi.number, '—') AS number, pi.posted_at::date AS day, to_char(pi.posted_at, 'HH24:MI:SS') AS time,
+             coalesce(pi.supplier_reference_no, (SELECT ref.number FROM purchase_invoices ref WHERE ref.id = pi.reference_invoice_id), '—') AS reference,
+             CASE pi.payment_status
+               WHEN 'unpaid' THEN 'آجل'
+               WHEN 'paid' THEN CASE
+                 WHEN coalesce(alloc.cash, 0) > 0 AND coalesce(alloc.card, 0) = 0 AND coalesce(alloc.bank, 0) = 0 THEN 'نقدي'
+                 WHEN coalesce(alloc.card, 0) > 0 AND coalesce(alloc.cash, 0) = 0 AND coalesce(alloc.bank, 0) = 0 THEN 'شبكة'
+                 ELSE 'متعدد' END
+               ELSE 'متعدد' END AS payment_method,
+             ${partyName} AS supplier,
+             round(coalesce(lines.gross, 0), 2)::text AS sum_price,
+             round(coalesce(lines.gross, 0) - pi.subtotal, 2)::text AS discount,
+             pi.subtotal::text AS subtotal, pi.tax_total::text AS tax, pi.total::text AS net,
+             pi.paid_total::text AS paid, (pi.total - pi.paid_total)::text AS due,
+             coalesce(warehouse.name, '—') AS warehouse, coalesce(branch.name_ar, '—') AS branch,
+             coalesce(\"user\".full_name, '—') AS user_name,
+             (${purchaseSign} * round(coalesce(lines.gross, 0), 2))::text AS s_sum_price,
+             (${purchaseSign} * round(coalesce(lines.gross, 0) - pi.subtotal, 2))::text AS s_discount,
+             (${purchaseSign} * pi.subtotal)::text AS s_subtotal,
+             (${purchaseSign} * pi.tax_total)::text AS s_tax,
+             (${purchaseSign} * pi.total)::text AS s_net
+      FROM purchase_invoices pi
+      LEFT JOIN parties party ON party.id = pi.party_id
+      LEFT JOIN warehouses warehouse ON warehouse.id = pi.warehouse_id
+      LEFT JOIN branches branch ON branch.id = pi.branch_id
+      LEFT JOIN users \"user\" ON \"user\".id = pi.created_by
+      LEFT JOIN LATERAL (
+        SELECT sum(l.quantity * l.unit_price) AS gross
+        FROM purchase_invoice_lines l
+        WHERE l.tenant_id = pi.tenant_id AND l.invoice_id = pi.id
+      ) lines ON true
+      -- 💳 نوع الدفع — inv.pay_type at the desktop is one flag on the فاتورة; the
+      -- cloud settles a شراء بسند صرف through payment_allocations, so the legs of
+      -- the سند are summed the same way the three of inv.cash/visa/bank are.
+      LEFT JOIN LATERAL (
+        SELECT sum(CASE WHEN v.method = 'cash' THEN a.amount ELSE 0 END) AS cash,
+               sum(CASE WHEN v.method = 'card' THEN a.amount ELSE 0 END) AS card,
+               sum(CASE WHEN v.method = 'bank' THEN a.amount ELSE 0 END) AS bank
+        FROM payment_allocations a
+        LEFT JOIN vouchers v ON v.id = a.voucher_id
+        WHERE a.tenant_id = pi.tenant_id AND a.invoice_id = pi.id
+      ) alloc ON true
+      WHERE ${purchaseInvoiceScope(tenantId, f)}
+      ORDER BY pi.posted_at DESC, pi.number DESC LIMIT 2000`,
+  },
+  {
+    key: 'daily-sales',
+    titleAr: 'تقرير مبيعات حسب اليوم',
+    group: 'sales',
+    hintAr: 'كل يومٍ بسطر: الإجمالي قبل الضريبة وضريبته وإجماليه، واسم اليوم بالعربية كما يسمّيه `ToString("ddd", ar)`.',
+    // 📄 نوع الفاتورة · 🏢 الفرع · 📅 من / إلى.
+    params: [INVOICE_KIND_DOCS, BRANCH, PERIOD[0]!, PERIOD[1]!],
+    columns: [
+      int('seq', 'الرقم'),
+      date('day', 'التاريخ'),
+      text('day_name', 'اليوم'),
+      money('before_tax', 'الإجمالي قبل الضريبة'),
+      money('tax', 'الضريبة'),
+      money('total', 'الإجمالي'),
+    ],
+    totals: ['before_tax', 'tax', 'total'],
+    // «إجمالي قبل الضريبة:» · «إجمالي الضريبة:» · «الإجمالي الكلي:»
+    grandTotal: [
+      { key: 'before_tax', labelAr: 'إجمالي قبل الضريبة' },
+      { key: 'tax', labelAr: 'إجمالي الضريبة' },
+      { key: 'total', labelAr: 'الإجمالي الكلي' },
+    ],
+    emptyAr: 'لا توجد بيانات، أدخل الفترة الزمنية الصحيحة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT row_number() OVER (ORDER BY daily.day)::text AS seq, daily.*
+      FROM (
+        SELECT si.posted_at::date AS day, ${dayName} AS day_name,
+               round(sum(CASE WHEN si.kind = 'sale' THEN si.subtotal ELSE -si.subtotal END), 2)::text AS before_tax,
+               round(sum(CASE WHEN si.kind = 'sale' THEN si.tax_total ELSE -si.tax_total END), 2)::text AS tax,
+               round(sum(CASE WHEN si.kind = 'sale' THEN si.total ELSE -si.total END), 2)::text AS total
+        FROM sales_invoices si
+        WHERE ${movementScope(tenantId, f)}
+        GROUP BY si.posted_at::date
+      ) daily
+      ORDER BY day LIMIT 2000`,
+  },
+  {
+    key: 'daily-process',
+    titleAr: 'تقرير الحركة اليومية',
+    group: 'sales',
+    hintAr: 'ستة أنواع حركة بستة أسطر: عدد فواتير كل نوع وإجماليه، وما منه نقديّ وما منه آجل.',
+    // 🏢 الفرع · 📅 من / إلى + وقت — 🏦 الصندوق و👤 المستخدم مؤجَّلان (§6.5).
+    params: [BRANCH, PERIOD[0]!, TIME_FROM_TO[0]!, PERIOD[1]!, TIME_FROM_TO[1]!],
+    columns: [
+      text('operation', 'نوع العملية'),
+      int('invoices', 'عدد الفواتير'),
+      money('total', 'الإجمالي'),
+      money('cash', 'نقدي'),
+      money('credit', 'آجل'),
+      { key: 'sort', labelAr: 'الترتيب', type: 'int', hidden: true },
+    ],
+    totals: ['invoices', 'total', 'cash', 'credit'],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT operation, invoices, total, cash, credit, sort FROM (
+        SELECT 1 AS sort, 'مبيعات' AS operation, count(*)::text AS invoices,
+               round(coalesce(sum(si.total), 0), 2)::text AS total,
+               round(coalesce(sum(CASE WHEN si.payment_status <> 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text AS cash,
+               round(coalesce(sum(CASE WHEN si.payment_status = 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text AS credit
+        FROM sales_invoices si WHERE ${dailyScope(tenantId, f, 'sale', true)}
+        UNION ALL
+        SELECT 2, 'مرتجع مبيعات', count(*)::text,
+               round(coalesce(sum(si.total), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN si.payment_status <> 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN si.payment_status = 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text
+        FROM sales_invoices si WHERE ${dailyScope(tenantId, f, 'sale_return', true)}
+        UNION ALL
+        SELECT 3, 'نقطة البيع', count(*)::text,
+               round(coalesce(sum(si.total), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN si.payment_status <> 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN si.payment_status = 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text
+        FROM sales_invoices si WHERE ${dailyScope(tenantId, f, 'sale', false)}
+        UNION ALL
+        SELECT 4, 'مرتجع نقطة البيع', count(*)::text,
+               round(coalesce(sum(si.total), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN si.payment_status <> 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN si.payment_status = 'unpaid' THEN si.total ELSE 0 END), 0), 2)::text
+        FROM sales_invoices si WHERE ${dailyScope(tenantId, f, 'sale_return', false)}
+        UNION ALL
+        SELECT 5, 'مشتريات', count(*)::text,
+               round(coalesce(sum(pi.total), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN pi.payment_status <> 'unpaid' THEN pi.total ELSE 0 END), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN pi.payment_status = 'unpaid' THEN pi.total ELSE 0 END), 0), 2)::text
+        FROM purchase_invoices pi WHERE ${dailyPurchaseScope(tenantId, f, 'purchase')}
+        UNION ALL
+        SELECT 6, 'مرتجع مشتريات', count(*)::text,
+               round(coalesce(sum(pi.total), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN pi.payment_status <> 'unpaid' THEN pi.total ELSE 0 END), 0), 2)::text,
+               round(coalesce(sum(CASE WHEN pi.payment_status = 'unpaid' THEN pi.total ELSE 0 END), 0), 2)::text
+        FROM purchase_invoices pi WHERE ${dailyPurchaseScope(tenantId, f, 'purchase_return')}
+      ) movements
+      ORDER BY sort LIMIT 2000`,
+  },
+  {
+    // The cloud already had a sales-analysis («أفضل الأصناف مبيعاً», one row per صنف with
+    // a share of the total); this one is the desktop's eight-way تحليل of frmRptInvAnalysis.
+    key: 'sales-inv-analysis',
+    titleAr: 'تقرير تحليل المبيعات',
+    group: 'sales',
+    hintAr: 'صافي الكمية والإجمالي والخصم والتكلفة والربح مجمَّعةً على البعد الذي تختاره (المخزن · العميل · الصنف · المندوب · المستخدم · اليوم · الشهر · مجموعة الصنف)، ونسبتان من الإجمالي العام.',
+    // 📋 نوع التقرير · 👤 المستخدم · 🧑‍💼 العميل · 📦 مجموعة الصنف · 🤝 مندوب البيع ·
+    // 🏭 المستودع · 📅 الفترة — 🏦 الصندوق مؤجَّل (§6.5).
+    params: [ANALYSIS_DIMENSION, PARTY, CATEGORY, SALESMAN, WAREHOUSE, PERIOD[0]!, PERIOD[1]!],
+    columns: [
+      text('dimension', 'البعد'),
+      int('invoices', 'فواتير'),
+      qty('net_quantity', 'صافي الكمية'),
+      money('net_total', 'صافي الإجمالي'),
+      money('net_discount', 'صافي الخصم'),
+      money('net_cost', 'صافي التكلفة'),
+      money('net_profit', 'صافي الربح'),
+      percent('profit_to_cost', 'نسبة الربح للتكلفة'),
+      percent('share_of_sales', 'نسبة الاجمالي لإجمالي البيع'),
+      percent('share_of_profit', 'نسبة الربح لإجمالي الربح'),
+    ],
+    totals: ['invoices', 'net_quantity', 'net_total', 'net_discount', 'net_cost', 'net_profit'],
+    // 📦 صافي الكمية · 💰 صافي الإجمالي · 🏷️ صافي الخصم · 💳 صافي التكلفة · 📈 صافي الربح
+    grandTotal: [
+      { key: 'net_quantity', labelAr: 'صافي الكمية' },
+      { key: 'net_total', labelAr: 'صافي الإجمالي' },
+      { key: 'net_discount', labelAr: 'صافي الخصم' },
+      { key: 'net_cost', labelAr: 'صافي التكلفة' },
+      { key: 'net_profit', labelAr: 'صافي الربح' },
+    ],
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT ${analysisDimension(f.dimension)} AS dimension,
+             count(DISTINCT si.id)::text AS invoices,
+             sum(signed.qty)::text AS net_quantity,
+             round(sum(signed.net), 2)::text AS net_total,
+             round(sum(signed.gross - signed.net), 2)::text AS net_discount,
+             round(sum(signed.cost), 2)::text AS net_cost,
+             round(sum(signed.net) - sum(signed.cost), 2)::text AS net_profit,
+             round(CASE WHEN sum(signed.cost) = 0 THEN 0 ELSE (sum(signed.net) - sum(signed.cost)) / sum(signed.cost) * 100 END, 2)::text AS profit_to_cost,
+             round(sum(signed.net) / nullif(sum(sum(signed.net)) OVER (), 0) * 100, 2)::text AS share_of_sales,
+             round((sum(signed.net) - sum(signed.cost)) / nullif(sum(sum(signed.net) - sum(signed.cost)) OVER (), 0) * 100, 2)::text AS share_of_profit
+      FROM sales_invoice_lines line
+      JOIN sales_invoices si ON si.id = line.invoice_id
+      LEFT JOIN items item ON item.id = line.item_id
+      LEFT JOIN item_categories cat ON cat.id = item.category_id
+      LEFT JOIN parties party ON party.id = si.party_id
+      LEFT JOIN salesmen salesman ON salesman.id = si.salesman_id
+      LEFT JOIN warehouses warehouse ON warehouse.id = si.warehouse_id
+      LEFT JOIN users "user" ON "user".id = si.created_by
+      CROSS JOIN LATERAL (
+        SELECT CASE WHEN si.kind = 'sale' THEN line.quantity ELSE -line.quantity END AS qty,
+               CASE WHEN si.kind = 'sale' THEN line.net ELSE -line.net END AS net,
+               CASE WHEN si.kind = 'sale' THEN line.quantity * line.unit_price ELSE -line.quantity * line.unit_price END AS gross,
+               CASE WHEN si.kind = 'sale' THEN line.cost_total ELSE -line.cost_total END AS cost
+      ) signed
+      WHERE ${movementLinesScope(tenantId, f, null)}
+        AND line.item_id IS NOT NULL
+      GROUP BY ${analysisDimension(f.dimension)}
+      ORDER BY net_total DESC LIMIT 2000`,
   },
   // ------------------------------------------------------------ purchases
   {

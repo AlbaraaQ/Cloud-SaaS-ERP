@@ -29,6 +29,15 @@ const dayish = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD').op
 // which answers with a 500 instead of the 422 a wrong filter deserves.
 const timeish = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Expected HH:mm or HH:mm:ss').optional();
 const invTypeish = z.enum(['pos', 'sale']).optional();
+/** 🔄 نوع العملية · 💵 حالة الدفع · 💳 نوع الدفع · 🧾 الضريبة · 📄 نوع الإشعار · 📋 نوع التقرير — the radio and combo boxes of the فاتورة and تحليل windows. */
+const procTypeish = z.enum(['sale', 'return']).optional();
+const paymentStateish = z.enum(['paid', 'unpaid', 'partial']).optional();
+const payMethodish = z.enum(['cash', 'credit', 'card', 'bank']).optional();
+const vatish = z.enum(['with', 'without']).optional();
+const notificationish = z.enum(['credit', 'debit']).optional();
+const dimensionish = z
+  .enum(['warehouse', 'customer', 'item', 'salesman', 'user', 'day', 'month', 'category'])
+  .optional();
 
 /** Only these filters reach SQL; anything else in the query string is ignored on purpose. */
 const filtersSchema = z
@@ -38,6 +47,12 @@ const filtersSchema = z
     fromTime: timeish,
     toTime: timeish,
     invType: invTypeish,
+    procType: procTypeish,
+    paymentStatus: paymentStateish,
+    payType: payMethodish,
+    vat: vatish,
+    notificationType: notificationish,
+    dimension: dimensionish,
     branchId: uuidish,
     warehouseId: uuidish,
     partyId: uuidish,
