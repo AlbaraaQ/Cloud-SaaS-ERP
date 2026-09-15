@@ -3,6 +3,7 @@ import { Decimal } from 'decimal.js';
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
+  marinaAdditions,
   marinaBookingAdditions,
   marinaBookings,
   marinaDayClosings,
@@ -50,13 +51,21 @@ const VAT_SETTING_KEY = 'marina.vatRate';
 const DEFAULT_VAT_RATE = 15;
 
 export type AdditionInput = {
-  description: string;
+  /**
+   * ➕ الإضافة — `BookingAddition.AditionID`: ما اختاره المشغّل من «🎁 الإضافات», whose
+   * تعريف is `Additions` (`Form_WPF/frmAdditions.xaml`). With it come the 📝 الاسم and the
+   * 💰 القيمة of the line, unless the caller says otherwise.
+   */
+  additionId?: string;
+  description?: string;
   quantity?: number | string;
   unitPrice?: number | string;
   amount?: number | string;
 };
 export type AdditionRow = {
   id: string;
+  /** ➕ الإضافة — `AditionID`; `null` لصفٍّ كُتب وصفه باليد. */
+  additionId: string | null;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -380,11 +389,53 @@ export class MarinaDocumentsService {
 
   // ─────────────────────────────── 🎁 الإضافات ───────────────────────────────
 
-  /** «✔» beside the additions grid: العدد × السعر = الإجمالي, as the grid shows it. */
+  /**
+   * «✔» beside the additions grid — `Add2Dgv` من `frmBookingM.xaml.cs`, in its own order:
+   *
+   *   • «يجب إدخال الكمية  » when «الكمية» is empty (and an ➕ الإضافة is chosen — a line
+   *     written by hand keeps the `1` it always had);
+   *   • الاسم من `Additions.name` و💰 القيمة من `Additions.SalePrice`, ما لم يقل المشغّل
+   *     غير ذلك — وهو ما يفعله `cmbAdditions_SelectionChanged` بـ«السعر»؛
+   *   • وإضافةٌ في الشبكة أصلاً **تُجمَع كمّيتها على صفّها** (`Quantity += quant` ثم
+   *     `TotalPrice = Quantity * UnitPrice`)، فلا صفّان للإضافة الواحدة.
+   */
   async addAddition(tenantId: string, bookingId: string, input: AdditionInput, userId?: string): Promise<AdditionRow> {
     await this.ensureEnabled(tenantId);
     await this.rawBooking(tenantId, bookingId);
-    const line = lineOf(input);
+    const definitions = await this.resolveAdditions(tenantId, [input]);
+    const definition = definitions.get(this.keyOf(input.additionId));
+    if (definition && input.quantity !== undefined && !decimal(input.quantity).gt(0))
+      throw new DomainError('MARINA_ADDITION_QUANTITY_REQUIRED', 'يجب إدخال الكمية  ', 422);
+    const line = lineOf(input, definition);
+
+    // `ISfound` — الإضافة موجودة في الشبكة: كمّيتها تُضاف إلى صفّها، وسعرها يبقى كما كُتب.
+    if (definition) {
+      const [existing] = await withTenantTx(this.database.db, tenantId, (tx) =>
+        tx
+          .select()
+          .from(marinaBookingAdditions)
+          .where(
+            and(
+              eq(marinaBookingAdditions.tenantId, tenantId),
+              eq(marinaBookingAdditions.bookingId, bookingId),
+              eq(marinaBookingAdditions.additionId, definition.id),
+            ),
+          )
+          .limit(1),
+      );
+      if (existing) {
+        const quantity = decimal(existing.quantity).plus(line.quantity);
+        const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
+          tx
+            .update(marinaBookingAdditions)
+            .set({ quantity: four(quantity), amount: four(quantity.mul(decimal(existing.unitPrice))) })
+            .where(and(eq(marinaBookingAdditions.tenantId, tenantId), eq(marinaBookingAdditions.id, existing.id)))
+            .returning(),
+        );
+        return additionRow(row!);
+      }
+    }
+
     const [row] = await withTenantTx(this.database.db, tenantId, (tx) =>
       tx.insert(marinaBookingAdditions).values({ id: newId(), tenantId, bookingId, ...line, createdBy: userId ?? null }).returning(),
     );
@@ -599,11 +650,36 @@ export class MarinaDocumentsService {
     additions: AdditionInput[],
   ): Promise<void> {
     if (!additions.length) return;
-    await tx.insert(marinaBookingAdditions).values(
-      additions
-        .filter((line) => String(line.description ?? '').trim())
-        .map((line) => ({ id: newId(), tenantId, bookingId, ...lineOf(line) })),
+    const definitions = await this.resolveAdditions(tenantId, additions);
+    const rows = additions
+      .map((line) => lineOf(line, definitions.get(this.keyOf(line.additionId))))
+      .filter((line) => line.description);
+    if (!rows.length) return;
+    await tx.insert(marinaBookingAdditions).values(rows.map((line) => ({ id: newId(), tenantId, bookingId, ...line })));
+  }
+
+  private keyOf(additionId: string | undefined): string {
+    return String(additionId ?? '').trim();
+  }
+
+  /**
+   * ➕ الإضافات of `Additions` — «🎁 الإضافات» reads them with
+   * `select id, Name from Additions where IsDeleted=0`, and an إضافة that is not there is
+   * not chosen: «الإضافة غير موجودة».
+   */
+  private async resolveAdditions(tenantId: string, inputs: AdditionInput[]): Promise<Map<string, AdditionDefinition>> {
+    const ids = [...new Set(inputs.map((line) => this.keyOf(line.additionId)).filter(Boolean))];
+    if (!ids.length) return new Map();
+    const rows = await withTenantTx(this.database.db, tenantId, (tx) =>
+      tx
+        .select()
+        .from(marinaAdditions)
+        .where(and(eq(marinaAdditions.tenantId, tenantId), inArray(marinaAdditions.id, ids), isNull(marinaAdditions.deletedAt))),
     );
+    const found = new Map<string, AdditionDefinition>(rows.map((row) => [row.id, { id: row.id, name: row.name, salePrice: row.salePrice }]));
+    const missing = ids.find((id) => !found.has(id));
+    if (missing) throw new DomainError('MARINA_ADDITION_NOT_FOUND', 'الإضافة غير موجودة', 404);
+    return found;
   }
 
   private async shape(
@@ -675,15 +751,25 @@ function periodOf(input: { periodHours?: number | string; periodMinutes?: number
 }
 
 /** العدد × السعر = الإجمالي — the grid's own ثلاثة أعمدة. */
-function lineOf(input: AdditionInput) {
+/** ➕ الإضافة كما تُقرأ من تعريفها — `Additions(name, SalePrice)`. */
+type AdditionDefinition = { id: string; name: string; salePrice: string };
+
+/**
+ * «الإجمالي» — الكمية × السعر (`Math.Round(price * quant, 2)` في `txtQuant_TextChanged`).
+ * With an ➕ الإضافة the 📝 الاسم comes from `Additions.name` و💰 القيمة من
+ * `Additions.SalePrice` — exactly what `cmbAdditions_SelectionChanged` writes into «السعر».
+ */
+function lineOf(input: AdditionInput, definition?: AdditionDefinition) {
   const quantity = decimal(input.quantity).gt(0) ? decimal(input.quantity) : new Decimal(1);
-  const lineTotal = input.amount === undefined || decimal(input.amount).lte(0) ? quantity.mul(decimal(input.unitPrice)) : decimal(input.amount);
-  const each = quantity.gt(0) ? lineTotal.div(quantity) : lineTotal;
+  const each = input.unitPrice === undefined ? decimal(definition?.salePrice) : decimal(input.unitPrice);
+  const lineTotal = input.amount === undefined || decimal(input.amount).lte(0) ? quantity.mul(each) : decimal(input.amount);
+  const unit = quantity.gt(0) ? lineTotal.div(quantity) : lineTotal;
   return {
-    description: String(input.description ?? '').trim(),
+    description: String(input.description ?? definition?.name ?? '').trim(),
     quantity: four(quantity),
-    unitPrice: four(each),
+    unitPrice: four(unit),
     amount: four(lineTotal),
+    additionId: definition?.id ?? null,
   };
 }
 
@@ -704,7 +790,7 @@ function normaliseBookingType(value: string | undefined): string {
 }
 
 function additionRow(row: typeof marinaBookingAdditions.$inferSelect): AdditionRow {
-  return { id: row.id, description: row.description, quantity: row.quantity, unitPrice: row.unitPrice, amount: row.amount };
+  return { id: row.id, additionId: row.additionId ?? null, description: row.description, quantity: row.quantity, unitPrice: row.unitPrice, amount: row.amount };
 }
 
 function violationRow(row: typeof marinaViolations.$inferSelect, vesselName: string, customerName: string): ViolationRow {

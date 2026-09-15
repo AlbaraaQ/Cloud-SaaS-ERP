@@ -167,6 +167,29 @@ export const vesselOwners = pgTable('vessel_owners', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }), partyId: uuid('party_id').notNull().references(() => parties.id), percent: numeric('percent', pct).notNull(), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
 }, (t) => ({ owner: uniqueIndex('vessel_owners_party_key').on(t.tenantId, t.vesselId, t.partyId).where(sql`deleted_at IS NULL`) }));
 /**
+ * ➕ الإضافة — `Additions(id, name, SalePrice, IsDeleted)`
+ * (`Form_WPF/frmAdditions.xaml` «📋 إضافات» — لوحتها «📋 إدارة الإضافات»).
+ *
+ * The window is three boxes (🔢 الرقم · 📝 الاسم · 💰 القيمة) and three buttons
+ * (➕ جديد · 💾 حفظ · 🗑️ حذف), and it is what fills «🎁 الإضافات» in `frmBookingM`:
+ * `LoadAdditions` is `select id, Name from Additions where IsDeleted=0`, and choosing one
+ * writes its `SalePrice` into «السعر».
+ *
+ * 🔢 الرقم is read-only in the window (`IsReadOnly="True"`), and 💰 القيمة is a zero when
+ * the box is left empty — both kept. The one thing it refuses is a name-less save.
+ */
+export const marinaAdditions = pgTable('marina_additions', {
+  id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  /** 🔢 الرقم — `txtNo`; the next one is `max(الرقم) + 1` of what is still there. */
+  number: integer('number').notNull(),
+  /** 📝 الاسم — `txtName`; «يجب إدخال اسم الإضافة ⚠️» when it is blank. */
+  name: text('name').notNull(),
+  /** 💰 القيمة — `SalePrice`, for one unit; «الإجمالي» = الكمية × السعر. */
+  salePrice: numeric('sale_price', money).notNull().default('0'),
+  currency: text('currency').notNull().default('SAR'), ...baseAuditColumns(), ...baseSoftDeleteColumns(),
+}, (t) => ({ number: uniqueIndex('marina_additions_tenant_number_key').on(t.tenantId, t.number).where(sql`deleted_at IS NULL`), name: index('marina_additions_tenant_name_idx').on(t.tenantId, t.name) }));
+
+/**
  * 🛶 الحجز — `Booking(InvID, MarineId, UserId, ClientId, Bdate, dateIn, PeriodHour,
  * PeriodMinute, Price, status, BookingType, notes, IsDeleted)`
  * (`Form_WPF/frmBookingM.xaml` «الحجوزات»).
@@ -201,7 +224,9 @@ export const marinaBookingAdditions = pgTable('marina_booking_additions', {
   /** السعر — `Price`، لوحدةٍ واحدة؛ والإجمالي = العدد × السعر. */
   unitPrice: numeric('unit_price', money).notNull().default('0'),
   /** الإجمالي — `amount`. */
-  amount: numeric('amount', money).notNull(), ...baseAuditColumns(),
+  amount: numeric('amount', money).notNull(),
+  /** ➕ الإضافة — `BookingAddition.AditionID`؛ ما اختاره المشغّل من «🎁 الإضافات». */
+  additionId: uuid('addition_id').references(() => marinaAdditions.id, { onDelete: 'set null' }), ...baseAuditColumns(),
 });
 export const rentalInvoices = pgTable('rental_invoices', {
   id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), bookingId: uuid('booking_id').notNull().references(() => marinaBookings.id), salesInvoiceId: uuid('sales_invoice_id').references(() => salesInvoices.id, { onDelete: 'set null' }),
@@ -275,4 +300,4 @@ export const sallaOrders = pgTable('salla_orders', {
 
 export const sallaBranchMappings = pgTable('salla_branch_mappings', { id: uuid('id').primaryKey(), tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }), connectionId: uuid('connection_id').references(() => sallaConnections.id, { onDelete: 'cascade' }), branchId: uuid('branch_id').references(() => branches.id), warehouseId: uuid('warehouse_id').references(() => warehouses.id), cashLocationId: uuid('cash_location_id'), remoteBranchId: text('remote_branch_id'), ...baseAuditColumns(), ...baseSoftDeleteColumns() }, (t) => ({ remote: uniqueIndex('salla_branch_mappings_remote_key').on(t.tenantId, t.connectionId, t.remoteBranchId).where(sql`deleted_at IS NULL`) }));
 
-export const nicheTables = { opticalPrescriptions, opticsFieldLabels, customerMeasurements, tailoringMeasurementAttributes, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaProducts, sallaOrders, sallaBranchMappings };
+export const nicheTables = { opticalPrescriptions, opticsFieldLabels, customerMeasurements, tailoringMeasurementAttributes, tailoringOrders, tailoringOrderOptions, tailoringOrderStatuses, tailoringTypes, tailoringOptionCategories, tailoringOptionValues, tailoringInvoices, tailoringInvoicePayments, tailoringGarmentTypes, vesselGroups, vessels, vesselGroupPricing, vesselOwners, marinaAdditions, marinaBookings, marinaBookingAdditions, rentalInvoices, marinaViolations, marinaOperationPlans, marinaOperationPlanLines, marinaPreparations, marinaDayClosings, vehicleMakes, vehicleModels, itemVehicleFitment, sallaConnections, sallaItemSync, sallaExportLog, sallaProducts, sallaOrders, sallaBranchMappings };

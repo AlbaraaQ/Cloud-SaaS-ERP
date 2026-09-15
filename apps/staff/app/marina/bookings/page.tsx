@@ -23,9 +23,16 @@ import { useQuery } from '../../../lib/use-query';
  *
  * «📝 ملاحظات» مكتوبة في الشاشة عند الديسكتوب ولا تُحفظ (`txtNotes` تُمحى ولا تُقرأ)،
  * فلم تُنقل. و«🖨️ طباعة» مؤجَّلة مع ملفّات `Reports/*.repx`.
+ *
+ * 🎁 الإضافات تُقرأ من تعريفاتها (`Additions` — `Form_WPF/frmAdditions.xaml`): اختيارٌ
+ * منها يكتب «السعر» من `SalePrice` كما يفعل `cmbAdditions_SelectionChanged`، و«➕» بجوارها
+ * يفتح شاشة «📋 إضافات». و«— بلا تعريف —» لصفٍّ يُكتب وصفه باليد، وهو تسميةٌ مخترَعة:
+ * النافذة عند الديسكتوب لا تقبل إلا ما في القائمة.
  */
-type Addition = { id: string; description: string; quantity: string; unitPrice: string; amount: string };
-type Draft = { id?: string; description: string; quantity: string; unitPrice: string };
+type Addition = { id: string; additionId: string | null; description: string; quantity: string; unitPrice: string; amount: string };
+type Draft = { id?: string; additionId?: string; description: string; quantity: string; unitPrice: string };
+/** ➕ الإضافة — تعريفها من `Additions` (`Form_WPF/frmAdditions.xaml`): 🔢 الرقم · 📝 الاسم · 💰 القيمة. */
+type AdditionDefinition = { id: string; number: number; name: string; salePrice: string; usageCount: number; version: number };
 
 type Booking = {
   id: string;
@@ -116,7 +123,13 @@ const cardOf = (booking: Booking): Card => ({
   rentalAmount: booking.rentalAmount,
   insuranceAmount: booking.insuranceAmount,
   companions: String(booking.companions),
-  additions: booking.additions.map((row) => ({ id: row.id, description: row.description, quantity: Number(row.quantity).toString(), unitPrice: Number(row.unitPrice).toString() })),
+  additions: booking.additions.map((row) => ({
+    id: row.id,
+    ...(row.additionId ? { additionId: row.additionId } : {}),
+    description: row.description,
+    quantity: Number(row.quantity).toString(),
+    unitPrice: Number(row.unitPrice).toString(),
+  })),
 });
 
 const num = (value: string): number => {
@@ -161,6 +174,8 @@ function MarinaBookings() {
   }, [applied]);
 
   const marina = useQuery<Marina>(() => apiFetch<Marina>('/marina').then((body) => ((body as { data?: Marina }).data ?? body) as Marina), []);
+  // «🎁 الإضافات» — `LoadAdditions`: select id, Name from Additions where IsDeleted=0.
+  const definitions = useQuery<AdditionDefinition[]>(() => apiList<AdditionDefinition>('/marina/additions'), []);
   const parties = useQuery<Party[]>(() => listParties(), []);
   const branches = useQuery<Branch[]>(() => listBranches(), []);
 
@@ -191,7 +206,12 @@ function MarinaBookings() {
         rentalAmount: card.rentalAmount || '0',
         insuranceAmount: card.insuranceAmount || '0',
         companions: Number(card.companions || 0),
-        additions: card.additions.map((row) => ({ description: row.description, quantity: row.quantity, unitPrice: row.unitPrice })),
+        additions: card.additions.map((row) => ({
+          ...(row.additionId ? { additionId: row.additionId } : {}),
+          description: row.description,
+          quantity: row.quantity,
+          unitPrice: row.unitPrice,
+        })),
       };
       await (card.id
         ? apiPatch(`/marina/bookings/${card.id}`, { ...payload, ...(card.version ? { version: card.version } : {}) })
@@ -252,6 +272,10 @@ function MarinaBookings() {
         <div className="row" style={{ gap: 6 }}>
           <Link className="btn" href="/marina/violations">
             ⚠️ المخالفات
+          </Link>
+          {/* «➕» بجوار «🎁 الإضافات» — `btnAddObj_Click` يفتح `frmAdditions`. */}
+          <Link className="btn" href="/marina/additions">
+            📋 إضافات
           </Link>
           {canManage && (
             <button className="btn primary" type="button" onClick={openNew}>
@@ -474,6 +498,29 @@ function MarinaBookings() {
                 <legend className="group-label" style={{ margin: 0 }}>🎁 الإضافات</legend>
                 <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <label className="field" style={{ margin: 0, flex: 1, minWidth: 180 }}>
+                    <span>🎁 الإضافات</span>
+                    <select
+                      className="input"
+                      value={line.additionId ?? ''}
+                      onChange={(event) => {
+                        const chosen = (definitions.data ?? []).find((row) => row.id === event.target.value);
+                        // `cmbAdditions_SelectionChanged` — «السعر» يُكتب من `SalePrice`.
+                        setLine(
+                          chosen
+                            ? { additionId: chosen.id, description: chosen.name, quantity: line.quantity, unitPrice: String(Number(chosen.salePrice)) }
+                            : { description: '', quantity: line.quantity, unitPrice: '0' },
+                        );
+                      }}
+                    >
+                      <option value="">— بلا تعريف —</option>
+                      {(definitions.data ?? []).map((row) => (
+                        <option key={row.id} value={row.id}>
+                          {row.number} · {row.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
                     <span>الوصف</span>
                     <input className="input" value={line.description} onChange={(event) => setLine({ ...line, description: event.target.value })} />
                   </label>
@@ -491,7 +538,15 @@ function MarinaBookings() {
                     title="إضافة"
                     onClick={() => {
                       if (!line.description.trim()) return;
-                      setCard({ ...card, additions: [...card.additions, { ...line }] });
+                      // `Add2Dgv` — إضافةٌ في الشبكة أصلاً تُجمَع كمّيتها على صفّها.
+                      const at = line.additionId ? card.additions.findIndex((row) => row.additionId === line.additionId) : -1;
+                      const additions =
+                        at >= 0
+                          ? card.additions.map((row, index) =>
+                              index === at ? { ...row, quantity: (num(row.quantity) + num(line.quantity)).toString() } : row,
+                            )
+                          : [...card.additions, { ...line }];
+                      setCard({ ...card, additions });
                       setLine({ description: '', quantity: '1', unitPrice: '0' });
                     }}
                   >
@@ -503,6 +558,7 @@ function MarinaBookings() {
                     <table>
                       <thead>
                         <tr>
+                          <th>🎁 الإضافة</th>
                           <th>الوصف</th>
                           <th className="num">العدد</th>
                           <th className="num">السعر</th>
@@ -513,6 +569,7 @@ function MarinaBookings() {
                       <tbody>
                         {card.additions.map((row, index) => (
                           <tr key={`${row.description}-${index}`}>
+                            <td dir="ltr">{(definitions.data ?? []).find((item) => item.id === row.additionId)?.number ?? '—'}</td>
                             <td>{row.description}</td>
                             <td className="num" dir="ltr">{row.quantity}</td>
                             <td className="num" dir="ltr">{row.unitPrice}</td>

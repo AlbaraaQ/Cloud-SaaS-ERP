@@ -1098,6 +1098,16 @@ const marina: ModuleNode = {
           'ready',
           { endpoint: '/marina' },
         ),
+        // 📋 إضافات — `frmAdditions.xaml` («📋 إضافات»): الرقم والاسم والقيمة، وهي ما
+        // يملأ «🎁 الإضافات» في `frmBookingM` («الحجوزات»).
+        screen(
+          'marina-additions',
+          'الإضافات',
+          'Booking additions',
+          '/marina/additions',
+          'ready',
+          { endpoint: '/marina/additions' },
+        ),
       ],
     },
     {

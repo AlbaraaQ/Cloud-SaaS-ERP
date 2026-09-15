@@ -793,6 +793,26 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة أنواع التفصيل مع شاشة القياسات،
   وتاريخُ الحالات (لا شاشة تقرأه).
 
+* **المرحلة 09 — الوحدات الرأسية، الجزء التاسع: ⛵ المرسى — ➕ الإضافات**
+  (`Form_WPF/frmAdditions.xaml` «📋 إضافات» — لوحتها «📋 إدارة الإضافات»، و«🎁
+  الإضافات» في `Form_WPF/frmBookingM.xaml` «الحجوزات»). **أصغر نوافذ المرحلة، وأوحدُها
+  التي لا تُملأ تعاريفها يدوياً في كل حجز: ثلاثة صناديق (🔢 الرقم — مقروء فقط — و📝
+  الاسم و💰 القيمة) وثلاثة أزرار (➕ جديد · 💾 حفظ · 🗑️ حذف)، وشبكة تحتها بالأعمدة
+  نفسها. وهي ما يملأ «🎁 الإضافات» في الحجز: `LoadAdditions` = `select id, Name from
+  Additions where IsDeleted=0`، واختيارٌ منها يكتب «السعر» من `SalePrice`
+  (`cmbAdditions_SelectionChanged`).** وحفظها: رفضٌ بلا اسم «يجب إدخال اسم الإضافة ⚠️»،
+  وقيمةٌ فارغةٌ صفر، ثم `insert`/`update`، و«✅ تم الحفظ بنجاح» أو «✅ تم حفظ
+  التعديلات بنجاح»؛ وحذفها: «يجب تحديد الإضافة المراد حذفها ⚠️» ثم تأكيد ثم `delete
+  from Additions`. ترحيل 0060 يضيف `marina_additions` (الرقم · الاسم · القيمة، وحذفٌ
+  ناعم) و`marina_booking_additions.addition_id` — `BookingAddition.AditionID`، فصار
+  صفّ «🎁 الإضافات» يشير إلى تعريفه بدل أن ينسخ اسمه فقط. و«➕» على الشبكة يجمع كمّية
+  إضافةٍ مكرَّرة على صفّها (`Quantity += quant`) ولا يفتح صفّاً ثانياً، و«الإجمالي» =
+  الكمية × السعر، و«يجب إدخال الكمية  » بكميةٍ فارغة. `apps/api/test/marina-additions.spec.ts`
+  (**8** اختبارات) و`scripts/verify-marina-additions.mjs` (**44** نقطة تحقّق حيّة، ثلاث
+  تشغيلات خضراء، والتنظيف في `finally`). **767** اختبار API (كان 759) · 36 staff ·
+  71 contract · 17 database · tsc وlint أخضران. ومؤجَّل عن قصد: «تعريف مالك»
+  (`frmOwners`) إلى جزءٍ يبني بطاقته، والطباعة والتقارير إلى مرحلتها.
+
 * **المرحلة 09 — الوحدات الرأسية، الجزء الثامن: 🛒 متجر سلة**
   (`Form_WPF/FrmSallah.xaml` «تكامل Salla API»، و`Class/SallaAPI.cs` و
   `Class/ProductsManager.cs` و`Class/OrdersManager.cs` و`Class/CustomersManager.cs` و

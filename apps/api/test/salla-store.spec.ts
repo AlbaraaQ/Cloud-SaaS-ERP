@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { resetMockStores } from '../src/modules/integrations/salla/salla-client.js';
+
 import { ALL_ORGANIZATION_PERMISSIONS, ALL_PLATFORM_PERMISSIONS, createActor, type Actor } from './fixtures.js';
 import { api } from './http.js';
 import { createTestApp, type TestApp } from './test-app.js';
-
-import { resetMockStores } from '../src/modules/integrations/salla/salla-client.js';
 
 /**
  * Phase 09 part eight — 🛒 متجر سلة.

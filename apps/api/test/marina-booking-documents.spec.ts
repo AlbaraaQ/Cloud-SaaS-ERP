@@ -135,8 +135,8 @@ describe('المرسى — frmBookingM · frmViolationM · frmInvoiceRentSrch', 
     });
     // 🎁 الإضافات — العدد × السعر = الإجمالي.
     expect(booking.additions).toEqual([
-      { id: expect.any(String), description: 'سترة نجاة', quantity: '2.0000', unitPrice: '25.0000', amount: '50.0000' },
-      { id: expect.any(String), description: 'وقود', quantity: '1.0000', unitPrice: '50.0000', amount: '50.0000' },
+      { id: expect.any(String), additionId: null, description: 'سترة نجاة', quantity: '2.0000', unitPrice: '25.0000', amount: '50.0000' },
+      { id: expect.any(String), additionId: null, description: 'وقود', quantity: '1.0000', unitPrice: '50.0000', amount: '50.0000' },
     ]);
     // `CalcuAll` — 400 + 100 إضافات + 100 تأمين = 600، و15% = 90، والصافي 690.
     expect(booking).toMatchObject({ additionsTotal: '100.0000', total: '600.0000', taxAmount: '90.0000', netAmount: '690.0000', vatRate: 15 });

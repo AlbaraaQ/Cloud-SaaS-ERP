@@ -1,4 +1,4 @@
-# Marina pack (Phase 22 + Phase 09 parts six & seven)
+# Marina pack (Phase 22 + Phase 09 parts six, seven & nine)
 
 Feature flag: `pack.marina`. Covers vessel groups, hour/half-hour/offer pricing, vessels,
 owner percentage links, bookings with insurance/companions metadata, booking additions,
@@ -21,11 +21,40 @@ The save is one transaction over three tables (`frmBookingM.xaml.cs` L590–L740
 (`marina.vatRate` here, 15 by default).
 
 `booking-documents.service.ts` carries the two documents; `group-cards.service.ts`
-carries the فئة and its ⏰ فترات التأجير; `marina.service.ts` keeps the definitions, the
-operations and the rental invoice. The **operations controller is registered first** in
+carries the فئة and its ⏰ فترات التأجير; `additions.service.ts` carries the ➕ الإضافات;
+`marina.service.ts` keeps the definitions, the operations and the rental invoice. The **operations controller is registered first** in
 `marina.module.ts`: its static `bookings/uninvoiced` must be mapped before the documents'
 `bookings/:id` — and inside the documents controller `groups/navigate` is declared before
 `groups/:id` for the same reason.
+
+## Where the ➕ الإضافات come from (Phase 09 part nine)
+
+| Window | File | What it holds |
+|---|---|---|
+| 📋 إضافات | `Form_WPF/frmAdditions.xaml` («📋 إضافات» — «📋 إدارة الإضافات») | 🔢 الرقم (read-only) · 📝 الاسم · 💰 القيمة · ➕ جديد · 💾 حفظ · 🗑️ حذف، وشبكة بالأعمدة نفسها |
+| 🎁 الإضافات | `Form_WPF/frmBookingM.xaml` («الحجوزات») | `cmbAdditions` · الكمية · السعر · الإجمالي · «➕ إضافة صنف جديد» |
+
+`Additions(id, name, SalePrice, IsDeleted)` is read by «🎁 الإضافات» and written by
+`frmAdditions`:
+
+```
+select id, Name from Additions where IsDeleted=0                  -- LoadAdditions
+select SalePrice from Additions where IsDeleted=0 and id=…        -- «السعر» عند الاختيار
+insert into Additions(name, SalePrice, IsDeleted) values(…, …, 0)  -- «💾 حفظ»
+update Additions set name=…, SalePrice=… where id=…                -- «💾 حفظ» على قديم
+delete from Additions where id=…                                   -- «🗑️ حذف»
+```
+
+and its refusals are `MARINA_ADDITION_NAME_REQUIRED` «يجب إدخال اسم الإضافة ⚠️» (422) ·
+`MARINA_ADDITION_QUANTITY_REQUIRED` «يجب إدخال الكمية  » (422) ·
+`MARINA_ADDITION_NOT_FOUND` «الإضافة غير موجودة» (404) ·
+`MARINA_ADDITION_DELETE_REQUIRED` «يجب تحديد الإضافة المراد حذفها ⚠️» (404).
+
+Three departures from the window, all recorded in `PHASE_09_VERTICALS.md` §12.3: 🔢 الرقم
+is a stored column (`max(الرقم) + 1`) rather than the window's `count + 1`, which collides
+as soon as a row is deleted; «🗑️ حذف» retires the تعريف instead of erasing it, so the
+حجوزات that already carry it keep their «الإجمالي»; and 🧾 الاستخدام (`usageCount`) is
+shown instead of refusing a تعريف in use.
 
 ## Where the definitions come from (Phase 09 part seven)
 

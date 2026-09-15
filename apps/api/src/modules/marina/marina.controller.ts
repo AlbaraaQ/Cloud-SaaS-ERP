@@ -1,7 +1,8 @@
 /**
  * Marina — `Form_WPF/frmBookingM.xaml` («الحجوزات») · `Form_WPF/frmViolationM.xaml`
- * («المخالفات») · `Form_WPF/frmGroupM.xaml` («📋 بطاقة فئة») · `Form_WPF/frmOwners.xaml`
- * («تعريف مالك») · `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير»).
+ * («المخالفات») · `Form_WPF/frmGroupM.xaml` («📋 بطاقة فئة») · `Form_WPF/frmAdditions.xaml`
+ * («📋 إضافات») · `Form_WPF/frmOwners.xaml` («تعريف مالك») ·
+ * `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير»).
  *
  * Reading (الحجوزات · المخالفات · فواتير التأجير · خطط التشغيل) needs `marina.view`;
  * writing a حجز أو مخالفة needs `marina.manage`; and issuing a فاتورة تأجير needs
@@ -24,6 +25,7 @@ import {
   type ViolationPatch,
   type ViolationQuery,
 } from './booking-documents.service.js';
+import { MarinaAdditionsService, type AdditionDefinitionInput, type AdditionDefinitionPatch } from './additions.service.js';
 import {
   MarinaGroupCardsService,
   type GroupCardInput,
@@ -35,7 +37,12 @@ import { MarinaService } from './marina.service.js';
 
 @Controller('marina')
 export class MarinaController {
-  constructor(private readonly marina: MarinaService, private readonly documents: MarinaDocumentsService, private readonly groups: MarinaGroupCardsService) {}
+  constructor(
+    private readonly marina: MarinaService,
+    private readonly documents: MarinaDocumentsService,
+    private readonly groups: MarinaGroupCardsService,
+    private readonly additions: MarinaAdditionsService,
+  ) {}
 
   private get tenantId(): string {
     return getTenantContext().tenantId;
@@ -120,6 +127,52 @@ export class MarinaController {
   @RequiresPermission('marina.manage')
   removeAddition(@Param('id') id: string, @Param('additionId') additionId: string) {
     return this.documents.removeAddition(this.tenantId, id, additionId);
+  }
+
+  // ─────────────────────────────── ➕ الإضافات ───────────────────────────────
+
+  /**
+   * «📋 إدارة الإضافات» — `select * from Additions where IsDeleted=0 ORDER BY id`, the
+   * list «🎁 الإضافات» in «الحجوزات» is filled from.
+   */
+  @Get('additions')
+  @RequiresPermission('marina.view')
+  listAdditions() {
+    return this.additions.list(this.tenantId);
+  }
+
+  /** 🔢 الرقم — `LoadNextAdditionNumber`: what a blank card shows in «🔢 الرقم». */
+  @Get('additions/next')
+  @RequiresPermission('marina.view')
+  nextAdditionNumber() {
+    return this.additions.nextNumber(this.tenantId);
+  }
+
+  /**
+   * «💾 حفظ» on a blank card — «يجب إدخال اسم الإضافة ⚠️» بلا اسم، وقيمةٌ فارغةٌ صفر.
+   * Declared before `additions/:id` so 🔢 الرقم الجديد is not read as an إضافة.
+   */
+  @Post('additions')
+  @RequiresPermission('marina.manage')
+  createAddition(@Body() body: AdditionDefinitionInput) {
+    return this.additions.create(this.tenantId, body, this.userId);
+  }
+
+  /** «💾 حفظ» على بطاقةٍ قائمة — «✅ تم حفظ التعديلات بنجاح». */
+  @Patch('additions/:id')
+  @RequiresPermission('marina.manage')
+  updateAddition(@Param('id') id: string, @Body() body: AdditionDefinitionPatch) {
+    return this.additions.update(this.tenantId, id, body, this.userId);
+  }
+
+  /**
+   * «🗑️ حذف» — after «يجب تحديد الإضافة المراد حذفها ⚠️» و«هل أنت متأكد من حذف هذه
+   * الإضافة؟ 🗑️» (`frmAdditions.btnDelete_Click`).
+   */
+  @Delete('additions/:id')
+  @RequiresPermission('marina.manage')
+  deleteAddition(@Param('id') id: string) {
+    return this.additions.remove(this.tenantId, id, this.userId);
   }
 
   /** 🧾 فاتورة التأجير من حجز — `RentInvoice(tot_Rent, tot_Additions, tax, tot_net)`. */
