@@ -855,6 +855,48 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `parties`)، وزرّا «تفاصيل» و«عرض»، و«⚖️ نوع الرصيد» الذي يُخفي عموداً في النافذة ولا
   يُسقط صفّاً.
 
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء الأول: ⚙️ إعدادات الربط الضريبي - زاتكا
+  ZATCA** (`Form_WPF/frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160) ·
+  `Class/ZatcaService.cs` (546) · `Class/ZatcaCredential.cs` · الجداول الثلاثة
+  `SettingZatca` · `CSRProperties` · `ZatcaCredential`). **محرّك الفاتورة الإلكترونية كان
+  يستقبل الشهادة جاهزة**: لا توليد، ولا تأهيل، ولا اختبار ربط — فصار للتأهيل ladder
+  بأربعة درجات خلف تسعة مسارات: `GET/PUT /einvoice/settings` ·
+  `POST /einvoice/settings/fill-from-company` (🔄 تعبئة تلقائي) ·
+  `POST /einvoice/csr/generate` (⚡ توليد) ·
+  `POST /einvoice/onboarding/compliance-csid` (🔵 بالـ 🔑 OTP) ·
+  `…/production-csid` (🔐 حفظ مفتاح التشفير) · `…/compliance-check` (🧪 اختبار الربط) ·
+  `…/renew` (🔄 Renews CSID) · `POST /einvoice/link/toggle` (⏸ إيقاف الربط / ▶ تشغيل).
+  **جدول `einvoice_settings` جديد** (ترحيل `0062` + `down`) يحمل أعمدة
+  `SettingZatca` وخصائص `CSRProperties` التسع وختم كل درجة، وأربعة أعمدة على
+  `einvoice_credentials` للزوجيْن: الامتثال (`request_id`) والإنتاج (`p_request_id` ·
+  `p_csid_enc` · `p_secret_enc`). و**طلب التوقيع PKCS#10 حقيقي** على `secp256k1` بموضوع
+  `C·OU·O·CN` و`subjectAltName` بخمس خصائص (`SN` = السريال بصيغة
+  `1-CloudERP|2-{الإصدار}|3-{uuid}` · `UID` = الرقم الضريبي · `title` = نوع الفواتير ·
+  `registeredAddress` · `businessCategory`) والامتداد
+  `1.3.6.1.4.1.311.20.2 = ZATCA-Code-Signing` — لأنّ `AuditorAPI` التي يستخدمها الديسكتوب
+  مكتبةٌ مغلقة، فكُتب الطلب على المواصفة المنشورة، والدليل أنّ `openssl req -verify`
+  يقول `self-signature verify OK`. **وبوابةٌ بثلاثة أوضاع** (🧪 محاكاة · 🔵 امتثال ·
+  🔴 إنتاج): المحاكاة ليست نجاحاً دائماً — وثيقةٌ يرفضها الفحص المحلي تُرجع `FAILED` —
+  وحين لا تُبلغ البوابة تكون النتيجة `502 EINVOICE_GATEWAY_UNREACHABLE` بعبارةٍ صريحة،
+  لا خطأ 500 مبهم. **والست وثائق لاختبار الربط** بالبيانات الثابتة في الديسكتوب
+  (UUID `8d487816…`، PIH = تجزئة البداية، «قلم رصاص» ×2 بسعر 2.00، 4.00 + 0.60 = 4.60،
+  والعميل «Acme Widget's LTD 2»)، بأنواعها 388/383/381 × 0100000/0200000 وحالاتها
+  CLEARED/REPORTED، وفحصٍ محليٍّ يغلق الحساب ويطلب الرقم الضريبي للمنشأة — فمؤسسةٌ لم
+  تُكمل بطاقتها ترى «Standard Invoice compliance check failed.» وأسبابها. والترتيب
+  محفوظ بعبارات الديسكتوب: «يجب إدخال OTP» · «يجب عليك إنشاء CSR أولاً!» · «يجب إصدار
+  شهادة الامتثال أولاً» · «يجب إكمال إعدادات الربط أولاً» · «تم الحفظ» · «تم بنجاح» ·
+  «تم الإيقاف بنجاح» · «تم التشغيل بنجاح». الأسرار مشفّرة `aes-256-gcm` ومقنّعة،
+  والمفتاح الخاص **يُعطى مرة واحدة**، وتوليد شهادةٍ جديدة **يُلغي** الشهادات المصدَّرة
+  كما يفعل `SaveCSR` بـ`DELETE FROM ZatcaCredential` (L511). وشاشة `/settings/zatca`
+  بتسميات النافذة كلها، وقائمةُ الخطوات الخمس، والست وثائق بعد آخر اختبار.
+  `apps/api/test/einvoicing-zatca-onboarding.spec.ts` (**18** اختباراً) و
+  `scripts/verify-einvoice-zatca.mjs` (**64** نقطة تحقّق حيّة، ثلاث تشغيلات متتالية
+  خضراء، وخطّ أساس يُعاد: الإعدادات وبطاقة المنشأة تعودان كما كانتا).
+  **886** اختبار API (كان 868) · 36 staff · 71 contract · tsc وlint أخضران. ومؤجَّل عن
+  قصد: ☁️ Load Data (يقرأ ملفّين من جهاز الكاشير)، و🏗️ Industry (لا عمودَ للنشاط
+  التجاري في بطاقة المنشأة بعد — ويُبلَّغ عنه تحذيراً)، وربط مسار الإرسال الحالي
+  بالبيئة المحفوظة، والأجزاء 2-5 (الإرسال · حالة المزامنة · مصر · التكاملات).
+
 * **المرحلة 10 — التقارير، الجزء السادس: 💰 تقارير الخزينة والرواتب والمستخدمين**
   (`Form_WPF/frmRptKhzna.xaml` «حركة الصندوق» (558/538) · `frmRptSalary.xaml` «تقرير
   الرواتب» (489/190) · `frmRptReseved.xaml` «تقرير الرواتب المستحقة» (393/225) ·

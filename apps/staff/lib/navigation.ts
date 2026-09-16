@@ -1560,7 +1560,7 @@ const settings: ModuleNode = {
           'ZATCA integration',
           '/settings/zatca',
           'ready',
-          { permission: 'einvoice.view', endpoint: '/einvoice/credentials' },
+          { permission: 'einvoice.view', endpoint: '/einvoice/settings' },
         ),
       ],
     },

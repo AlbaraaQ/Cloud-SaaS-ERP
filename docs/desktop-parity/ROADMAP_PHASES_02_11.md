@@ -172,11 +172,25 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Accept (each part): every ported report matches desktop columns/filters; print-ready
   Arabic RTL; new tests + a re-runnable live script; a real route in the staff tree.
 
-## Phase 11 — Zatca / ETA / integrations
+## Phase 11 — Zatca / ETA / integrations 🟡 part one done (2026-09, `PHASE_11_EINVOICING.md`)
 
-- [ ] Desktop: `ZatcaService.cs`, `EtaService.cs`, `EtaReciptService.cs`,
-  `frmZatcaSetting*`, `frmEtaSetting*`, `frmSentEinvoice*`, `frmInvsSyncStatusZatca*`,
-  `Geidea.cs`, `NeoleapService.cs` (payments), `WhatsAppSender.cs`.
-- [ ] Cloud: `modules/zatca|integrations/**`.
+- [x] Desktop (part one): `frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160),
+  `Class/ZatcaService.cs` (546), `Class/ZatcaCredential.cs`,
+  `Class/CustZatcaEndDate.cs`, and the three tables `SettingZatca` · `CSRProperties` ·
+  `ZatcaCredential`.
+- [x] Cloud (part one): `modules/einvoicing/**` — `einvoice_settings` (migration `0062`)
+  plus `request_id` and the `P_*` pair on `einvoice_credentials`;
+  `zatca/csr.ts` (a real PKCS#10 request), `zatca/gateway.ts` (🧪 simulation · 🔵 sandbox ·
+  🔴 core), `zatca/compliance-check.ts` (the six documents),
+  `zatca-onboarding.service.ts`; staff `/settings/zatca`.
+- [x] Part one — ⚙️ إعدادات الربط الضريبي: 🔄 تعبئة تلقائي · ⚡ توليد · 🔵 Compliance
+  CSID · 🔐 Get PCSID · 🧪 اختبار الربط · 🔄 Renews CSID · ⏸ إيقاف الربط (18 tests +
+  64 live checks).
+- [ ] Part two — 🧾 send, sign and chain: `frmSentEinvoice` +
+  `ZatcaService.IntegrateInvoice` (reporting/clearance, the eight-tag QR, retry).
+- [ ] Part three — 📊 `frmInvsSyncStatusZatca`: the sync-status grid, its filters and its
+  statuses.
+- [ ] Part four — 🇪🇬 `frmEtaSetting` + `EtaService` + `EtaReciptService`.
+- [ ] Part five — 💳 `Geidea.cs` · `NeoleapService.cs` · `WhatsAppSender.cs`.
 - [ ] Accept: onboarding → sign → send → poll → credit/debit-note flow certified
   against the Fatoora simulator; ETA sale receipts; payment-gateway tender in POS.
