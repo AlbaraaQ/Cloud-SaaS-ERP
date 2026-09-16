@@ -828,6 +828,32 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   `PrinterSettings` «📑 ربط الطابعات بالتقارير» (الخادم لا يرى طابعات المحل)، وأثر
   `PrintItemType` و`PrintComponentsItemsIndividually` على ترتيب بنود الفاتورة،
   والصور روابط لا بايتات لأنّ السحابة لا تخزّن ملفات.
+* **المرحلة 10 — التقارير، الجزء الثامن: 📑 كشوف الحساب** (`Form_WPF/frmCustAccount.xaml`
+  «أرصدة حساب العملاء» (556/683) · `frmCustAccountGet.xaml` «📋 كشف حساب عميل» (747/1017) ·
+  `frmCustLastPay.xaml` «📋 حركة آخر سداد للعملاء» (628/630) · `frmAccountBalance.xaml`
+  «كشف حساب تفصيلي» · `frmCostCenterBalance.xaml` «تقرير مركز كلفة`). **عائلةٌ من سبع
+  نوافذ خارج جدول `frmRpt*` الاثنتين والثلاثين**: أربعٌ منها كانت حيّة من المرحلتين 07 و08
+  (`GET /statements/general-ledger/:id` بـ`with_descendants`، و`GET /statements/cost-center/:id`،
+  و`GET /hrm/employee-statement`)، وثلاثٌ لم تكن — فبُنيت: **`customer-balances`** شبكةُ
+  الأعمدة السبعة (`#` · `🔢 رقم الحساب` · `👤 اسم العميل` · `💸 حركة مدين` · `💰 حركة دائن` ·
+  `⚖️ الرصيد` · `📌 الحالة`) وحركة الطرف هي حركة **حسابه** (`Entry_sub.acc_no`، L221-L231)
+  والرصيد `Abs(debit − credit)` وحالته بزيادة الجانب (L258-L288) ولا يُطبع من لا حركة له؛
+  و**`party-statement`** كشفٌ قيداً بسطر (`GROUP BY GlobalID, date, notes, acc_no`، L336)
+  بأربع بطاقات يوضع الرصيد فيها على **جانبٍ واحد** (`UpdateSummary` L583-L609)؛
+  و**`customer-last-payment`** آخر قيدٍ حرّك الحساب (`TOP 1 … ORDER BY id DESC`، L222-L231)
+  بقيمته (`dept == 0 ? credit : dept`، L258) ورصيده وثلاث بطاقات `💳 الإجمالي` · `⚖️ الرصيد` ·
+  `📌 السجلات` — وبلا فلتر فترة، لأنّ النافذة لا مربّع تاريخ فيها. وفلتر «🏷️ نوع الحساب»
+  (الكل · عملاء · موردين) يجعل كشف العميل كشف المورد. **واستُكملت النوافذ الأربع** بفلترَي
+  ⏰ الوقت (`frmAccountBalance` L458-L463: صندوقا وقتٍ مع صندوقي تاريخ، والرصيد السابق
+  يقرأ الساعة نفسها) و📋 نوع القيد (بمفردات `source_type` التي يطبعها عمود «النوع»، لأنّ
+  قائمة `cmbEntryType` L108-L127 بالفهرس وتخالف `GetEntryTypeName` في معنى الأرقام).
+  `apps/api/test/report-party-statements.spec.ts` (**14** اختباراً) واختباران ملحقان
+  بـ`accounting-statement.spec.ts` (13 · 14) و`scripts/verify-party-statements.mjs`
+  (**67** نقطة تحقّق حيّة، أربع تشغيلات متتالية بصفر فشل، كل رقمٍ فرقٌ عن خطّ أساس،
+  والقيود تُعكس ولا تُمحى كما في الدفاتر). **868** اختبار API (كان 852) · 36 staff ·
+  71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: عمود «الجوال» (لا `mobile` على
+  `parties`)، وزرّا «تفاصيل» و«عرض»، و«⚖️ نوع الرصيد» الذي يُخفي عموداً في النافذة ولا
+  يُسقط صفّاً.
 
 * **المرحلة 10 — التقارير، الجزء السادس: 💰 تقارير الخزينة والرواتب والمستخدمين**
   (`Form_WPF/frmRptKhzna.xaml` «حركة الصندوق» (558/538) · `frmRptSalary.xaml` «تقرير

@@ -109,6 +109,11 @@ export type ReportFilters = {
    * report reads the movement ledger's `doc_type` instead.
    */
   docType?: string;
+  /**
+   * 🏷️ نوع الحساب — «👤 عملاء» · «🏭 موردين» · «🔵 الكل» (`frmCustAccountGet` L355-L365,
+   * whose `Customers.type` is 1 عميل · 2 مورد · 3 كلاهما).
+   */
+  partyKind?: string;
 };
 
 export type ReportDefinition = {
@@ -1267,6 +1272,77 @@ const actorUserScope = (employeeId?: string): SQL =>
 /** 🖥️ الجهاز — `Log4NetLog.Logger` names the class that logged; the cloud names the caller. */
 const auditDevice = sql`coalesce(log.meta->>'ip', log.meta->>'ua', log.meta->>'userAgent', log.entity, '—')`;
 
+/** 🏷️ نوع الحساب — «🔵 الكل» · «👤 عملاء» · «🏭 موردين» (`frmCustAccountGet` L355-L365). */
+const PARTY_KIND: ReportParam = {
+  name: 'partyKind',
+  labelAr: 'نوع الحساب',
+  kind: 'select',
+  options: [
+    { value: 'all', labelAr: 'الكل' },
+    { value: 'customer', labelAr: 'عملاء' },
+    { value: 'supplier', labelAr: 'موردين' },
+  ],
+};
+
+/** 👤 حسابا الطرف — the receivable and the payable account, as a one-column list. */
+const partyAccounts = (alias: SQL): SQL =>
+  sql`SELECT x.id FROM (VALUES (${alias}.receivable_account_id), (${alias}.payable_account_id)) AS x(id) WHERE x.id IS NOT NULL`;
+
+/**
+ * 👤 حركة الطرف — how a customer's or a supplier's movement is found.
+ *
+ * `frmCustAccountGet` L336 and `frmCustAccount` L221 read the party's **own account** in
+ * the journal (`Entry_sub.acc_no = Customers.AccountCode`) — nothing else. Counting the
+ * lines that merely carry the party as well would count a collection twice: the receipt
+ * debits the bank *and* credits the customer, and both lines name him. So the account is
+ * what counts, and the lines that carry the party are the **fallback** for a party the
+ * chart never gave an account — a customer opened in a hurry, whose payments would
+ * otherwise vanish from his own statement.
+ */
+const partyMovement = (alias: SQL): SQL => sql`(
+          CASE WHEN ${alias}.receivable_account_id IS NULL AND ${alias}.payable_account_id IS NULL
+               THEN jel.party_id = ${alias}.id
+               ELSE jel.account_id IN (${partyAccounts(alias)}) END)`;
+
+/** 🏷️ نوع الحساب — «عملاء» · «موردين» · «الكل», as `Customers.type` at the desktop. */
+const partyKindScope = (alias: string, partyKind?: string): SQL => {
+  switch (partyKind) {
+    case 'customer':
+      return sql`${sql.raw(alias)}.kind IN ('customer', 'both')`;
+    case 'supplier':
+      return sql`${sql.raw(alias)}.kind IN ('supplier', 'both')`;
+    default:
+      return all;
+  }
+};
+
+/** 💳 · 💵 · ⚖️ — a card riding on the first row, hidden from the grid. */
+const card = (key: string, labelAr: string): ReportColumn => ({ key, labelAr, type: 'money', hidden: true });
+
+/**
+ * 💳 إجمالي المدين · 💵 إجمالي الدائن · ⚖️ الرصيد المدين · ⚖️ الرصيد الدائن — the four
+ * boxes of `frmCustAccountGet` (`UpdateSummary` L583-L609). The window puts the رصيد on
+ * **one** side only: the side the money is on, so the two cards can never both be filled.
+ */
+const statementCards = (
+  debitKey = 's_debit',
+  creditKey = 's_credit',
+  balanceDebitKey = 's_bal_debit',
+  balanceCreditKey = 's_bal_credit',
+): ReportColumn[] => [
+  card(debitKey, 'إجمالي المدين'),
+  card(creditKey, 'إجمالي الدائن'),
+  card(balanceDebitKey, 'الرصيد المدين'),
+  card(balanceCreditKey, 'الرصيد الدائن'),
+];
+
+const statementGrandTotal = [
+  { key: 's_debit', labelAr: 'إجمالي المدين' },
+  { key: 's_credit', labelAr: 'إجمالي الدائن' },
+  { key: 's_bal_debit', labelAr: 'الرصيد المدين' },
+  { key: 's_bal_credit', labelAr: 'الرصيد الدائن' },
+];
+
 const definitions: ReportDefinition[] = [
   // ---------------------------------------------------------------- sales
   {
@@ -1462,22 +1538,119 @@ const definitions: ReportDefinition[] = [
   },
   {
     key: 'customer-balances',
-    titleAr: 'أرصدة العملاء',
+    titleAr: 'أرصدة حساب العملاء',
     group: 'sales',
-    hintAr: 'الرصيد من القيود المرحّلة: مدين ناقص دائن على حركة كل عميل.',
-    params: [],
-    columns: [text('code', 'الرمز'), text('party', 'العميل'), money('debit', 'مدين'), money('credit', 'دائن'), money('balance', 'الرصيد')],
+    hintAr:
+      '`frmCustAccount` L221-L288: لكل عميلٍ حساب، وحركته في الفترة مديناً ودائناً، ورصيده (الفرق مطلقاً) وحالته — «مدين» إن زاد المدين، و«دائن» إن زاد الدائن. ولا يظهر في الجدول من لا حركة له.',
+    params: [PARTY, PARTY_KIND, SALESMAN, PERIOD[0]!, PERIOD[1]!],
+    columns: [
+      int('seq', '#'),
+      text('account_code', '🔢 رقم الحساب'),
+      text('party', '👤 اسم العميل'),
+      money('debit', '💸 حركة مدين'),
+      money('credit', '💰 حركة دائن'),
+      money('balance', '⚖️ الرصيد'),
+      text('status', '📌 الحالة'),
+    ],
     totals: ['debit', 'credit', 'balance'],
-    build: (tenantId) => sql`
-      SELECT party.code, party.name AS party, sum(jel.debit)::text AS debit, sum(jel.credit)::text AS credit,
-             (sum(jel.debit) - sum(jel.credit))::text AS balance
-      FROM journal_entry_lines jel
-      JOIN journal_entries je ON je.id = jel.entry_id
-      JOIN parties party ON party.id = jel.party_id
-      WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted' AND party.kind IN ('customer', 'both')
-      GROUP BY party.code, party.name
-      HAVING sum(jel.debit) <> sum(jel.credit) ORDER BY party.code`,
+    emptyAr: 'لا حركة لحسابات العملاء في هذه الفترة — و`frmCustAccount` لا يطبع إلا من تحرك حسابه',
+    signature: true,
+    build: (tenantId, f) => sql`
+      WITH party_move AS (
+        SELECT party.id AS party_id, sum(jel.debit) AS debit, sum(jel.credit) AS credit
+          FROM parties party
+          JOIN journal_entry_lines jel ON jel.tenant_id = ${tenantId} AND ${partyMovement(sql`party`)}
+          JOIN journal_entries je ON je.id = jel.entry_id AND je.status = 'posted'
+         WHERE party.tenant_id = ${tenantId} AND party.deleted_at IS NULL
+           AND ${eqIf(sql`party.id`, f.partyId)}
+           AND ${partyKindScope('party', f.partyKind)}
+           AND ${onDate(sql`je.date`, f.from, f.to)}
+           AND ${eqIf(sql`jel.salesman_id`, f.salesmanId)}
+         GROUP BY party.id
+      )
+      SELECT row_number() OVER (ORDER BY party.code) AS seq,
+             coalesce(acc.code, party.code) AS account_code,
+             party.name AS party,
+             round(coalesce(m.debit, 0), 2)::text AS debit,
+             round(coalesce(m.credit, 0), 2)::text AS credit,
+             round(abs(coalesce(m.debit, 0) - coalesce(m.credit, 0)), 2)::text AS balance,
+             CASE WHEN coalesce(m.debit, 0) >= coalesce(m.credit, 0) THEN 'مدين' ELSE 'دائن' END AS status
+        FROM parties party
+        LEFT JOIN accounts acc ON acc.id = party.receivable_account_id
+        JOIN party_move m ON m.party_id = party.id AND (coalesce(m.debit, 0) <> 0 OR coalesce(m.credit, 0) <> 0)
+       WHERE party.tenant_id = ${tenantId} AND party.deleted_at IS NULL
+         AND ${eqIf(sql`party.id`, f.partyId)}
+         AND ${partyKindScope('party', f.partyKind)}
+       ORDER BY party.code LIMIT 1000`,
   },
+  {
+    key: 'customer-last-payment',
+    titleAr: 'حركة آخر سداد للعملاء',
+    group: 'sales',
+    hintAr:
+      '`frmCustLastPay`: آخر قيدٍ حرّك حساب كل عميل — قيمته وتاريخه ونوع سنده — ورصيده الكامل مديناً أو دائناً. بلا فترة: النافذة لا مربّع تاريخ فيها.',
+    params: [PARTY, PARTY_KIND],
+    columns: [
+      text('account_code', 'رقم الحساب'),
+      text('party', 'اسم العميل'),
+      text('phone', 'الهاتف'),
+      money('last_amount', 'قيمة آخر سداد'),
+      date('last_day', 'تاريخ آخر سداد'),
+      text('entry_type', 'نوع السند'),
+      money('balance', 'الرصيد'),
+      text('status', 'الحالة'),
+      text('entry_no', 'رقم القيد'),
+      card('s_total', '💳 الإجمالي'),
+      card('s_balance', '⚖️ الرصيد'),
+      countCard,
+    ],
+    totals: ['last_amount', 'balance'],
+    grandTotal: [
+      { key: 's_total', labelAr: 'الإجمالي' },
+      { key: 's_balance', labelAr: 'الرصيد' },
+      { key: 's_count', labelAr: 'السجلات' },
+    ],
+    emptyAr: 'لا حسابات عملاء ذات حركة',
+    signature: true,
+    build: (tenantId, f) => sql`
+      SELECT coalesce(acc.code, party.code) AS account_code,
+             party.name AS party,
+             coalesce(party.phone, '—') AS phone,
+             round(CASE WHEN coalesce(le.debit, 0) = 0 THEN coalesce(le.credit, 0) ELSE le.debit END, 2)::text AS last_amount,
+             le.day AS last_day,
+             ${entryTypeLabel()} AS entry_type,
+             round(abs(coalesce(m.debit, 0) - coalesce(m.credit, 0)), 2)::text AS balance,
+             CASE WHEN coalesce(m.debit, 0) >= coalesce(m.credit, 0) THEN 'مدين' ELSE 'دائن' END AS status,
+             coalesce(je.number, '—') AS entry_no,
+             CASE WHEN row_number() OVER (ORDER BY party.code) = 1
+                  THEN round(sum(CASE WHEN coalesce(le.debit, 0) = 0 THEN coalesce(le.credit, 0) ELSE le.debit END) OVER (), 2)::text ELSE '0' END AS s_total,
+             CASE WHEN row_number() OVER (ORDER BY party.code) = 1
+                  THEN round(sum(coalesce(m.debit, 0) - coalesce(m.credit, 0)) OVER (), 2)::text ELSE '0' END AS s_balance,
+             '1' AS s_count
+        FROM parties party
+        LEFT JOIN accounts acc ON acc.id = party.receivable_account_id
+        JOIN LATERAL (
+          SELECT sum(jel.debit) AS debit, sum(jel.credit) AS credit
+            FROM journal_entry_lines jel
+            JOIN journal_entries je ON je.id = jel.entry_id AND je.status = 'posted'
+           WHERE jel.tenant_id = ${tenantId} AND ${partyMovement(sql`party`)}
+        ) m ON coalesce(m.debit, 0) <> 0 OR coalesce(m.credit, 0) <> 0
+        LEFT JOIN LATERAL (
+          SELECT je.id AS entry_id, je.date AS day, jel.debit, jel.credit
+            FROM journal_entry_lines jel
+            JOIN journal_entries je ON je.id = jel.entry_id AND je.status = 'posted'
+           WHERE jel.tenant_id = ${tenantId} AND ${partyMovement(sql`party`)}
+           ORDER BY je.date DESC, coalesce(je.entry_time, '00:00'::time) DESC, je.created_at DESC, jel.line_no
+           LIMIT 1
+        ) le ON true
+        LEFT JOIN journal_entries je ON je.id = le.entry_id
+        ${journalDocumentJoins}
+       WHERE party.tenant_id = ${tenantId} AND party.deleted_at IS NULL
+         AND ${eqIf(sql`party.id`, f.partyId)}
+         AND ${partyKindScope('party', f.partyKind)}
+       ORDER BY party.code LIMIT 1000`,
+  },
+
   {
     key: 'customer-settlements',
     titleAr: 'سداد العملاء',
@@ -2801,22 +2974,54 @@ const definitions: ReportDefinition[] = [
   },
   {
     key: 'party-statement',
-    titleAr: 'كشف حساب طرف',
+    titleAr: 'كشف حساب عميل',
     group: 'accounting',
-    hintAr: 'اختر العميل أو المورد لعرض حركته من القيود المرحّلة.',
-    params: [PARTY, ...PERIOD],
-    columns: [date('day', 'التاريخ'), text('number', 'القيد'), text('description', 'البيان'), money('debit', 'مدين'), money('credit', 'دائن'), money('running', 'الرصيد التراكمي')],
+    hintAr:
+      '`frmCustAccountGet`: حركة حساب العميل قيداً قيداً — مجموع مدينه ومجموع دائنه، ورصيده إلى أيّ الجانبين مال. و«🏷️ نوع الحساب» يجعله كشف المورد كذلك، وهي النافذة نفسها في الديسكتوب.',
+    params: [PARTY, PARTY_KIND, BRANCH, PERIOD[0]!, PERIOD[1]!],
+    columns: [
+      int('seq', 'م'),
+      money('debit', 'مدين'),
+      money('credit', 'دائن'),
+      text('party', 'العميل / المورد'),
+      text('number', 'رقم القيد'),
+      date('day', 'تاريخ القيد'),
+      text('note', 'البيان'),
+      ...statementCards(),
+      countCard,
+    ],
     totals: ['debit', 'credit'],
+    grandTotal: [...statementGrandTotal, { key: 's_count', labelAr: 'عدد القيود' }],
+    emptyAr: 'لا حركة لهذا الحساب في هذه الفترة — و`frmCustAccountGet` يطلب العميل أولاً («اختر عميل»)',
+    signature: true,
     build: (tenantId, f) => sql`
-      SELECT je.date AS day, coalesce(je.number, '—') AS number,
-             coalesce(jel.description, je.description, '—') AS description,
-             jel.debit::text, jel.credit::text,
-             sum(jel.debit - jel.credit) OVER (ORDER BY je.date, je.number, jel.line_no)::text AS running
-      FROM journal_entry_lines jel
-      JOIN journal_entries je ON je.id = jel.entry_id
-      WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted' AND jel.party_id IS NOT NULL
-        AND ${eqIf(sql`jel.party_id`, f.partyId)} AND ${onDate(sql`je.date`, f.from, f.to)}
-      ORDER BY je.date, je.number, jel.line_no LIMIT 2000`,
+      SELECT row_number() OVER (ORDER BY je.date, je.number) AS seq,
+             round(sum(jel.debit), 2)::text AS debit,
+             round(sum(jel.credit), 2)::text AS credit,
+             max(party.name) AS party,
+             coalesce(je.number, '—') AS number,
+             je.date AS day,
+             coalesce(min(je.description), '') AS note,
+             CASE WHEN row_number() OVER (ORDER BY je.date, je.number) = 1
+                  THEN round(sum(sum(jel.debit)) OVER (), 2)::text ELSE '0' END AS s_debit,
+             CASE WHEN row_number() OVER (ORDER BY je.date, je.number) = 1
+                  THEN round(sum(sum(jel.credit)) OVER (), 2)::text ELSE '0' END AS s_credit,
+             CASE WHEN row_number() OVER (ORDER BY je.date, je.number) = 1
+                  THEN greatest(sum(sum(jel.debit) - sum(jel.credit)) OVER (), 0)::text ELSE '0' END AS s_bal_debit,
+             CASE WHEN row_number() OVER (ORDER BY je.date, je.number) = 1
+                  THEN greatest(-sum(sum(jel.debit) - sum(jel.credit)) OVER (), 0)::text ELSE '0' END AS s_bal_credit,
+             '1' AS s_count
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel.entry_id
+        JOIN parties party ON party.tenant_id = ${tenantId} AND party.deleted_at IS NULL
+          AND ${partyMovement(sql`party`)}
+       WHERE jel.tenant_id = ${tenantId} AND je.status = 'posted'
+         AND ${eqIf(sql`party.id`, f.partyId)}
+         AND ${partyKindScope('party', f.partyKind)}
+         AND ${onDate(sql`je.date`, f.from, f.to)}
+         AND ${eqIf(sql`je.branch_id`, f.branchId)}
+       GROUP BY je.id, je.date, je.number
+       ORDER BY je.date, je.number LIMIT 2000`,
   },
 
   // ------------------------------------------------------------------ pos

@@ -278,6 +278,63 @@ Validation is a gate, not a suggestion: `printNo` 1..50, `printType` 1|2, images
 rejected unless the report is registered. A typo therefore cannot create a row that
 silently prints nothing.
 
+## 📑 كشوف الحساب — `frmCustAccount` · `frmCustAccountGet` · `frmCustLastPay` (phase 10, part eight)
+
+The 32 `frmRpt*` windows of `PHASE_10_REPORTS.md` §1 are done after parts 1–7. The desktop
+has a second family that the table does not count — the seven «كشف حساب» windows — and this
+part is that family. Four of the seven were already live from earlier phases
+(`GET /statements/general-ledger/:id` with `with_descendants=1` is both «كشف حساب تفصيلي»
+and «كشف حساب رئيسي», `GET /statements/cost-center/:id` is «تقرير مركز كلفة», and
+`GET /hrm/employee-statement` is «كشف حساب موظف»), so this part adds the three that were
+missing and finishes the filters of the four that were not:
+
+| Key | Window | Columns |
+|---|---|---|
+| `customer-balances` | `frmCustAccount` «أرصدة حساب العملاء» | `#` · `🔢 رقم الحساب` · `👤 اسم العميل` · `💸 حركة مدين` · `💰 حركة دائن` · `⚖️ الرصيد` · `📌 الحالة` |
+| `party-statement` | `frmCustAccountGet` «📋 كشف حساب عميل» | `م` · `مدين` · `دائن` · `العميل / المورد` · `رقم القيد` · `تاريخ القيد` · `البيان` |
+| `customer-last-payment` | `frmCustLastPay` «📋 حركة آخر سداد للعملاء» | `رقم الحساب` · `اسم العميل` · `الهاتف` · `قيمة آخر سداد` · `تاريخ آخر سداد` · `نوع السند` · `الرصيد` · `الحالة` · `رقم القيد` |
+
+Three rules the desktop's `.xaml.cs` files state and the SQL keeps:
+
+- **👤 حركة الطرف هي حركة حسابه** — `partyMovement()` in `report-catalog.ts`. Both windows
+  read `Entry_sub.acc_no = Customers.AccountCode` (L221 · L336), so the party's
+  `receivable_account_id` / `payable_account_id` are what count. Counting the lines that
+  merely carry the party would count a collection twice: the receipt debits the صندوق *and*
+  credits the customer, and both lines name him. Lines carrying the party are the
+  **fallback** for a party the chart never gave an account, so his payments do not vanish.
+- **⚖️ الرصيد على جانبٍ واحد** — `statementCards()`/`statementGrandTotal`. `UpdateSummary`
+  (L583-L609) puts the رصيد on one side only, and the two cards are summed from the rows,
+  so they cannot both carry money.
+- **💳 آخر سداد** — `ORDER BY je.date DESC, entry_time DESC, created_at DESC, line_no`
+  (L222-L231 `SELECT TOP 1 … ORDER BY id DESC`) with `debit = 0 ? credit : debit` (L258).
+  `frmCustLastPay` has **no** date box, so the report declares no period param at all.
+
+`partyKind` is a new filter (`all` · `customer` · `supplier` — the 🔵 الكل · 👤 عملاء · 🏭
+موردين radios of `frmCustAccountGet`), and it is what lets one report serve the supplier's
+statement as well as the customer's, exactly as the desktop's one window does.
+
+The four windows that were already live gained the two filters they were missing, in
+`accounting.service.ts` (not here): **⏰ الوقت** — `frmAccountBalance` has a time box beside
+each date box (`BuildDateTimeFilter` L458-L463), and `journal_entries` keeps the date and
+the time apart, so they are glued back together (the opening balance reads the same clock:
+a قيد posted at nine is *before* a period that opens at noon of the same day) — and
+**📋 نوع القيد**, spoken in the `source_type` vocabulary the النوع column already prints,
+because `cmbEntryType` (L108-L127) is index-based and disagrees with `GetEntryTypeName`
+about what each number means.
+
+| Route | Permission |
+|---|---|
+| `GET /reports/customer-balances?partyId=&partyKind=&salesmanId=&from=&to=` | `reporting.view` |
+| `GET /reports/party-statement?partyId=&partyKind=&branchId=&from=&to=` | `reporting.view` |
+| `GET /reports/customer-last-payment?partyId=&partyKind=` | `reporting.view` |
+| `GET /statements/general-ledger/:id?…&from_time=&to_time=&kind=` | `accounting.reports.view` |
+| `GET /statements/cost-center/:id?…&kind=` | `accounting.reports.view` |
+
+Tests: `apps/api/test/report-party-statements.spec.ts` (14) plus two appended to
+`accounting-statement.spec.ts`; live script `scripts/verify-party-statements.mjs`
+(67 checks, every figure asserted as a difference from a baseline, entries reversed rather
+than deleted).
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it

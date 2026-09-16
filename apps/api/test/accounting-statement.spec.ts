@@ -363,6 +363,62 @@ describe('Accounting statement — كشف الحساب', () => {
     expect((response.body as Record<string, unknown>).account).toBeDefined();
   });
 
+  it('13. ⏰ الوقت — اليوم يُقسَّم بساعته، لا بليلته كلها', async () => {
+    // `frmAccountBalance` puts a time box beside each date box (`BuildDateTimeFilter`
+    // L458-L463), so a period that opens at noon must not carry a قيد posted at nine.
+    const clockId = await account({ code: '1500', nameAr: 'حساب الوقت', type: 'asset' });
+    const morning = await post(
+      [
+        { accountId: clockId, debit: '70' },
+        { accountId: capitalId, credit: '70' },
+      ],
+      { date: iso(0), time: '09:00:00', description: 'قيد الصباح' },
+    );
+    const evening = await post(
+      [
+        { accountId: clockId, debit: '30' },
+        { accountId: capitalId, credit: '30' },
+      ],
+      { date: iso(0), time: '21:00:00', description: 'قيد المساء' },
+    );
+
+    const numbersIn = (list: Array<Record<string, unknown>>) =>
+      list.filter((row) => row.rank !== 0).map((row) => row.number);
+
+    const fromNoon = rows((await statement(clockId, `from=${iso(0)}&from_time=12:00`)).body);
+    expect(numbersIn(fromNoon)).toEqual([data(evening).number]);
+    // The nine o'clock قيد did not vanish: it is what the الرصيد السابق is carrying.
+    expect(amt(fromNoon.find((row) => row.rank === 0)?.debit)).toBe('70.0000');
+
+    const untilNoon = rows((await statement(clockId, `from=${iso(0)}&to=${iso(0)}&to_time=12:00`)).body);
+    expect(numbersIn(untilNoon)).toEqual([data(morning).number]);
+
+    // Nothing sent means the whole day, as it always did.
+    const wholeDay = rows((await statement(clockId, `from=${iso(0)}&to=${iso(0)}`)).body);
+    expect(numbersIn(wholeDay).sort()).toEqual([data(morning).number, data(evening).number].sort());
+  });
+
+  it('14. 📋 نوع القيد — «كل الأنواع» تعني الكل، ونوعٌ واحد يُقصّ ما سواه', async () => {
+    const movementsIn = async (query: string) =>
+      rows((await statement(cashId, query)).body).filter((row) => row.rank !== 0);
+
+    const all = await movementsIn('full_period=1');
+    const manual = await movementsIn('full_period=1&kind=manual');
+    // Every قيد in these fixtures is a manual one, so the filter takes nothing away …
+    expect(manual.length).toBe(all.length);
+    expect(manual.length).toBeGreaterThan(0);
+    // … and a type nothing here belongs to empties the كشف.
+    expect(await movementsIn('full_period=1&kind=sales_invoice')).toHaveLength(0);
+    expect(await movementsIn('full_period=1&kind=voucher_receipt')).toHaveLength(0);
+
+    // ⚖️ الرصيد السابق counts the same type and nothing else: the 300 before the period
+    // was posted by hand, so it is there for `manual` and absent for an invoice.
+    const openingOf = async (query: string) =>
+      rows((await statement(cashId, query)).body).find((row) => row.rank === 0);
+    expect(amt((await openingOf(`from=${iso(-6)}&kind=manual`))?.debit)).toBe('300.0000');
+    expect(amt((await openingOf(`from=${iso(-6)}&kind=sales_invoice`))?.debit)).toBe('0.0000');
+  });
+
   it('12. عزل المؤسسات — حساب مؤسسة أخرى غير موجود', async () => {
     const response = await api(
       ctx.server,

@@ -169,6 +169,9 @@ const accounting: ModuleNode = {
         screen('daily-movement', 'الحركة اليومية', 'Daily movement', '/reports/general-ledger', 'ready', {
           permission: 'reporting.view',
         }),
+        screen('party-statement', 'كشف حساب عميل', 'Party statement', '/reports/party-statement', 'ready', {
+          permission: 'reporting.view',
+        }),
         screen('trial-balance', 'ميزان المراجعة', 'Trial balance', '/accounting/trial-balance', 'ready', {
           permission: 'accounting.reports.view',
           endpoint: '/statements/trial-balance',
@@ -1035,11 +1038,19 @@ const sales: ModuleNode = {
         }),
         screen(
           'customer-balances',
-          'أرصدة العملاء',
-          'Customer balances',
+          'أرصدة حساب العملاء',
+          'Customer account balances',
           '/reports/customer-balances',
           'ready',
           { permission: 'reporting.view', endpoint: '/reports/party-balances' },
+        ),
+        screen(
+          'customer-last-payment',
+          'حركة آخر سداد للعملاء',
+          'Last payment movement',
+          '/reports/customer-last-payment',
+          'ready',
+          { permission: 'reporting.view' },
         ),
         screen(
           'customer-settlements',

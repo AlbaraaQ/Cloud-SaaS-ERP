@@ -89,6 +89,16 @@ export type StatementQuery = {
   fullPeriod?: boolean;
   /** `عدم إظهار الرصيد السابق`. */
   hidePreviousBalance?: boolean;
+  /**
+   * ⏰ الوقت — `frmAccountBalance` gives every end of the period a date box **and** a
+   * time box (`BuildDateTimeFilter` L458-L463), so midnight is not the whole story of
+   * the first or the last day. Nothing sent means `00:00` at the start and `23:59` at
+   * the end, which is the day the date alone always meant.
+   */
+  fromTime?: string;
+  toTime?: string;
+  /** 📋 نوع القيد — one of `STATEMENT_KINDS`. */
+  kind?: string;
 };
 
 /**
@@ -299,6 +309,34 @@ const ENTRY_TYPE_LABELS: Record<string, string> = {
   contract_invoice: 'قيد فاتورة عقد',
 };
 
+/**
+ * 📋 نوع القيد — the choices `cmbEntryType` offers in `frmAccountBalance` (L108-L127)
+ * and `frmCostCenterBalance`. The desktop's list is **index**-based and disagrees with
+ * its own `GetEntryTypeName` about what each number means, so the filter speaks the
+ * cloud's vocabulary instead: the very words the النوع column of these two reports
+ * already prints, so a type the operator picks and a type the report prints can never
+ * drift apart.
+ */
+const STATEMENT_KINDS = ['opening', 'sales_invoice', 'pos_sale', 'return_sale', 'purchase_invoice', 'return_purchase', 'voucher_receipt', 'voucher_payment', 'inventory_adjust', 'shift_close', 'contract_invoice', 'manual', 'reversal'] as const;
+
+const statementKindScope = (kind?: string) => {
+  switch (kind) {
+    // The two voucher kinds live on the voucher, not on the entry.
+    case 'voucher_receipt':
+      return sql`${vouchers.kind} = 'receipt'`;
+    case 'voucher_payment':
+      return sql`${vouchers.kind} = 'payment'`;
+    case 'manual':
+      return sql`${journalEntries.sourceType} IS NULL AND ${journalEntries.kind} = 'manual'`;
+    case 'reversal':
+      return sql`${journalEntries.kind} = 'reversal'`;
+    default:
+      return (STATEMENT_KINDS as readonly string[]).includes(kind ?? '')
+        ? sql`${journalEntries.sourceType} = ${kind}`
+        : undefined;
+  }
+};
+
 function entryTypeOf(row: {
   kind: string;
   sourceType: string | null;
@@ -347,6 +385,8 @@ export type CostCenterStatementQuery = {
   summary?: boolean;
   fullPeriod?: boolean;
   hidePreviousBalance?: boolean;
+  /** 📋 نوع القيد — one of `STATEMENT_KINDS`. */
+  kind?: string;
 };
 
 /** A cost centre as the list returns it — and, with `withBalances`, its node's balance. */
@@ -1455,9 +1495,18 @@ export class AccountingService {
         ? sql`${accounts.path} <@ ${account.path}::ltree`
         : eq(accounts.id, accountId);
 
+      /**
+       * 📅 من/إلى + ⏰ الوقت — the desktop glues the date box to the time box at each end
+       * of the period; the cloud keeps the two apart (`journal_entries.date` ·
+       * `journal_entries.entry_time`), so they are glued back together here.
+       */
+      const at = sql`(${journalEntries.date} + coalesce(${journalEntries.entryTime}, '00:00'::time))`;
+      const startAt = sql`(${query.from ?? null}::date + coalesce(${query.fromTime ?? null}::time, '00:00'::time))`;
+      const endAt = sql`(${query.to ?? null}::date + coalesce(${query.toTime ?? null}::time, '23:59'::time))`;
+      const kindScope = statementKindScope(query.kind);
       const period = query.fullPeriod
         ? []
-        : [query.from ? gte(journalEntries.date, query.from) : undefined, query.to ? lte(journalEntries.date, query.to) : undefined].filter(
+        : [query.from ? sql`${at} >= ${startAt}` : undefined, query.to ? sql`${at} <= ${endAt}` : undefined].filter(
             (clause) => clause !== undefined,
           );
       const where = and(
@@ -1465,6 +1514,7 @@ export class AccountingService {
         eq(journalEntries.status, 'posted'),
         inBranch,
         query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
+        kindScope,
         ...period,
       );
 
@@ -1484,13 +1534,17 @@ export class AccountingService {
             .from(journalEntryLines)
             .innerJoin(journalEntries, eq(journalEntries.id, journalEntryLines.entryId))
             .innerJoin(accounts, eq(accounts.id, journalEntryLines.accountId))
+            .leftJoin(vouchers, eq(vouchers.journalEntryId, journalEntries.id))
             .where(
               and(
                 eq(journalEntryLines.tenantId, tenantId),
                 eq(journalEntries.status, 'posted'),
                 inBranch,
                 query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
-                lt(journalEntries.date, query.from),
+                kindScope,
+                // The same clock the period uses: a قيد posted at nine is *before* a
+                // period that opens at noon, even on the very same day.
+                sql`${at} < ${startAt}`,
               ),
             )
             .then((rows) => rows[0])
@@ -1980,6 +2034,7 @@ export class AccountingService {
         : [query.from ? gte(journalEntries.date, query.from) : undefined, query.to ? lte(journalEntries.date, query.to) : undefined].filter(
             (clause) => clause !== undefined,
           );
+      const kindScope = statementKindScope(query.kind);
 
       const before = query.from
         ? await tx
@@ -1996,6 +2051,7 @@ export class AccountingService {
                 inArray(journalEntryLines.costCenterId, scope),
                 query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
                 query.accountId ? eq(journalEntryLines.accountId, query.accountId) : undefined,
+                kindScope,
                 lt(journalEntries.date, query.from),
               ),
             )
@@ -2032,6 +2088,7 @@ export class AccountingService {
             inArray(journalEntryLines.costCenterId, scope),
             query.branchId ? eq(journalEntries.branchId, query.branchId) : undefined,
             query.accountId ? eq(journalEntryLines.accountId, query.accountId) : undefined,
+            kindScope,
             ...period,
           ),
         )

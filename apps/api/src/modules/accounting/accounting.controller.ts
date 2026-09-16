@@ -230,16 +230,24 @@ export class AccountingController {
     @Param('accountId') accountId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    /** ⏰ الوقت — `frmAccountBalance`'s two time boxes, one at each end of the period. */
+    @Query('from_time') fromTime?: string,
+    @Query('to_time') toTime?: string,
     @Query('branch_id') branchId?: string,
     @Query('with_descendants') withDescendants?: string,
     @Query('summary') summary?: string,
     @Query('full_period') fullPeriod?: string,
     @Query('hide_previous_balance') hidePreviousBalance?: string,
+    /** 📋 نوع القيد — one of `STATEMENT_KINDS`, as `cmbEntryType` lists them. */
+    @Query('kind') kind?: string,
   ) {
     const statement = await this.accounting.accountStatement(getTenantContext().tenantId, accountId, {
       from,
       to,
+      fromTime,
+      toTime,
       branchId,
+      kind,
       withDescendants: on(withDescendants),
       summary: on(summary),
       // `فترة كاملة (من البداية)` is on until someone names a date.
@@ -292,12 +300,15 @@ export class AccountingController {
     @Query('summary') summary?: string,
     @Query('full_period') fullPeriod?: string,
     @Query('hide_previous_balance') hidePreviousBalance?: string,
+    /** 📋 نوع القيد — one of `STATEMENT_KINDS`, as `cmbEntryType` lists them. */
+    @Query('kind') kind?: string,
   ) {
     const statement = await this.accounting.costCenterStatement(getTenantContext().tenantId, costCenterId, {
       from,
       to,
       branchId,
       accountId,
+      kind,
       summary: on(summary),
       fullPeriod: on(fullPeriod) || !(from || to),
       hidePreviousBalance: on(hidePreviousBalance),

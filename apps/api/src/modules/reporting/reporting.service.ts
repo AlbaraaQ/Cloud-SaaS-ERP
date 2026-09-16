@@ -81,6 +81,8 @@ const filtersSchema = z
     year: z.string().max(4).optional(),
     /** 📁 الفئة — `cmbGroups` of `frmRptRentInvoices` (`GroupMarine`). */
     groupId: uuidish,
+    /** 🏷️ نوع الحساب — «👤 عملاء» · «🏭 موردين» (the كشف حساب windows' own radios). */
+    partyKind: z.enum(['all', 'customer', 'supplier']).optional(),
   })
   .partial();
 
