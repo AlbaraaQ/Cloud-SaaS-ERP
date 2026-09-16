@@ -43,7 +43,9 @@ describe('RBAC and access management', () => {
     });
     expect(denied.status).toBe(403);
     expect(denied.body.code).toBe('FORBIDDEN');
-    expect(denied.body.detail).toBe('permission platform.tenant.manage required');
+    // Controllers declare the canonical `tenant.*` spelling; the viewer holds the legacy
+    // `platform.tenant.view` grant, which authorises `tenant.view` through the alias map.
+    expect(denied.body.detail).toBe('permission tenant.manage required');
 
     const permitted = await api(ctx.server, 'patch', '/api/v1/tenant', {
       token: admin.token,
@@ -208,9 +210,10 @@ describe('RBAC and access management', () => {
       });
       expect(created.status).toBe(201);
       const role = created.body.data as { id: string; permissionCodes: string[]; isSystem: boolean };
-      // The API returns the codes in registry order, not the order they were sent in.
+      // Writes normalise legacy `platform.*` spellings to canonical `tenant.*`, so the
+      // database converges on the canonical namespace (reads accept both spellings).
       expect([...role.permissionCodes].sort()).toEqual(
-        ['platform.tenant.view', 'accounting.reports.view'].sort(),
+        ['tenant.view', 'accounting.reports.view'].sort(),
       );
       expect(role.isSystem).toBe(false);
 
@@ -227,7 +230,7 @@ describe('RBAC and access management', () => {
       });
       expect(replaced.status).toBe(201);
       expect((replaced.body.data as { permissionCodes: string[] }).permissionCodes).toEqual([
-        'platform.audit.view',
+        'tenant.audit.view',
       ]);
 
       const unknown = await api(ctx.server, 'post', '/api/v1/roles', {

@@ -1,6 +1,13 @@
 import { Pool, type PoolClient } from 'pg';
 import { baselineRoles, env, tenantSettingsRegistry } from '@erp/config';
-import { ALL_PERMISSIONS, permissionRegistry } from '@erp/contracts';
+import {
+  ALL_PERMISSIONS,
+  canonicalizePermissionCode,
+  findPermission,
+  permissionRegistry,
+  platformPermissionRegistry,
+  platformRoleCatalog,
+} from '@erp/contracts';
 
 import { newId } from './ids.js';
 
@@ -66,7 +73,11 @@ export async function seedPermissionRegistry(connectionString?: string): Promise
 }
 
 async function upsertPermissions(client: PoolClient): Promise<number> {
-  for (const permission of permissionRegistry) {
+  // Tenant registry (canonical + deprecated spellings) plus the platform-console
+  // registry — both live in the `permissions` table; the registries stay separate
+  // in code so tenant flows can never enumerate `console.*`.
+  const catalog = [...permissionRegistry, ...platformPermissionRegistry];
+  for (const permission of catalog) {
     await client.query(
       `INSERT INTO permissions (code, module, description)
        VALUES ($1, $2, $3)
@@ -74,7 +85,33 @@ async function upsertPermissions(client: PoolClient): Promise<number> {
       [permission.code, permission.module, permission.description],
     );
   }
-  return permissionRegistry.length;
+  // Platform role catalogue (family A) — idempotent, mirrors migration 0032.
+  for (const role of platformRoleCatalog) {
+    await client.query(
+      `INSERT INTO platform_roles (code, name, description)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
+      [role.code, role.nameEn, role.description],
+    );
+  }
+  return catalog.length;
+}
+
+/**
+ * Resolves a baseline role's permission list to storable canonical codes.
+ * `*` expands to the canonical tenant codes only — never deprecated spellings
+ * (deduped by construction) and never `console.*`.
+ */
+function resolveSeedCodes(permissions: readonly string[]): string[] {
+  if (permissions.includes(ALL_PERMISSIONS)) {
+    return permissionRegistry.filter((entry) => !entry.deprecated).map((entry) => entry.code);
+  }
+  const out = new Set<string>();
+  for (const code of permissions) {
+    const canonical = canonicalizePermissionCode(code);
+    if (findPermission(canonical) && !canonical.startsWith('console.')) out.add(canonical);
+  }
+  return [...out];
 }
 
 export async function seedPlatform(
@@ -155,11 +192,7 @@ export async function seedPlatform(
       const roleId = roleRow.rows[0]?.id as string;
       roleNames.push(role.name);
 
-      const codes = role.permissions.includes(ALL_PERMISSIONS)
-        ? permissionRegistry.map((permission) => permission.code)
-        : role.permissions.filter((code) =>
-            permissionRegistry.some((permission) => permission.code === code),
-          );
+      const codes = resolveSeedCodes(role.permissions);
 
       await client.query(`DELETE FROM role_permissions WHERE role_id = $1`, [roleId]);
       for (const code of codes) {
@@ -230,6 +263,15 @@ export async function seedPlatform(
       const opsTenantId = opsTenantRow.rows[0]?.id as string;
       await client.query(`SELECT set_config('app.tenant_id', $1, false)`, [opsTenantId]);
 
+      // Platform role grant: the operator holds `platform_owner` in the role model
+      // (the legacy `is_platform_admin` flag above stays as its deprecated twin).
+      await client.query(
+        `INSERT INTO platform_memberships (id, user_id, role_code)
+         VALUES ($1, $2, 'platform_owner')
+         ON CONFLICT (user_id, role_code) DO NOTHING`,
+        [newId(), platformAdminUserId],
+      );
+
       const opsMembershipRow = await client.query<{ id: string }>(
         `INSERT INTO memberships (id, tenant_id, user_id, display_name, status, is_owner)
          VALUES ($1, $2, $3, $4, 'active', true)
@@ -250,11 +292,7 @@ export async function seedPlatform(
           [newId(), opsTenantId, role.name, role.isSystem, role.description],
         );
         const opsRoleId = opsRoleRow.rows[0]?.id as string;
-        const opsCodes = role.permissions.includes(ALL_PERMISSIONS)
-          ? permissionRegistry.map((permission) => permission.code)
-          : role.permissions.filter((code) =>
-              permissionRegistry.some((permission) => permission.code === code),
-            );
+        const opsCodes = resolveSeedCodes(role.permissions);
         for (const code of opsCodes) {
           await client.query(
             `INSERT INTO role_permissions (role_id, permission_code) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -273,7 +311,7 @@ export async function seedPlatform(
     }
 
     return {
-      permissions: permissionRegistry.length,
+      permissions: permissionCount,
       tenantId,
       userId,
       membershipId,

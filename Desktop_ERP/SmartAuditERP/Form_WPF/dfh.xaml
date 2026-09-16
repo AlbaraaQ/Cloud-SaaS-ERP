@@ -1,0 +1,306 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.dfh"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="الرقابة على بيع وشراء الأصناف"
+    Width="490" Height="420"
+    MinWidth="490" MinHeight="420"
+    MaxWidth="490" MaxHeight="420"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══════════ Brushes ═══════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══════════ TextBox Style ═══════════ -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ Button Styles ═══════════ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SaveBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <!-- ═══════════ DataGrid Styles ═══════════ -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════════════ -->
+        <!--  GroupBox4 - الرقابة على بيع وشراء الأصناف   -->
+        <!-- ══════════════════════════════════════════════ -->
+        <Border x:Name="GroupBox4"
+                Grid.Row="0"
+                Background="White"
+                Margin="8,8,8,0"
+                CornerRadius="10"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- عنوان البطاقة -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource HeaderBrush}"
+                        CornerRadius="10,10,0,0">
+                    <TextBlock Text="🔍 الرقابة على بيع وشراء الأصناف التالية"
+                               Foreground="White"
+                               FontSize="13" FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+                <!-- DataGrid - dgvCurrencies -->
+                <DataGrid x:Name="dgvCurrencies"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                          RowStyle="{StaticResource DgvRow}"
+                          CanUserAddRows="True"
+                          CanUserDeleteRows="False"
+                          CanUserReorderColumns="True"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          FlowDirection="RightToLeft"
+                          Background="White"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E8EBF5"
+                          AlternatingRowBackground="#F8F9FD"
+                          Margin="4,4,4,4">
+
+                    <DataGrid.Columns>
+
+                        <!-- Column4: الصنف (ComboBox) -->
+                        <DataGridComboBoxColumn x:Name="Column4"
+                                                Header="📦 الصنف"
+                                                Width="*"
+                                                DisplayMemberPath="currency"
+                                                SelectedValuePath="id"
+                                                SelectedValueBinding="{Binding ItemId, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <!-- Column1: رقابة (CheckBox) -->
+                        <DataGridCheckBoxColumn x:Name="Column1"
+                                                Header="✅ رقابة"
+                                                Binding="{Binding IsControlled, UpdateSourceTrigger=PropertyChanged}"
+                                                Width="100"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Panel2 - رقابة على الصرف -->
+                <Border x:Name="Panel2"
+                        Grid.Row="2"
+                        BorderBrush="{StaticResource BorderLight}"
+                        
+                        BorderThickness="0,1,0,0"
+                        Padding="12,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Label1: نص الرقابة -->
+                        <TextBlock x:Name="Label1"
+                                   Text="رقابة على عملية الصرف لأكثر من :"
+                                   FontSize="12"
+                                   FontWeight="Bold"
+                                   Foreground="#1B2642"
+                                   VerticalAlignment="Center"
+                                   Margin="92,0,144,0" Grid.ColumnSpan="3"/>
+
+                        <!-- txtVal: القيمة -->
+                        <TextBox x:Name="txtVal"
+                                 Style="{StaticResource ModernTextBox}"
+                                 Text="10000"
+                                 TextChanged="txtVal_TextChanged" Grid.Column="2" Margin="78,0,44,0"/>
+
+                        <!-- lblCurr: العملة -->
+                        <TextBlock x:Name="lblCurr"
+                                   Grid.Column="0"
+                                   FontSize="12"
+                                   FontWeight="Bold"
+                                   Foreground="#1B2642"
+                                   VerticalAlignment="Center"
+                                   MinWidth="120"
+                                   Margin="0,0,8,0"/>
+                    </Grid>
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════ -->
+        <!--  Panel1 - Footer: أزرار الحفظ والخروج         -->
+        <!-- ══════════════════════════════════════════════ -->
+        <Border x:Name="Panel1"
+                Grid.Row="1"
+                Background="{StaticResource FooterBrush}"
+                Padding="12,8"
+                Margin="0,6,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- btnClose: خروج -->
+                <Button x:Name="btnClose"
+                        Grid.Column="0"
+                        Content="✖ خروج"
+                        Style="{StaticResource DangerBtn}"
+                        Width="100"
+                        Click="btnClose_Click"/>
+
+                <!-- btnSave: حفظ -->
+                <Button x:Name="btnSave"
+                        Grid.Column="2"
+                        Content="💾 حفظ"
+                        Style="{StaticResource SaveBtn}"
+                        Width="100"
+                        Click="btnSave_Click"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

@@ -1,0 +1,275 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmAdditionalCost"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="تكاليف إضافية" 
+        Height="500" Width="750"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#F4F6F7"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <!-- Gradients -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#4e54c8" Offset="0"/>
+            <GradientStop Color="#8f94fb" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="TotalGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#3498DB" Offset="0"/>
+            <GradientStop Color="#2980B9" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Styles -->
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="MinWidth" Value="100"/>
+            <Setter Property="Padding" Value="15,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DataGridComboBoxColumn" TargetType="ComboBox">
+            <Setter Property="IsEditable" Value="False"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
+
+        <Style x:Key="DataGridTextColumn" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- الجدول الرئيسي -->
+        <Border Grid.Row="0" Background="White" Margin="10" CornerRadius="10">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" Opacity="0.1" ShadowDepth="0"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- العنوان -->
+                <Border Grid.Row="0" Background="{StaticResource HeaderGradient}" 
+                        CornerRadius="10,10,0,0" Padding="15">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="💰" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="تفاصيل التكاليف الإضافية" Foreground="White" 
+                                   FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- الجدول -->
+                <DataGrid x:Name="dgvCosts" Grid.Row="1"
+                          AutoGenerateColumns="False" 
+                          Background="Transparent" 
+                          BorderThickness="0" 
+                          AlternatingRowBackground="#F9FBFD" 
+                          RowHeight="45"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          CanUserAddRows="True"
+                          CanUserDeleteRows="False"
+                          Margin="10"
+                          CellEditEnding="dgvCosts_CellEditEnding">
+                    <DataGrid.ColumnHeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#2C3E50"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="FontSize" Value="12"/>
+                            <Setter Property="Padding" Value="10"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        </Style>
+                    </DataGrid.ColumnHeaderStyle>
+                    <!-- استبدل تعريف الأعمدة في DataGrid بهذا -->
+                    <DataGrid.Columns>
+
+                        <!-- اسم التكلفة -->
+                        <DataGridComboBoxColumn Header="اسم التكلفة" 
+                            Width="2*" 
+                            x:Name="colCostName"
+                            SelectedValueBinding="{Binding CostId, UpdateSourceTrigger=PropertyChanged}">
+                            <DataGridComboBoxColumn.ElementStyle>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource DataGridComboBoxColumn}">
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                </Style>
+                            </DataGridComboBoxColumn.ElementStyle>
+                            <DataGridComboBoxColumn.EditingElementStyle>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource DataGridComboBoxColumn}">
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                </Style>
+                            </DataGridComboBoxColumn.EditingElementStyle>
+                        </DataGridComboBoxColumn>
+
+                        <!-- القيمة -->
+                        <DataGridTextColumn Header="القيمة" 
+                        Binding="{Binding CostValue, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
+                        Width="*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="Foreground" Value="#27AE60"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                            <DataGridTextColumn.EditingElementStyle>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource DataGridTextColumn}">
+                                    <Setter Property="TextAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.EditingElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- ملاحظة -->
+                        <DataGridTextColumn Header="ملاحظة" 
+                        Binding="{Binding Note, UpdateSourceTrigger=PropertyChanged}" 
+                        Width="2*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                            <DataGridTextColumn.EditingElementStyle>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource DataGridTextColumn}">
+                                    <Setter Property="TextAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.EditingElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- مركز التكلفة -->
+                        <DataGridComboBoxColumn Header="مركز التكلفة" 
+                            Width="*"
+                            x:Name="colCostCenter"
+                            SelectedValueBinding="{Binding CostCenterId, UpdateSourceTrigger=PropertyChanged}">
+                            <DataGridComboBoxColumn.ElementStyle>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource DataGridComboBoxColumn}">
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                </Style>
+                            </DataGridComboBoxColumn.ElementStyle>
+                            <DataGridComboBoxColumn.EditingElementStyle>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource DataGridComboBoxColumn}">
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                </Style>
+                            </DataGridComboBoxColumn.EditingElementStyle>
+                        </DataGridComboBoxColumn>
+
+                        <!-- حذف -->
+                        <DataGridTemplateColumn Header="حذف" Width="80">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="🗑️" 
+                        Background="#E74C3C" 
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        FontSize="16"
+                        Padding="5"
+                        Click="btnDeleteRow_Click"
+                        ToolTip="حذف"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- منطقة الإجمالي -->
+        <Border Grid.Row="1" Background="{StaticResource TotalGradient}" 
+                Margin="10,0" CornerRadius="10" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" Opacity="0.3" ShadowDepth="0"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="المجموع الكلي:" 
+                           Foreground="White" FontSize="16" FontWeight="Bold" 
+                           VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                <TextBox Grid.Column="1" x:Name="txtSumVal" 
+                         Text="0.00" 
+                         IsReadOnly="True"
+                         FontSize="18" 
+                         FontWeight="Bold"
+                         Foreground="#2C3E50"
+                         Background="White"
+                         TextAlignment="Center"
+                         BorderThickness="0"
+                         Padding="10"
+                         Height="40"
+                         HorizontalAlignment="Left"
+                         MinWidth="200">
+                    <TextBox.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="8"/>
+                        </Style>
+                    </TextBox.Resources>
+                </TextBox>
+            </Grid>
+        </Border>
+
+        <!-- الأزرار -->
+        <Border Grid.Row="2" Background="White" BorderBrush="#E0E6ED" 
+                BorderThickness="0,1,0,0" Padding="15">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                <!-- زر جديد -->
+                <Button x:Name="btnNew" Content="➕ جديد" Background="#4e54c8" 
+                        Style="{StaticResource ActionButton}" Click="btnNew_Click"/>
+
+                <!-- زر إدراج -->
+                <Button x:Name="btnSave" Content="✔️ إدراج" Background="#27AE60" 
+                        Style="{StaticResource ActionButton}" Click="btnSave_Click"
+                        Width="120"/>
+
+                <!-- زر إغلاق -->
+                <Button x:Name="btnClose" Content="✖️ إغلاق" Background="#C0392B" 
+                        Style="{StaticResource ActionButton}" Click="btnClose_Click"/>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

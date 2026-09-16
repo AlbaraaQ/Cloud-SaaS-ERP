@@ -1,0 +1,1047 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Home"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تطبيقات المدقق : برنامج الفوترة الإلكترونية للمحاسبة والمستودعات"
+    WindowState="Maximized"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    FontFamily="Cairo, Tahoma, Arial"
+    Background="#F0F2F7"
+    Loaded="Window_Loaded"
+    Closing="Window_Closing"
+    KeyDown="Window_KeyDown"
+    SizeChanged="Window_SizeChanged">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══════════════════════════════════════════
+             BRUSHES
+        ═══════════════════════════════════════════ -->
+        <LinearGradientBrush x:Key="MenuBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#3D0073" Offset="0"/>
+            <GradientStop Color="#290050" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="MenuHoverBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#5A0099" Offset="0"/>
+            <GradientStop Color="#4F0087" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#3D0073" Offset="0"/>
+            <GradientStop Color="#5A0099" Offset="0.5"/>
+            <GradientStop Color="#3D0073" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#2A0050" Offset="0"/>
+            <GradientStop Color="#3D0073" Offset="0.5"/>
+            <GradientStop Color="#2A0050" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SideBarBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2A0050" Offset="0"/>
+            <GradientStop Color="#1A0030" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="POSBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FF8C00" Offset="0"/>
+            <GradientStop Color="#CC6600" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="InfoBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#3498DB" Offset="0"/>
+            <GradientStop Color="#2471A3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#C8B8E0"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="14" ShadowDepth="3"
+                          Direction="270" Opacity="0.18"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="MenuShadow"
+                          BlurRadius="8" ShadowDepth="2"
+                          Direction="270" Opacity="0.35"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.25"
+                          Color="#000000"/>
+
+        <!-- ═══════════════════════════════════════════
+             TOP MENU ITEM STYLE
+        ═══════════════════════════════════════════ -->
+        <Style x:Key="TopMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="0"
+                                Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <ContentPresenter x:Name="Icon"
+                                                  Grid.Row="0"
+                                                  Content="{TemplateBinding Icon}"
+                                                  HorizontalAlignment="Center"
+                                                  Margin="0,4,0,2"/>
+                                <ContentPresenter Grid.Row="1"
+                                                  ContentSource="Header"
+                                                  HorizontalAlignment="Center"
+                                                  TextElement.Foreground="White"
+                                                  TextElement.FontWeight="Bold"
+                                                  TextElement.FontSize="10"
+                                                  Margin="0,0,0,4"/>
+                                <Popup x:Name="PART_Popup"
+                                       IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                       Placement="Bottom"
+                                       AllowsTransparency="True"
+                                       Focusable="False"
+                                       PopupAnimation="Fade">
+                                    <Border Background="#3D0073"
+                                            BorderBrush="#5A0099"
+                                            BorderThickness="1"
+                                            CornerRadius="0,0,6,6"
+                                            MinWidth="160"
+                                            Effect="{StaticResource MenuShadow}">
+                                        <ItemsPresenter/>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource MenuHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource MenuHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════════════════════════════════════
+             SUB MENU ITEM STYLE
+        ═══════════════════════════════════════════ -->
+        <Style x:Key="SubMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0"
+                                                  ContentSource="Header"
+                                                  TextElement.Foreground="White"
+                                                  VerticalAlignment="Center"/>
+                                <Path Grid.Column="1"
+                                      x:Name="Arrow"
+                                      Data="M0,0 L4,4 L0,8"
+                                      Stroke="White" StrokeThickness="1.5"
+                                      VerticalAlignment="Center"
+                                      Margin="8,0,0,0"
+                                      Visibility="Collapsed"/>
+                                <Popup x:Name="PART_Popup"
+                                       IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                       Placement="Right"
+                                       AllowsTransparency="True"
+                                       Focusable="False"
+                                       PopupAnimation="Fade">
+                                    <Border Background="#3D0073"
+                                            BorderBrush="#5A0099"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            MinWidth="180"
+                                            Effect="{StaticResource MenuShadow}">
+                                        <ItemsPresenter/>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#5A0099"/>
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="True">
+                                <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════════════════════════════════════
+             ACTION BUTTON STYLE
+        ═══════════════════════════════════════════ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource MenuBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.70"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="POSBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource POSBrush}"/>
+        </Style>
+
+        <!-- ═══════════════════════════════════════════
+             STATUS BAR STYLES
+        ═══════════════════════════════════════════ -->
+        <Style x:Key="StatusLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#3D0073"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="StatusSeparatorStyle" TargetType="TextBlock">
+            <Setter Property="Text" Value="|"/>
+            <Setter Property="Foreground" Value="#8A6AAA"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="4,0"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ROW 0 : شريط القوائم الرئيسي
+        ════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource MenuBrush}"
+                Effect="{StaticResource MenuShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Menu x:Name="MainMenuStrip"
+                      Grid.Column="0"
+                      Background="Transparent"
+                      Foreground="White"
+                      FontFamily="Cairo, Tahoma, Arial"
+                      FlowDirection="RightToLeft"
+                      Padding="4,0">
+
+                    <!-- ═══ المحاسبة ═══ -->
+                    <MenuItem x:Name="StripAccount"
+                              Header="المحاسبة"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="📊" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="AccountDefinintionMenu" Header="تعاريف" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripAccountsDirectory"    Header="دليل الحسابات"     Style="{StaticResource SubMenuItemStyle}" Click="stripAccountsDirectory_Click"/>
+                            <MenuItem x:Name="stripTreeAcc"              Header="شجرة الحسابات"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripTreeAcc_Click"/>
+                            <MenuItem x:Name="stripBox"                  Header="بطاقة صندوق"       Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripBox_Click"/>
+                            <MenuItem x:Name="stripBank"                 Header="بطاقة بنك"         Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripBank_Click"/>
+                            <MenuItem x:Name="stripCostCenterCard"       Header="بطاقة مركز تكلفة"  Style="{StaticResource SubMenuItemStyle}" Click="stripCostCenterCard_Click"/>
+                            <MenuItem x:Name="StripPaymentMethodCustomr" Header="طريقة دفع عميل"    Style="{StaticResource SubMenuItemStyle}" Click="StripPaymentMethodCustomr_Click"/>
+                            <MenuItem x:Name="StripExpenses"             Header="بطاقة المصاريف"    Style="{StaticResource SubMenuItemStyle}" Click="StripExpenses_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="AccountOper" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripIntialBalance"  Header="قيد إفتتاحي"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripIntialBalance_Click"/>
+                            <MenuItem x:Name="stripAddRestriction" Header="سند قيد"          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripAddRestriction_Click"/>
+                            <MenuItem x:Name="stripSandQabth"      Header="سند قبض"          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSandQabth_Click"/>
+                            <MenuItem x:Name="stripSandSarf"       Header="سند صرف"          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSandSarf_Click"/>
+                            <MenuItem x:Name="stripSandVAT"        Header="سند صرف الضريبة"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSandVAT_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="AccountRpt" Header="تقارير محاسبية" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripRestraction"      Header="القيود اليومية"        Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripRestraction_Click"/>
+                            <MenuItem x:Name="stripSandat"           Header="عرض السندات"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSandat_Click"/>
+                            <MenuItem x:Name="stripAccountBala"      Header="كشف حساب"              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripAccountBala_Click"/>
+                            <MenuItem x:Name="stripAccountStatement" Header="كشف حساب رئيسي"       Style="{StaticResource SubMenuItemStyle}" Click="stripAccountStatement_Click"/>
+                            <MenuItem x:Name="stripShowKhzna"        Header="حركة الصندوق"          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripShowKhzna_Click"/>
+                            <MenuItem x:Name="stripRptBalances"      Header="أرصدة الحسابات"        Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripRptBalances_Click"/>
+                            <MenuItem x:Name="StripRptCostCenter"    Header="أرصدة مراكز التكلفة"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="StripRptCostCenter_Click"/>
+                            <MenuItem x:Name="StripCostCenter"       Header="تقرير مركز الكلفة"     Style="{StaticResource SubMenuItemStyle}" Click="StripCostCenter_Click"/>
+                            <MenuItem x:Name="stripDailyProcess"     Header="الحركة اليومية"        Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDailyProcess_Click"/>
+                            <MenuItem x:Name="stripMezan"            Header="ميزان المراجعة رئيسي"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMezan_Click"/>
+                            <MenuItem x:Name="stripIncomeAnalysis"   Header="قائمة الدخل التحليلية" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripIncomeAnalysis_Click"/>
+                            <MenuItem x:Name="stripIncomeAnalysis2"  Header="قائمة الدخل (جديد)"    Style="{StaticResource SubMenuItemStyle}" Click="stripIncomeAnalysis2_Click"/>
+                            <MenuItem x:Name="stripMainbadget1"      Header=""                       Style="{StaticResource SubMenuItemStyle}" Visibility="Collapsed"/>
+                            <MenuItem x:Name="stripBadgetAnalys"     Header="ميزانية تحليلية"       Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripBadgetAnalys_Click"/>
+                            <MenuItem x:Name="stripMenuTaxReport"    Header="الإقرار الضريبي"       Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMenuTaxReport_Click"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ المستودعات ═══ -->
+                    <MenuItem x:Name="StripStores"
+                              Header="المستودعات"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="🏭" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="StoreDefinition" Header="التعاريف" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="StripItemDirctory" Header="دليل المواد"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="StripItemDirctory_Click"/>
+                            <MenuItem x:Name="stripStore"        Header="بطاقة مستودع"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripStore_Click"/>
+                            <MenuItem x:Name="stripGroup"        Header="بطاقة مجموعة"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripGroup_Click"/>
+                            <MenuItem x:Name="stripUnit"         Header="بطاقة وحدة"    Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripUnit_Click"/>
+                            <MenuItem x:Name="stripItem"         Header="بطاقة مادة"    Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripItem_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="StoreOper" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripTransfer"            Header="مناقلة"          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripTransfer_Click"/>
+                            <MenuItem x:Name="stripFirstStock"          Header="بضاعة أول مدة"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripFirstStock_Click"/>
+                            <MenuItem x:Name="stripInputInv"            Header="فاتورة إدخال"    Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripInputInv_Click"/>
+                            <MenuItem x:Name="stripOutputInv"           Header="فاتورة إخراج"    Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripOutputInv_Click"/>
+                            <MenuItem x:Name="strIpinventoryAdjustment" Header="تسوية مخزنية"    Style="{StaticResource SubMenuItemStyle}" Click="strIpinventoryAdjustment_Click"/>
+                            <MenuItem x:Name="StripInvertoryDeliveries" Header="توصيل مخزني"     Style="{StaticResource SubMenuItemStyle}" Click="StripInvertoryDeliveries_Click"/>
+                            <MenuItem x:Name="stripInvertoryOrderInv"   Header="طلب بضاعة"       Style="{StaticResource SubMenuItemStyle}" Click="stripInvertoryOrderInv_Click"/>
+                            <MenuItem x:Name="StripPrintBarcode"        Header="طباعة الباركود"  Style="{StaticResource SubMenuItemStyle}" Click="StripPrintBarcode_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="StoreRpt" Header="تقارير مستودعية" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripSafeGrd"                  Header="جرد المواد"                      Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSafeGrd_Click"/>
+                            <MenuItem x:Name="StripSafeGrdDate"              Header="جرد المواد حتى تاريخ"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="StripSafeGrdDate_Click"/>
+                            <MenuItem x:Name="stripItemMov"                  Header="حركة مادة تفصيلي"              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripItemMov_Click"/>
+                            <MenuItem x:Name="stripItemsMovs"                Header="حركة مواد تجميعي"              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripItemsMovs_Click"/>
+                            <MenuItem x:Name="stripExpire"                   Header="صلاحية المواد"                  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripExpire_Click"/>
+                            <MenuItem x:Name="stripSalesAanalysis"           Header="تحليل المبيعات"                 Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSalesAanalysis_Click"/>
+                            <MenuItem x:Name="stripTotalSalePurch"           Header="إجمالي المبيعات والمشتريات"    Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripTotalSalePurch_Click"/>
+                            <MenuItem x:Name="stripBenefits"                 Header="أرباح الفواتير"                 Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripBenefits_Click"/>
+                            <MenuItem x:Name="stripDecision"                 Header="معدل الدوران والركود"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDecision_Click"/>
+                            <MenuItem x:Name="StripRptProducedItems"         Header="تقرير أمر الإنتاج"             Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="StripRptProducedItems_Click"/>
+                            <MenuItem x:Name="stripInvbyTypes"               Header="الفواتير بحسب النوع"           Style="{StaticResource SubMenuItemStyle}" Click="stripInvbyTypes_Click"/>
+                            <MenuItem x:Name="stripIInvoicesByType"          Header="فواتير بحسب النوع 2"           Style="{StaticResource SubMenuItemStyle}" Click="stripIInvoicesByType_Click"/>
+                            <MenuItem x:Name="StripItemsExpiration"          Header="انتهاء صلاحية الأصناف"         Style="{StaticResource SubMenuItemStyle}" Click="StripItemsExpiration_Click"/>
+                            <MenuItem x:Name="StripItemsRptSerialNo"         Header="تقرير الأرقام التسلسلية"       Style="{StaticResource SubMenuItemStyle}" Click="StripItemsRptSerialNo_Click"/>
+                            <MenuItem x:Name="StripItemsRptSerialNoSummary"  Header="تقرير الأرقام التسلسلية تجميعي" Style="{StaticResource SubMenuItemStyle}" Click="StripItemsRptSerialNoSummary_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="ToolStripsallastore" Header="متجر سلة" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="ToolStripListProductsalla"       Header="المنتجات"         Style="{StaticResource SubMenuItemStyle}" Click="ToolStripListProductsalla_Click"/>
+                            <MenuItem x:Name="ToolStripMenuItemGetOrderSallah" Header="إدارة الطلبات"   Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemGetOrderSallah_Click"/>
+                            <MenuItem x:Name="ToolStripMenuItemSallaSafes"     Header="ربط المستودعات"  Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemSallaSafes_Click"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ المشتريات ═══ -->
+                    <MenuItem x:Name="StripPurches"
+                              Header="المشتريات"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="🛒" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="PurchOper" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripPurchInv"    Header="فاتورة المشتريات" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripPurchInv_Click"/>
+                            <MenuItem x:Name="stripPurchReturn" Header="مردود المشتريات"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripPurchReturn_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="PurchSand" Header="السندات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripPaySupl"    Header="سند صرف لمورد" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripPaySupl_Click"/>
+                            <MenuItem x:Name="stripShowSand"   Header="عرض السندات"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripShowSand_Click"/>
+                            <MenuItem x:Name="stripCreditNote" Header="إشعار دائن"    Style="{StaticResource SubMenuItemStyle}" Visibility="Collapsed" Click="stripCreditNote_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="ToolStripNotficPurch" Header="الإشعارات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="ToolStripNotficDeptPurch"   Header="إشعار دائن"      Style="{StaticResource SubMenuItemStyle}" Click="ToolStripNotficDeptPurch_Click"/>
+                            <MenuItem x:Name="ToolStripNotficCreditPurch" Header="إشعار مدين"      Style="{StaticResource SubMenuItemStyle}" Click="ToolStripNotficCreditPurch_Click"/>
+                            <MenuItem x:Name="RptNotficPurch"             Header="تقرير الإشعارات" Style="{StaticResource SubMenuItemStyle}" Click="RptNotficPurch_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="PurchRpt" Header="التقارير" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripSupplAccou"               Header="كشف مورد"                       Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSupplAccou_Click"/>
+                            <MenuItem x:Name="StripRptInvPurchaseDetails"    Header="تقرير فواتير المشتريات"         Style="{StaticResource SubMenuItemStyle}" Click="StripRptInvPurchaseDetails_Click"/>
+                            <MenuItem x:Name="StripRptReturnPurchaseDetails" Header="تقرير مردود فواتير المشتريات"  Style="{StaticResource SubMenuItemStyle}" Click="StripRptReturnPurchaseDetails_Click"/>
+                            <MenuItem x:Name="StripRptNetPurchase"           Header="صافي المشتريات"                 Style="{StaticResource SubMenuItemStyle}" Click="StripRptNetPurchase_Click"/>
+                            <MenuItem x:Name="stripPurchDetails"             Header="مشتريات تفصيلية"                Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripPurchDetails_Click"/>
+                            <MenuItem x:Name="StripItemsPurchDetails"        Header="مشتريات الأصناف تجميعي"        Style="{StaticResource SubMenuItemStyle}" Click="StripItemsPurchDetails_Click"/>
+                            <MenuItem x:Name="stripSupplAccBala"             Header="أرصدة الموردين"                 Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSupplAccBala_Click"/>
+                            <MenuItem x:Name="stripSadadSuppl"               Header="سداد الموردين"                  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSadadSuppl_Click"/>
+                            <MenuItem x:Name="stripEmpPurchess"              Header="مشتريات موظف"                   Style="{StaticResource SubMenuItemStyle}" Click="stripEmpPurchess_Click"/>
+                            <MenuItem x:Name="stripSupplInv"                 Header="الفواتير بحسب الموردين"         Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSupplInv_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripAddSupplier" Header="بطاقة مورد" Style="{StaticResource SubMenuItemStyle}" Click="stripAddSupplier_Click"/>
+                    </MenuItem>
+
+                    <!-- ═══ المبيعات ═══ -->
+                    <MenuItem x:Name="StripSales"
+                              Header="المبيعات"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="🧾" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="SaleOper" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripPOS"               Header="نقطة البيع"              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripPOS_Click"/>
+                            <MenuItem x:Name="stripSaleInv"           Header="فاتورة مبيعات"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSaleInv_Click"/>
+                            <MenuItem x:Name="stripSaleRetu"          Header="مردود المبيعات"          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSaleRetu_Click"/>
+                            <MenuItem x:Name="stripShowPrice"         Header="عرض سعر"                 Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripShowPrice_Click"/>
+                            <MenuItem x:Name="stripCloseCasher"       Header="إغلاق اليومية"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripCloseCasher_Click"/>
+                            <MenuItem x:Name="closeshiftandroid"      Header="إغلاق مبيعات أندرويد"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Visibility="Collapsed" Click="closeshiftandroid_Click"/>
+                            <MenuItem x:Name="stripinvcontract"       Header="فاتورة المقاولات"        Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripinvcontract_Click"/>
+                            <MenuItem x:Name="stripinvcontractreturn" Header="مرتجع مقاولات"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripinvcontractreturn_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="SaleSand" Header="السندات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripSandQclient" Header="سند قبض عميل" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripSandQclient_Click"/>
+                            <MenuItem x:Name="stripShowSanadat" Header="عرض السندات"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripShowSanadat_Click"/>
+                            <MenuItem x:Name="stripDeptNote"    Header="إشعار مدين"   Style="{StaticResource SubMenuItemStyle}" Visibility="Collapsed" Click="stripDeptNote_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="NotficReport" Header="الإشعارات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="ToolstripNotficCreditSale" Header="إشعار دائن"      Style="{StaticResource SubMenuItemStyle}" Click="ToolstripNotficCreditSale_Click"/>
+                            <MenuItem x:Name="ToolstripNotficDeptsal"    Header="إشعار مدين"      Style="{StaticResource SubMenuItemStyle}" Click="ToolstripNotficDeptsal_Click"/>
+                            <MenuItem x:Name="RptNotfic"                 Header="تقرير الإشعارات" Style="{StaticResource SubMenuItemStyle}" Click="RptNotfic_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="saleRpt" Header="التقارير" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripShiftCloses"          Header="إغلاقات اليومية"            Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripShiftCloses_Click"/>
+                            <MenuItem x:Name="StripRptInvSalesDetails"   Header="تقرير فواتير المبيعات"      Style="{StaticResource SubMenuItemStyle}" Click="StripRptInvSalesDetails_Click"/>
+                            <MenuItem x:Name="StripRptReturnSalesDetails" Header="تقرير مردود فواتير المبيعات" Style="{StaticResource SubMenuItemStyle}" Click="StripRptReturnSalesDetails_Click"/>
+                            <MenuItem x:Name="StripRptNetSalesDetails"   Header="صافي المبيعات"              Style="{StaticResource SubMenuItemStyle}" Click="StripRptNetSalesDetails_Click"/>
+                            <MenuItem x:Name="stripDetailSales"          Header="مبيعات تفصيلية"             Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDetailSales_Click"/>
+                            <MenuItem x:Name="StripItemsSalesDetails"    Header="مبيعات الأصناف تجميعي"     Style="{StaticResource SubMenuItemStyle}" Click="StripItemsSalesDetails_Click"/>
+                            <MenuItem x:Name="StripSaleByCategry"        Header="مبيعات بحسب الفئة"          Style="{StaticResource SubMenuItemStyle}" Click="StripSaleByCategry_Click"/>
+                            <MenuItem x:Name="StripInvProfit"            Header="أرباح الفواتير"             Style="{StaticResource SubMenuItemStyle}" Click="StripInvProfit_Click"/>
+                            <MenuItem x:Name="StripItemProfit"           Header="أرباح الأصناف"              Style="{StaticResource SubMenuItemStyle}" Click="StripItemProfit_Click"/>
+                            <MenuItem x:Name="StripItemsProfitDetails"   Header="تفاصيل أرباح الأصناف"       Style="{StaticResource SubMenuItemStyle}" Click="StripItemsProfitDetails_Click"/>
+                            <MenuItem x:Name="StripRptSalesmen"          Header="تقرير المندوبين"            Style="{StaticResource SubMenuItemStyle}" Click="StripRptSalesmen_Click"/>
+                            <MenuItem x:Name="stripEmpSales"             Header="مبيعات موظف"                Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripEmpSales_Click"/>
+                            <MenuItem x:Name="stripCleintBala"           Header="كشف عميل"                   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripCleintBala_Click"/>
+                            <MenuItem x:Name="stripClientsBalans"        Header="أرصدة العملاء"              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripClientsBalans_Click"/>
+                            <MenuItem x:Name="stripClientPay"            Header="سداد العملاء"               Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripClientPay_Click"/>
+                            <MenuItem x:Name="stripInvbyclient"          Header="الفواتير بحسب العملاء"      Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripInvbyclient_Click"/>
+                            <MenuItem x:Name="StripSalesInPeriod"        Header="حركة المبيعات"              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="StripSalesInPeriod_Click"/>
+                            <MenuItem x:Name="StripGraphSale"            Header="تقرير بياني"                Style="{StaticResource SubMenuItemStyle}" Click="StripGraphSale_Click"/>
+                            <MenuItem x:Name="stripDetailSalescontract"  Header="تقرير فواتير المقاولات"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDetailSalescontract_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="POSRpt" Header="تقارير نقطة البيع" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="RptPOSSales"            Header="تقرير مبيعات POS"      Style="{StaticResource SubMenuItemStyle}" Click="RptPOSSales_Click"/>
+                            <MenuItem x:Name="RptPOSItemSalesDetailed" Header="تفاصيل أصناف POS"    Style="{StaticResource SubMenuItemStyle}" Click="RptPOSItemSalesDetailed_Click"/>
+                            <MenuItem x:Name="RptPOSItemSales"        Header="أصناف POS تجميعي"      Style="{StaticResource SubMenuItemStyle}" Click="RptPOSItemSales_Click"/>
+                            <MenuItem x:Name="StripRptDailySales"     Header="تقرير المبيعات اليومية" Style="{StaticResource SubMenuItemStyle}" Click="StripRptDailySales_Click"/>
+                            <MenuItem x:Name="StripCategorySaleByDay" Header="تقرير مبيعات للمجموعة" Style="{StaticResource SubMenuItemStyle}" Click="StripCategorySaleByDay_Click"/>
+                            <MenuItem x:Name="ToolItemAndroidSal"     Header="تقرير فواتير أندرويد"  Style="{StaticResource SubMenuItemStyle}" Visibility="Collapsed" Click="ToolItemAndroidSal_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripAddclient"  Header="بطاقة عميل"  Style="{StaticResource SubMenuItemStyle}" Click="stripAddclient_Click"/>
+                        <MenuItem x:Name="stripAddSaleman" Header="بطاقة مندوب" Style="{StaticResource SubMenuItemStyle}" Click="stripAddSaleman_Click"/>
+                    </MenuItem>
+
+                    <!-- ═══ الموظفين والرواتب ═══ -->
+                    <MenuItem x:Name="StripHR"
+                              Header="الموظفين والرواتب"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="👥" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="HRdefinition" Header="التعاريف" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripDefineManag" Header="تعريف الإدارات" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDefineManag_Click"/>
+                            <MenuItem x:Name="stripDefineClass" Header="تعريف الأقسام"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDefineClass_Click"/>
+                            <MenuItem x:Name="stripDefineEmp"   Header="تعريف موظف"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDefineEmp_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="HRoper" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripWard"              Header="الحوافز والجزاءات" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripWard_Click"/>
+                            <MenuItem x:Name="ToolStripResevedSalary" Header="إستحقاق راتب"      Style="{StaticResource SubMenuItemStyle}" Click="ToolStripResevedSalary_Click"/>
+                            <MenuItem x:Name="ToolStripSandSalary"    Header="سند صرف راتب"      Style="{StaticResource SubMenuItemStyle}" Click="ToolStripSandSalary_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="HRRpt" Header="التقارير" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="ToolStripMenuItemreseved"    Header="تقرير الإستحقاق"  Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemreseved_Click"/>
+                            <MenuItem x:Name="stripPaySalary"              Header="دفع الرواتب"      Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripPaySalary_Click"/>
+                            <MenuItem x:Name="ToolStripMenuItemAccountEmp" Header="حساب موظف"        Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemAccountEmp_Click"/>
+                            <MenuItem x:Name="StripUsersRecords"           Header="سجلات المستخدمين" Style="{StaticResource SubMenuItemStyle}" Click="StripUsersRecords_Click"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ إدارة المراسي ═══ -->
+                    <MenuItem x:Name="StripMarine"
+                              Header="إدارة المراسي"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="⛵" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="stripMarineDefin" Header="التعاريف" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripMarineGrp"    Header="بطاقة نموذج"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineGrp_Click"/>
+                            <MenuItem x:Name="stripAddMarine"    Header="بطاقة مركب"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripAddMarine_Click"/>
+                            <MenuItem x:Name="stripMarineAdds"   Header="بطاقة إضافات" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineAdds_Click"/>
+                            <MenuItem x:Name="stripMarineOwner"  Header="بطاقة مالك"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineOwner_Click"/>
+                            <MenuItem x:Name="stripMarineClient" Header="بطاقة عميل"   Style="{StaticResource SubMenuItemStyle}" IsEnabled="False"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripMarineManag" Header="إدارة" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripMarineAttend"    Header="تحضير المراكب" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineAttend_Click"/>
+                            <MenuItem x:Name="stripMarineViolation" Header="المخالفات"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineViolation_Click"/>
+                            <MenuItem x:Name="stripMarineQueue"     Header="خطة الدور"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineQueue_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripMarineOper" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripMarineInv"         Header="فاتورة"        Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineInv_Click"/>
+                            <MenuItem x:Name="stripJoinInvs"          Header="ربط الفواتير"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripJoinInvs_Click"/>
+                            <MenuItem x:Name="stripMarineBook"        Header="حجوزات"        Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineBook_Click"/>
+                            <MenuItem x:Name="stripMarineCloseCasher" Header="إغلاق اليومية" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripMarineCloseCasher_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripMarineRpt" Header="التقارير" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripClosesRpt"       Header="إغلاقات اليومية"     Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripClosesRpt_Click"/>
+                            <MenuItem x:Name="StripRptRentInvoices" Header="تقرير فواتير التأجير" Style="{StaticResource SubMenuItemStyle}" Click="StripRptRentInvoices_Click"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ إدارة المشاريع ═══ -->
+                    <MenuItem x:Name="StripProjectMang"
+                              Header="إدارة المشاريع"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="🏗️" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="stripProjMngDefine" Header="التعاريف" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripPMTerm"       Header="بطاقة بند"   Style="{StaticResource SubMenuItemStyle}" Click="stripPMTerm_Click"/>
+                            <MenuItem x:Name="stripPMContractor" Header="بطاقة مقاول" Style="{StaticResource SubMenuItemStyle}" Click="stripPMContractor_Click"/>
+                            <MenuItem x:Name="stripPMClient"     Header="بطاقة عميل"  Style="{StaticResource SubMenuItemStyle}" Click="stripPMClient_Click"/>
+                            <MenuItem x:Name="stripStagePM"      Header="مراحل مشروع" Style="{StaticResource SubMenuItemStyle}" Click="stripStagePM_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripProjMngOpr" Header="العمليات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripPMContract"       Header="عقد عميل"       Style="{StaticResource SubMenuItemStyle}" Click="stripPMContract_Click"/>
+                            <MenuItem x:Name="stripExecutePM"        Header="عقد مقاول"       Style="{StaticResource SubMenuItemStyle}" Click="stripExecutePM_Click"/>
+                            <MenuItem x:Name="StripProjCyclePM"      Header="متابعة"          Style="{StaticResource SubMenuItemStyle}" Click="StripProjCyclePM_Click"/>
+                            <MenuItem x:Name="stripRequirements"     Header="عروض"            Style="{StaticResource SubMenuItemStyle}" Click="stripRequirements_Click"/>
+                            <MenuItem x:Name="stripCashVoucherPM"    Header="سند قبض عميل"   Style="{StaticResource SubMenuItemStyle}" Click="stripCashVoucherPM_Click"/>
+                            <MenuItem x:Name="stripPaymentVoucherPM" Header="سند دفع لمقاول" Style="{StaticResource SubMenuItemStyle}" Click="stripPaymentVoucherPM_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripProjMngRpt" Header="التقارير" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="ToolStripMenuItem160" Header="تقرير 1" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ إعدادات ═══ -->
+                    <MenuItem x:Name="StripSettings"
+                              Header="إعدادات"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="⚙️" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="foundationDef" Header="تعاريف المنشأة" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripFoundation"   Header="بطاقة المنشأة"                          Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripFoundation_Click"/>
+                            <MenuItem x:Name="stripBranch"       Header="بطاقة فرع"                              Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripBranch_Click"/>
+                            <MenuItem x:Name="StripZatcaSetting" Header="إعدادات الربط مع هيئة الزكاة والضريبة" Style="{StaticResource SubMenuItemStyle}" Click="StripZatcaSetting_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="managSetting" Header="إعدادات إدارية" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripBackup"        Header="النسخ الإحتياطي"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripBackup_Click"/>
+                            <MenuItem x:Name="stripDefaultPrint"  Header="إفتراضي الطباعة"           Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Visibility="Collapsed" Click="stripDefaultPrint_Click"/>
+                            <MenuItem x:Name="stripMonitorItem"   Header="الرقابة على الأصناف"       Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Visibility="Collapsed" Click="stripMonitorItem_Click"/>
+                            <MenuItem x:Name="stripDataRecycling" Header="تدوير البيانات"            Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripDataRecycling_Click"/>
+                            <MenuItem x:Name="stripCreateDb"      Header="إنشاء ملف"                 Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripCreateDb_Click"/>
+                            <MenuItem x:Name="mainStripEmailMang" Header="إدارة البريد الإلكتروني"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Visibility="Collapsed" Click="mainStripEmailMang_Click"/>
+                            <MenuItem x:Name="StripImportData"    Header="إستيراد وتصدير البيانات"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="StripImportData_Click"/>
+                            <MenuItem x:Name="stripMaintainInvs"  Header="صيانة الفواتير"            Style="{StaticResource SubMenuItemStyle}" Click="stripMaintainInvs_Click"/>
+                            <MenuItem x:Name="StripOffers"        Header="العروض"                    Style="{StaticResource SubMenuItemStyle}" Click="StripOffers_Click"/>
+                            <MenuItem x:Name="striptoolsendData"  Header="مزامنة البيانات بروتوكول" Style="{StaticResource SubMenuItemStyle}" Click="striptoolsendData_Click"/>
+                            <MenuItem x:Name="AccountingPeriods"  Header="الفترات المحاسبية"        Style="{StaticResource SubMenuItemStyle}" Click="AccountingPeriods_Click"/>
+                            <MenuItem x:Name="ToolStripMenuItemRestorData" Header="إستعادة البيانات" Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemRestorData_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="usersettings" Header="إعدادات المستخدمين" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripAddUser"   Header="بطاقة مستخدم"       Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripAddUser_Click"/>
+                            <MenuItem x:Name="stripUserPerm"  Header="صلاحيات المستخدمين" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripUserPerm_Click"/>
+                            <MenuItem x:Name="stripChangePwd" Header="تغيير كلمة المرور"  Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripChangePwd_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="stripGnrlSet" Header="إعدادات عامة" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="stripGnrlSetting"                Header="إعدادات عامة"         Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripGnrlSetting_Click"/>
+                            <MenuItem x:Name="stripfingDevice"                 Header="إعدادات جهاز التحضير" Style="{StaticResource SubMenuItemStyle}" IsEnabled="False" Click="stripfingDevice_Click"/>
+                            <MenuItem x:Name="ToolStripMenuItemsallahSetting"  Header="إعدادات ربط سلة"      Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemsallahSetting_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="StripLanguages" Header="اللغة" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="btnArabic"  Header="العربية" Style="{StaticResource SubMenuItemStyle}" Click="btnArabic_Click"/>
+                            <MenuItem x:Name="btnEnglish" Header="English"  Style="{StaticResource SubMenuItemStyle}" Click="btnEnglish_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="StripSyn" Header="المزامنة" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="StripSynInv"             Header="مزامنة الفواتير"        Style="{StaticResource SubMenuItemStyle}" Click="StripSynInv_Click"/>
+                            <MenuItem x:Name="StripSynEntry"           Header="مزامنة القيود"          Style="{StaticResource SubMenuItemStyle}" Click="StripSynEntry_Click"/>
+                            <MenuItem x:Name="StripSynReceipt"         Header="مزامنة السندات"         Style="{StaticResource SubMenuItemStyle}" Click="StripSynReceipt_Click"/>
+                            <MenuItem x:Name="stripSyncStocks"         Header="مزامنة المخزون"         Style="{StaticResource SubMenuItemStyle}" Click="stripSyncStocks_Click"/>
+                            <MenuItem x:Name="btnSyncData"             Header="إدارة المزامنة"         Style="{StaticResource SubMenuItemStyle}" Click="btnSyncData_Click"/>
+                            <MenuItem x:Name="StripPaymentTypeSetting" Header="إعدادات طريقة الدفع"   Style="{StaticResource SubMenuItemStyle}" Click="StripPaymentTypeSetting_Click"/>
+                            <MenuItem x:Name="StripPriceSetting"       Header="إعدادات الأسعار"        Style="{StaticResource SubMenuItemStyle}" Click="StripPriceSetting_Click"/>
+                            <MenuItem x:Name="StripZatcaSyncInv"       Header="مزامنة الفواتير Zatca" Style="{StaticResource SubMenuItemStyle}" Click="StripZatcaSyncInv_Click"/>
+                            <MenuItem x:Name="ToolstripDevicesAndroid"  Header="أجهزة أندرويد المرتبطة" Style="{StaticResource SubMenuItemStyle}" Click="ToolstripDevicesAndroid_Click"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ الفوترة المصرية ═══ -->
+                    <MenuItem x:Name="StripEgyptEInvoice"
+                              Header="الفوترة المصرية"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="🇪🇬" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="StripEgyRepots" Header="التقارير" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="StripEgyUploadedInvoice" Header="الفواتير المرفوعة" Style="{StaticResource SubMenuItemStyle}" Click="StripEgyUploadedInvoice_Click"/>
+                        </MenuItem>
+
+                        <MenuItem x:Name="StripEgySetting" Header="الإعدادات" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem x:Name="StripEtaSetting" Header="إعدادات الربط مع مصلحة الضرائب المصرية" Style="{StaticResource SubMenuItemStyle}" Click="StripEtaSetting_Click"/>
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══ دعم فني ═══ -->
+                    <MenuItem x:Name="StripSupport"
+                              Header="دعم فني"
+                              Style="{StaticResource TopMenuItemStyle}">
+                        <MenuItem.Icon>
+                            <TextBlock Text="🎧" FontSize="26" HorizontalAlignment="Center"/>
+                        </MenuItem.Icon>
+
+                        <MenuItem x:Name="StripLicense"            Header="الترخيص"             Style="{StaticResource SubMenuItemStyle}" Click="StripLicense_Click"/>
+                        <MenuItem x:Name="stripAbout"              Header="عن البرنامج"          Style="{StaticResource SubMenuItemStyle}" Click="stripAbout_Click"/>
+                        <MenuItem x:Name="StripUpdateProgram"      Header="تحديث البرنامج"       Style="{StaticResource SubMenuItemStyle}" Click="StripUpdateProgram_Click"/>
+                        <MenuItem x:Name="StripDownLoadTeamViewer" Header="تحميل TeamViewer"     Style="{StaticResource SubMenuItemStyle}" Click="StripDownLoadTeamViewer_Click"/>
+                        <MenuItem x:Name="StripDownLoadAnydesk"    Header="تحميل AnyDesk"       Style="{StaticResource SubMenuItemStyle}" Click="StripDownLoadAnydesk_Click"/>
+                        <MenuItem x:Name="OpenTeamViwewr"          Header="فتح TeamViewer"       Style="{StaticResource SubMenuItemStyle}" Click="OpenTeamViwewr_Click"/>
+                        <MenuItem x:Name="toolstripdesign"         Header="فتح المصمم"           Style="{StaticResource SubMenuItemStyle}" Click="toolstripdesign_Click"/>
+                        <MenuItem x:Name="ToolStripMenuItemYoutube" Header="شروحات المدقق"       Style="{StaticResource SubMenuItemStyle}" Click="ToolStripMenuItemYoutube_Click"/>
+                        <MenuItem x:Name="BtnSupportTicket"        Header="🆘 إطلب المساعدة"    Style="{StaticResource SubMenuItemStyle}" Click="BtnSupportTicket_Click"/>
+                    </MenuItem>
+
+                </Menu>
+
+                <!-- زر تسجيل الخروج -->
+                <Button x:Name="btnLogOut"
+                        Grid.Column="1"
+                        Width="44" Height="44"
+                        Margin="8,0"
+                        ToolTip="تسجيل الخروج"
+                        Style="{StaticResource ActionBtn}"
+                        Background="{StaticResource DangerBrush}"
+                        Click="btnLogOut_Click">
+                    <TextBlock Text="🚪" FontSize="20"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ROW 1 : المحتوى الرئيسي
+        ════════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- المنطقة الرئيسية -->
+            <Border Grid.Column="0"
+                    x:Name="Panel2"
+                    Background="#F0F2F7">
+                <Grid>
+                    <!-- لوحة الترحيب والوصول السريع -->
+                    <StackPanel x:Name="PanelCenter"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Border Background="White"
+                                CornerRadius="16"
+                                Padding="40,30"
+                                Effect="{StaticResource CardShadow}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="🏢"
+                                           FontSize="64"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,12"/>
+                                <TextBlock x:Name="lblWelcomeTitle"
+                                           Text="مرحباً بكم في تطبيقات المدقق"
+                                           FontSize="22" FontWeight="Bold"
+                                           Foreground="#3D0073"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Text="برنامج الفوترة الإلكترونية للمحاسبة والمستودعات"
+                                           FontSize="14"
+                                           Foreground="#666"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,20"/>
+
+                                <!-- بطاقات الوصول السريع -->
+                                <WrapPanel HorizontalAlignment="Center"
+                                           Orientation="Horizontal">
+
+                                    <Button x:Name="BtnSales"
+                                            Style="{StaticResource ActionBtn}"
+                                            Width="110" Height="80"
+                                            Margin="6"
+                                            Visibility="Collapsed"
+                                            Click="BtnSales_Click">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="🧾" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="فاتورة مبيعات" FontSize="10" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button x:Name="BtnPurches"
+                                            Style="{StaticResource ActionBtn}"
+                                            Width="110" Height="80"
+                                            Margin="6"
+                                            Visibility="Collapsed"
+                                            Click="BtnPurches_Click">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="🛒" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="فاتورة مشتريات" FontSize="10" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button x:Name="BtnQutation"
+                                            Style="{StaticResource ActionBtn}"
+                                            Width="110" Height="80"
+                                            Margin="6"
+                                            Visibility="Collapsed"
+                                            Click="BtnQutation_Click">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="📋" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="عرض سعر" FontSize="10" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button x:Name="BtnaddSupplier"
+                                            Style="{StaticResource ActionBtn}"
+                                            Width="110" Height="80"
+                                            Margin="6"
+                                            Background="{StaticResource InfoBrush}"
+                                            Visibility="Collapsed"
+                                            Click="BtnaddSupplier_Click">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="🏢" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="تعريف مورد" FontSize="10" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button x:Name="BtnAddcustomer"
+                                            Style="{StaticResource ActionBtn}"
+                                            Width="110" Height="80"
+                                            Margin="6"
+                                            Background="{StaticResource SaveBrush}"
+                                            Visibility="Collapsed"
+                                            Click="BtnAddcustomer_Click">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="👤" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="تعريف عميل" FontSize="10" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button x:Name="BtnAddItems"
+                                            Style="{StaticResource ActionBtn}"
+                                            Width="110" Height="80"
+                                            Margin="6"
+                                            Background="{StaticResource POSBrush}"
+                                            Visibility="Collapsed"
+                                            Click="BtnAddItems_Click">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="📦" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="تعريف مادة" FontSize="10" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- الشريط الجانبي -->
+            <Border Grid.Column="1"
+                    x:Name="FlowLayoutPanel1"
+                    Width="110"
+                    Background="{StaticResource SideBarBrush}"
+                    VerticalAlignment="Stretch">
+                <StackPanel VerticalAlignment="Top"
+                            Margin="4,8">
+                    <Button x:Name="btnPOS2"
+                            Style="{StaticResource POSBtn}"
+                            Height="90"
+                            Width="98"
+                            Margin="0,0,0,6"
+                            Click="btnPOS2_Click">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="🖥️" FontSize="32" HorizontalAlignment="Center"/>
+                            <TextBlock Text="نقطة بيع" FontSize="11" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+     ROW 2 : شريط الحالة السفلي
+════════════════════════════════════════════════════════════════ -->
+        <Border x:Name="ToolStrip1"
+        Grid.Row="2"
+        Background="#E8E0F0"
+        BorderBrush="#C8B8E0"
+        BorderThickness="0,1,0,0"
+        Padding="6,4"
+        MinHeight="34">
+
+            <DockPanel LastChildFill="True">
+
+                <!-- ═══ الجانب الأيمن (يظهر أولاً في RTL) ═══ -->
+                <StackPanel DockPanel.Dock="Right"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center">
+
+                    <!-- زر تسجيل الخروج -->
+                    <Button x:Name="btnLogOutSmall"
+                    Width="28" Height="28"
+                    Margin="4,0"
+                    Style="{StaticResource ActionBtn}"
+                    Background="{StaticResource DangerBrush}"
+                    ToolTip="تسجيل الخروج"
+                    Click="btnLogOut_Click">
+                        <TextBlock Text="🚪" FontSize="13"/>
+                    </Button>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- الوقت -->
+                    <TextBlock Text="🕐" FontSize="12" VerticalAlignment="Center" Margin="2,0"/>
+                    <TextBlock x:Name="lblTime2"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,6,0"
+                       FlowDirection="LeftToRight"
+                       MinWidth="130"/>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- المستخدم -->
+                    <TextBlock Text="👤" FontSize="12" VerticalAlignment="Center" Margin="2,0"/>
+                    <TextBlock x:Name="txtLoggedUser1"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Foreground="#3D0073"
+                       Margin="2,0,6,0"/>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- الفرع -->
+                    <TextBlock Text="🏢" FontSize="12" VerticalAlignment="Center" Margin="2,0"/>
+                    <TextBlock x:Name="lblBranch1"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,6,0"/>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- نسخة تجريبية -->
+                    <TextBlock x:Name="lblIsTrial1"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Foreground="#B92F2F"
+                       FontWeight="Bold"
+                       Margin="2,0,6,0"/>
+
+                    <!-- حالة الاتصال بالبصمة -->
+                    <TextBlock x:Name="lblConnectBar"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,4,0"/>
+
+                </StackPanel>
+
+                <!-- ═══ الجانب الأيسر (يظهر ثانياً في RTL) ═══ -->
+                <StackPanel DockPanel.Dock="Left"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center">
+
+                    <!-- إشعارات Zatca والترخيص -->
+                    <TextBlock x:Name="LblZatca"
+                       Text="✅ الربط الضريبي فعال"
+                       Foreground="#0F9609"
+                       FontSize="10" FontWeight="Bold"
+                       VerticalAlignment="Center"
+                       Margin="4,0"
+                       Visibility="Collapsed"/>
+
+                    <TextBlock x:Name="lblNosendzatca"
+                       Text="يوجد"
+                       Foreground="Crimson"
+                       FontSize="10" FontWeight="Bold"
+                       VerticalAlignment="Center"
+                       Margin="2,0"
+                       Visibility="Collapsed"
+                       Cursor="Hand"
+                       MouseLeftButtonUp="lblNosendzatca_Click"/>
+
+                    <TextBlock x:Name="LblLicenseExpire"
+                       Foreground="Red"
+                       FontSize="10" FontWeight="Bold"
+                       VerticalAlignment="Center"
+                       Margin="4,0"
+                       Cursor="Hand"
+                       MouseLeftButtonUp="LblLicenseExpire_Click"/>
+
+                    <TextBlock x:Name="lblnotify"
+                       Text="حالة المزامنة نشطة"
+                       FontSize="10" FontWeight="Bold"
+                       VerticalAlignment="Center"
+                       Margin="4,0"
+                       Visibility="Collapsed"
+                       Cursor="Hand"
+                       MouseLeftButtonUp="lblnotify_Click"/>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- زر إطلب المساعدة -->
+                    <Button x:Name="btnSupportTicketBar"
+                    Style="{StaticResource ActionBtn}"
+                    Padding="8,3"
+                    Margin="4,0"
+                    Click="BtnSupportTicket_Click">
+                        <TextBlock Text="🆘 إطلب المساعدة" FontSize="10" FontWeight="Bold"/>
+                    </Button>
+
+                </StackPanel>
+
+                <!-- ═══ المنتصف (يملأ المساحة المتبقية) ═══ -->
+                <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- الإصدار -->
+                    <TextBlock Text="📦" FontSize="11" VerticalAlignment="Center" Margin="2,0"/>
+                    <TextBlock x:Name="lblVersion"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,6,0"/>
+
+                    <!-- قاعدة البيانات -->
+                    <TextBlock Text="🗄️" FontSize="11" VerticalAlignment="Center" Margin="2,0"/>
+                    <TextBlock x:Name="lbldbName"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,6,0"/>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- نوع الجهاز -->
+                    <TextBlock x:Name="lblDeviceType"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,6,0"/>
+
+                    <TextBlock Style="{StaticResource StatusSeparatorStyle}"/>
+
+                    <!-- حالة المزامنة -->
+                    <TextBlock Text="🔄" FontSize="11" VerticalAlignment="Center" Margin="2,0"/>
+                    <TextBlock x:Name="btnSyncIng"
+                       Style="{StaticResource StatusLabelStyle}"
+                       Margin="2,0,4,0"
+                       Cursor="Hand"
+                       MouseLeftButtonUp="btnSyncIng_Click"/>
+
+                    <!-- زر تحديث المزامنة -->
+                    <Button x:Name="btnRefreshSync"
+                    Width="24" Height="24"
+                    Margin="2,0"
+                    Style="{StaticResource ActionBtn}"
+                    Visibility="Collapsed"
+                    ToolTip="تحديث المزامنة"
+                    Click="btnRefreshSync_Click">
+                        <TextBlock Text="🔄" FontSize="12"/>
+                    </Button>
+
+                    <!-- شريط التقدم -->
+                    <ProgressBar x:Name="ProgressBarC"
+                         Width="120" Height="14"
+                         Margin="4,0"
+                         Visibility="Collapsed"
+                         Foreground="#3D0073"
+                         Background="#E0D0F0"/>
+
+                </StackPanel>
+
+            </DockPanel>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

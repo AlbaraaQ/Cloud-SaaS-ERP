@@ -49,21 +49,54 @@ one thing a compliance feature must not lie about, and it is why `prepared` exis
   canonicalising (C14N 1.1, excluding the signature, QR and extension nodes) is not
   implemented. Our generator never writes those three nodes, so the document as produced *is*
   its own hashed form; the canonicaliser has to strip them once they exist.
-- **Onboarding.** CSR generation against ZATCA's template, the compliance CSID call, the
-  compliance checks and the production CSID exchange are done by the customer today and the
-  results pasted into `PUT /einvoice/credentials`.
+- **The XAdES signature is not wrapped** (see the bullet above); onboarding, by contrast, is
+  no longer missing — see the next section.
 - **Certificate tag 9** (the CA's signature over the certificate public key) is only available
   from the issued certificate, so it is emitted once the certificate itself is stored.
 
 Everything above is credential-bound, not code-bound: no ZATCA sandbox account can be created
 from inside this repository's CI.
 
+## Phase 11 part one — ⚙️ إعدادات الربط الضريبي (`frmZatcaSetting`)
+
+The window the customer used to do onboarding **on their own device and paste the result back**
+is now a first-class part of the API. Everything below is ported from
+`Desktop_ERP/SmartAuditERP/Form_WPF/frmZatcaSetting.xaml(.cs)`; the full rule-by-rule account
+is in `docs/desktop-parity/PHASE_11_EINVOICING.md` §4.
+
+| step | button | endpoint | permission |
+|---|---|---|---|
+| read the window | — | `GET /einvoice/settings` | `einvoice.view` |
+| 💾 حفظ الإعدادات | Save Settings | `PUT /einvoice/settings` | `einvoice.manage` |
+| 🔄 تعبئة تلقائي | fill from بطاقة المنشأة | `POST /einvoice/settings/fill-from-company` | `einvoice.manage` |
+| ⚡ توليد | Generate | `POST /einvoice/csr/generate` | `einvoice.credentials.manage` |
+| 🔵 compliance CSID | needs the 🔑 OTP | `POST /einvoice/onboarding/compliance-csid` | `einvoice.credentials.manage` |
+| 🔐 حفظ مفتاح التشفير | Get PCSID | `POST /einvoice/onboarding/production-csid` | `einvoice.credentials.manage` |
+| 🧪 اختبار الربط | Test Compliance | `POST /einvoice/onboarding/compliance-check` | `einvoice.credentials.manage` |
+| 🔄 Renews CSID | تجديد الشهادة بعد 5 سنوات | `POST /einvoice/onboarding/renew` | `einvoice.credentials.manage` |
+| ⏸ إيقاف الربط / ▶ تشغيل | the link switch | `POST /einvoice/link/toggle` | `einvoice.manage` |
+
+Three rules worth knowing before you touch this code:
+
+- **A new CSR revokes the issued CSIDs.** A certificate is bound to the key that requested it,
+  so generating again clears both pairs — the desktop does the same with
+  `DELETE FROM ZatcaCredential`.
+- **The order is enforced, in the desktop's own words.** No production CSID without a
+  compliance one, no compliance CSID without a CSR, no compliance check without both, and the
+  link cannot be switched off before it is configured.
+- **The gateway has three modes.** 🧪 Simulation answers locally (deterministically, so tests
+  and re-runs agree), 🔵 Compliance dials the sandbox, 🔴 Production dials the core host.
+  An unreachable or refusing gateway is a `502 EINVOICE_GATEWAY_UNREACHABLE`, never a 500.
+
 ## Runbook
 
 1. Fill in بطاقة المنشأة — a missing VAT number makes every document invalid.
-2. Generate the CSR on the customer's own device, complete ZATCA onboarding, then store the
-   private key, CSID and secret with `PUT /einvoice/credentials` (encrypted at rest with
-   AES-256-GCM, returned masked, never readable again).
+2. Complete onboarding in الإعدادات ← إعدادات الربط مع هيئة الزكاة والضريبة: 🔄 تعبئة تلقائي
+   fills the CSR properties from بطاقة المنشأة, ⚡ توليد mints the key and the PKCS#10 request
+   (the private key is shown **once**), 🔵 issues the compliance CSID with the OTP, 🔐 exchanges
+   it for the production CSID, then 🧪 اختبار الربط proves the six documents. Everything is
+   stored encrypted (AES-256-GCM) and read back masked. `PUT /einvoice/credentials` still works
+   for a tenant that prefers to paste its own grant.
 3. Set `ZATCA_API_BASE_URL` for the environment (simulation first).
 4. Post invoices normally; posting is never blocked by e-invoicing.
 5. Watch `GET /einvoice/submissions` — the admin screen is الإعدادات ← المزامنة ← Zatca — and

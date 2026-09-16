@@ -19,6 +19,14 @@ export type InvoiceLineTotal = {
   net: string;
   tax: string;
   total: string;
+  /**
+   * The line's share of the header (document) discount, distributed pro-rata by
+   * gross value — the desktop `InvoiceCalc`/`BindToEntry` rule
+   * (`price × qty × TotDiscount / SumPrice`). It is already subtracted from `net`
+   * (and its VAT from `tax`), so header totals reconcile with the lines — which is
+   * what ZATCA validates. Zero when the invoice carries no header discount.
+   */
+  headerDiscountShare: string;
 };
 
 export type InvoiceTotalsInput = {
@@ -74,7 +82,7 @@ function divRound(numerator: Int, denominator: Int): Int {
 export function calculateInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals {
   const scale = input.scale ?? 4;
   const unit = ten(scale);
-  const lines = input.lines.map((line) => {
+  const prepared = input.lines.map((line) => {
     const quantity = parse(line.quantity, scale);
     const unitPrice = parse(line.unitPrice, scale);
     const gross = divRound(quantity * unitPrice, unit);
@@ -83,21 +91,57 @@ export function calculateInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals
     const discount = rateDiscount + parse(line.discountAmount ?? '0', scale);
     const net = gross - discount;
     const taxRate = parse(line.taxRate ?? '0', scale);
+    return { gross, discount, net, taxRate };
+  });
+
+  // The header discount is distributed across the lines pro-rata by gross value
+  // (desktop rule) so every line's net and VAT already reflect it. A discount that
+  // only shrank the header while the lines kept their VAT would overstate the tax
+  // and fail ZATCA reconciliation (header taxable must equal the sum of line nets).
+  const headerDiscount = parse(input.invoiceDiscount ?? '0', scale);
+  const shares = new Array<Int>(prepared.length).fill(0n);
+  if (headerDiscount !== 0n && prepared.length > 0) {
+    const totalGross = prepared.reduce((sum, line) => sum + (line.gross > 0n ? line.gross : 0n), 0n);
+    if (totalGross > 0n) {
+      for (let index = 0; index < prepared.length; index += 1) {
+        const base = prepared[index]!.gross > 0n ? prepared[index]!.gross : 0n;
+        shares[index] = divRound(headerDiscount * base, totalGross);
+      }
+      const distributed = shares.reduce((sum, share) => sum + share, 0n);
+      const remainder = headerDiscount - distributed;
+      if (remainder !== 0n) {
+        let target = 0;
+        for (let index = 1; index < prepared.length; index += 1) {
+          if (prepared[index]!.gross > prepared[target]!.gross) target = index;
+        }
+        shares[target] = (shares[target] ?? 0n) + remainder;
+      }
+    }
+  }
+
+  const lines = prepared.map((line, index) => {
+    const share = shares[index] ?? 0n;
+    // The share reduces the VAT-inclusive base, exactly as the desktop subtracts the
+    // header discount from the gross sum before extracting VAT.
+    const base = line.net - share;
     const tax = input.priceIncludesVat
-      ? divRound(net * taxRate, 100n * unit + taxRate)
-      : divRound(net * taxRate, 100n * unit);
-    const taxableNet = input.priceIncludesVat ? net - tax : net;
-    const total = input.priceIncludesVat ? net : net + tax;
-    return { gross: format(gross, scale), discount: format(discount, scale), net: format(taxableNet, scale), tax: format(tax, scale), total: format(total, scale) };
+      ? divRound(base * line.taxRate, 100n * unit + line.taxRate)
+      : divRound(base * line.taxRate, 100n * unit);
+    const taxableNet = input.priceIncludesVat ? base - tax : base;
+    const total = input.priceIncludesVat ? base : base + tax;
+    return { gross: format(line.gross, scale), discount: format(line.discount, scale), net: format(taxableNet, scale), tax: format(tax, scale), total: format(total, scale), headerDiscountShare: format(share, scale) };
   });
   const subtotal = lines.reduce((sum, line) => sum + parse(line.net, scale), 0n);
-  const discount = parse(input.invoiceDiscount ?? '0', scale);
-  const taxable = subtotal - discount;
   const tax = lines.reduce((sum, line) => sum + parse(line.tax, scale), 0n);
   const extraTax = parse(input.extraTax ?? '0', scale);
   const withholding = parse(input.withholding ?? '0', scale);
-  const total = taxable + tax + extraTax - withholding;
-  return { lines, subtotal: format(subtotal, scale), discount: format(discount, scale), taxable: format(taxable, scale), tax: format(tax, scale), extraTax: format(extraTax, scale), withholding: format(withholding, scale), total: format(total, scale) };
+  // Normally every fils of the discount is distributed (the remainder lands on the
+  // largest line above). Only a zero-gross invoice leaves a share unallocated, and
+  // dropping it silently would undercharge — so it still reduces the header total,
+  // which the service then rejects as negative for sales documents.
+  const unallocated = headerDiscount - shares.reduce((sum, share) => sum + share, 0n);
+  const total = subtotal + tax + extraTax - withholding - unallocated;
+  return { lines, subtotal: format(subtotal, scale), discount: format(headerDiscount, scale), taxable: format(subtotal, scale), tax: format(tax, scale), extraTax: format(extraTax, scale), withholding: format(withholding, scale), total: format(total, scale) };
 }
 
 export type LandedCostLineInput = { lineId?: string; itemId?: string; quantity: string; net: string; unitCost?: string };

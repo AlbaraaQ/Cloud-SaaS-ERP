@@ -1,0 +1,423 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmBanks"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:fa="http://schemas.fontawesome.io/icons/"
+        Title="🏦 تعريف البنوك" 
+        Height="650" Width="850"
+        FlowDirection="RightToLeft"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        Background="#F5F5F5"
+        Loaded="frmBanks_Load">
+
+    <Window.Resources>
+        <!-- Gradient Brushes -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#2193b0" Offset="0"/>
+            <GradientStop Color="#6dd5ed" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#483D8B" Offset="0"/>
+            <GradientStop Color="#6A5ACD" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SuccessGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1e7e34" Offset="0"/>
+            <GradientStop Color="#28a745" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#8B0000" Offset="0"/>
+            <GradientStop Color="#B22222" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Button Styles -->
+        <Style x:Key="NavButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryGradient}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryGradient}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="43"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="5">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SmallAddButton" TargetType="Button">
+            <Setter Property="Background" Value="#C0FFC0"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="23"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DataGrid Style -->
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RowHeight" Value="30"/>
+            <Setter Property="AlternatingRowBackground" Value="#F8F9FA"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E9ECEF"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderGradient}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <GroupBox Header="📋 ادخل بيانات البنوك" 
+                  FontWeight="Bold"
+                  Background="White"
+                  Margin="10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Input Form -->
+                <Grid Grid.Row="0" Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Row 1: Bank Name -->
+                    <TextBlock Grid.Row="0" Grid.Column="0" 
+                              x:Name="Label7"
+                              Text="🏦 اسم البنك" 
+                              VerticalAlignment="Center" 
+                              Margin="0,0,10,0"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="5"
+                            x:Name="txtName"
+                            FontWeight="Bold"
+                            Padding="5"
+                            Margin="0,5"/>
+
+                    <!-- Row 2: Country, City, Area -->
+                    <TextBlock Grid.Row="1" Grid.Column="0" 
+                              x:Name="Label3"
+                              Text="🌍 الدولة" 
+                              VerticalAlignment="Center" 
+                              Margin="0,0,10,0"/>
+                    <Grid Grid.Row="1" Grid.Column="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="cmbCountry" 
+                                 Grid.Column="0"
+                                 FontWeight="Bold"
+                                 Padding="5"
+                                 Margin="0,5,5,5"
+                                 DisplayMemberPath="name"
+                                 SelectedValuePath="id"
+                                 SelectionChanged="cmbCountry_SelectedIndexChanged"/>
+                        <Button x:Name="btnCountryAdd" 
+                               Grid.Column="1"
+                               Content="➕"
+                               Style="{StaticResource SmallAddButton}"
+                               Margin="0,5"
+                               Click="btnCountryAdd_Click"/>
+                    </Grid>
+
+                    <TextBlock Grid.Row="1" Grid.Column="2" 
+                              x:Name="Label9"
+                              Text="🏙️ المدينة" 
+                              VerticalAlignment="Center" 
+                              Margin="10,0,10,0"/>
+                    <Grid Grid.Row="1" Grid.Column="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="cmbCity" 
+                                 Grid.Column="0"
+                                 FontWeight="Bold"
+                                 Padding="5"
+                                 Margin="0,5,5,5"
+                                 DisplayMemberPath="name"
+                                 SelectedValuePath="id"
+                                 SelectionChanged="cmbCity_SelectedIndexChanged"/>
+                        <Button x:Name="btnCityAdd" 
+                               Grid.Column="1"
+                               Content="➕"
+                               Style="{StaticResource SmallAddButton}"
+                               Margin="0,5"
+                               Click="btnCityAdd_Click"/>
+                    </Grid>
+
+                    <TextBlock Grid.Row="1" Grid.Column="4" 
+                              x:Name="Label4"
+                              Text="📍 المنطقة" 
+                              VerticalAlignment="Center" 
+                              Margin="10,0,10,0"/>
+                    <Grid Grid.Row="1" Grid.Column="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="cmbArea" 
+                                 Grid.Column="0"
+                                 FontWeight="Bold"
+                                 Padding="5"
+                                 Margin="0,5,5,5"
+                                 DisplayMemberPath="name"
+                                 SelectedValuePath="id"/>
+                        <Button x:Name="btnAreaAdd" 
+                               Grid.Column="1"
+                               Content="➕"
+                               Style="{StaticResource SmallAddButton}"
+                               Margin="0,5"
+                               Click="btnAreaAdd_Click"/>
+                    </Grid>
+
+                    <!-- Row 3: Tel, Mobile, Discount -->
+                    <TextBlock Grid.Row="2" Grid.Column="0" 
+                              x:Name="Label2"
+                              Text="📞 تليفون" 
+                              VerticalAlignment="Center" 
+                              Margin="0,0,10,0"/>
+                    <TextBox Grid.Row="2" Grid.Column="1"
+                            x:Name="txtTel"
+                            FontWeight="Bold"
+                            Padding="5"
+                            Margin="0,5"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="2" 
+                              x:Name="Label10"
+                              Text="📱 موبايل" 
+                              VerticalAlignment="Center" 
+                              Margin="10,0,10,0"/>
+                    <TextBox Grid.Row="2" Grid.Column="3"
+                            x:Name="txtMobile"
+                            FontWeight="Bold"
+                            Padding="5"
+                            Margin="0,5"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="4" 
+                              x:Name="lblDis"
+                              Text="💰 نسبة الاقتطاع %" 
+                              VerticalAlignment="Center" 
+                              Margin="10,0,10,0"/>
+                    <TextBox Grid.Row="2" Grid.Column="5"
+                            x:Name="txtDis"
+                            Text="0"
+                            FontWeight="Bold"
+                            Padding="5"
+                            Margin="0,5"/>
+
+                    <!-- Row 4: Notes -->
+                    <TextBlock Grid.Row="3" Grid.Column="0" 
+                              x:Name="Label5"
+                              Text="📝 ملاحظات" 
+                              VerticalAlignment="Top" 
+                              Margin="0,10,10,0"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="5"
+                            x:Name="txtNotes"
+                            TextWrapping="Wrap"
+                            AcceptsReturn="True"
+                            FontWeight="Bold"
+                            Padding="5"
+                            Height="60"
+                            Margin="0,5"/>
+
+                    <!-- Row 5: CheckBox -->
+                    <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+                             x:Name="chkChangeInPOS"
+                             Content="✅ تغيير في نقطة البيع"
+                             Visibility="Collapsed"
+                             Margin="0,10"/>
+                </Grid>
+
+                <!-- DataGrid Section -->
+                <GroupBox Grid.Row="1" 
+                         x:Name="GroupBox1"
+                         Header="📊 بيانات البنوك" 
+                         FontWeight="Bold"
+                         Margin="10">
+                    <DataGrid x:Name="dgvBanks"
+                             SelectionChanged="dgvBanks_SelectionChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الرقم" Binding="{Binding Column3}" Visibility="Collapsed"/>
+                            <DataGridTextColumn Header="اسم البنك" Binding="{Binding Column1}" Width="150"/>
+                            <DataGridTextColumn Header="الدولة" Binding="{Binding Column2}" Width="120"/>
+                            <DataGridTextColumn Header="المدينة" Binding="{Binding Column4}" Width="120"/>
+                            <DataGridTextColumn Header="المنطقة" Binding="{Binding Column7}" Width="*"/>
+                            <DataGridTextColumn Header="تليفون" Binding="{Binding Column5}" Width="100"/>
+                            <DataGridTextColumn Header="موبايل" Binding="{Binding Column6}" Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </GroupBox>
+
+                <!-- Action Panel -->
+                <Border Grid.Row="2" 
+                       x:Name="panel2"
+                       BorderBrush="#CCC" 
+                       BorderThickness="1" 
+                       Padding="10"
+                       Margin="10,0,10,10">
+                    <StackPanel Orientation="Horizontal" 
+                               HorizontalAlignment="Center">
+
+                        <!-- Close Button -->
+                        <Button x:Name="btnClose"
+                               Style="{StaticResource NavButton}"
+                               Background="{StaticResource DangerGradient}"
+                               ToolTip="إغلاق"
+                               Click="btnClose_Click">
+                            <TextBlock Text="✖️" FontSize="20"/>
+                        </Button>
+
+                        <!-- Navigation Buttons -->
+                        <Button x:Name="btnFirst"
+                               Style="{StaticResource NavButton}"
+                               ToolTip="الأول"
+                               Click="btnFirst_Click">
+                            <TextBlock Text="⏮️" FontSize="20"/>
+                        </Button>
+
+                        <Button x:Name="btnPrevious"
+                               Style="{StaticResource NavButton}"
+                               ToolTip="السابق"
+                               Click="btnPrevious_Click">
+                            <TextBlock Text="◀️" FontSize="20"/>
+                        </Button>
+
+                        <Button x:Name="btnNext"
+                               Style="{StaticResource NavButton}"
+                               ToolTip="التالي"
+                               Click="btnNext_Click">
+                            <TextBlock Text="▶️" FontSize="20"/>
+                        </Button>
+
+                        <Button x:Name="btnLast"
+                               Style="{StaticResource NavButton}"
+                               ToolTip="الأخير"
+                               Click="btnLast_Click">
+                            <TextBlock Text="⏭️" FontSize="20"/>
+                        </Button>
+
+                        <!-- Print Button -->
+                        <Button x:Name="btnPrint"
+                               Style="{StaticResource NavButton}"
+                               ToolTip="طباعة"
+                               Visibility="Collapsed"
+                               Click="btnPrint_Click">
+                            <TextBlock Text="🖨️" FontSize="20"/>
+                        </Button>
+
+                        <!-- Action Buttons -->
+                        <Button x:Name="btnDelete"
+                               Style="{StaticResource ActionButton}"
+                               ToolTip="حذف"
+                               Click="btnDelete_Click">
+                            <StackPanel>
+                                <TextBlock Text="🗑️" FontSize="18" HorizontalAlignment="Center"/>
+                                <TextBlock Text="حذف" FontSize="9"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Name="btnSave"
+                               Style="{StaticResource ActionButton}"
+                               ToolTip="حفظ"
+                               Click="btnSave_Click">
+                            <StackPanel>
+                                <TextBlock Text="💾" FontSize="18" HorizontalAlignment="Center"/>
+                                <TextBlock Text="حفظ" FontSize="9"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Name="btnNew"
+                               Style="{StaticResource ActionButton}"
+                               ToolTip="جديد"
+                               Click="btnNew_Click">
+                            <StackPanel>
+                                <TextBlock Text="➕" FontSize="18" HorizontalAlignment="Center"/>
+                                <TextBlock Text="جديد" FontSize="9"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </GroupBox>
+    </Grid>
+</Window>

@@ -1,0 +1,313 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmItemProperties"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="خواص المادة"
+    Width="390"
+    Height="310"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False"
+    WindowStartupLocation="CenterOwner"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="frmItemProperties_Load">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15" Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20" Color="#000000"/>
+
+        <!-- Label Style -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+
+        <!-- TextBox Style -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsReadOnly" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F0F4FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ComboBox Style -->
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Button Style -->
+        <Style x:Key="InsertBtn" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid Margin="10">
+
+        <!-- GroupBox1 -->
+        <Border x:Name="GroupBox1"
+                x:FieldModifier="public"
+                Background="White"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="14"
+                Effect="{StaticResource CardShadow}">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <!-- Header -->
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- الطول -->
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- العرض -->
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- العدد -->
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- الكمية الناتجة -->
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- زر الإدراج -->
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- طبيعة المادة مخفية -->
+                </Grid.RowDefinitions>
+
+                <!-- ═══ Header ═══ -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource HeaderBrush}"
+                        CornerRadius="8"
+                        Padding="10,6">
+                    <TextBlock Text="📐 خواص المادة"
+                               Foreground="White"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+                <!-- ═══ الطول ═══ -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="95"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="lblHeight"
+                               x:FieldModifier="public"
+                               Grid.Column="0"
+                               Text="📏 الطول"
+                               Style="{StaticResource FieldLabel}"/>
+
+                    <TextBox x:Name="txtHeight"
+                             x:FieldModifier="public"
+                             Grid.Column="2"
+                             Style="{StaticResource ModernTextBox}"
+                             TextChanged="txtHeight_TextChanged"
+                             LostFocus="txtHeight_Leave"
+                             KeyDown="txtHeight_KeyDown"/>
+                </Grid>
+
+                <!-- ═══ العرض ═══ -->
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="95"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="lblWidth"
+                               x:FieldModifier="public"
+                               Grid.Column="0"
+                               Text="↔️ العرض"
+                               Style="{StaticResource FieldLabel}"/>
+
+                    <TextBox x:Name="txtWidth"
+                             x:FieldModifier="public"
+                             Grid.Column="2"
+                             Style="{StaticResource ModernTextBox}"
+                             TextChanged="txtWidth_TextChanged"
+                             KeyDown="txtWidth_KeyDown"/>
+                </Grid>
+
+                <!-- ═══ العدد ═══ -->
+                <Grid Grid.Row="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="95"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="lblQty"
+                               x:FieldModifier="public"
+                               Grid.Column="0"
+                               Text="🔢 العدد"
+                               Style="{StaticResource FieldLabel}"/>
+
+                    <TextBox x:Name="txtQty"
+                             x:FieldModifier="public"
+                             Grid.Column="2"
+                             Style="{StaticResource ModernTextBox}"
+                             TextChanged="txtQty_TextChanged"
+                             LostFocus="txtQty_Leave"
+                             KeyDown="txtQty_KeyDown"/>
+                </Grid>
+
+                <!-- ═══ الكمية الناتجة ═══ -->
+                <Grid Grid.Row="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="95"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="lblResultQnty"
+                               x:FieldModifier="public"
+                               Grid.Column="0"
+                               Text="📊 الكمية الناتجة"
+                               Style="{StaticResource FieldLabel}"
+                               FontSize="10"/>
+
+                    <TextBox x:Name="txtNetQnty"
+                             x:FieldModifier="public"
+                             Grid.Column="2"
+                             Style="{StaticResource ModernTextBox}"
+                             IsReadOnly="True"
+                             TextChanged="txtNetQnty_TextChanged"
+                             LostFocus="txtNetQnty_Leave"
+                             KeyDown="txtNetQnty_KeyDown"/>
+                </Grid>
+
+                <!-- ═══ زر الإدراج ═══ -->
+                <Button x:Name="btnInsert"
+                        x:FieldModifier="public"
+                        Grid.Row="10"
+                        Style="{StaticResource InsertBtn}"
+                        Content="⏬ إدراج"
+                        Click="btnInsert_Click"/>
+
+                <!-- ═══ طبيعة المادة (مخفية) ═══ -->
+                <Grid Grid.Row="12" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="95"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="Label3"
+                               x:FieldModifier="public"
+                               Grid.Column="0"
+                               Text="طبيعة المادة"
+                               Style="{StaticResource FieldLabel}"
+                               Visibility="Collapsed"/>
+
+                    <ComboBox x:Name="cmbItemProperties"
+                              x:FieldModifier="public"
+                              Grid.Column="2"
+                              Style="{StaticResource ModernComboBox}"
+                              IsEnabled="False"
+                              Visibility="Collapsed"
+                              SelectionChanged="cmbItemProperties_SelectedIndexChanged">
+                        <ComboBoxItem Content="ميزان"/>
+                        <ComboBoxItem Content="تعبئة"/>
+                        <ComboBoxItem Content="مساحة"/>
+                        <ComboBoxItem Content="متر طولي"/>
+                    </ComboBox>
+                </Grid>
+
+            </Grid>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>

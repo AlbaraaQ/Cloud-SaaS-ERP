@@ -18,8 +18,10 @@ import {
 } from '@erp/contracts';
 import {
   cashLocationBalances,
+  cashLocationCustodians,
   cashLocations,
   currencies,
+  employees,
   newId,
   tenants,
   withTenantTx,
@@ -105,17 +107,22 @@ export class CashLocationsService {
         .limit(query.limit)
         .offset(query.offset);
 
+      const custodians = await custodianIdsByLocation(tx, tenantId, rows.map((row) => row.id));
       return {
-        data: rows.map((row) => toCashLocationDto(row, { maskBankDetails: true })),
+        data: rows.map((row) =>
+          toCashLocationDto(row, { maskBankDetails: true, custodianIds: custodians.get(row.id) ?? [] }),
+        ),
         meta: buildMeta(totalRow?.value ?? 0, query),
       };
     });
   }
 
   async read(tenantId: string, cashLocationId: string): Promise<CashLocationDto> {
-    return withTenantTx(this.database.db, tenantId, async (tx) =>
-      toCashLocationDto(await this.mustFind(tx, tenantId, cashLocationId)),
-    );
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const row = await this.mustFind(tx, tenantId, cashLocationId);
+      const custodians = await custodianIdsByLocation(tx, tenantId, [row.id]);
+      return toCashLocationDto(row, { custodianIds: custodians.get(row.id) ?? [] });
+    });
   }
 
   async listBalances(tenantId: string, cashLocationId: string): Promise<CashLocationBalanceDto[]> {
@@ -176,6 +183,7 @@ export class CashLocationsService {
         bank: input.bank ?? null,
         changeInPos: input.changeInPos ?? false,
         isActive: input.isActive ?? true,
+        notes: input.notes ?? null,
         createdAt: now,
         createdBy: actorUserId,
       });
@@ -186,13 +194,15 @@ export class CashLocationsService {
         .values({ tenantId, cashLocationId, currencyCode, balance: '0' })
         .onConflictDoNothing();
 
+      await this.replaceCustodians(tx, tenantId, cashLocationId, input.kind, input.custodianIds);
       const row = await this.mustFind(tx, tenantId, cashLocationId);
       await this.recordAudit(tx, tenantId, 'create', row, null);
-      return row;
+      const custodians = await custodianIdsByLocation(tx, tenantId, [row.id]);
+      return toCashLocationDto(row, { custodianIds: custodians.get(row.id) ?? [] });
     });
 
     markRequestAudited();
-    return toCashLocationDto(created);
+    return created;
   }
 
   async update(
@@ -236,6 +246,7 @@ export class CashLocationsService {
       if (input.changeInPos !== undefined) updates.changeInPos = input.changeInPos;
       if (input.isDefault !== undefined) updates.isDefault = input.isDefault;
       if (input.isActive !== undefined) updates.isActive = input.isActive;
+      if (input.notes !== undefined) updates.notes = input.notes;
 
       await tx.update(cashLocations).set(updates).where(eq(cashLocations.id, cashLocationId));
 
@@ -247,13 +258,17 @@ export class CashLocationsService {
           .onConflictDoNothing();
       }
 
+      if (input.custodianIds !== undefined) {
+        await this.replaceCustodians(tx, tenantId, cashLocationId, existing.kind, input.custodianIds);
+      }
       const row = await this.mustFind(tx, tenantId, cashLocationId);
       await this.recordAudit(tx, tenantId, 'update', row, existing);
-      return row;
+      const custodians = await custodianIdsByLocation(tx, tenantId, [row.id]);
+      return toCashLocationDto(row, { custodianIds: custodians.get(row.id) ?? [] });
     });
 
     markRequestAudited();
-    return toCashLocationDto(updated);
+    return updated;
   }
 
   async remove(tenantId: string, cashLocationId: string): Promise<void> {
@@ -309,6 +324,59 @@ export class CashLocationsService {
     return row;
   }
 
+  /**
+   * 👤 مسئولي الصندوق — `frmTreasury.xaml.cs:222` saves the treasury and re-inserts
+   * `Stock_Emps` in one transaction, and refuses a الصندوق with no مسئول at all
+   * («يجب اختيار موظف مسئول»). Same rule, same transaction, one difference: the desktop
+   * deletes first and inserts after, which for a moment leaves the box unowned. Here the
+   * employees are validated *before* anything is written, so a typo cannot strip a safe
+   * of its custodians on the way to failing.
+   */
+  private async replaceCustodians(
+    tx: DrizzleTx,
+    tenantId: string,
+    cashLocationId: string,
+    kind: string,
+    custodianIds: string[] | undefined,
+  ): Promise<void> {
+    const requested = custodianIds ?? [];
+    if (kind === 'safe' && custodianIds !== undefined && requested.length === 0) {
+      throw validationFailed('يجب اختيار موظف مسئول — a safe needs a responsible employee', 'custodianIds');
+    }
+    if (!requested.length) return;
+
+    const unique = Array.from(new Set(requested));
+    const rows = await tx
+      .select({ id: employees.id })
+      .from(employees)
+      .where(
+        and(eq(employees.tenantId, tenantId), inArray(employees.id, unique), isNull(employees.deletedAt)),
+      );
+    if (rows.length !== unique.length) {
+      const known = new Set(rows.map((row) => row.id));
+      const missing = unique.find((id) => !known.has(id));
+      throw validationFailed(`Employee ${missing} does not belong to this tenant`, 'custodianIds');
+    }
+
+    await tx
+      .delete(cashLocationCustodians)
+      .where(
+        and(
+          eq(cashLocationCustodians.tenantId, tenantId),
+          eq(cashLocationCustodians.cashLocationId, cashLocationId),
+        ),
+      );
+    await tx.insert(cashLocationCustodians).values(
+      unique.map((employeeId) => ({
+        id: newId(),
+        tenantId,
+        cashLocationId,
+        employeeId,
+        createdBy: actorStamp().actorUserId,
+      })),
+    );
+  }
+
   private async clearDefault(tx: DrizzleTx, tenantId: string, kind: string): Promise<void> {
     await lockDefaultSwitch(tx, tenantId, `cash_locations:${kind}`);
     await tx
@@ -362,7 +430,9 @@ function auditView(row: CashLocation): Record<string, unknown> {
     isDefault: row.isDefault,
     changeInPos: row.changeInPos,
     isActive: row.isActive,
+    /** 👤 مسئولي الصندوق are audited by the treasury write itself, not by this projection. */
     bank: bank ? { bankName: bank.bankName ?? null, iban: bank.iban ? maskIban(bank.iban) : null } : null,
+    notes: row.notes ?? null,
   };
 }
 
@@ -406,9 +476,38 @@ async function resolveCurrency(
   return (tenantRow?.baseCurrency ?? 'SAR').trim();
 }
 
+/** 👤 مسئولي الصندوق of many boxes at once — one query, so a list of 50 costs two. */
+async function custodianIdsByLocation(
+  tx: DrizzleTx,
+  tenantId: string,
+  cashLocationIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (!cashLocationIds.length) return map;
+  const rows = await tx
+    .select({
+      cashLocationId: cashLocationCustodians.cashLocationId,
+      employeeId: cashLocationCustodians.employeeId,
+    })
+    .from(cashLocationCustodians)
+    .where(
+      and(
+        eq(cashLocationCustodians.tenantId, tenantId),
+        inArray(cashLocationCustodians.cashLocationId, cashLocationIds),
+      ),
+    )
+    .orderBy(asc(cashLocationCustodians.createdAt));
+  for (const row of rows) {
+    const list = map.get(row.cashLocationId) ?? [];
+    list.push(row.employeeId);
+    map.set(row.cashLocationId, list);
+  }
+  return map;
+}
+
 export function toCashLocationDto(
   row: CashLocation,
-  options: { maskBankDetails?: boolean } = {},
+  options: { maskBankDetails?: boolean; custodianIds?: string[] } = {},
 ): CashLocationDto {
   const bank = (row.bank ?? null) as CashLocationDto['bank'];
   const projected =
@@ -425,6 +524,8 @@ export function toCashLocationDto(
     bank: projected,
     changeInPos: row.changeInPos,
     isActive: row.isActive,
+    notes: row.notes ?? null,
+    custodianIds: options.custodianIds ?? [],
     version: row.version,
     createdAt: isoOf(row.createdAt),
     updatedAt: isoOrNull(row.updatedAt),

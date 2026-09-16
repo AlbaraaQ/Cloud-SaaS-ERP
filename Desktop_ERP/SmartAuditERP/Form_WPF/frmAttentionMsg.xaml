@@ -1,0 +1,158 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmAttentionMsg"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تنبيه"
+    Width="468" Height="173"
+    MinWidth="468" MinHeight="173"
+    MaxWidth="468" MaxHeight="173"
+    WindowStartupLocation="CenterOwner"
+    Topmost="True"
+    ResizeMode="NoResize"
+    FlowDirection="RightToLeft"
+    Background="#F5F5F5"
+    FontFamily="Cairo, Tahoma, Arial">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="CadetBlueBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#7FB5C0" Offset="0"/>
+            <GradientStop Color="#5F9EA0" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BrownBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#A52A2A" Offset="0"/>
+            <GradientStop Color="#7B1A1A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Width" Value="112"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="8,0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--  المنطقة العلوية: أيقونة + عنوان + رسالة           -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <Grid Grid.Row="0" Margin="10,10,10,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="55"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- رسالة التنبيه + عنوان تنبيه -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Label1: تنبيه -->
+                <TextBlock x:Name="Label1"
+                           Grid.Row="0"
+                           Text="تنبيه"
+                           FontFamily="Tahoma, Cairo"
+                           FontSize="15"
+                           FontWeight="Bold"
+                           Foreground="#1B2642"
+                           Margin="0,0,0,4"/>
+
+                <!-- lblmsg: نص الرسالة -->
+                <TextBox x:Name="lblmsg"
+                         Grid.Row="1"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         BorderThickness="0"
+                         Background="#F5F5F5"
+                         FontFamily="Tahoma"
+                         FontSize="12"
+                         VerticalAlignment="Top"
+                         VerticalContentAlignment="Top"/>
+            </Grid>
+
+            <!-- PictureBox1: أيقونة تنبيه (Emoji بديل الصورة) -->
+            <TextBlock x:Name="PictureBox1"
+                       Grid.Column="1"
+                       Text="❓"
+                       FontSize="36"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--  الأزرار: تأكيد + إلغاء                            -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,10">
+
+            <!-- btnInsure: تأكيد -->
+            <Button x:Name="btnInsure"
+                    Content="تأكيد"
+                    Background="{StaticResource CadetBlueBrush}"
+                    Style="{StaticResource ActionBtn}"
+                    IsEnabled="False"
+                    Margin="0,0,16,0"
+                    Click="btnInsure_Click"/>
+
+            <!-- btnClose: إلغاء -->
+            <Button x:Name="btnClose"
+                    Content="إلغاء"
+                    Background="{StaticResource BrownBrush}"
+                    Style="{StaticResource ActionBtn}"
+                    Click="btnClose_Click"/>
+
+        </StackPanel>
+    </Grid>
+</dx:ThemedWindow>

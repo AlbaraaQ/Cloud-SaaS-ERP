@@ -1,0 +1,911 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmTaxRptPeriod"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="إقرار ضريبي"
+    Width="1220" Height="720"
+    MinWidth="1100" MinHeight="650"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ══════════ Brushes ══════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="InfoBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2196F3" Offset="0"/>
+            <GradientStop Color="#1565C0" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="WarningBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FF9800" Offset="0"/>
+            <GradientStop Color="#E65100" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight"        Color="#D0D7E8"/>
+        <SolidColorBrush x:Key="CellLightSteelBlue" Color="#B0C4DE"/>
+        <SolidColorBrush x:Key="CellLightGray"      Color="#D3D3D3"/>
+        <SolidColorBrush x:Key="CellGainsboro"      Color="#DCDCDC"/>
+
+        <!-- ══════════ Effects ══════════ -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15" Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20" Color="#000000"/>
+
+        <!-- ══════════ Styles – Buttons ══════════ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height"          Value="36"/>
+            <Setter Property="MinWidth"        Value="90"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="FontSize"        Value="12"/>
+            <Setter Property="FontWeight"      Value="Bold"/>
+            <Setter Property="Background"      Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding"         Value="10,0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Effect"          Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.50"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <Style x:Key="InfoBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource InfoBrush}"/>
+        </Style>
+
+        <Style x:Key="WarningBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+        </Style>
+
+        <!-- ══════════ Styles – Labels (readonly display cells) ══════════ -->
+        <!-- LightSteelBlue cell -->
+        <Style x:Key="CellSteelBlue" TargetType="Border">
+            <Setter Property="Background"       Value="{StaticResource CellLightSteelBlue}"/>
+            <Setter Property="BorderBrush"      Value="#9AACCF"/>
+            <Setter Property="BorderThickness"  Value="1"/>
+            <Setter Property="CornerRadius"     Value="4"/>
+            <Setter Property="Padding"          Value="4,2"/>
+        </Style>
+
+        <!-- LightGray cell -->
+        <Style x:Key="CellGray" TargetType="Border">
+            <Setter Property="Background"       Value="{StaticResource CellLightGray}"/>
+            <Setter Property="BorderBrush"      Value="#BBBBBB"/>
+            <Setter Property="BorderThickness"  Value="1"/>
+            <Setter Property="CornerRadius"     Value="4"/>
+            <Setter Property="Padding"          Value="4,2"/>
+        </Style>
+
+        <!-- Gainsboro header cell -->
+        <Style x:Key="CellGainsboroStyle" TargetType="Border">
+            <Setter Property="Background"       Value="{StaticResource CellGainsboro}"/>
+            <Setter Property="BorderBrush"      Value="#BBBBBB"/>
+            <Setter Property="BorderThickness"  Value="1"/>
+            <Setter Property="CornerRadius"     Value="4"/>
+            <Setter Property="Padding"          Value="4,2"/>
+        </Style>
+
+        <!-- TextBlock inside value cell -->
+        <Style x:Key="CellText" TargetType="TextBlock">
+            <Setter Property="FontSize"                 Value="12"/>
+            <Setter Property="FontWeight"               Value="Bold"/>
+            <Setter Property="HorizontalAlignment"      Value="Center"/>
+            <Setter Property="VerticalAlignment"        Value="Center"/>
+            <Setter Property="TextAlignment"            Value="Center"/>
+            <Setter Property="TextWrapping"             Value="Wrap"/>
+            <Setter Property="Foreground"               Value="#1B2642"/>
+        </Style>
+
+        <!-- Header-label inside a SteelBlue cell (title row) -->
+        <Style x:Key="SectionHeaderText" TargetType="TextBlock">
+            <Setter Property="FontSize"             Value="13"/>
+            <Setter Property="FontWeight"           Value="Bold"/>
+            <Setter Property="HorizontalAlignment"  Value="Center"/>
+            <Setter Property="VerticalAlignment"    Value="Center"/>
+            <Setter Property="Foreground"           Value="#1B2642"/>
+        </Style>
+
+        <!-- Net-Tax result cell (larger, colored dynamically) -->
+        <Style x:Key="NetTaxCellText" TargetType="TextBlock">
+            <Setter Property="FontSize"             Value="13"/>
+            <Setter Property="FontWeight"           Value="Bold"/>
+            <Setter Property="HorizontalAlignment"  Value="Center"/>
+            <Setter Property="VerticalAlignment"    Value="Center"/>
+            <Setter Property="TextAlignment"        Value="Center"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ════════════════════════════════════════════
+         ROOT GRID  (3 rows: toolbar / content / footer)
+         ════════════════════════════════════════════ -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- Panel1 toolbar -->
+            <RowDefinition Height="*"/>      <!-- Panel2 data   -->
+            <RowDefinition Height="Auto"/>   <!-- progress      -->
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════════
+             ROW 0 – TOOLBAR  (Panel1)
+             ══════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="White"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,0,0,1"
+                Padding="10,8"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- ── Row 0-0: Branch + action buttons ── -->
+                <Grid Grid.Row="0" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- الفرع label -->
+                    <TextBlock Grid.Column="0"
+                               x:Name="Label5"
+                               Text="الفرع :"
+                               FontWeight="Bold" FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+
+                    <!-- cmbBranches -->
+                    <ComboBox Grid.Column="1"
+                              x:Name="cmbBranches"
+                              Width="160" Height="30"
+                              VerticalContentAlignment="Center"
+                              FontFamily="Tahoma" FontSize="12"
+                              Margin="0,0,6,0"
+                              SelectionChanged="cmbBranches_SelectionChanged"/>
+
+                    <!-- chkAllBranches -->
+                    <CheckBox Grid.Column="2"
+                              x:Name="chkAllBranches"
+                              Content="الكل"
+                              FontSize="12" FontWeight="Bold"
+                              VerticalAlignment="Center"
+                              Margin="0,0,14,0"
+                              Checked="chkAllBranches_CheckedChanged"
+                              Unchecked="chkAllBranches_CheckedChanged"/>
+
+                    <!-- Spacer -->
+                    <Grid Grid.Column="3"/>
+
+                    <!-- btnShow -->
+                    <Button Grid.Column="4"
+                            x:Name="btnShow"
+                            Content="👁️ عرض"
+                            Style="{StaticResource ActionBtn}"
+                            Width="100"
+                            Margin="0,0,6,0"
+                            Click="btnShow_Click"/>
+
+                    <!-- btnPreview -->
+                    <Button Grid.Column="5"
+                            x:Name="btnPreview"
+                            Content="👁️ معاينة"
+                            Style="{StaticResource InfoBtn}"
+                            Width="100"
+                            Margin="0,0,6,0"
+                            Click="btnPreview_Click"/>
+
+                    <!-- btnPrint -->
+                    <Button Grid.Column="6"
+                            x:Name="btnPrint"
+                            Content="🖨️ طباعة"
+                            Style="{StaticResource WarningBtn}"
+                            Width="100"
+                            Margin="0,0,6,0"
+                            Click="btnPrint_Click"/>
+
+                    <!-- btnClose -->
+                    <Button Grid.Column="7"
+                            x:Name="btnClose"
+                            Content="✖ خروج"
+                            Style="{StaticResource DangerBtn}"
+                            Width="90"
+                            Click="btnClose_Click"/>
+                </Grid>
+
+                <!-- ── Row 0-1: Date range ── -->
+                <Grid Grid.Row="1" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               x:Name="Label2"
+                               Text="من تاريخ"
+                               FontWeight="Bold" FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+
+                    <dxe:DateEdit Grid.Column="1"
+                                  x:Name="txtDateFrom"
+                                  Width="150" Height="30"
+                                  DateTime="{Binding DateFromValue, RelativeSource={RelativeSource AncestorType=dx:ThemedWindow}, Mode=TwoWay}"
+                                  Mask="d"
+                                  FontSize="12"/>
+
+                    <Grid Grid.Column="2"/>
+
+                    <TextBlock Grid.Column="3"
+                               x:Name="Label3"
+                               Text="الى تاريخ"
+                               FontWeight="Bold" FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"/>
+
+                    <dxe:DateEdit Grid.Column="4"
+                                  x:Name="txtDateTo"
+                                  Width="150" Height="30"
+                                  DateTime="{Binding DateToValue, RelativeSource={RelativeSource AncestorType=dx:ThemedWindow}, Mode=TwoWay}"
+                                  Mask="d"
+                                  FontSize="12"/>
+                </Grid>
+
+                <!-- ── Row 0-2: Quarterly / Monthly filters + detail buttons ── -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ckQuart -->
+                    <CheckBox Grid.Column="0"
+                              x:Name="ckQuart"
+                              Content="ريع سنة"
+                              FontSize="12" FontWeight="Bold"
+                              VerticalAlignment="Center"
+                              Margin="0,0,6,0"
+                              Checked="ckQuart_CheckedChanged"
+                              Unchecked="ckQuart_CheckedChanged"/>
+
+                    <!-- cmbQuartars -->
+                    <ComboBox Grid.Column="1"
+                              x:Name="cmbQuartars"
+                              Width="140" Height="30"
+                              FontSize="12"
+                              IsEnabled="False"
+                              SelectionChanged="cmbQuartars_SelectionChanged">
+                        <ComboBoxItem Content="الربع الأول"/>
+                        <ComboBoxItem Content="الربع الثاني"/>
+                        <ComboBoxItem Content="الربع الثالث"/>
+                        <ComboBoxItem Content="الربع الرابع"/>
+                    </ComboBox>
+
+                    <Grid Grid.Column="2"/>
+
+                    <!-- ckMonthly -->
+                    <CheckBox Grid.Column="3"
+                              x:Name="ckMonthly"
+                              Content="شهري"
+                              FontSize="12" FontWeight="Bold"
+                              VerticalAlignment="Center"
+                              Margin="0,0,6,0"
+                              Checked="ckMonthly_CheckedChanged"
+                              Unchecked="ckMonthly_CheckedChanged"/>
+
+                    <!-- cmbMonthly -->
+                    <ComboBox Grid.Column="4"
+                              x:Name="cmbMonthly"
+                              Width="140" Height="30"
+                              FontSize="12"
+                              IsEnabled="False"
+                              SelectionChanged="cmbMonthly_SelectionChanged">
+                        <ComboBoxItem Content="شهر 1"/>
+                        <ComboBoxItem Content="شهر 2"/>
+                        <ComboBoxItem Content="شهر 3"/>
+                        <ComboBoxItem Content="شهر 4"/>
+                        <ComboBoxItem Content="شهر 5"/>
+                        <ComboBoxItem Content="شهر 6"/>
+                        <ComboBoxItem Content="شهر 7"/>
+                        <ComboBoxItem Content="شهر 8"/>
+                        <ComboBoxItem Content="شهر 9"/>
+                        <ComboBoxItem Content="شهر 10"/>
+                        <ComboBoxItem Content="شهر 11"/>
+                        <ComboBoxItem Content="شهر 12"/>
+                    </ComboBox>
+
+                    <Grid Grid.Column="5"/>
+
+                    <!-- btnSalesDetails -->
+                    <Button Grid.Column="6"
+                            x:Name="btnSalesDetails"
+                            Content="📊 تفاصيل الإيرادات"
+                            Style="{StaticResource ActionBtn}"
+                            Width="140"
+                            Margin="0,0,6,0"
+                            Click="btnSalesDetails_Click"/>
+
+                    <!-- btnPurchesDetails -->
+                    <Button Grid.Column="7"
+                            x:Name="btnPurchesDetails"
+                            Content="📊 تفاصيل مشتريات"
+                            Style="{StaticResource InfoBtn}"
+                            Width="140"
+                            Click="btnPurchesDetails_Click"/>
+
+                    <!-- btnPOSdetails (hidden) -->
+                    <Button Grid.Column="8"
+                            x:Name="btnPOSdetails"
+                            Content="📊 تفاصيل نقطة البيع"
+                            Style="{StaticResource WarningBtn}"
+                            Width="140"
+                            Visibility="Collapsed"
+                            Margin="6,0,0,0"
+                            Click="btnPOSdetails_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════
+             ROW 1 – DATA PANEL  (Panel2)
+             ══════════════════════════════════════════ -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Auto">
+            <StackPanel Margin="8,8,8,8">
+
+                <!-- ┌─────────────────────────────────────────────────────┐
+                     │  TOP SECTION : Sales (right) + Purchases (left)     │
+                     └─────────────────────────────────────────────────────┘ -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- Purchases left block -->
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <!-- Sales right block -->
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ══════════ PURCHASES BLOCK (left / Grid.Column=0) ══════════ -->
+                    <Border Grid.Column="0"
+                            Background="White"
+                            CornerRadius="10"
+                            Effect="{StaticResource CardShadow}"
+                            Padding="6">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="36"/>  <!-- title -->
+                                <RowDefinition Height="36"/>  <!-- col headers -->
+                                <RowDefinition Height="36"/>  <!-- row 1 -->
+                                <RowDefinition Height="46"/>  <!-- row 2 -->
+                                <RowDefinition Height="36"/>  <!-- row 3 -->
+                                <RowDefinition Height="46"/>  <!-- row 4 -->
+                                <RowDefinition Height="36"/>  <!-- row 5 -->
+                                <RowDefinition Height="36"/>  <!-- row 6 total -->
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Title -->
+                            <Border Grid.Row="0" Grid.ColumnSpan="5"
+                                    Style="{StaticResource CellSteelBlue}"
+                                    Margin="0,0,0,3">
+                                <TextBlock x:Name="Label61"
+                                           Text="ضريبة القيمة المضافة على المشتريات"
+                                           Style="{StaticResource SectionHeaderText}"/>
+                            </Border>
+
+                            <!-- Column Headers -->
+                            <Border Grid.Row="1" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label40" Text="الضريبة"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label41" Text="الصافي"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label42" Text="تفاصيل المشتريات:"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 1: المشتريات الخاضعة للنسبة الأساسية -->
+                            <Border Grid.Row="2" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtTaxNetPurch" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="2" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtNetPurch" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="2" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label60"
+                                           Text="المشتريات الخاضعة للنسبة الأساسية"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 2: الاستيرادات الخاضعة / الجمارك -->
+                            <Border Grid.Row="3" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label51" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="3" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label52" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="3" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label59"
+                                           Text="الإستيرادات الخاضعة للقيمة المضافة والتي تدفع في الجمارك"
+                                           Style="{StaticResource CellText}" FontSize="10"/>
+                            </Border>
+
+                            <!-- Row 3: سندات الصرف -->
+                            <Border Grid.Row="4" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtExpenseVAT" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="4" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtExpenseNet" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="4" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label58" Text="سندات الصرف"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 4: الاستيرادات / الاحتساب العكسي -->
+                            <Border Grid.Row="5" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label47" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="5" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label48" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="5" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label56"
+                                           Text="الاستيرادات الخاضعة للقيمة المضافة التي تطبق عليها آلية الاحتساب العكسي"
+                                           Style="{StaticResource CellText}" FontSize="10"/>
+                            </Border>
+
+                            <!-- Row 5: المشتريات المعفاة -->
+                            <Border Grid.Row="6" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtNoTaxPurch" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="6" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtPurchOutTax" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="6" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label57" Text="المشتريات المعفاة"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 6: اجمالي المشتريات (SteelBlue total) -->
+                            <Border Grid.Row="7" Grid.Column="0"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,4,0">
+                                <TextBlock x:Name="txtNetPurchTax" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="7" Grid.Column="2"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,4,0">
+                                <TextBlock x:Name="txtNetPurches" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="7" Grid.Column="4"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,0,0">
+                                <TextBlock x:Name="Label55" Text="اجمالي المشتريات"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- ══════════ SALES BLOCK (right / Grid.Column=2) ══════════ -->
+                    <Border Grid.Column="2"
+                            Background="White"
+                            CornerRadius="10"
+                            Effect="{StaticResource CardShadow}"
+                            Padding="6">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="36"/>
+                                <RowDefinition Height="36"/>
+                                <RowDefinition Height="36"/>
+                                <RowDefinition Height="46"/>
+                                <RowDefinition Height="36"/>
+                                <RowDefinition Height="46"/>
+                                <RowDefinition Height="36"/>
+                                <RowDefinition Height="36"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Title -->
+                            <Border Grid.Row="0" Grid.ColumnSpan="5"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label1"
+                                           Text="ضريبة القيمة المضافة على المبيعات"
+                                           Style="{StaticResource SectionHeaderText}"/>
+                            </Border>
+
+                            <!-- Column Headers -->
+                            <Border Grid.Row="1" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label37" Text="الضريبة"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label38" Text="الصافي"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label39" Text="تفاصيل المبيعات:"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 1: المبيعات الخاضعة للنسبة الأساسية -->
+                            <Border Grid.Row="2" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtTaxNetSale" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="2" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtNetSale" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="2" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label9"
+                                           Text="المبيعات الخاضعة للنسبة الأساسية"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 2: إيرادات أخرى -->
+                            <Border Grid.Row="3" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtIncomesVAT" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="3" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtIncomes" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="3" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label10" Text="إيرادات آخرى"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 3: سندات القبض -->
+                            <Border Grid.Row="4" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtReceiptsVAT" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="4" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtReceipts" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="4" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label13" Text="سندات القبض"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 4: الصادرات -->
+                            <Border Grid.Row="5" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label30" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="5" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="Label31" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="5" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label11" Text="الصادرات"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 5: المبيعات المعفاة -->
+                            <Border Grid.Row="6" Grid.Column="0"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtSalesNoTax" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="6" Grid.Column="2"
+                                    Style="{StaticResource CellGray}" Margin="0,0,4,3">
+                                <TextBlock x:Name="txtSalesOutTax" Text="0"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="6" Grid.Column="4"
+                                    Style="{StaticResource CellGray}" Margin="0,0,0,3">
+                                <TextBlock x:Name="Label17" Text="المبيعات المعفاة"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+
+                            <!-- Row 6: إجمالي المبيعات -->
+                            <Border Grid.Row="7" Grid.Column="0"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,4,0">
+                                <TextBlock x:Name="txtNetSaleTax" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="7" Grid.Column="2"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,4,0">
+                                <TextBlock x:Name="txtNetSales" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                            <Border Grid.Row="7" Grid.Column="4"
+                                    Style="{StaticResource CellSteelBlue}" Margin="0,0,0,0">
+                                <TextBlock x:Name="Label12" Text="إجمالي المبيعات"
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- ══════════ SEPARATOR: تفاصيل الضريبة ══════════ -->
+                <Border Margin="0,10,0,6"
+                        Style="{StaticResource CellSteelBlue}"
+                        Height="36">
+                    <TextBlock x:Name="Label25"
+                               Text="تفاصيل الضريبة"
+                               Style="{StaticResource SectionHeaderText}"/>
+                </Border>
+
+                <!-- ══════════ BOTTOM SECTION: Tax Details row ══════════ -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- Previous period VAT -->
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <!-- Previous period correction -->
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <!-- Current period VAT -->
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <!-- Excise tax -->
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Card 1: ضريبة القيمة المضافة المرحلة من الفترات السابقة -->
+                    <Border Grid.Column="0"
+                            Background="White" CornerRadius="10"
+                            Effect="{StaticResource CardShadow}"
+                            Padding="6">
+                        <StackPanel>
+                            <Border Style="{StaticResource CellGainsboroStyle}"
+                                    Height="60" Margin="0,0,0,4">
+                                <TextBlock x:Name="Label62"
+                                           Text="ضريبة القيمة المضافة التي تم ترحيلها من الفترات السابقة"
+                                           Style="{StaticResource CellText}"
+                                           FontSize="11" TextWrapping="Wrap"/>
+                            </Border>
+                            <Border Style="{StaticResource CellSteelBlue}" Height="36">
+                                <TextBlock x:Name="Label14" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Card 2: تصحيحات من الفترة السابقة -->
+                    <Border Grid.Column="2"
+                            Background="White" CornerRadius="10"
+                            Effect="{StaticResource CardShadow}"
+                            Padding="6">
+                        <StackPanel>
+                            <Border Style="{StaticResource CellGainsboroStyle}"
+                                    Height="60" Margin="0,0,0,4">
+                                <TextBlock x:Name="Label65"
+                                           Text="تصحيحات من الفترة السابقة (في حدود 5000 ريال)"
+                                           Style="{StaticResource CellText}"
+                                           FontSize="11" TextWrapping="Wrap"/>
+                            </Border>
+                            <Border Style="{StaticResource CellSteelBlue}" Height="36">
+                                <TextBlock x:Name="Label63" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Card 3: اجمالي ضريبة القيمة المضافة الحالية -->
+                    <Border Grid.Column="4"
+                            Background="White" CornerRadius="10"
+                            Effect="{StaticResource CardShadow}"
+                            Padding="6">
+                        <StackPanel>
+                            <Border Style="{StaticResource CellGainsboroStyle}"
+                                    Height="60" Margin="0,0,0,4">
+                                <TextBlock x:Name="Label66"
+                                           Text="اجمالي ضريبة القيمة المضافة المستحقة عن الفترة الضريبية الحالية"
+                                           Style="{StaticResource CellText}"
+                                           FontSize="11" TextWrapping="Wrap"/>
+                            </Border>
+                            <Border Style="{StaticResource CellSteelBlue}" Height="36">
+                                <TextBlock x:Name="Label64" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Card 4: اجمالي الضريبة الانتقائية -->
+                    <Border Grid.Column="6"
+                            Background="White" CornerRadius="10"
+                            Effect="{StaticResource CardShadow}"
+                            Padding="6">
+                        <StackPanel>
+                            <Border Style="{StaticResource CellGainsboroStyle}"
+                                    Height="60" Margin="0,0,0,4">
+                                <TextBlock x:Name="Label6"
+                                           Text="اجمالي الضريبة الإنتقائية المستحقة عن الفترة الضريبية الحالية"
+                                           Style="{StaticResource CellText}"
+                                           FontSize="11" TextWrapping="Wrap"/>
+                            </Border>
+                            <Border Style="{StaticResource CellSteelBlue}" Height="36">
+                                <TextBlock x:Name="txtExtraVAT" Text=" "
+                                           Style="{StaticResource CellText}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ══════════ NET TAX ROW ══════════ -->
+                <Border Margin="0,10,0,0"
+                        Background="White"
+                        CornerRadius="10"
+                        Effect="{StaticResource CardShadow}"
+                        Padding="6">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Style="{StaticResource CellGainsboroStyle}"
+                                Height="40">
+                            <TextBlock x:Name="Label67"
+                                       Text="صافي ضريبة القيمة المضافة"
+                                       Style="{StaticResource SectionHeaderText}"/>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                x:Name="NetTaxBorder"
+                                Background="{StaticResource CellLightSteelBlue}"
+                                BorderBrush="#9AACCF"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Height="40">
+                            <TextBlock x:Name="txtNetTax"
+                                       Text=" "
+                                       Style="{StaticResource NetTaxCellText}"
+                                       Foreground="#1B2642"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ══════════════════════════════════════════
+             ROW 2 – ProgressBar
+             ══════════════════════════════════════════ -->
+        <ProgressBar Grid.Row="2"
+                     x:Name="ProgressBar1"
+                     Height="18"
+                     Minimum="0" Maximum="100" Value="0"
+                     Background="#E8EBF5"
+                     Foreground="{StaticResource HeaderBrush}"
+                     BorderThickness="0"/>
+    </Grid>
+</dx:ThemedWindow>

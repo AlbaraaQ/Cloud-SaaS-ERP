@@ -1,0 +1,1205 @@
+# المرحلة 09 — الوحدات الرأسية (desktop parity)
+
+**الحالة: الأجزاء الأول والثاني والثالث والرابع والخامس والسادس والسابع والثامن والتاسع مُنجزة** — الجزء الأول 🧑‍💼 المندوبون
+والعمولات (`frmSalesMen` + `frmInvBySalesMen`؛ ترحيل 0052، **21** نقطة تحقّق حيّة)
+والجزء الثاني 🧵 طلب التفصيل (`frmOrders` + `frmOrderDetails` + `frmOptions`؛ ترحيل
+0053، **38** نقطة تحقّق حيّة) والجزء الثالث 🧾 فاتورة التفصيل (`frmViewOrders` +
+`AddNewSizes`؛ ترحيل 0054، **41** نقطة تحقّق حيّة) والجزء الرابع 📏 القياسات
+(`frmMeasurements` + `frmMeasurementDetails` + `frmMeasurementAttributes`؛ ترحيل 0055،
+**37** نقطة تحقّق حيّة) والجزء الخامس 👓 النظارات (`frmGlasses` + `Other_Column`؛ ترحيل
+0056، **33** نقطة تحقّق حيّة) والجزء السادس ⛵ المرسى: الحجوزات والمخالفات
+(`frmBookingM` + `frmViolationM` + `frmInvoiceRentSrch`؛ ترحيل 0057، **45** نقطة تحقّق
+حيّة، **740** اختبار API) والجزء السابع ⛵ المرسى: 📋 بطاقة الفئة و⏰ فترات التأجير
+(`frmGroupM` + `frmAddPeriod`؛ ترحيل 0058، **58** نقطة تحقّق حيّة، **749** اختبار API)
+والجزء الثامن 🛒 متجر سلة (`FrmSallah` + `SallaAPI` + `ProductsManager` + `OrdersManager` +
+`CustomersManager` + `SallaAuth`؛ ترحيل 0059، **40** نقطة تحقّق حيّة، **759** اختبار API)
+والجزء التاسع ⛵ المرسى: ➕ الإضافات (`frmAdditions` و«🎁 الإضافات» من `frmBookingM`؛
+ترحيل 0060، **44** نقطة تحقّق حيّة، **767** اختبار API). ما بقي من المرحلة 09 تقاريرٌ
+وملحقاتٌ مُثبتة في §14.
+
+الغرض: نقل **النوافذ الرأسية** كما يعرضها الديسكتوب — حقولها وفلاترها وعبارات رفضها —
+لا اختراع وحداتٍ جديدة. الوحدات الرأسية في السحابة جزءٌ منها خدماتٌ بلا شاشات
+(`optics` · `tailoring` · `fitment` · `installments`) وجزءٌ منها شاشاتٌ واختبارات
+(`projects` · `marina`)؛ وهذه المرحلة تُتمّ كل نافذةٍ على حدة: شاشة، واختبارات،
+وتحقّق حيّ، وطريقٌ في الشجرة.
+
+كل قسم في هذه الوثيقة يُسمّي ملفه من `Desktop_ERP` نصّاً، وتسمياته مأخوذة من تلك
+الملفات بالعربية. أي تسمية مخترَعة تُبرَّر صراحةً في ملخّص الجزء.
+
+## 1. المصادر (ملفات `Desktop_ERP`)
+
+### الجزء الأول
+
+| المجال | الملفات |
+|---|---|
+| 🧑‍💼 بطاقة المندوب | `Form_WPF/frmSalesMen.xaml` («شاشة المندوبين») + `.xaml.cs` · `Class_WPF/SalesmanRow.cs` |
+| 📋 عمولات المندوب | `Form_WPF/frmInvBySalesMen.xaml` («مبيعات مندوب خلال فترة») + `.xaml.cs` |
+| القاعدة | جدول `salesmen(id, name, comm, Colle_Comm, Profit_Comm, tel, mobile, email, notes, IS_Deleted)` و`Inv.salesman` و`Inv_Sub` و`Notes(Doc_Type=2)` و`Receipts(SalesManID, ReceiptType 5|7)` |
+
+### الجزء الثاني
+
+| المجال | الملفات |
+|---|---|
+| 🧵 الطلب | `Form_WPF/frmOrders.xaml` («إدارة طلبات التفصيل») + `.xaml.cs` · `Form_WPF/frmOrderDetails.xaml` («إضافة طلب تفصيل») + `.xaml.cs` · `Form_WPF/frmOptions.xaml` («⚙️ إدارة الخيارات الجاهزة») + `.xaml.cs` |
+| القاعدة | `vw_OrdersComplete` · `TailoringOrders` · `OrderOptions` · `OrderStatus` · `TailoringTypes` · `OptionCategories` · `OptionValues` · `CustomerMeasurements` |
+
+### الجزء الثالث
+
+| المجال | الملفات |
+|---|---|
+| 🧾 الفاتورة | `Form_WPF/frmViewOrders.xaml` («عرض الطلبات - ViewOrders») + `.xaml.cs` (376/183 سطراً) · `Form_WPF/AddNewSizes.xaml` («إضافة مقاس جديد») + `.xaml.cs` (1185/1280) · `Form_WPF/frmSandQ.xaml` (`ISTailor = true`, L664) |
+| القاعدة | `Inv_Tailor(code, name, quantity, phone_num, Date, sale_price, state, type, bill)` · `Inv_Sub_Tailor` (39 عمود قياس + `paid`) · `SandQ` (سند القبض) |
+
+### الجزء الرابع
+
+| المجال | الملفات |
+|---|---|
+| 📏 القياسات | `Form_WPF/frmMeasurements.xaml` («إدارة قياسات العملاء») + `.xaml.cs` (351/345) · `Form_WPF/frmMeasurementDetails.xaml` («📏 بيانات القياس») + `.xaml.cs` (250/320) · `Form_WPF/frmMeasurementAttributes.xaml` («📏 إدارة خصائص القياسات») + `.xaml.cs` (244/409) |
+| القاعدة | `CustomerMeasurements(MeasurementID, Cust_ID, MeasurementName, MeasurementDate, Notes, IsActive)` · `MeasurementValues(MeasurementID, AttributeID, AttributeValue)` · `MeasurementAttributes(AttributeID, AttributeName, DisplayOrder, IsActive)` · `sp_DeleteMeasurement` · «📐 المقاسات» في `frmCustomers.xaml` L1184 |
+
+### الجزء الخامس
+
+| المجال | الملفات |
+|---|---|
+| 👓 بيانات النظارات | `Form_WPF/frmGlasses.xaml` («👓 بيانات النظارات») + `.xaml.cs` (598/308) — التبويب «👓  القياسات» و«⚙  أسماء الحقول» · `Form_WPF/frmInvSale.xaml.cs` L2503–2530 (`glassesOptions`، Alt+G) |
+| القاعدة | `Glasses(InvGlobalID, ItemId, orientation, SPH, CYL, AX, [ADD], IPD)` — كتابتها `Class/InvoiceOper.cs` L1656–1672 وقراءتها `glassOtions` L3904 وحذفها مع الفاتورة L1517 · `Other_Column(R1,R2,R3,R4,R5,L1,L2,L3,L4,L5)` — `insertglasses` و`loadcolumnOther` و`loadNameLbl` · `Class/Print.cs` L710 (`ReSPH … LeIPD`) |
+
+### الجزء السادس
+
+| المجال | الملفات |
+|---|---|
+| ⛵ الحجوزات | `Form_WPF/frmBookingM.xaml` («الحجوزات») + `.xaml.cs` (1170/1339) — التبويبان «📋 بيانات الحجوزات» و«🔍 البحث» |
+| ⚠️ المخالفات | `Form_WPF/frmViolationM.xaml` («المخالفات») + `.xaml.cs` (426/396) |
+| 🧾 بحث الفواتير | `Form_WPF/frmInvoiceRentSrch.xaml` («بحث الفواتير») + `.xaml.cs` (397/481) |
+| القاعدة | `Booking(InvID, MarineId, UserId, ClientId, Bdate, dateIn, PeriodHour, PeriodMinute, Price, status, BookingType, notes, IsDeleted)` · `BookingAddition(bookId, AditionID, Price, quanty, notes, IsDeleted)` · `RentInvoice(proc_type=4 … tot_Rent, tot_Additions, tax, tot_net, RentPeriod, Insurance, Companions)` · `Violation(MarineId, Vdate, Period, status, ViolatType, notes, IsDeleted)` · `Marine` · `GroupMarine` · `Additions` · `SettingGeneral(Inv_Id=4).MainVAT` |
+
+### الجزء السابع
+
+| المجال | الملفات |
+|---|---|
+| 📋 بطاقة فئة | `Form_WPF/frmGroupM.xaml` («📋 بطاقة فئة») + `.xaml.cs` (480/537) |
+| ⏰ فترات التأجير | `Form_WPF/frmAddPeriod.xaml` («⏰ فترات التأجير» — عنوان لوحته «⏰ إدارة فترات التأجير») + `.xaml.cs` (653) |
+| القاعدة | `GroupMarine(id, code, name, nameEN, HourPrice, HalfHPrice, OfferHour, OfferHalf, IsDeleted, image)` · `RentPeriodSub(MGroupID, code, periodID, offer, rent)` · `RentPeriod(id, name)` — عشر مددٍ مزروعة في `AlterDb.txt` L3317 · `Marine(Groupcode)` |
+
+### الجزء التاسع
+
+| المجال | الملفات |
+|---|---|
+| 📋 إضافات | `Form_WPF/frmAdditions.xaml` («📋 إضافات» — لوحتها «📋 إدارة الإضافات») + `.xaml.cs` (317/340) |
+| 🎁 الإضافات | `Form_WPF/frmBookingM.xaml` («الحجوزات») `cmbAdditions` L484 · «الكمية» L497 · «السعر» L509 · «الإجمالي» L518 · «➕ إضافة صنف جديد» L500 — و`.xaml.cs`: `LoadAdditions` L211 · `Add2Dgv` L405 · `CalcuAll` L480 · `cmbAdditions_SelectionChanged` L991 · `btnAddObj_Click` L1214 |
+| القاعدة | `Additions(id, name, SalePrice, IsDeleted)` · `BookingAddition(bookId, AditionID, Price, quanty, notes, IsDeleted)` — و`Additions` مزروع في `CrystalLiteDB.txt` L49 |
+
+### الجزء الثامن
+
+| المجال | الملفات |
+|---|---|
+| 🛒 تكامل Salla API | `Form_WPF/FrmSallah.xaml` («تكامل Salla API» — لوحته «🛒 تكامل منصة Salla») + `.xaml.cs` (119/105) |
+| العميل والمديرون | `Class/SallaAPI.cs` (76) · `Class/ProductsManager.cs` · `Class/OrdersManager.cs` · `Class/CustomersManager.cs` · `Class/SallaAuth.cs` (34) |
+| القوائم | `Home.xaml` L394–L398 («متجر سلة»: المنتجات · إدارة الطلبات · ربط المستودعات) وL638 («إعدادات ربط سلة»)؛ والمعالجات الثلاثة في `Home.xaml.cs` L3878–L3882 **فارغة** |
+| القاعدة | لا جدولَ: النافذة تُحصي ما تجلبه ولا تحفظه — فلا `SallaProducts` ولا `SallaOrders` في `CrystalLiteDB.txt` |
+
+## 2. ما هو موجود في السحابة قبل كل جزء (قياس)
+
+### قبل الجزء الأول
+
+| النهاية | الحالة قبل الجزء الأول | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `GET /sales/salesmen` | `id · name · employeeRef · active` | **لا** نسبَ عمولة، ولا هاتف/جوال/بريد/ملاحظات، ولا ربطاً ببطاقة الموظف |
+| `POST` / `PATCH /sales/salesmen` | الاسم والمرجع والتفعيل | لا «نسبة بين 0 و100»: أي نصٍّ يُخزَّن صفراً (`double.TryParse … ? : 0`) |
+| `sales_invoices.salesman_id` | موجود، ولا شيء يقرأه | لا إجابة عن «ماذا باع هذا المندوب؟»، ولا عن «كم يستحق؟» |
+| `vouchers.salesman_id` | موجود (👔 المندوب، ترحيل 0025) ويُشير إلى **الموظف** | الديسكتوب يُشير بالسند والفاتورة إلى جدول `salesmen` نفسه؛ والسحابة فصمتهما اثنين |
+| `sales_adjustment_notes` | `kind` مدين/دائن | لا شيء يقرأ الإشعار في حساب العمولة |
+
+### قبل الجزء الثاني
+
+| النهاية | الحالة قبل الجزء الثاني | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `GET/POST /tailoring/parties/{id}/measurements` | قياس العميل (`customer_measurements`) | هذا **كل** ما كان: لا طلب، ولا حالة، ولا موعد تسليم، ولا سعر |
+| — | لا شيء | `frmOrders` يقرأ `vw_OrdersComplete`: رقم الطلب · العميل · الجوال · القياس · نوع التفصيل · الحالة · التاريخين · السعر · المدفوع · المتبقي |
+| — | لا شيء | `frmOrderDetails` يحفظ قماشاً وتصميماً وخيارات، ويرفض «الرجاء اختيار عميل» |
+| — | لا شيء | `frmOptions` يُدير تصنيفاتٍ وخيارات و«⭐ تعيين افتراضي» |
+
+### قبل الجزء الثالث
+
+| النهاية | الحالة قبل الجزء الثالث | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `/tailoring/orders` (الجزء الثاني) | طلب التفصيل كاملاً | الفاتورة **وثيقة أخرى**: `frmViewOrders` يقرأ `Inv_Tailor` لا `TailoringOrders` |
+| — | لا شيء | `frmViewOrders`: شبكة `📋 رقم الفاتورة · 👤 الاسم · 📱 الجوال · 📅 التاريخ · 💰 الإجمالي · ✅ المدفوع · ⏳ الباقي · 📌 الحالة · 👁️ عرض`، وصندوق بحثٍ واحد «🔍 الهاتف أو اسم العميل...» |
+| — | لا شيء | `AddNewSizes`: «📋 البيانات الأساسية» + 39 قياساً و«⚙️ لوحة التحكم» (`جديد · حفظ · مكرر · فاتورة · طباعه · إستلام دفعة`) |
+| `tailoring_order_statuses` | أربع حالات (الجزء الثاني) | الفاتورة تشترك في الدورة نفسها، فلم تُخلق قائمةٌ ثانية |
+
+### قبل الجزء الرابع
+
+| النهاية | الحالة قبل الجزء الرابع | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `POST /tailoring/measurements` | قياسٌ واحد: `partyId` · `kind` · `measurements jsonb` · `notes` | **لا** 👤 اسم صاحب القياس، ولا 📅 تاريخاً، ولا قائمة، ولا تعديل، ولا حذف، ولا شاشة |
+| `/tailoring/parties/{id}/measurements` | قياسات عميل بلا ترتيب وبلا عدد | لا «📋 قياسات العميل» ولا «🔍 بحث» بالجوال أو الاسم |
+| — | لا شيء | لا «📏 خصائص القياسات»: فبطاقة القياس عند الديسكتوب **تُبنى وقت التشغيل** منها |
+
+### قبل الجزء الخامس
+
+| النهاية | الحالة قبل الجزء الخامس | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `GET/POST /optics/prescriptions` | وصفةٌ على عميل أو سطر فاتورة، `rightEye`/`leftEye` jsonb | **لا** تعديل، ولا حذف، ولا قائمة، ولا شاشة، ولا اختبار |
+| — | لا شيء | «⚙  أسماء الحقول»: لا جدولَ `Other_Column` في السحابة، فلا عناوينَ للمربعات العشرة ولا حفظاً لها |
+| `GET /optics/invoice-lines/{id}/print-section` | `{title, rows}` | العنوان إنكليزي، والقسم لا يحمل عناوين الحقول ولا قيم العينين مفصولة |
+
+### قبل الجزء السادس
+
+| النهاية | الحالة قبل الجزء السادس | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `GET/POST /marina/bookings` | حجز بـ`startsAt`/`endsAt` وتأمين ومرافقين | **لا** رقم، ولا 🔖 حالة، ولا 🚢 نوع حجز، ولا ⏱️ مدة، ولا 💰 قيمة، ولا إضافات بكمية وسعر، ولا مجاميع، ولا بحث، ولا تعديل ولا حذف |
+| `GET/POST /marina/violations` | مخالفة بوصفها ومبلغها | لا 🔢 رقماً، ولا ⚠️ نوعاً، ولا ⏱️ مدة (يوم)، ولا تعديل ولا حذف |
+| `GET /marina/rental-invoices` | كل الفواتير بلا مرشِّح | لا «🔍 خيارات البحث»: لا تاريخين، ولا عميلاً/جوالاً، ولا «الصافي من/إلى»؛ ولا ضريبة ولا صافياً في الفاتورة |
+
+### قبل الجزء السابع
+
+| النهاية | الحالة قبل الجزء السابع | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `POST /marina/groups` | `{ name, code }` — اسمٌ ورمز، ولا ردَّ يقرأهما إلا قائمة `GET /marina` | **لا** 🔢 رقماً، ولا اسمـاً إنكليزياً، ولا قيمة ساعة ولا نصف ساعة، ولا عرضيهما بالدقائق، ولا صورة، ولا قراءةَ فئةٍ واحدة، ولا تعديلاً ولا حذفاً |
+| `POST /marina/groups/{id}/pricing` | سعرٌ واحد لِمدةٍ واحدة (`periodKind`) | لا `RentPeriodSub`: لا «⏰ المدة · 💵 السعر · 🎁 العرض» ولا «➕ إضافة مدة» |
+| — | لا شيء | لا «📋 قائمة الفئات»: `رقم الفئة · رمز الفئة · اسم الفئة · قيمة الساعة · قيمة النصف ساعة` ولا ⏮ ◀ ▶ ⏭ |
+| — | لا شيء | لا `DELETE /marina/vessels/{id}`: فالفئة التي تحمل مركباً لا تُمحى عند الديسكتوب أبداً |
+
+### قبل الجزء الثامن
+
+| النهاية | الحالة قبل الجزء الثامن | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `GET /integrations/salla/products` | أصنافٌ محلية وحالة مزامنتها | لا `ProductsManager`: لا «📦 جلب المنتجات»، ولا «➕ إضافة منتج»، ولا `PUT`/`DELETE products/{id}`، ولا مرآةً لما في المتجر |
+| `GET /integrations/salla/orders` | فواتير `orderType='salla'` ممّا يصل بالويب هوك فقط | لا `OrdersManager`: لا «📋 جلب الطلبات»، ولا حفظاً لرقم الطلب البعيد (فلا منعَ للتكرار)، ولا `PUT orders/{id}/status` |
+| — | لا شيء | لا `CustomersManager`: لا «👥 العملاء» |
+| `POST /integrations/salla/connections` | ربطٌ بلا فكّ | لا `DELETE /integrations/salla/connections/{id}`: لا سبيل إلى قطع متجر |
+
+### قبل الجزء التاسع
+
+| النهاية | الحالة قبل الجزء التاسع | الفجوة مقابل الديسكتوب |
+|---|---|---|
+| `POST /marina/bookings/:id/additions` | صفٌّ بـ`description · quantity · unitPrice · amount` | **لا** تعريفَ للإضافة: لا `Additions`، فلا «🎁 الإضافات» قائمةً تُقرأ منها، ولا سعراً يأتي من تعريف، ولا `AditionID` على الصفّ |
+| `marina_booking_additions` | «الوصف · العدد · السعر · الإجمالي» مكتوبة باليد | `cmbAdditions` عند الديسكتوب لا يقبل إلا ما في `Additions`، واختيارٌ منها يكتب «السعر» (`cmbAdditions_SelectionChanged`) |
+| — | لا شيء | لا «📋 إضافات» (`frmAdditions`): لا 🔢 رقماً ولا 💰 قيمة، ولا رفض «يجب إدخال اسم الإضافة ⚠️» ولا «يجب تحديد الإضافة المراد حذفها ⚠️» |
+| — | لا شيء | `Add2Dgv` تجمع كمّية إضافةٍ مكرَّرة على صفّها (`Quantity += quant`)؛ والسحابة كانت تفتح صفّاً ثانياً |
+
+## 3. الأجزاء
+
+| الجزء | المصادر | المحتوى | الحالة |
+|---|---|---|---|
+| الأول | `frmSalesMen` · `frmInvBySalesMen` | **🧑‍💼 المندوبون والعمولات**: البطاقة بالثلاث نسب + «📋 طباعة فواتير مندوب وعمولاتهم» (§4) | **تمّ** |
+| الثاني | `frmOrders` · `frmOrderDetails` · `frmOptions` | **🧵 طلب التفصيل**: الطلب وحالاته الأربع وخياراته وقماشه (§5) | **تمّ** |
+| الثالث | `frmViewOrders` · `AddNewSizes` | **🧾 فاتورة التفصيل** — `Inv_Tailor` و`Inv_Sub_Tailor`، وحالاتها `مستلم · في الخياطة · جاهز · تم التسليم` (§6) | **تمّ** |
+| الرابع | `frmMeasurements` · `frmMeasurementAttributes` · `frmMeasurementDetails` | **📏 القياسات** — قياس كل عميل باسمه وتاريخه وقيمه، وخصائص القياس التي تُبنى منها البطاقة (§7) | **تمّ** |
+| الخامس | `frmGlasses` · `glassOtions` (`InvoiceOper` L3904) · `Other_Column` | **👓 النظارات** — الوصفة بعشر قيم نصية، و«⚙️ أسماء الحقول» التي تسمّيها كل مؤسسة (§8) | **تمّ** |
+| السادس | `frmBookingM` · `frmViolationM` · `frmInvoiceRentSrch` | **⛵ المرسى: الحجوزات والمخالفات** — الحجز برقمه وحالته ونوعه ومدته وإضافاته ومجاميعه، والمخالفة بنوعها ومدتها، وبحث فواتير التأجير (§9) | **تمّ** |
+| السابع | `frmGroupM` · `frmAddPeriod` | **⛵ المرسى: 📋 بطاقة الفئة و⏰ فترات التأجير** — الفئة برقمها ورمزها واسميها وقيمتَي الساعة ونصف الساعة وعرضَيهما وصورتها، وفتراتها العشر بأسعارها وعروضها، و⏮ ◀ ▶ ⏭ (§10) | **تمّ** |
+| الثامن | `FrmSallah` · `SallaAPI` · `ProductsManager` · `OrdersManager` · `CustomersManager` · `SallaAuth` | **🛒 متجر سلة** — جلب المنتجات وإضافة منتج وتحديثه وحذفه، وجلب الطلبات إلى فواتير برقمها البعيد، وتحديث حالتها عند المتجر (§11) | **تمّ** |
+| التاسع | `frmAdditions` · `frmBookingM` («🎁 الإضافات») | **⛵ المرسى: ➕ الإضافات** — تعريف الإضافة برقمها واسمها وقيمتها، و«🎁 الإضافات» في الحجز تقرأ منها سعرها، وكمّيةٌ مكرَّرة تُجمَع على صفّها (§12) | **تمّ** |
+
+> ملاحظة على الترتيب: «الطلبات والعروض» كانت تُقرأ اسماً على `frmOrders` و`frmViewOrders`
+> و`OrdersManager.cs`. قراءة الملفات أثبتت غير ذلك: `frmOrders` يُدير **`TailoringOrders`**
+> (طلب التفصيل) و`frmViewOrders` يقرأ **`Inv_Tailor`** (فاتورة التفصيل)، و`OrdersManager`
+> و`ProductsManager` غلافان على `SallaAPI`. فانقسم الجزء إلى الثاني (الطلب) والثالث
+> (الفاتورة)، وانتقل «سلة» إلى ما بعدهما. وأما «عرض السعر» فشاشته `frmQuotation` لا
+> `frmOrders`.
+
+## 4. الجزء الأول — 🧑‍💼 المندوبون والعمولات
+
+### 4.1 ما يفعله الديسكتوب فعلاً
+
+**`Form_WPF/frmSalesMen.xaml`** («شاشة المندوبين») — تبويبتان:
+
+* «🧑‍💼 بيانات المندوبين» — `🧑‍💼 اسم المندوب:` · `عمولة المبيعات:` · `عمولة التحصيل:` ·
+  `عمولة الربح:` · `الهاتف` · `الجوال` · `البريد الإلكتروني` · `ملاحظات`، وزرّ
+  `📋 طباعة فواتير مندوب وعمولاتهم`.
+* «🔍 البحث» — `اسم المندوب` · `🔍 بحث`، ثم «📋 قائمة المندوبين» بأعمدة
+  `الرقم · 🧑‍💼 اسم المندوب · عمولة المبيعات · 📧 البريد الإلكتروني · 📞 الهاتف · 📱 الجوال`،
+  وشريط `➕ جديد · 💾 حفظ · 🗑️ حذف · 🖨️ طباعة · ⏮ ◀ ▶ ⏭ · ✖`.
+
+والقواعد في `frmSalesMen.xaml.cs`:
+
+* L155 `btnSave_Click` — إدخالٌ واحد على
+  `salesmen(name, comm, tel, mobile, email, notes, IS_Deleted, Profit_Comm, Colle_Comm)`،
+  ثم «تم حفظ المندوب بنجاح.» أو «تم تحديث بيانات المندوب.».
+* L174 — النسب تُقرأ بـ`double.TryParse(txt, out double c) ? c : 0`: **ما ليس رقماً
+  فهو صفر**.
+* L215 `btnDelete_Click` — «اختر مندوباً ليتم حذفه.» ثم `IS_Deleted = 1`.
+* L272 `Button1_Click` — يفتح `frmInvBySalesMen`.
+
+**`Form_WPF/frmInvBySalesMen.xaml`** («مبيعات مندوب خلال فترة») — «🔍 بيانات البحث»
+(`👤 المندوب` + `🌐 الكل` مفعّل، `📅 الفترة الزمنية` بـ`كل الفترة` مفعّل و`من`/`إلى`
+على اليوم) و`📊 عرض`؛ وشبكة بأعمدة `📌 نوع الحركة · 📅 التاريخ · 🔢 رقم السند ·
+🔗 رقم المرجع · 👤 المندوب · 💰 القيمة · 📈 عمولة المبيعات · 💳 عمولة التحصيل ·
+📊 عمولة الربح · 👁️ عرض`؛ وذيول `💰 إجمالي القيمة: · 📈 ع. المبيعات: ·
+💳 ع. التحصيل: · 📊 ع. الربح:` تحت `🏆 الإجمالي`؛ وأزرار `📊 تصدير Excel · 👁️ معاينة ·
+🖨️ طباعة · ✖ خروج`. والقواعد في `frmInvBySalesMen.xaml.cs`:
+
+* L196 `ShowInvoiceResults` — `Inv` بـ`salesman > 0` و`IS_Deleted=0` و
+  `inv_type IN (2,3)` و`proc_type IN (1,2)`، مُضيَّقاً بالمندوب وبالفرع
+  (`MainClass.BranchNo` L193) وبالتاريخين إلا مع «كل الفترة».
+* L254 `ProcessInvoiceRow` — `SUM(val1 × exchange_price)` لكل فاتورة، ثم يُخراج VAT إن
+  كانت الأسعار شاملةً له، ثم `minus` وخصومات الأسطر (L307) فتصل إلى `netForComm`.
+* L295 — `SELECT comm, name, Profit_Comm, Colle_Comm FROM salesmen WHERE id=…`: **من لا
+  بطاقةَ له يُسقَط** (L302).
+* L322–L338 — «نوع الحركة»: «فاتورة بيع» · «فاتورة مرتجع بيع» · «فاتورة نقطة بيع» ·
+  «فاتورة مرتجع نقطة بيع».
+* L330–L341 — العمولات الثلاث:
+  `salesComm = comm% × netForComm` ·
+  `collComm = Colle_Comm% × netForComm` **إن كان `pay_type` موجوداً** (L331) ·
+  `profitComm = Profit_Comm% × (netForComm − AvrgCost)` **إن كان الأساس موجباً**.
+* L351 `LoadCreditNotes` — `Notes WHERE Doc_Type=2 AND Inv_No=…`: «إشعار مدين» عن كل
+  **فاتورة بيع** (`proc_type=1`)، قيمته `Discount` وعمولتاه مبيعاتٌ وتحصيل، و`IsPlus=-1`.
+* L411 `LoadReceiptsByType` — «سند قبض عميل» (`ReceiptType=5`) و«سند قبض» (7)،
+  `SalesManID <> -1` و`ISDeleted=0`، **ودائماً داخل التاريخين** (L426)؛ قيمته
+  `NetVal × 100 / 115` (L452) وعمولته `Colle_Comm% × NetVal` (L453).
+* L482 `RecalculateSummary` — `sumVal += row.Value` (بلا `isPlus`!) وكل عمولةٍ بإشارتها.
+
+### 4.2 ما شُحن
+
+* **ترحيل `0052_salesman_card.sql`** — `salesmen` تكتسب `commission_rate` ·
+  `collection_commission_rate` · `profit_commission_rate` · `employee_id` · `tel` ·
+  `mobile` · `email` · `notes`، ومؤشّراً فريداً على `(tenant_id, employee_id)`.
+  لا عمودٌ حُذف ولا حقلٌ في جسمٍ قائم تغيّر شكله.
+* **`GET /sales/salesmen/commissions`** — `salesman_id` · `all_salesmen` · `all_period` ·
+  `from` · `to` · `branch_id`؛ ويُجيب بـ
+  `{ salesmanId, salesmanName, allSalesmen, allPeriod, from, to, branchId, summary:
+  { totalValue, salesCommission, collectionCommission, profitCommission, invoices,
+  notes, receipts, rows }, rows: [...] }`.
+* **الشاشتان** — `/sales/salesmen` (البطاقة كاملةً، مع الرابط إلى التقرير) و
+  `/sales/salesman-commissions`، وصفٌّ في شجرة المبيعات تحت «التقارير».
+* **`employee_id`** — الجسر السحابي بين بطاقة المندوب وبطاقة الموظف: الفاتورة تسمي
+  المندوب، وسند القبض يسمي الموظف، والتقرير يقرأ الاسمين معاً.
+
+### 4.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **`employee_id` ليس في الديسكتوب** — هو علاجُ انقسامٍ سببه السحابة: `sales_invoices
+   .salesman_id` يسمي بطاقة المندوب و`vouchers.salesman_id` يسمي بطاقة الموظف
+   (ترحيل 0025)، والديسكتوب يصل الاثنين بجدول `salesmen` واحد. الجسر هو ما يجعل
+   مندوباً واحداً يملك فواتيره وسنداته معاً.
+2. **«💰 إجمالي القيمة» بإشارة** — `RecalculateSummary` L482 يجمع `Value` بلا `isPlus`،
+   فالمرتجع **يرفع** إجمالي الديسكتوب. الإجمالي هنا مجموعٌ مُوقَّع، كما «💰 الإجمالي»
+   في «حركات الموظف» (المرحلة 08، الجزء الخامس): تقريرٌ يكبر حين ترجع البضاعة يدفع
+   عمولةً على إرجاع.
+3. **لا نصف «مشتريات»** — `InvType=1` في الديسكتوب يبدّل نصف النافذة إلى مشتريات،
+   و`purchase_invoices` في السحابة لا تحمل موظفاً أصلاً، فلا شيء يُخترع (القرار نفسه
+   الذي سُجّل في المرحلة 08 §8.4).
+4. **`netForComm` هو `subtotal`** — `calculateInvoiceTotals` تُخرج ضريبةً وخصماً للسطر
+   وخصماً للفاتورة قبل التخزين، وهذا هو نفسُ ما تحسبه النافذة في L254–L307.
+5. **«عمولة التحصيل» على الفاتورة = `paid_total > 0`** — الديسكتوب يقرأ `Inv.pay_type`
+   (طريقة الدفع المختارة عند الحفظ)؛ والسحابة تُثبت التحصيل بوثيقته: بيعٌ نقديّ يُسدَّد
+   عند الترحيل، و`addPayment` يزيد `paid_total`. من لم يُحصَّل منه شيء لا عمولةَ له.
+6. **قيمة السند `net_amount` لا `NetVal × 100 / 115`** — الديسكتوب يستخرج ضريبةً
+   مقدارها 15% مكتوبةً في الكود؛ وسند السحابة يحمل ضريبته حقلاً (`net_amount =
+   amount − vat_amount`)، وهو الرقم نفسه بلا تخمين. أما العمولة فتبقى على ما قُبض
+   فعلاً (`amount`).
+7. **السندات مقيدة بالتاريخين دائماً، وغير مقيدة بالفرع** — `LoadReceiptsByType` L426
+   لا يعرف «كل الفترة»، وL411 لا يذكر فرعاً وإن كان لجدول `Receipts` عمودُ `BranchID`.
+   نُقل الوضع كما هو، وفي الشاشة سطرٌ يقوله، وفي الاختبار تأكيدٌ يُثبته حتى لا
+   يُصلَح صامتاً.
+8. **النسبة بين 0 و100 تُرفض بدل أن تُصفر** — `double.TryParse` يخزّن صفراً لمن كتب
+   «عشرة» و250% لمن كتبها؛ والسحابة تردّ بـ
+   «نسبة العمولة يجب أن تكون بين 0 و100» و«نسبة العمولة يجب أن تكون رقماً».
+9. **`👁️ عرض` مؤجَّل** — كما في المرحلة 08: يفتح الوثيقة بعينها، وشاشات الفواتير في
+   السحابة قوائم لا بطاقات؛ يُفتح متى صارت تُفتح بـ`?id=`.
+10. **`📊 تصدير Excel` → CSV** و**`🖨️ طباعة`** من المتصفح، و**`👁️ معاينة`** مؤجَّلة مع
+    `.repx` إلى مرحلة التقارير.
+
+### 4.4 التحقق (نتائج)
+
+* `apps/api/test/salesman-card.spec.ts` — **5 اختبارات**: البطاقة بالثلاث نسب
+  والاتصالات وربط الموظف، رفضُ نسبةٍ فوق 100 وتحتها وغيرِ رقمية، رفضُ موظفٍ من مؤسسة
+  أخرى، ورفضُ بطاقةٍ ثانية تطلب موظفاً مرتبطاً (`SALESMAN_EMPLOYEE_TAKEN`)، التحديث
+  الجزئي، وعزل المستأجرين.
+* `apps/api/test/salesman-commissions.spec.ts` — **9 اختبارات**: تقريرٌ فارغ
+  و«🌐 الكل»/«كل الفترة» مفعّلان، فاتورة محصَّلة بالعمولات الثلاث (20 / 10 / 24)،
+  فاتورة آجلة بلا عمولة تحصيل، مرتجعٌ بإشارةٍ سالبة، إشعار مدين يستردّ (5 / 2.5)،
+  سند قبض عميل (1000 / 57.5)، الفترة، والفرع و«المندوب»، وعزل المستأجرين.
+* `scripts/verify-salesmen.mjs` — **21** نقطة تحقّق حيّة؛ ثلاثُ تشغيلاتٍ متتالية خضراء.
+  الوثائقُ التي لا يمكن إبطالها — فاتورةٌ مُحصَّلة (لا يُلغى سندٌ له تحصيل) وإشعارُ
+  مدينٍ مُرحَّل — تُنشأ **مرّةً واحدة** وتُعادُ في التشغيل التالي، وكذلك مندوبُ التحقق
+  وموظفُه وصنفُه؛ وكل ما سواها يُلغى في نهاية التشغيل («لا أثر للوثائق المُلغاة»).
+* **684** اختبار API (كان 670) · 36 staff · 71 contract · `tsc` و`lint` أخضران.
+
+## 5. الجزء الثاني — 🧵 طلب التفصيل
+
+### 5.1 ما يفعله الديسكتوب فعلاً
+
+**`Form_WPF/frmOrders.xaml`** («إدارة طلبات التفصيل») — شريط فلاتر فوق شبكة واحدة:
+
+* الفلاتر: `txtSearch` (رقم الطلب **أو** اسم العميل) · `cmbStatus`
+  (`DisplayMemberPath=StatusName` و`SelectedValuePath=StatusID`، من
+  `SELECT StatusID, StatusName FROM OrderStatus WHERE IsActive=1 ORDER BY DisplayOrder`
+  L54، وتُضاف «الكل» بـ`StatusID=0` في الواجهة لا في البيانات) · `dtFrom` · `dtTo` ·
+  «🔍 بحث».
+* «📋 قائمة الطلبات»: `رقم الطلب · 👤 العميل · 📞 الجوال · القياس · نوع التفصيل ·
+  ⚙️ الحالة · 📅 تاريخ الطلب · 📅 موعد التسليم · 💰 السعر · 💵 المدفوع · ⌛ المتبقي`
+  و«عدد السجلات: {n}»، والترتيب `ORDER BY OrderDate DESC` (L104).
+* الأزرار: `✖ إغلاق · ➕ إضافة طلب جديد · ✏️ تعديل · 🗑️ حذف · 🔄 تغيير الحالة`، والنقر
+  المزدوج على صفٍّ = «✏️ تعديل» (L339).
+* ⌛ **الصف المتأخّر** (`IsDelayed`) يُلوَّن `#FFE4E4` بنصٍّ أحمرَ داكن (L146).
+
+**`Form_WPF/frmOrderDetails.xaml`** («إضافة طلب تفصيل») — البطاقة بأقسامها الثلاثة:
+
+* «👤 بيانات العميل» — بحثٌ بالاسم أو الجوال (`Customers`) و«🔍 بحث»، ورفضان:
+  «الرجاء إدخال اسم أو جوال العميل» و«لم يتم العثور على عميل».
+* «📋 تفاصيل الطلب» — `القياس` (`CustomerMeasurements` للعميل نفسه، واسمه يرجع إلى
+  «قياس بتاريخ …» إن لم يكن له اسم، L259) · `نوع التفصيل` (`TailoringTypes` ولكلٍّ
+  `DefaultPrice`) · `موعد التسليم` · `الكمية` (1) · `السعر` · `المدفوع` · `المتبقي`.
+* «🔧 الخيارات» — `OptionCategories` × `OptionValues`، قيمةٌ واحدة لكل تصنيف
+  (`selectedOptions[catId] = valId`، L176) تُكتب في `OrderOptions`.
+* «🧵 تفاصيل القماش والتصميم» — `نوع القماش` · `لون القماش` · `ملاحظات التصميم`.
+* «💾 حفظ الطلب» و«✖ إلغاء»، وعند الحفظ ثلاثة رفوضٍ بنصّها (L318–L341):
+  **«الرجاء اختيار عميل»** · **«الرجاء اختيار نوع التفصيل»** · **«الرجاء إدخال السعر»**
+  (حين `price <= 0`). و⌛ المتبقي = 💰 السعر − 💵 المدفوع (L290)؛ وهو **سالبٌ مسموح**،
+  يُلوَّن أخضر بدل الأحمر ولا يُرفض.
+
+**`Form_WPF/frmOptions.xaml`** («⚙️ إدارة الخيارات الجاهزة») — لوحتان: «📂 التصنيفات
+(الأنواع)» و«🔧 الخيارات المتاحة»، لكلٍّ `➕ إضافة · ✏️ تعديل · 🗑️ حذف`، وللخيارات
+`⭐ تعيين افتراضي`. الترتيب `ISNULL(MAX(DisplayOrder),0)+1` (L136/L232) والحذف
+`IsActive=0` (L198/L298) بعد «هل أنت متأكد من حذف هذا التصنيف وجميع خياراته؟»،
+والتعيينُ الافتراضي يُصفّر التصنيف ثم يُعيّن المختار (L323/L330).
+
+### 5.2 ما شُحن
+
+* **ترحيل `0053_tailoring_orders.sql`** (+ `down/`) — ستة جداول:
+  `tailoring_orders` (`number` · `party_id` · `measurement_id` · `type_id` · `status_id` ·
+  `order_date` · `delivery_date` · `quantity` · `price` · `paid_amount` · `fabric_type` ·
+  `fabric_color` · `design_notes` · `general_notes`)، `tailoring_order_options`،
+  `tailoring_order_statuses`، `tailoring_types`، `tailoring_option_categories`،
+  `tailoring_option_values`. لا عمودٌ أُزيل ولا جدولٌ أُعيدت تسميته.
+* **الحالات الأربع تُبَذَّر** في الترحيل لكل مؤسسة قائمة، وفي
+  `OrgProvisioningService.ensureTailoringOrderStatuses` لكل مؤسسة تُخلق بعده — على
+  غرار `salary_adjustment_types` في الجزء الرابع من المرحلة 08.
+* **النهايات** (`@Controller('tailoring')`): `GET/POST/PATCH/DELETE /tailoring/orders` ·
+  `POST /tailoring/orders/{id}/status` · `GET /tailoring/order-statuses` ·
+  `GET/POST/PATCH/DELETE /tailoring/types` · `GET/POST/PATCH/DELETE
+  /tailoring/option-categories` · `POST/PATCH/DELETE /tailoring/option-values` ·
+  `POST /tailoring/option-values/{id}/default`. القراءة `tailoring.view` والكتابة
+  `tailoring.manage`.
+* **الشاشتان**: `/tailoring/orders` (الشبكة والفلاتر والبطاقة في نافذة) و
+  `/tailoring/options` (لوحتا التصنيفات والخيارات)، ووحدة جديدة في الشجرة
+  (`🧵 التفصيل` ← «الطلبات» و«التعاريف»).
+* **إصلاحٌ عارض**: `PartiesService.softDelete` كان يقارن الرصيد — وهو نصٌّ بأربعة
+  أعشار — بالسلسلة `'0'`، فكان **يرفض كل حذف عميل**. كشفه سكربت التحقّق حين فشل في
+  تنظيف العميل الذي أنشأه؛ والمقارنة الآن رقمية، ومُثبَّتة باختبار في `parties.spec.ts`.
+
+### 5.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **أسماء الحالات مخترَعة، ومصدرها من الديسكتوب نفسه.** صفوف `OrderStatus` ليست في
+   هذا المستودع (`frmOrders` يقرأها فقط)، والموضع الوحيد الذي كُتبت فيه دورة التفصيل
+   كلماتٍ هو `frmViewOrders.GetStateText` L119: `0 مستلم · 1 في الخياطة · 2 جاهز ·
+   default تم التسليم`. بُذِرت الأربع بهذا الترتيب، و`is_final` على «تم التسليم» وحدها.
+2. **⌛ متأخّر = موعد التسليم مضى والحالة ليست نهائية.** `IsDelayed` يُحسب داخل
+   `vw_OrdersComplete` (متن العرض ليس في المستودع)؛ والقراءة هي نفسها التي يعبّر عنها
+   تلويث الصف بالأحمر.
+3. **`OrderNumber` من سلسلة الوثائق.** الإجراء المُخزَّن الذي يولّده ليس في المستودع؛
+   والسحابة تُرقّم الوثيقة من `document_sequences` بالبادئة `TO-` كسائر وثائقها.
+4. **«✏️ تعديل» يُعدّل الطلب المختار.** `LoadOrderData` L417 في الديسكتوب **فارغة**
+   («تحميل بيانات الطلب للتعديل - يمكن تطويرها لاحقًا») والحفظ يُدرج طلباً جديداً؛
+   والسحابة تُصلح ما اختاره المستخدم، لأن هذا معنى الزر لمن يضغطه.
+5. **`customer_immutable`.** الديسكتوب يعيد الإدراج بدل التعديل، فلا يوجد «تغيير عميل
+   الطلب» أصلاً؛ والسحابة ترفضه صراحةً (`TAILORING_CUSTOMER_IMMUTABLE`) بدل أن تُبقي
+   قياساً وخياراتٍ لعميلٍ على طلبِ عميلٍ آخر.
+6. **`sp_UpdateOrderStatus` يُكتب على الطلب نفسه.** متن الإجراء ليس في المستودع؛
+   والملحوظ بعده إعادة التحميل، فالحالة وحدها هي التي تُكتب. لا جدولُ تاريخٍ للحالات:
+   لا شاشة في الديسكتوب تقرأه.
+7. **«🧵 أنواع التفصيل» تُدار بالـ API بلا شاشة.** لا نافذة في الديسكتوب تُحرّر
+   `TailoringTypes` (تُقرأ في `frmOrderDetails` فقط وتُبَذَّر في القاعدة)، والطلب لا
+   يُحفظ بلا نوع؛ فالنهاية موجودة والشاشة مؤجَّلة كصفٍّ بحالة `api` في الشجرة.
+8. **`createdBy` = المستخدم الفعلي.** الديسكتوب يكتب `Environment.UserName` (مستخدم
+   الجهاز)؛ والسحابة تملك هويةً حقيقية في `created_by`.
+9. **«🗑️ حذف» حذفٌ ناعم.** «سيتم حذف جميع البيانات المرتبطة به» يصدق على الخيارات:
+   الصفوف تُحجب بـ`deleted_at`، كما في كل وثائق السحابة.
+
+### 5.4 التحقق (نتائج)
+
+* `apps/api/test/tailoring-orders.spec.ts` — **11 اختباراً**: الحالات الأربع وترتيبها
+  ونهايتها، نوع التفصيل واسمه المكرر، التصنيف وخياراه و⭐ الافتراضي، البطاقة كاملة
+  برقمها `TO-000001` ومتبقيها، الرفوض الثلاثة بنصّها، قياسُ عميلٍ آخر
+  (`TAILORING_MEASUREMENT_PARTY_MISMATCH`)، المتبقي السالب، تغييرُ الحالة وعودةُ
+  المتأخّر عادياً عند التسليم، فلاتر القائمة (الحالة · البحث بالرقم · البحث بالاسم ·
+  التاريخان)، التحديث الجزئي و`VERSION_CONFLICT`، الحذفُ وعزلُ المستأجرين.
+* `apps/api/test/parties.spec.ts` — اختبارٌ إضافي لحذف عميلٍ بلا حركة (الإصلاح العارض).
+* `scripts/verify-tailoring.mjs` — **38** نقطة تحقّق حيّة؛ خمسُ تشغيلاتٍ متتالية خضراء،
+  وأربعٌ منها تبدأ من قاعدةٍ نظيفة وتنتهي بلا أثر: لا طلب، ولا نوع، ولا تصنيف، ولا عميل.
+* **696** اختبار API (كان 684) · 36 staff · 71 contract · `tsc` و`lint` أخضران.
+
+## 6. الجزء الثالث — 🧾 فاتورة التفصيل
+
+### 6.1 ما يفعله الديسكتوب فعلاً
+
+**`Form_WPF/frmViewOrders.xaml`** («عرض الطلبات - ViewOrders») — صندوق بحثٍ واحد فوق
+شبكة واحدة:
+
+* `txtPhoneNum` — «🔍 الهاتف أو اسم العميل...»، يُبحث مع الكتابة
+  (`txtPhoneNum_TextChanged`)؛ و`SearchInData` L55 تقرأ
+  `SELECT code, name, phone_num, Date, sale_price, state FROM Inv_Tailor` بشرط
+  `phone_num LIKE @search OR name LIKE @search` (L64) وترتيب `ORDER BY code`.
+* الشبكة: `📋 رقم الفاتورة · 👤 الاسم · 📱 الجوال · 📅 التاريخ · 💰 الإجمالي · ✅ المدفوع ·
+  ⏳ الباقي · 📌 الحالة · 👁️ عرض`، و«النتائج: {n}» (`lblResultCount`).
+* 💰 الإجمالي **ليس** السعر المُخزَّن: `sale_price + sale_price * 5.0 / 100.0` (L88) —
+  نسبة الـ5% نفسها التي يمرّرها `AddNewSizes.CreateInvoice` L419 إلى نقطة البيع في
+  `txtTotVAT`.
+* ✅ المدفوع = `SELECT paid FROM Inv_Sub_Tailor WHERE inv_code=@code` (L130)،
+  و⏳ الباقي = الإجمالي بالضريبة − المدفوع (L90).
+* 📌 الحالة = `GetStateText` L119: `0 مستلم · 1 في الخياطة · 2 جاهز · default تم التسليم`
+  — وهي الكلمات التي بُذِرت في الجزء الثاني.
+* «👁️ عرض» يفتح `AddNewSizes.showResult(code)` (L156).
+
+**`Form_WPF/AddNewSizes.xaml`** («إضافة مقاس جديد») — البطاقة التي تكتب `Inv_Tailor`:
+
+* «📋 البيانات الأساسية» (L369) — `👤 اسم العميل` (`txtName`) · `📞 رقم الجوال`
+  (`txtPhoneNum`) · `👔 نوع الثوب` (`typeCB`: `سعودي · بحريني · اماراتي · كويتي`, L423)
+  · `🔢 العدد` · `💰 السعر` · `💵 الإجمالي` · `✅ الحالة` (L461) · `💳 الصافي (مع الضريبة)`
+  · `💵 المدفوع` · `💰 الباقي`.
+* `CalculateTotalPrice` L860 — 💵 الإجمالي = 💰 السعر × 🔢 العدد.
+* `📐 المقاسات` (L522) — `الطول (س/ك)` · `الكتف` · `اليد (س/ص)` · `الرقبه (س/ص)` ·
+  `الوسع (1-3)` · `وسع الكم (1-2)` · `🔍 نوع الجيب` (`مقاس الجيب` · `بعد الجيب`).
+* `✨ الأشكال والتفاصيل` (L818) — `شكل الجبزور` · `مقاس الجبزور` · `الكتف` · `الجيب` ·
+  `شكل الرقبه` · `طقطق` · `شكل اليد` · `كسرة اليد` · `شكل الحافة`.
+* `📏 مقاسات إضافية` (L639) — `كفة تحت` · `جوال` · `محفظة` · `أسفل` · `رقابة` · `ملاحظات`.
+* `btnSave_Click` L191 — رفضان بنصّهما: **«برجاء اختيار العميل»** و**«يرجي إدخال
+  السعر»** (حين الإجمالي `"0"`). و`InsertNewTailorInvoice` L256 يكتب `state = 0`
+  و`bill = 0`، و`InsertNewTailorInvoiceSub` L278 يكتب القياسات التسعة والثلاثين.
+* «⚙️ لوحة التحكم» (L742) — `جديد · حفظ · مكرر · فاتورة · طباعه · إستلام دفعة`؛
+  و«إستلام دفعة» L664 يفتح `frmSandQ` بـ`ISTailor=true` مملوءاً بالمتبقي وعبارة
+  «تم استلام دفعة من عملية رقم {code}» (L683).
+
+### 6.2 ما شُحن
+
+* **ترحيل `0054_tailoring_invoices.sql`** (+ `down/`) — ثلاثة جداول:
+  `tailoring_invoices` (`number` · `party_id` · `customer_name` · `phone` ·
+  `invoice_date` · `quantity` · `unit_price` · `total` · `paid_amount` · `status_id` ·
+  `garment_type_id` · `billed` · `measurements jsonb` · `notes`)،
+  `tailoring_invoice_payments` (`voucher_id` → `vouchers` بـ`ON DELETE set null`)،
+  و`tailoring_garment_types`. الأنواع الأربعة تُبَذَّر لكل مؤسسة قائمة في الترحيل،
+  ولكل مؤسسة جديدة في `OrgProvisioningService.ensureTailoringGarmentTypes`.
+* **النهايات**: `GET /tailoring/garment-types` · `GET /tailoring/measurement-fields` ·
+  `GET/POST /tailoring/invoices` · `GET/PATCH/DELETE /tailoring/invoices/{id}` ·
+  `POST /tailoring/invoices/{id}/status` · `POST /tailoring/invoices/{id}/payments`.
+  القراءة `tailoring.view` والكتابة `tailoring.manage`.
+* **📐 سجلّ المقاسات**: الحقول التسعة والثلاثون تُخدم بأسماء أعمدة `Inv_Sub_Tailor`
+  (`height1` · `shoulder` · `handShape` …) مع تسميات الشاشة ومجموعاتها وأنواعها
+  (`number` · `text` · `select` · `flag`) وخيارات القوائم — فترسمها الشاشة من السجلّ بدل
+  أن تخمّن، ويُرفض أي مفتاحٍ ليس فيه (`TAILORING_MEASUREMENT_FIELD_UNKNOWN`).
+* **الشاشة**: `/tailoring/invoices` — شبكة `frmViewOrders` بصندوق بحثها و«النتائج»،
+  ونافذة «👁️ عرض» ببطاقة `AddNewSizes` كاملة (الأقسام الأربعة + المقاسات من السجلّ +
+  الدفعات)، ونافذتا «🔄 تغيير الحالة» و«💵 إستلام دفعة» (بصندوق أو بلا صندوق).
+  ووحدة التفصيل في الشجرة تضمّها تحت «الطلبات».
+* **`apps/api/test/tailoring-invoices.spec.ts`** — 11 اختباراً، و
+  **`scripts/verify-tailoring-invoices.mjs`** — 41 نقطة تحقّق حيّة.
+
+### 6.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **الحالة من الصفوف نفسها.** `state` في `Inv_Tailor` فهرسٌ صحيح (`stateCB.SelectedIndex`)
+   وكلماته في `GetStateText` L119 — وهي الكلمات التي بُذِرت في الجزء الثاني. الفاتورة
+   تُشير إلى صفوف `tailoring_order_statuses` نفسها: دورةٌ واحدة تُسمّى مرةً واحدة، بدل
+   قائمةٍ ثانية تنحرف عن الأولى.
+2. **👔 `type` جدولٌ جديد: `tailoring_garment_types`.** كلمات `typeCB` الأربع في الملف
+   نفسه (L423)، وهي **غير** `tailoring_types` (نوع التفصيل في `frmOrderDetails`): النوع
+   يقول *ماذا* يُخاط، ونوع الثوب يقول *كيف*.
+3. **39 عموداً تصير `jsonb` واحداً.** `measurements` مفتاحه أسماء أعمدة
+   `Inv_Sub_Tailor` كما في الديسكتوب، وهو الخيار نفسه الذي اتُّخذ في `customer_measurements`.
+   التسميات ليست بيانات: هي `Label Content` في `AddNewSizes.xaml`، تُخدم في سجلّ.
+4. **رقم الفاتورة `TI-000001`** من سلسلة الوثائق (`docType: 'tailoring_invoice'`) —
+   والإجراء المُخزَّن الذي يرقّمها في الديسكتوب ليس في المستودع.
+5. **💵 إستلام دفعة: دفعة دائماً، وسندٌ إن وُجد الصندوق.** الدفعة تُسجَّل على الفاتورة
+   في الحالتين، وإن أُرسل `cashLocationId` كُتب **سند قبض** حقيقي (`kind: 'receipt'`،
+   `subtype: 'customer'`) بعبارة «تم استلام دفعة من عملية رقم {number}» — كما يفتح
+   الديسكتوب `frmSandQ` بـ`ISTailor = true`. والسند `ON DELETE set null`: يبقى في
+   الخزينة إن حُذفت الفاتورة، ولا يُحذف معها.
+6. **`✅ المدفوع` تراكمي على الفاتورة.** `Inv_Sub_Tailor.paid` رقمٌ واحد يتزايد؛
+   والسحابة تحفظ الرقم نفسه، وتحتفظ بكل دفعةٍ صفاً بتاريخها وعبارتها وسندها.
+7. **«فاتورة» في لوحة التحكم لم تُبنَ.** الزر في الديسكتوب يملأ سلّة ويستدعي نقطة البيع؛
+   ولا شاشة نقطةِ بيعٍ في هذه المرحلة، فالزر لم يُعرض بدل أن يُعرض ميتاً. العمود `bill`
+   موجود (`billed`) ويظهر في الشبكة بعلامة «مُحوَّلة».
+8. **`🖨️ طباعه`** ينفّذ طباعة المتصفح للنافذة.
+
+### 6.4 التحقق (نتائج)
+
+* `apps/api/test/tailoring-invoices.spec.ts` — **11 اختباراً**: أنواع الثوب الأربعة
+  بترتيبها، سجلّ المقاسات (39 حقلاً · ثلاث مجموعات · تسميات · خيارات `شكل اليد`)،
+  البطاقة كاملة برقمها وإجماليها وصافيها ×1.05 وباقيها، الرفضان بنصّهما
+  («برجاء اختيار العميل» · «يرجي إدخال السعر»)، القياس المجهول، تغييرُ الحالة من
+  «مستلم» إلى «جاهز» إلى «تم التسليم»، إستلامُ دفعةٍ بلا صندوق (المدفوع يكبر والباقي
+  ينقص والعبارة) وبصندوق (سندُ قبضٍ مربوط)، البحث بالجوال وبالاسم وتصفيةُ الحالة،
+  التعديل الجزئي و`VERSION_CONFLICT`، الحذفُ وعزلُ المستأجرين.
+* `scripts/verify-tailoring-invoices.mjs` — **41** نقطة تحقّق حيّة؛ تشغيلان متتاليان
+  أخضران على ستاك قائم، والثاني يبدأ من قاعدةٍ بلا فواتير وينتهي بلا أثر: لا فاتورة،
+  ولا عميل، والسندُ باقٍ في الخزينة (مُثبَّتٌ بفحص).
+* **707** اختبار API (كان 696) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران.
+
+## 7. الجزء الرابع — 📏 القياسات
+
+### 7.1 ما يفعله الديسكتوب فعلاً
+
+**`Form_WPF/frmMeasurements.xaml`** («إدارة قياسات العملاء») — صندوق بحثٍ واحد، وشبكة،
+وأربعة أزرار:
+
+* «البحث برقم الجوال أو الاسم:» — `txtSearch`، واسمه المائي «🔍 الجوال أو الاسم...»
+  (`txtSearchWatermark`)، يُبحث بـ«🔍 بحث» أو بمفتاح الإدخال (`txtSearch_KeyDown`).
+  `SearchCustomer` L~140: `SELECT TOP 10 id, name, mobile FROM Customers WHERE mobile
+  LIKE @Search OR name LIKE @Search ORDER BY name`، وأول صفٍّ هو العميل.
+  البحث الفارغ: «الرجاء إدخال رقم الجوال أو اسم العميل»؛ ولا نتيجة: «لم يتم العثور على
+  عميل».
+* بعد الاختيار يُكشَف `pnlCustomerInfo`: «العميل: …» و«الجوال: …»، ثم
+  `LoadCustomerMeasurements`. وقبل أي بحثٍ الشبكة هي `LoadAllMeasurements`:
+  `CustomerMeasurements INNER JOIN Customers` بشرط `IsActive = 1` وترتيب
+  `MeasurementDate DESC`.
+* «📋 قياسات العميل» — `👤 اسم صاحب القياس · 📅 التاريخ · 📝 الملاحظات ·
+  📐 عدد المقاسات · العميل` (الرقم مخفي)، وعدد المقاسات
+  `(SELECT COUNT(*) FROM MeasurementValues WHERE MeasurementID = …)`. النقر المزدوج
+  = «✏️ تعديل القياس».
+* الأزرار — `➕ إضافة قياس جديد · ✏️ تعديل القياس · 🗑️ حذف القياس · ✖ إغلاق` — ورفوضها:
+  «الرجاء البحث عن عميل أولًا» · «الرجاء اختيار قياس للتعديل» · «الرجاء اختيار قياس
+  للحذف» · «هل أنت متأكد من حذف هذا القياس؟» ثم «تم الحذف بنجاح».
+
+**`Form_WPF/frmMeasurementDetails.xaml`** («📏 بيانات القياس») — البطاقة:
+
+* «👤 اسم صاحب القياس *» · «📐 قيم القياسات» · «📝 ملاحظات»، و«💾 حفظ · ✖ إلغاء».
+* «📐 قيم القياسات» **تُبنى وقت التشغيل** من
+  `SELECT AttributeID, AttributeName FROM MeasurementAttributes WHERE IsActive = 1
+  ORDER BY DisplayOrder` — صفٌّ لكل خاصية مفعّلة، ومعه الوحدة «سم».
+* `btnSave_Click` — رفضان: «الرجاء إدخال اسم صاحب القياس» و«الرجاء إدخال قياس واحد على
+  الأقل»؛ وقيمةٌ تُحسب قياساً إن فسّرت عدداً أكبر من الصفر (`decimal.TryParse` ثم
+  `val > 0`). الحفظ معاملةٌ واحدة: INSERT/UPDATE القياس، ثم `DELETE FROM
+  MeasurementValues WHERE MeasurementID=@ID` عند التعديل، ثم إدراج ما فوق الصفر.
+
+**`Form_WPF/frmMeasurementAttributes.xaml`** («📏 إدارة خصائص القياسات») — نافذة
+التعاريف:
+
+* الشبكة — `📝 اسم الخاصية · 🔢 الترتيب · ⚙️ الحالة`، والحالة
+  `CASE WHEN IsActive = 1 THEN 'نشط' ELSE 'معطل' END`.
+* `➕ إضافة` — `InputDialog` بعنوان «إضافة خاصية جديدة» وسؤال «أدخل اسم الخاصية (مثل:
+  الطول، العرض، الكم)»؛ والترتيب `ISNULL(MAX(DisplayOrder), 0) + 1`.
+* `✏️ تعديل` — العنوان «تعديل» والسؤال «تعديل اسم الخاصية:»؛ واسمٌ فارغٌ أو كما هو لا
+  يفعل شيئاً.
+* `🔕 تعطيل` — بعد «هل أنت متأكد من تعطيل هذه الخاصية؟\nسيتم إخفاؤها من القياسات
+  الجديدة»: `IsActive = 0`. **ليس حذفاً**.
+* `▲ تحريك للأعلى` و`▼ تحريك للأسفل` — مبادلة `DisplayOrder` مع الجار
+  (`WHERE DisplayOrder IN (@Current, @Prev)`)، ثم إعادة تحديد الصف بمعرّفه. لا جارَ في
+  الطرفين، فلا شيء يحدث.
+
+### 7.2 ما شُحن
+
+* **ترحيل `0055_measurements.sql`** (+ `down/`) — جدول
+  `tailoring_measurement_attributes` (name_ar · display_order · active) وعمودان على
+  `customer_measurements`: `name` (👤 اسم صاحب القياس) و`measurement_date` (📅 التاريخ).
+  الخصائص الثلاث — الطول · العرض · الكم — تُبذَّر لكل مؤسسة قائمة في الترحيل، ولكل
+  مؤسسة جديدة في `OrgProvisioningService.ensureMeasurementAttributes`. لا عمودٌ أُزيل
+  ولا مفتاحٌ في `measurements` أُلغي.
+* **النهايات**: `GET/POST /tailoring/measurements` · `GET/PATCH/DELETE
+  /tailoring/measurements/{id}` · `GET/POST/PATCH /tailoring/measurement-attributes` ·
+  `POST /tailoring/measurement-attributes/{id}/deactivate` ·
+  `POST …/{id}/move`. القراءة `tailoring.view` والكتابة `tailoring.manage`.
+  و`GET /tailoring/parties/{id}/measurements` و`…/latest` باقيتان على حالهما، مزيدتين
+  بـ👤 الاسم و📅 التاريخ و📐 العدد.
+* **الشاشتان**: `/tailoring/measurements` (البحث و«العميل: …» «الجوال: …» والشبكة
+  والبطاقة) و`/tailoring/measurements/attributes` (الشبكة و«➕ إضافة · ✏️ تعديل ·
+  🔕 تعطيل · ▲▼ · ✖ إلغاء»)، ومجموعة «القياسات» في وحدة 🧵 التفصيل.
+* **`apps/api/test/tailoring-measurements.spec.ts`** — 11 اختباراً، و
+  **`scripts/verify-measurements.mjs`** — 37 نقطة تحقّق حيّة.
+
+### 7.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **الخصائص الثلاث مبذورة، وهي كلمات الديسكتوب نفسه.** صفوف `MeasurementAttributes`
+   ليست في هذا المستودع، والموضع الوحيد الذي يسمّي فيه خاصيةً هو سؤال الإضافة:
+   «أدخل اسم الخاصية (مثل: الطول، العرض، الكم)» (`btnAdd_Click`). بُذِرت الثلاث بهذا
+   الترتيب — لا لأنها «القياس الصحيح»، بل لأن بطاقة القياس بلا خاصيةٍ واحدة لا صندوق
+   فيها.
+2. **القيَم تُفتاح بمعرّف الخاصية لا باسمها.** `MeasurementValues` يفتاحها بـ`AttributeID`
+   (رقم)، والسحابة بـ`uuid` الخاصية: فإعادة تسمية خاصية لا تُضيّع الأرقام المأخوذة.
+   و`measurements jsonb` بقي كما هو — ومفاتيحه الحرّة القديمة (`height` · `shoulder`)
+   هي أعمدة «📐 المقاسات» في `frmCustomers.xaml` L1184 (الطول · كتف · الرقبة · وسع اليد
+   · وسع الخطوة · رقم الصفحة) وهي **الوثيقة نفسها** في الديسكتوب.
+3. **👤 الاسم مرفوضٌ إن أُرسل فارغاً، لا إن أُغفل.** البطاقة ترسله دائماً (الحقل
+   معلَّم `*` فعلامة الرفض تظهر لمن يضغط حفظ)، أمّا النهاية فقد كانت تقبل قياساً بلا اسم
+   قبل هذا الجزء، و«قياس بتاريخ …» هو عنوان الديسكتوب نفسه لقياسٍ بلا اسم. فحُفظ
+   التوافق، وبقي الرفض reachable.
+4. **`sp_DeleteMeasurement` حذفٌ ناعم.** متن الإجراء ليس في المستودع، و`IsActive = 1` هو
+   شرط كل قراءة بعده؛ فالحذف عندنا `deleted_at`، وطلبٌ استعمل القياس يحتفظ برقمه لأن
+   `assertMeasurement` يمنع إسناد قياسٍ محذوفٍ جديد.
+5. **«🔕 تعطيل» ليس حذفاً، و«تفعيل» طريقٌ رجوعاً منه.** النافذة لا تملك إلا التعطيل؛
+   والسحابة تُفعّل عبر `PATCH {active: true}` لأن «معطل» في الديسكتوب نهايةُ طريق، وهي
+   هنا حالةٌ قابلة للرجوع.
+6. **«الرجاء اختيار قياس للتعديل» و«للحذف» قراراتٌ في الشاشة.** الزرّان لا يُفعّلان إلا
+   بصفٍّ مختار، والرفض يبقى في الواجهة حيث يراه الضاغط.
+
+### 7.4 التحقق (نتائج)
+
+* `apps/api/test/tailoring-measurements.spec.ts` — **11 اختباراً**: الخصائص الثلاث
+  بترتيبها و⚙️ حالتها، الإضافة وترتيبها التالي والاسم المكرر والفارغ، التعديل
+  و`VERSION_CONFLICT`، التعطيل وخروجها من القائمة المفعّلة وتفعيلها، ▲▼ والطرف الذي لا
+  يتحرك، بطاقة القياس كاملة (الاسم · التاريخ · القيم · عددها · الصفر الذي لا يُكتب)،
+  رفوض البطاقة والبحث الأربعة بنصّها، القياس بلا اسم و«قياس بتاريخ …»، المفاتيح الحرّة
+  القديمة، التعديل الذي يُسقط الصفر، الحذف وعزل المستأجرين.
+* `scripts/verify-measurements.mjs` — **37** نقطة تحقّق حيّة؛ ثلاث تشغيلات متتالية
+  خضراء على ستاك قائم، والثانية تبدأ من قاعدةٍ بلا قياسات وتنتهي بلا أثر: لا قياس، ولا
+  عميل، و🔢 الترتيب يعود كما كان، والخاصية المضافة تُعطَّل (لا زرَّ حذف في النافذة).
+  التنظيف في `finally` — ففشلُ فحصٍّ لا يترك خلفه صفوفاً.
+* و`verify-tailoring.mjs` (38) و`verify-tailoring-invoices.mjs` (41) خضراء بعد الترحيل:
+  عمودان أُضيفا إلى `customer_measurements` ولم يتغيّر ما كان.
+* **718** اختبار API (كان 707) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران.
+
+## 8. الجزء الخامس — 👓 النظارات
+
+### 8.1 ما يفعله الديسكتوب فعلاً
+
+`Form_WPF/frmGlasses.xaml` («👓 بيانات النظارات») نافذةٌ واحدة بتبويبين، لا نافذتان:
+
+* **«👓  القياسات»** — عمودان: «🔴 العين اليمنى (RE)» و«🟢 العين اليسرى (LE)»، وفي كلٍّ
+  خمسة صناديق. أسماؤها **ليست في الملف**: `loadNameLbl` يقرؤها وقت التشغيل —
+  `select isnull(L1,'LE-SPH') … isnull(R5,'RE-IPD') from Other_Column` — ويكتبها في
+  العناوين؛ فما يكتبه صاحب المحل في التبويب الثاني هو ما يراه بجانب كل رقم.
+* **«⚙  أسماء الحقول»** — «حقل 1» … «حقل 5» تحت «R (Right)» و«حقل 6» … «حقل 10» تحت
+  «L (Left)»، و«💾 حفظ الأسماء» = `delete from Other_Column` ثم
+  `insert into Other_Column (R1,R2,R3,R4,R5,L1,L2,L3,L4,L5)` ثم «تم الحفظ بنجاح» بعنوان
+  «المدقق». فاليسار هو **النصف الثاني** من الصف: حقل 6 هو `L1`.
+* التبويبان لا يُفتحان معاً: من فاتورة بيع (`code = 1`) تُخفى «⚙  أسماء الحقول»
+  و«💾 حفظ الأسماء»، ومن مدخل التعاريف تظهران.
+
+الأزرار: «🔄 جديد» (`CLR` — عشرة صناديق فارغة) · «✔ إدراج» (`bindClass` ثم `Close`) ·
+«✖ خروج». `bindClass` يُضيف **صفّين** دائماً — `orientation` `"R"` ثم `"L"` — و
+`bindControls` يقرأ كلًّا منهما بـ`OrdinalIgnoreCase`. وكل قيمة `VarChar`:
+`Conversions.ToString` لا يُحلّل شيئاً، فلا تحقّقَ ولا رفضَ في النافذة كلها.
+
+الدورة كاملة: `frmInvSale.glassesOptions` L2505 (Alt+G) يفتحها للصنف تحت المؤشر بعد
+رفضين — «الرجاء إضافة صنف للفاتورة» و«الرجاء وضع المؤشر على الصنف» — و`InvoiceOper`
+L1662 يكتب الصفّين وL1517 يحذفهما مع الفاتورة، و`glassOtions` L3904 يقرؤهما لكل سطر،
+و`Class/Print.cs` L710 يطبعها `ReSPH · ReCYL · ReAX · ReADD · ReIPD` و`LeSPH · …`.
+
+### 8.2 ما شُحن
+
+* **الترحيل `0056_optics_labels.sql`** (+ `down/`) — `optics_field_labels` على صورة
+  `Other_Column`: عشرة أعمدةٍ مسماة (`r1…r5` · `l1…l5`) وبدائلها في defaults الأعمدة
+  نفسها («RE-SPH» … «LE-IPD»)، وصفٌّ واحد لكل مؤسسة (`optics_field_labels_tenant_key`
+  حيث `deleted_at is null`). لا بذور: من لم يفتح النافذة يقرأ البدائل، كما يفعل
+  `isnull`. والترحيل لا يُضيف RLS — كما في 0055 — فالعزل من `withTenantTx` وشرط
+  `tenant_id` الصريح في كل قراءة، ويُثبَّت باختبار.
+* **`opticsFieldLabels`** في `packages/database/src/schema/niche.ts` وضمن `nicheTables`.
+* **`OpticsService`** — `listPrescriptions` (`?search=|partyId=|limit=|offset=` مع
+  `meta.total` و`meta.customer`) · `getPrescription` · `createPrescription` ·
+  `updatePrescription` (`version` في `WHERE`) · `deletePrescription` (حذف ناعم) ·
+  `getFieldLabels` (بعناوينها وبدائلها) · `saveFieldLabels` (استبدال الصف) ·
+  `invoicePrintSection` (القسم كما كان، مضافاً إليه العناوين).
+* **النهايات** — `GET/POST /optics/prescriptions` · `GET/PATCH/DELETE
+  /optics/prescriptions/{id}` · `GET/PUT /optics/field-labels` ·
+  `GET /optics/invoice-lines/{lineId}/print-section`؛ القراءة `optics.view` والكتابة
+  `optics.manage`، وبوّابة `pack.optics` على حالها.
+* **شاشتان** — `/optics/prescriptions` (البطاقة: عمودان وخمسة صناديق لكل عين، وأزرارها
+  «🔄 جديد · ✔ إدراج · ✖ خروج») و`/optics/field-labels` («حقل 1» … «حقل 10» تحت
+  «R (Right)» و«L (Left)» و«💾 حفظ الأسماء · ✖ خروج»)، ووحدة «👓 النظارات» في الشجرة.
+* **اختبارات** — `apps/api/test/optics-prescriptions.spec.ts` (**11** اختباراً) و
+  `scripts/verify-optics.mjs` (**33** نقطة تحقّق حيّة).
+
+### 8.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **الوصفة على عميل، لا على سطر فاتورة.** الديسكتوب يُسنِدها إلى
+   `Glasses(InvGlobalID, ItemId)`، فلا قائمةَ له — تُفتح من الفاتورة وحدها. السحابة
+   تُبقي `invoice_line_id` (وقسم الطباعة يقرؤه) وتجعل العميل هو الأصل، فلزمها بابٌ إلى
+   البطاقة: `GET /optics/prescriptions` وهو الشاشة الوحيدة المخترَعة في هذا الجزء.
+2. **صفٌّ واحد يحمل العينين.** الصفّان في الديسكتوب هما R وL، و`optical_prescriptions`
+   كان يحمل `rightEye` و`leftEye` معاً؛ فأُبقي. و`orientation` عندنا **نوع الوصفة**
+   (بعيد/قريب) لا «أيّ عين» كما في عمود `Glasses.orientation` — المعنيان محفوظان
+   ومُسمّيان بما يُفرّقهما.
+3. **القيم نصوص، بلا تحليل.** `SPH … IPD` أعمدة `VarChar` و`Conversions.ToString` لا
+   يُحلّل؛ و«PL» و«+1.25» و«-0.50 × 90» قيمٌ مشروعة. مربّع رقميّ يرفضها يفقد ما يقصده
+   البصّريّ.
+4. **الاسم الفارغ يُقرأ ببديله.** `isnull(L3,'LE-AX')` لا يُفرّق بين «لم يُسمَّ» و«سُمّي
+   بلا اسم»؛ فالصندوق الفارغ يُقرأ «LE-AX» بدل أن يُفقد عنوانه، وهو خلافٌ في القراءة
+   وحدها — المخزَّن كما كُتب.
+5. **«💾 حفظ الأسماء» يستبدل الصفّ، والشاشة لا تُفرّغ الصناديق بعده.** النافذة تنادي
+   `CLR()` عقب الحفظ فتُفرّغها؛ وشاشتنا تُعيد قراءتها من القاعدة، وهو ما تظهره النافذة
+   نفسها عند فتحها مرةً ثانية.
+6. **قسم الطباعة يحمل `title` و`rows` كما كان**، ومعهما `labels` و`right` و`left`؛
+   وعنوانه صار «👓 بيانات النظارات» — عنوان النافذة — بدل "Optical prescription".
+7. **«الرجاء اختيار عميل»** جملة الديسكتوب نفسها (`frmOrderDetails.xaml.cs` L324):
+   نافذة النظارات لا ترفض شيئاً، ورفضاها («الرجاء إضافة صنف للفاتورة» · «الرجاء وضع
+   المؤشر على الصنف») هما للفاتورة لا للوصفة.
+8. **`pack.optics`** بوّابة الجزء كما كان، و`ensureEnabled` لم يتغيّر: بلا البوّابة لا
+   شاشةَ ولا نهاية.
+
+### 8.4 التحقق (نتائج)
+
+* `apps/api/test/optics-prescriptions.spec.ts` — **11 اختباراً**: العناوين العشرة وبدائلها
+  وحقل 6 = `L1`، «💾 حفظ الأسماء» يستبدل الصفّ والفارغ يُقرأ ببديله، الوصفة بعشر قيم
+  نصية («PL» تُحفظ نصاً)، الرفوض الثلاثة بنصّها، `VERSION_CONFLICT` على نسخةٍ قديمة،
+  «🔍 بحث» بالجوال وبالاسم وصندوقٌ فارغ، القائمة بـ`?partyId=` وترتيبها، الحذف، قسم
+  الطباعة بعناوين المؤسسة، فصل `optics.view` عن `optics.manage`، وعزل المستأجرين (وصفة
+  محمد 404 عند جاره، وعناوينه لم تتغيّر).
+* `scripts/verify-optics.mjs` — **33** نقطة تحقّق حيّة؛ تشغيلان متتاليان أخضران على ستاك
+  قائم، والثاني يبدأ من مؤسسةٍ فيها صفّ عناوين فينتهي وقد أُعيد كما كان: الوصفات
+  تُمحى، والعميل المُصنع يُحذف، والتنظيف في `finally`.
+* و`verify-measurements.mjs` (37) و`verify-tailoring.mjs` (37) و
+  `verify-tailoring-invoices.mjs` (39) خضراء بعد الترحيل: جدولٌ أُضيف ولم يتغيّر ما كان.
+* **729** اختبار API (كان 718) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران · و`/optics/prescriptions` و`/optics/field-labels` يردّان 200.
+
+## 9. الجزء السادس — ⛵ المرسى: الحجوزات والمخالفات
+
+### 9.1 ما يفعله الديسكتوب فعلاً
+
+`Form_WPF/frmBookingM.xaml` («الحجوزات») نافذةٌ واحدة بتبويبين:
+
+* **«📋 بيانات الحجوزات»** — 🔢 الرقم (`txtNo` = عدد الحجوزات + 1) · 📅 التاريخ (`Bdate`) ·
+  📋 الفئة (`cmbGroup`) · 🔖 حالة الحجز (`cmbBookingStatu`: «مؤكد»/«غير مؤكد») · 🚢 نوع
+  الحجز (`«حجز عادي»`/`«بحر مفتوح»`) · 🕐 وقت الحجز و📅 تاريخ الحجز (`dateIn`) · 👤 العميل ·
+  ⚓ المركب · 💰 القيمة (`txtPrice`، يكتبها المشغّل) · ⏱️ المدة ساعة/دقيقة · 🎁 الإضافات
+  (من جدول `Additions`: الكمية · السعر · الإجمالي)، ثم مجاميع «إجمالي الإضافات · الإجمالي ·
+  ضريبة 15% · الصافي».
+* **«🔍 البحث»** — رقم الحجز، أو من تاريخ/إلى تاريخ، أو عميل؛ والشبكة «📋 نتائج البحث»:
+  `رقم الحركة · الرقم · التاريخ · العميل · الجوال · رقم العميل`.
+
+الحفظ صفقةٌ واحدة تكتب ثلاثة جداول (L590–L740): `RentInvoice` بـ`tot_Rent` و
+`tot_Additions` و`tax` و`tot_net` و`RentPeriod`، ثم `Booking`، ثم
+`delete BookingAddition` وإدراج الإضافات من جديد. وأوّل ما ترفضه:
+**«يجب تحديد مدة الحجز»** إن وقف الساعة والدقيقة على صفر. والمجاميع `CalcuAll` (L478):
+
+```
+إجمالي الإضافات = Σ(العدد × السعر) · الإجمالي = الإضافات + القيمة
+ضريبة = ROUND(الإجمالي × MainVAT ÷ 100, 2) · الصافي = الإجمالي + الضريبة
+```
+
+و`MainVAT` من `SettingGeneral where Inv_Id=4` (`LoadMainSettings`) — ضريبة المرسى وحدها،
+و«ضريبة 15%» في الملف ظلُّها.
+
+`frmViolationM` («المخالفات») أصغر: 🔢 الرقم (`MAX(id)+1`) · 📅 التاريخ · ⛵ المركب ·
+⚠️ نوع المخالفة · ⏱️ مدة المخالفة (يوم) · 📝 ملاحظة، تُحفظ في
+`Violation(MarineId, Vdate, Period, status, ViolatType, notes, IsDeleted)` بعد ثلاثة رفوض
+بترتيبها: «يجب اختيار المركب» · «يجب تحديد مدة المخالفة» · «يجب تحديد نوع المخالفة».
+
+`frmInvoiceRentSrch` («بحث الفواتير») — «🔍 خيارات البحث»: رقم الفاتورة · التاريخ من/إلى ·
+المستخدم · العميل · جوال العميل · الصافي من/إلى، و«🗑️ تصفية الحقول»؛ والشبكة
+«🧾 قائمة الفواتير»: `الرقم · 📅 التاريخ · 👤 العميل · 💰 الصافي · 👤 المستخدم · 📱 الجوال`.
+
+### 9.2 ما شُحن
+
+* **الترحيل `0057_marina_bookings.sql`** (+ `down/`) — على `marina_bookings`: 🔢 الرقم
+  (`number`) · 📅 التاريخ (`document_date`) · 🚢 نوع الحجز (`booking_type`) · ⏱️ المدة
+  (`period_hours` · `period_minutes`) · 💰 القيمة (`rental_amount`)؛ وعلى
+  `marina_booking_additions`: الكمية (`quantity`) وسعر الوحدة (`unit_price`)؛ وعلى
+  `marina_violations`: الرقم (`number`) · ⚠️ النوع (`violation_type`) · ⏱️ المدة
+  (`period_days`)؛ وعلى `rental_invoices`: الضريبة (`tax_amount`) والصافي
+  (`net_amount`) والتاريخ. ولا RLS — كما في 0055 و0056 — فالعزل من `withTenantTx` وشرط
+  `tenant_id`، ويُثبَّت باختبار.
+* **`MarinaDocumentsService`** (`booking-documents.service.ts`) — الحجز بكل حقوله
+  ومجاميعه وإضافاته، والمخالفة بكل حقولها، مع رفوضها بنصّها.
+* **النهايات** — `GET/POST /marina/bookings` و`GET/PATCH/DELETE /marina/bookings/{id}` و
+  `POST/DELETE /marina/bookings/{id}/additions[/{additionId}]` و`GET/POST
+  /marina/violations` و`GET/PATCH/DELETE /marina/violations/{id}` و
+  `GET /marina/rental-invoices` بمرشِّحات البحث. القراءة `marina.view` والكتابة
+  `marina.manage` وإصدار الفاتورة `marina.invoice`.
+* **الشاشات** — «⛵ الحجوزات» و«⚠️ المخالفات» بُنيتا من النافذتين (شبكة + بطاقة)، و«🧾 بحث
+  الفواتير» حملت «🔍 خيارات البحث» و«🗑️ تصفية الحقول».
+* **اختبارات** — `apps/api/test/marina-booking-documents.spec.ts` (**11** اختباراً) و
+  `scripts/verify-marina.mjs` (**45** نقطة تحقّق حيّة).
+
+### 9.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **🔢 الرقم تسلسلٌ (`BK-000001` · `VI-000001`)** لا «عدد الصفوف + 1». الرقم عند
+   الديسكتوب يتغيّر إن حُذف صفٌّ قبله، وكل وثيقةٍ في السحابة رقمها الخاص.
+2. **🔖 الحالة و🚢 النوع نصّان عربيّان** («مؤكد» · «غير مؤكد» · «حجز عادي» · «بحر مفتوح»)
+   لأن `cmbBookingStatu.Content` و`rbNormal` هكذا يُحفظان؛ و`'booked'` القديم يُقرأ
+   «مؤكد». واسمٌ غير معروف مرفوض بجملةٍ مخترَعة تُبرَّر بأن النافذة لا تعرض إلا هذين.
+3. **⏱️ المدة صندوقان** (`periodHours` · `periodMinutes`) إلى جانب التاريخين، و
+   `RentPeriod` مشتقٌّ منهما؛ فإن لم تُرسَل اشتُقّت من `startsAt`/`endsAt`.
+4. **💰 القيمة اختيارية**: تُقرأ من تسعير الفئة إن تُركت فارغة — فالديسكتوب يتركها
+   للمشغّل لأن التسعيرة على الحائط، والسحابة تحفظها في `vessel_group_pricing`.
+5. **🎁 الإضافة كمية × سعر** لا مبلغاً واحداً، وشبكتها `الوصف · العدد · السعر · الإجمالي`
+   كما عند الديسكتوب؛ و`amount` باقٍ لكل صفٍّ كُتب قبله.
+6. **الإجمالي = الإضافات + القيمة + التأمين** — الديسكتوب يرسل التأمين صفراً من هذه
+   النافذة فلا يدخل إجماليه؛ والتأمين عندنا مبلغٌ قائم على الحجز فيُضاف، ويُذكر ذلك.
+7. **الضريبة والصافي يُحسبان ويُحفظان** على فاتورة التأجير (`tax_amount` · `net_amount`)،
+   أما سطر فاتورة البيع فيبقى على إجماليه ونسبة ضريبة صفر كما كان — ورفع الضريبة إليه
+   يأتي مع الفاتورة الإلكترونية، وهو مؤجَّل لا مفقود.
+8. **«📝 ملاحظات» في بطاقة الحجز لم تُنقل**: `txtNotes` تُمحى ولا تُحفظ عند الديسكتوب
+   (والصف يُكتب بـ`notes = N' حجز رقم' + txtNo`).
+9. **عمود «الحالة» في «⚠️ قائمة المخالفات» مربوطٌ بالمدة عند الديسكتوب**
+   (`Binding="{Binding period}"`) و⛵ المركب يُظهر الرقم لا الاسم؛ فصار لكلٍّ عموده:
+   «الحالة» (مفتوحة/مغلقة) و«⏱️ مدة المخالفة (يوم)» واسم المركب.
+10. **«المستخدم» و«نوع العملية» ليسا مرشِّحَين** في بحث الفواتير: الجدولholds فواتير
+    التأجير وحدها (`proc_type=4` كان فاصل الديسكتوب)، ولا عمودَ يحمل المستخدم.
+11. **«🗑️ حذف» للحجز بجملةٍ عربية** («هل أنت متأكد من حذف هذا الحجز؟»): سؤال الديسكتوب
+    بالإنكليزية (`"Do you want to delete this record"`)، وهو من قلّةٍ متروكة في الكود.
+
+### 9.4 التحقق (نتائج)
+
+* `apps/api/test/marina-booking-documents.spec.ts` — **11 اختباراً**: الحجز برقمه وحالته
+  ونوعه ومدته ومجاميعه الأربعة، الرفض الأول ورفض النوع المجهول، الإضافات إضافةً وحذفاً،
+  التعديل الذي يستبدل الإضافات و`VERSION_CONFLICT`، البحث بالرقم والعميل والتاريخين،
+  المخالفة بثلاثة رفوض ثم تعديلها وحذفها («اختر المخالفة ليتم حذفها»)، فاتورة التأجير
+  بمجاميعها وبحثها، حذف الحجز، فصل `marina.view` عن `marina.manage`، وعزل المستأجرين.
+* `scripts/verify-marina.mjs` — **45** نقطة تحقّق حيّة؛ تشغيلان متتاليان أخضران على ستاك
+  قائم، والثاني يبدأ من مرسىً فيه فئة ومركب فيستعملهما، وينتهي بلا حجز ولا مخالفة من
+  هذا التشغيل — التنظيف في `finally`.
+* و`verify-optics.mjs` (33) و`verify-measurements.mjs` (37) و`verify-tailoring.mjs` (37) و
+  `verify-tailoring-invoices.mjs` (39) خضراء بعد الترحيل.
+* **740** اختبار API (كان 729) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران · و`/marina/bookings` و`/marina/violations` و`/marina/link-invoices` تردّ 200.
+
+## 10. الجزء السابع — ⛵ المرسى: 📋 بطاقة الفئة و⏰ فترات التأجير
+
+### 10.1 ما يفعله الديسكتوب فعلاً
+
+`frmGroupM` («📋 بطاقة فئة») هي بطاقة **تعريفة المرسى**: الفئة هي ما يُسعَّر به الحجز في
+`frmBookingM`. حقولها: 🖼️ صورة الفئة (وصِلَتاها «📂 اختر» و«🗑️ حذف») · 🔢 رقم الفئة
+(`txtNo`، للقراءة فقط — `LoadNextNo` = عدد صفوف `GroupMarine` + 1) · رمز الفئة (`txtCode`) · اسم
+الفئة (عربي) (`txtName`) · اسم الفئة (EN) (`txtNameEN`) · قيمة الساعة (`txtHourPrice`) ·
+عرض الساعة (دقيقة) (`txtHourOffer`) · قيمة النصف ساعة (`txtHalfHPrice`) · عرض النصف ساعة
+(دقيقة) (`txtHalfHOffer`) · «➕ إضافة مدة». وتحتها «📋 قائمة الفئات» بأعمدتها
+`رقم الفئة (مخفي) · رمز الفئة · اسم الفئة · قيمة الساعة · قيمة النصف ساعة`، ثم الأزرار
+`⏮ الأول · ◀ السابق · ▶ التالي · ⏭ الأخير · 🖨️ طباعة · 🗑️ حذف · 💾 حفظ · ➕ جديد`.
+
+«💾 حفظ» يكتب ثلاثة أشياء في نسقٍ واحد:
+
+```sql
+insert into GroupMarine(id, code, name, nameEN, HourPrice, HalfHPrice,
+  OfferHour, OfferHalf, IsDeleted, image) …
+delete from RentPeriodSub where MGroupID=…
+insert into RentPeriodSub(MGroupID, code, periodID, rent, offer) …  -- 2 · ساعة
+insert into RentPeriodSub(MGroupID, code, periodID, rent, offer) …  -- 1 · نصف ساعة
+```
+
+فالفترتان الأساسيتان **تُكتبان من صندوقي البطاقة في كل حفظة**، حتى لو كان `frmAddPeriod`
+قد أضاف مدداً أخرى. ورفضاه: «ادخل الفئة» إن كان الرمز فارغاً، و«الفئة تم ادخالها مسبقا»
+إن وُجد صفٌّ بنفس `name`. والحذف: «اختر الفئة ليتم حذفها» إن لم تُختر، و«هذه الفئة لها
+ارتباطات فرعية لايمكن حذفها» إن وُجد `Marine` بـ`Groupcode` نفسه، ثم سؤال «هل انت متأكد
+من حذف الفئة» و`update … set IsDeleted=1` وجملة «تم الحذف». والتنقّل `Navigate(sql)`
+**يقف مكانه** إن لم يجد صفاً (`if (!reader.HasRows) return;`).
+
+`frmAddPeriod` («⏰ فترات التأجير»، وعنوان لوحته «⏰ إدارة فترات التأجير») شبكةٌ من
+`⏰ المدة · 💵 السعر · 🎁 العرض · 🗑️` فوق مُنتقًى واحد «🏷️ الفئة»، وحفظها
+`delete RentPeriodSub where MGroupID=…` ثم كل صفٍّ من الشبكة، بعد رفضَين بترتيبهما:
+«يجب إستكمال البيانات ⚠️» (صفٌّ بلا فترة أو بسعرٍ صفر) و«يجب اختيار الفئة أولاً ⚠️».
+و⏰ المدة من `RentPeriod(id, name)` — عشر مددٍ مزروعة: `نصف ساعة · ساعة · ساعة و نصف ·
+ساعتين · ساعتين و نصف · ثلاث ساعات · ثلاث ساعات و نصف · أربع ساعات · أربع ساعات و نصف ·
+خمس ساعات`.
+
+### 10.2 ما شُحن
+
+* **الترحيل `0058_vessel_group_cards.sql`** — `vessel_groups` تحمل `number` · `name_en` ·
+  `hour_price` · `hour_offer_minutes` · `half_hour_price` · `half_hour_offer_minutes` ·
+  `image_url`، و`vessel_group_pricing` تحمل `period_id` · `minutes` · `offer_minutes`؛
+  وقيد `period_kind` وُسِّع ليقبل `period_<id>` (كان أربع قيم من `0018`، والمدد عشر).
+* **`apps/api/src/modules/marina/group-cards.service.ts`** — `MarinaGroupCardsService`:
+  «📋 قائمة الفئات» · قراءة بطاقة · «💾 حفظ» (البطاقة ثم فترتَيها) · «✏️ تعديل» ·
+  «🗑️ حذف» بالرفضَين · «⏰ إدارة فترات التأجير» (استبدال الفترات) · ⏮ ◀ ▶ ⏭ · و⏰ المدة
+  العشر (`RENT_PERIODS`)، كلها معزولةٌ بالمستأجر وبـ`version` للتزامن التفاؤلي.
+* **النهايات** — `GET /marina/groups` · `GET /marina/groups/navigate` (قبل `groups/:id`
+  لأن Nest يطابق بترتيب التسجيل) · `GET /marina/rent-periods` · `GET /marina/groups/{id}` ·
+  `POST /marina/groups` · `PATCH /marina/groups/{id}` · `DELETE /marina/groups/{id}` ·
+  `PUT /marina/groups/{id}/periods`. و`POST /marina/groups/{id}/pricing` القديم باقٍ كما
+  هو، و`POST /marina/groups` بما كان يُرسله (`{ name, code }`) يُنشئ الفئة نفسها.
+* **`DELETE /marina/vessels/{id}`** — تقاعدُ مركبٍ (حذفٌ ناعم): الفئة التي تحمل مركباً لا
+  تُمحى، فبلا هذا الطريق لا مخرج.
+* **الشاشة** — `apps/staff/app/marina/groups/page.tsx` («📋 بطاقة فئة»)، و«⏰ إدارة فترات
+  التأجير» نافذةٌ فوقها، وطريقٌ في الشجرة تحت «إدارة المراسي ← التعاريف».
+* **اختبارات** — `apps/api/test/marina-group-cards.spec.ts` (**9** اختبارات) و
+  `scripts/verify-marina-groups.mjs` (**58** نقطة تحقّق حيّة).
+
+### 10.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **🖼️ صورة الفئة رابطٌ لا بايتات** — `GroupMarine.image` عمود `image` يخزّن البايتات؛
+   ولا مخزن ملفّاتٍ في هذه المنصّة، فالشاشة تقبل رابطاً أو `data:image/…` ورابطٌ بغير
+   هذين مرفوض بجملةٍ مخترَعة «رابط صورة الفئة غير صحيح» (لا مقابلَ لها عند الديسكتوب
+   لأنه لا يسأل عن رابط).
+2. **🔢 الرقم تسلسلٌ تصاعديٌّ لكل مستأجر** (`max(number) + 1`) لا «عدد الصفوف + 1»: رقم
+   الديسكتوب يتغيّر إن حُذف صفٌّ قبله، وأرقام الفئات مفاتيحُ تنقّل.
+3. **⏰ المدة عشرٌ ثابتة في الكود** (`RENT_PERIODS`) لا جدول `RentPeriod`: لا نافذةَ
+   للقائمة عند الديسكتوب، وهي مزروعة في `AlterDb`، فتُحفظ في الخدمة كما حُفظ نصّا
+   «حجز عادي» و«بحر مفتوح» في الجزء السادس، ولا يُخزَّن إلا `period_id`. وأسماؤها
+   مُقلَّمة: بذور الديسكتوب تحمل فراغاتٍ زائدة (`N' ساعة'` · `N'خمس ساعات '`).
+4. **`RentPeriodSub.code` لم يُنقل** — نسخةٌ من رمز الفئة تُكتب مع كل صفٍّ ولا تُقرأ.
+5. **«الفئة تم ادخالها مسبقا» تُقارن الرمز لا الاسم** — الديسكتوب يفحص
+   `where name='…'` بقيمة صندوق الرمز (خلطٌ بين العمودين)؛ والصوابُ ما فعلناه.
+6. **«هذه الفئة لها ارتباطات فرعية لايمكن حذفها» تنظر إلى `vessels.group_id`** لا إلى
+   `Marine.Groupcode` — الرابطُ أوثق من نسخةِ الرمز.
+7. **«اختر الفئة ليتم حذفها» بـ 404 لا 422** — النافذة تُظهرها تحذيراً حين لا تُختار
+   فئة، والـ REST لا يصلها طلبٌ بلا مُعرِّف؛ فالجملة باقية والحالة 404 لئلا يعرف غريبٌ
+   أن الفئة موجودة عند مستأجرٍ آخر.
+8. **«يجب اختيار الفئة أولاً ⚠️» صار **«الفئة غير موجودة»** في `PUT …/periods` — الطريق
+   يحمل مُعرِّف الفئة، فلا حالةَ «لم تُختر فئة»؛ والجملة نفسها محفوظة في الوثيقة.
+9. **اسم الفئة (عربي) يقوم مقامه الرمز إن لم يُرسَل** — العمود `NOT NULL` في السحابة
+   و`NULL` عند الديسكتوب، فالرمز يسدّه لا الرفض.
+10. **⏰ فترات التأجير تستبدل كلَّ صفوف التسعير** كما يفعل `frmAddPeriod` (`delete` ثم
+    `insert`): فمن حذف «ساعة» من الشبكة فقد حذف سعرها من تسعير الحجز — وهو فعلُ
+    الديسكتوب بعينه، لا تساهلاً منّا.
+11. **⏮ ◀ ▶ ⏭ يقف عند الطرف** — `if (!reader.HasRows) return;` عند الديسكتوب، والسحابة
+    تردّ البطاقة نفسها؛ ولا جملةَ جديدة.
+12. **🖨️ طباعة** مؤجَّلة مع `Reports/*.repx` (§13).
+
+### 10.4 التحقق (نتائج)
+
+* `apps/api/test/marina-group-cards.spec.ts` — **9 اختبارات**: المدد العشر، البطاقة
+  بحقولها وفترتَيها المكتوبتين من قيمة الساعة ونصف الساعة، الرفوض الأربعة، التعديل
+  و`VERSION_CONFLICT`، الفترات الأربع و«يجب إستكمال البيانات ⚠️» (ولا صفَّ يُمحى بعد
+  الرفض)، ⏮ ◀ ▶ ⏭ والوقوف عند الطرف، الحذف بالرفضَين ثم «تم الحذف»، فصل `marina.view`
+  عن `marina.manage`، وعزل المستأجرين.
+* `scripts/verify-marina-groups.mjs` — **58** نقطة تحقّق حيّة؛ ثلاث تشغيلات متتالية
+  خضراء على ستاك قائم، والتنظيف في `finally` يمحو فئات التشغيل ومراكبها.
+* **749** اختبار API (كان 740) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران · و`/marina/groups` تردّ 200. و`verify-marina` (45) و`verify-optics` (33) و
+  `verify-measurements` (37) و`verify-tailoring` (37) و`verify-tailoring-invoices` (39)
+  خضراء بعد الترحيل.
+
+## 11. الجزء الثامن — 🛒 متجر سلة
+
+### 11.1 ما يفعله الديسكتوب فعلاً
+
+`FrmSallah` («تكامل Salla API» — ولوحة عنوانه «🛒 تكامل منصة Salla») أربعة أزرار لا أكثر:
+
+| الزر | ما يفعله | ما يقوله |
+|---|---|---|
+| «📦 جلب المنتجات» | `productsManager.GetProducts()` → `GET products` | «تم جلب {n} منتج.» |
+| «📋 جلب الطلبات» | `ordersManager.GetOrders()` → `GET orders` | «تم جلب {n} طلب.» |
+| «➕ إضافة منتج» | `productsManager.CreateProduct(...)` → `POST products` | «تم إضافة المنتج بنجاح.» |
+| «📥 جلب الطلبات (2)» | `await Task.Run(() => { })` | «جلب الطلبات (2) — يمكن تخصيصه لاحقاً.» |
+
+والخطأ عند الجميع `«خطأ: {message}»`، يَرميه `SallaAPI` أصلاً بصيغة
+`«خطأ في الطلب: {status} - {body}»`. وأمّا «➕ إضافة منتج» فيُرسل كائناً مثبَّتاً في الكود
+لا صنفاً حقيقياً: `{ name = "اسم المنتج", price = 100, quantity = 50, description = "وصف
+المنتج" }`.
+
+ثلاثة أمور لا بدّ من قولها كما هي:
+
+1. **الرمز مموضع في الكود** — `new SallaAPI("2adcaba8-c5a8-426c-8fc9-3281fa4b056d")` في
+   `Window_Loaded`؛ لا إعدادات، ولا تخزين، ولا تجديد.
+2. **النافذة تُحصي ولا تحفظ** — لا جدولَ لمنتجات سلة ولا لطلباتها في `CrystalLiteDB.txt`؛
+   وكل ما يبقى من «جلب» هو رقمٌ في صندوق رسالة.
+3. **قوائم «متجر سلة» الثلاث فارغة** — `ToolStripListProductsalla_Click` و
+   `ToolStripMenuItemGetOrderSallah_Click` و`ToolStripMenuItemSallaSafes_Click` أجسامُها
+   `{ }`، والنوافذ التي كانت تفتحها (`FrmSallaProducts` · `FrmOrderSalla` ·
+   `FrmSallaBranchMapping`) معلَّقة في `Home.xaml.cs` L257–L261 وغير موجودة في الشجرة.
+
+و`Class/ManagerOnline.cs` (723 سطراً) **ليس من سلة في شيء**: هو نبضةُ الرخصة
+(`QLicense`) وإرسالُ `CompanyName · Mobile · City · LicenseDate · LicenseFeatures` إلى
+`https://app-cloud-rmxb.onrender.com/api/Customer/Cust`، وتاريخُ ZATCA؛ ولا سطرَ فيه عن
+المنتجات أو الطلبات. وقد كان يُظنّ من سلة لاسمه، فقراءة الملف أثبتت غير ذلك، ويُثبت هنا.
+
+### 11.2 ما شُحن
+
+* **الترحيل `0059_salla_store.sql`** — `salla_products` (منتجات المتجر كما جُلبت) و
+  `salla_orders` (كل طلبٍ برقمه البعيد وحالته ومرآته وارتباطه بفاتورته)، كلتاهما تحت RLS.
+* **`salla-client.ts`** — `SallaClient` على `https://api.salla.dev/admin/v2` بـ Bearer،
+  و`products`/`orders`/`customers` كما في المديرات الثلاث، ورسالة الخطأ بلسان `SallaAPI`.
+  والنقل (`SallaTransport`) **محقون لا مثبَّت**: `fetch` في الإنتاج، ومتجرٌ في الذاكرة
+  حين يكون معرّف المتجر يبدأ بـ `MOCK-` أو حين تُضبط `SALLA_TRANSPORT=mock`.
+* **`salla-store.service.ts`** — «📦 جلب المنتجات» (تُحفظ المرآة) · «➕ إضافة منتج» (من
+  صنفٍ حقيقي بالمفاتيح الأربعة) · `PUT`/`DELETE products/{id}` · «👥 العملاء» (قراءةٌ بلا
+  تخزين) · «📋 جلب الطلبات» (فاتورة لكل طلب، والرقم البعيد يمنع التكرار) ·
+  `PUT orders/{id}/status` بـ`{ status }` · «🗑️ حذف الطلب» (المرآة ومسوّدتها) · «قطع
+  المتجر».
+* **النهايات** — `POST products/pull` · `POST products/push` · `PUT products/{remoteId}` ·
+  `DELETE products/{remoteId}` · `GET catalog` · `GET customers` · `POST orders/pull` ·
+  `PUT orders/{id}/status` · `DELETE orders/{id}` · `DELETE connections/{id}`؛ وكلُّ ما كان
+  (`GET products` · `GET orders` · «ربط المستودعات» · «إعدادات ربط سلة» · طابور التصدير ·
+  الويب هوك) باقٍ على حاله.
+* **الشاشتان** — «📦 منتجات متجر سلة» (جدولان: الأصناف محلياً، ومنتجات المتجر) و«📋 إدارة
+  طلبات سلة» (جلب · تحديث حالة · حذف · فتح الفاتورة).
+* **اختبارات** — `apps/api/test/salla-store.spec.ts` (**10** اختبارات) و
+  `scripts/verify-salla.mjs` (**40** نقطة تحقّق حيّة).
+
+### 11.3 قرارات (ما خُولف فيه الديسكتوب، ولماذا)
+
+1. **لا رمزَ في الكود** — الرمز مشفَّرٌ لكل مستأجر (`salla_connections.access_token_enc`)
+   منذ المرحلة 22؛ والديسكتوب يضعه حرفيّاً في `FrmSallah.xaml.cs`.
+2. **ما يُجلب يُحفظ** — الديسكتوب يُحصي ويَنسى؛ والسحابة تحفظ `salla_products` و
+   `salla_orders`، وإلا فلا معنى لـ«جلب» ولا سبيل إلى منع التكرار.
+3. **رقم الطلب البعيد هو المفتاح** — `salla_orders.remote_id` فريدٌ لكل متجر، فالجلب
+   الثاني لا ينشئ فاتورةً ثانية. ولا وجود لهذا عند الديسكتوب لأنه لا ينشئ فاتورة أصلاً.
+4. **«➕ إضافة منتج» يرسل صنفاً حقيقياً** — الاسم من `nameAr`، والسعر من `salePrice`،
+   والوصف من `nameEn`؛ أمّا `quantity` فيبقى صفراً: لا كميةَ متاحة للصنف في هذه المرحلة
+   (مخزونُه في جدول آخر)، والديسكتوب كان يرسل `50` جزافاً.
+5. **«الكمية» تُقرأ ولا تُرسَل في التحديث** — `productPayloadOf` لا يغيّر كمية المتجر،
+   لأن المخزون هنا هو الحقيقة لا العكس.
+6. **الطلب يصير فاتورةً مسوّدة** لا حركةً معلَّقة: هي وثيقة المؤسسة نفسها، تُرحَّل
+   وتُقبض كأيّ فاتورة — والديسكتوب لا ينشئ شيئاً.
+7. **الفرع من «ربط المستودعات»، ثم أول فرعٍ في المؤسسة** — النافذة عند الديسكتوب لا تربط
+   (معالجُها فارغ)، فالربطُ تفضيلٌ لا شرط.
+8. **«👥 العملاء» بلا جدول** — `CustomersManager` يُقرأ ولا يُخزَّن، لأن الطلب يحمل اسم
+   عميله وجواله، ولا شيء عند الديسكتوب يربط عميل سلة بعميل المؤسسة.
+9. **«📥 جلب الطلبات (2)» لم يُنقل** — `await Task.Run(() => { })` وصندوق رسالة.
+10. **متجرٌ في الذاكرة** — `MOCK-` و`SALLA_TRANSPORT=mock`: النقل محقون، فصار في الإمكان
+    اختبارُ مسارٍ كان عند الديسكتوب لا يُختبر إلا بمتجرٍ حقيقي.
+11. **«🗑️ حذف الطلب» يمحو المسوّدة** (لا حركة مخزون، ولا قيد، ولا إرسال إلى ZATCA) ويرفض
+    المُرحَّل بجملةٍ مخترَعة «لا يمكن حذف طلبٍ مُرحَّل؛ أصدِر مرتجعاً بدلاً منه» — لا
+    مقابلَ لها عند الديسكتوب لأنه لا يحذف طلباً أصلاً.
+12. **قطع المتجر يمحو مرآة منتجاته** ويُبقي الطلبات: كل طلبٍ فاتورةٌ قائمة في المؤسسة.
+
+### 11.4 التحقق (نتائج)
+
+* `apps/api/test/salla-store.spec.ts` — **10 اختبارات**: «📦 جلب المنتجات» وحفظها، «➕ إضافة
+  منتج» ثم ظهوره في الجلب وتحديثه وحذفه، «👥 العملاء»، «📋 جلب الطلبات» بفاتورةٍ لكل طلب ثم
+  لا تكرار، تحديث الحالة ورفضُها الفارغ، حذفُ الطلب ومسوّدته، الرفوض الأربعة (بـ«خطأ في
+  الطلب: 404 …» بلسان `SallaAPI`)، فصل `salla.integration.view` عن
+  `salla.integration.manage`، عزل المستأجرين، وقطع المتجر.
+* `scripts/verify-salla.mjs` — **40** نقطة تحقّق حيّة؛ ثلاث تشغيلات متتالية خضراء،
+  والتنظيف في `finally` يمحو الطلبات والفواتير والمتجر والصنف والوحدة والمجموعة.
+* **759** اختبار API (كان 749) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران · و`/integrations/salla/products` و`/integrations/salla/orders` تردّان 200. و
+  `verify-marina-groups` (58) · `verify-marina` (45) · `verify-optics` (33) ·
+  `verify-measurements` (37) · `verify-tailoring` (37) · `verify-tailoring-invoices` (39)
+  خضراء بعد الترحيل.
+
+## 12. الجزء التاسع — ⛵ المرسى: ➕ الإضافات
+
+### 12.1 ما تنقله النافذة
+
+`Form_WPF/frmAdditions.xaml` («📋 إضافات» — لوحتها «📋 إدارة الإضافات») أصغر نوافذ
+المرحلة: ثلاثة صناديق وثلاثة أزرار وشبكة.
+
+| العنصر | `frmAdditions` | ما يفعله |
+|---|---|---|
+| «🔢 الرقم» | `txtNo`، `IsReadOnly="True"` | يُملأ بـ«الرقم التالي» عند فتح النافذة وبعد كل حفظ وحذف |
+| «📝 الاسم» | `txtName` | «يجب إدخال اسم الإضافة ⚠️» إن كان فارغاً، والمؤشَّر إليه |
+| «💰 القيمة» | `txtSalePrice` | صندوقٌ فارغٌ يصير صفراً قبل الحفظ |
+| «➕ جديد» | `btnNew_Click` | يفرّغ الصناديق ويعيد تحميل الشبكة والرقم |
+| «💾 حفظ» | `btnSave_Click` | `insert`/`update`، ثم «✅ تم الحفظ بنجاح» أو «✅ تم حفظ التعديلات بنجاح» |
+| «🗑️ حذف» | `btnDelete_Click` | «يجب تحديد الإضافة المراد حذفها ⚠️»، ثم «هل أنت متأكد من حذف هذه الإضافة؟ 🗑️»، ثم `delete from Additions where id=…` و«✅ تم الحذف بنجاح» |
+| الشبكة | `dgvData` | `🔢 الرقم · 📝 الاسم · 💰 القيمة` من `select * from Additions where IsDeleted=0 ORDER BY id` |
+
+والنصف الآخر من الجزء «🎁 الإضافات» في `Form_WPF/frmBookingM.xaml` («الحجوزات») — وهو
+السبب في أن جدول `Additions` يستحق أن يُنقل:
+
+```
+LoadAdditions()                → select id, Name from Additions where IsDeleted=0
+cmbAdditions_SelectionChanged  → txtAdditPrice.Text = SalePrice
+txtQuant_TextChanged           → txtAdditiTot.Text  = ROUND(price * quant, 2)
+Add2Dgv                        → «يجب إدخال الكمية  » · وإضافةٌ في الشبكة أصلاً تُجمَع
+                                 كمّيتها (`Quantity += quant` ثم `TotalPrice = Quantity * UnitPrice`)
+insert into BookingAddition(bookId, AditionID, Price, quanty, notes, IsDeleted)
+```
+
+### 12.2 ما صار في السحابة
+
+ترحيل `0060_marina_additions.sql`:
+
+* **`marina_additions`** — 🔢 الرقم (`number`) · 📝 الاسم (`name`) · 💰 القيمة
+  (`sale_price`)، وحذفٌ ناعم.
+* **`marina_booking_additions.addition_id`** — `BookingAddition.AditionID`؛ فصار صفّ
+  «🎁 الإضافات» يشير إلى تعريفه بدل أن ينسخ اسمه فقط.
+
+والنهايات (القراءة بـ`marina.view` والكتابة بـ`marina.manage`):
+
+| النهاية | ما يقابلها |
+|---|---|
+| `GET /marina/additions` | `select * from Additions where IsDeleted=0 ORDER BY id` |
+| `GET /marina/additions/next` | `LoadNextAdditionNumber` — ما تُظهره بطاقةٌ جديدة |
+| `POST /marina/additions` | «💾 حفظ» على بطاقةٍ جديدة |
+| `PATCH /marina/additions/{id}` | «💾 حفظ» على بطاقةٍ قائمة |
+| `DELETE /marina/additions/{id}` | «🗑️ حذف» |
+| `POST /marina/bookings/{id}/additions` | `Add2Dgv` — ويقبل الآن `additionId` |
+
+ورموز الرفض: `MARINA_ADDITION_NAME_REQUIRED` «يجب إدخال اسم الإضافة ⚠️» (422) ·
+`MARINA_ADDITION_QUANTITY_REQUIRED` «يجب إدخال الكمية  » (422) ·
+`MARINA_ADDITION_NOT_FOUND` «الإضافة غير موجودة» (404) ·
+`MARINA_ADDITION_DELETE_REQUIRED` «يجب تحديد الإضافة المراد حذفها ⚠️» (404).
+
+### 12.3 فروقٌ عن الديسكتوب (مُبرَّرة)
+
+1. **🔢 الرقم عمودٌ محفوظ، لا `count + 1`** — `LoadNextAdditionNumber` يعدّ الصفوف ويضيف
+   واحداً؛ وبعد حذف صفٍّ يعود العدد فيصطدم الرقم الجديد برقمٍ قائم (الإضافة تُحذف
+   حذفاً قاطعاً هناك)، فيُكتب صفٌّ على صفّ. وهنا `max(الرقم) + 1`: الرقم لا يُعاد
+   استعماله، و«🎁 الإضافات» لا يشتبه عليها إضافةٌ بأخرى.
+2. **الحذف ناعم** — `delete from Additions` عند الديسكتوب يمحو التعريف ويترك
+   `BookingAddition.AditionID` يتيماً؛ وهنا يُتقاعد التعريف (`deleted_at`) ويبقى صفّ
+   الحجز باسمه وسعره وإجماليه. وهذا أثرُ قاعدة الحذف الناعم في كل المنصّة.
+3. **🧾 الاستخدام (`usageCount`)** — عمودٌ مخترَع: كم حجزاً يستعمل هذه الإضافة.
+   الديسكتوب لا يعرضه لأنه يمحو التعريف بلا سؤال؛ وهنا يُعرض بدل أن يُمنع، فلا يُكسر
+   شيء.
+4. **«يجب إدخال الكمية  » على الإضافة المُعرَّفة وحدها** — `Add2Dgv` ترفض الكمية
+   الفارغة قبل أن تنظر إلى `cmbAdditions`؛ وهنا يبقى الصفّ المكتوب باليد على عُرفه
+   القديم (كميةٌ بلا قيمة ⇒ 1) حتى لا تنكسر شاشةٌ قائمة، والرفض يصحب «🎁 الإضافات»
+   الذي اختياره من تعريف.
+5. **السعر يُقرأ من التعريف ولا يُفرض** — اختيارٌ من «🎁 الإضافات» يملأ «السعر» كما
+   يفعل `cmbAdditions_SelectionChanged`، ويبقى الصندوق قابلاً للتعديل (`txtAdditPrice`
+   ليس مقروءاً فقط في النافذة).
+6. **«— بلا تعريف —»** في قائمة الإضافات على شاشة الحجز تسميةٌ مخترَعة: النافذة عند
+   الديسكتوب لا تقبل إلا ما في `Additions`، والسحابة تحتفظ بسبيلٍ لصفٍّ يُكتب وصفه
+   باليد لأن `marina_booking_additions.description` كان يُكتب هكذا قبل هذا الجزء.
+7. **الكمية تُجمَع ولا يتكرر الصفّ** — `Add2Dgv` عند الديسكتوب تجمع على شبكةٍ في
+   الذاكرة قبل أن تُدرج؛ والسحابة تدرج فوراً، فصار الجمع على قاعدة البيانات: صفٌّ واحد
+   للإضافة الواحدة في الحجز الواحد.
+
+### 12.4 التحقق (نتائج)
+
+* `apps/api/test/marina-additions.spec.ts` — **8 اختبارات**: 🔢 الرقم التالي، «💾 حفظ»
+  وقيمةٌ فارغةٌ صفر، الرفوض الثلاثة، التعديل و`VERSION_CONFLICT`، «🎁 الإضافات» بالاسم
+  والسعر من التعريف وجمعُ الكمية، «يجب إدخال الكمية  » و«الإضافة غير موجودة» و🧾
+  الاستخدام، «🗑️ حذف» وبقاءُ الصفّ، فصلُ `marina.view` عن `marina.manage`، وعزلُ
+  المستأجرين (ولكلِّ مرسى أرقامه من واحد).
+* `scripts/verify-marina-additions.mjs` — **44** نقطة تحقّق حيّة؛ ثلاث تشغيلات متتالية
+  خضراء، والتنظيف في `finally` يمحو الحجزين والإضافتين.
+* **767** اختبار API (كان 759) · 36 staff · 71 contract · 17 database · `tsc` و`lint`
+  أخضران · و`/marina/additions` و`/marina/bookings` تردّان 200. و`verify-marina-groups`
+  (58) · `verify-marina` (45) · `verify-salla` (40) · `verify-optics` (33) ·
+  `verify-measurements` (37) · `verify-tailoring` (37) · `verify-tailoring-invoices`
+  (39) خضراء بعد الترحيل.
+
+## 13. معايير القبول لكل جزء
+
+1. اختبارات جديدة خضراء + المجموعة كاملة خضراء + `pnpm -r run lint` أخضر.
+2. تحقّق حيّ (سكربت) يمشي المسار ضد ستاك قائم، ويُعاد تشغيله بلا أثر.
+3. التسميات من `Desktop_ERP` بنصّها، ونسبة تطابق ≥ 90%؛ أي تسمية مخترَعة تُبرَّر.
+4. لا حذف وظيفة قائمة بلا بديل، ولا كسر لتوافق الـ API.
+5. تحديث `docs/STATUS.md` و`docs/desktop-parity/README.md`، وكومِت+dفع على
+   `arena/…`، وتعليق على PR #4.
+6. كل شاشةٍ طريقٌ حقيقيٌّ في الشجرة — لا صفَّ يشير إلى مسارٍ لم يُبنَ.
+
+## 14. مؤجَّل عن قصد
+
+* **`👁️ عرض`** في `frmInvBySalesMen` (وفي كل نوافذ المرحلة) — إلى أن تُفتح شاشات
+  الوثائق بـ`?id=`.
+* **`🖨️ طباعة` و`👁️ معاينة`** وملفّات `Reports/*.repx` الخاصة بالوحدات — مرحلة التقارير.
+* **نصف «مشتريات»** في `frmInvBySalesMen` — إلى أن تحمل فاتورة الشراء موظفاً.
+* **`📊 تصدير Excel`** — CSV بدلاً منه حتى مرحلة التقارير.
+* **السنداتُ بلا فرع وبلا «كل الفترة»** — منقولٌ كما في النافذة، ومُثبَّتٌ باختبار.
+* **شاشة «🧵 أنواع التفصيل»** — النهاية جاهزة والصف في الشجرة بحالة `api`؛ تُبنى مع
+  شاشة القياسات (الجزء الرابع) لأن الطلب يقرأ الاثنتين معاً.
+* **تاريخُ الحالات** (`sp_UpdateOrderStatus` قد يكتبه) — لا شاشة تقرأه، فلا جدولَ له.
+* **«فاتورة» في «⚙️ لوحة التحكم»** (`AddNewSizes` L742) — يملأ سلّة ويستدعي نقطة البيع؛
+  `billed` جاهز والشاشة مؤجَّلة مع شاشات نقطة البيع.
+* **`frmSandQ` كاملاً** (شيكات، توريد بنكي، «كل الفترة») — «إستلام دفعة» يكتب السند عبر
+  `TreasuryService`؛ وشاشة الخزينة نفسها مرحلةٌ أخرى.
+* **شاشة القياسات** (`frmMeasurements`) — الجزء الرابع: `customer_measurements` يخزّنها
+  اليوم بلا شاشة، وبطاقة الفاتورة تقرأ حقولها من السجلّ.
+* **«📐 المقاسات» في `frmCustomers.xaml` L1184** (الطول · كتف · الرقبة · وسع اليد · وسع
+  الخطوة · رقم الصفحة) — أعمدةٌ ثابتة على العميل؛ وهي في السحابة المفاتيح الحرّة نفسها
+  في `measurements`، وشاشتها شاشة بطاقة العميل لا هذه.
+* **`sp_DeleteMeasurement`** — متن الإجراء ليس في المستودع؛ والحذف عندنا ناعم
+  بـ`deleted_at` لأن `IsActive = 1` هو شرط كل قراءة بعده.
+* **فتح «👓 بيانات النظارات» من سطر الفاتورة** (`frmInvSale` Alt+G ورفضاه «الرجاء إضافة
+  صنف للفاتورة» · «الرجاء وضع المؤشر على الصنف») — شاشة فاتورة البيع لا تُدير أسطرها
+  بعدُ في السحابة، و`invoice_line_id` جاهز لها متى بُنيت.
+* **`frmInvPOS.glassesOptions`** — غلافٌ فارغ في الديسكتوب نفسه (`// يبقى كما في
+  الأصل`)؛ فلا شيء يُنقل منه.
+* **`pnpm db:seed` لا يستدعي `OrgProvisioningService.provisionOrgDefaults`** — فمؤسسة
+  `demo` المزروعة في قاعدةٍ جديدة لا تحمل بذور الوحدات (حالات الطلب · أنواع الثوب ·
+  خصائص القياس) حتى تُدار يدوياً؛ وهو أثرٌ في بيئة التطوير لا في الكود، وأُثبت هنا
+  ليُعرف.
+* **«🖨️ طباعة» و«🖨️ طباعة»** في `frmBookingM` و`frmViolationM`، وملفّات
+  `Reports/*.repx`، و`frmRptRentInvoices` («تقرير فواتير التأجير») — كلها إلى مرحلة
+  التقارير.
+* **⏮ ◀ ▶ ⏭ على الحجوزات والمخالفات** — أزرار تنقّلٍ على وثيقةٍ واحدة؛ الشبكة والبحث أغنى
+  منها. أما «📋 بطاقة فئة» فلا صندوق بحثٍ فيها عند الديسكتوب، فنُقلت أسهمها كما هي
+  (§10.1) — وهي أول نافذةٍ تُنقل أسهمها.
+* ~~**`Additions` كجدول تعاريف**~~ — **أُنجز في الجزء التاسع** (§12): `marina_additions`
+  و`marina_booking_additions.addition_id`، وشاشة «📋 إضافات»، و«🎁 الإضافات» تقرأ منها.
+* **`frmOwners` («تعريف مالك»)** — بطاقة عميلٍ كاملة (جوال · هوية · رقم ضريبي · دولة ·
+  مدينة · مركز تكلفة · رصيد افتتاحي)؛ و«المالك» عندنا رابطٌ بنسبة على المركب
+  (`vessel_owners`) والعميل نفسه يُدار في شاشة العملاء. **وهو المرشَّح للجزء العاشر**:
+  النافذة تكتب `Owners` و`Accounts_Index` وقيدَ الرصيد الافتتاحي (`Entry` · `Entry_sub`)
+  معاً في حفظةٍ واحدة.
+* **🛒 سلة — ما لم يُنقل من الجزء الثامن:**
+  * **«📥 جلب الطلبات (2)»** — زرٌّ ميت (`await Task.Run(() => { })` ثم صندوق رسالة).
+  * **`Class/ManagerOnline.cs`** (723 سطراً) — نبضةُ الرخصة وتاريخ ZATCA، وليس من سلة في
+    شيء؛ لا يُنقل في هذه المرحلة.
+  * **منتجات المتجر لا تُصبح أصنافاً محلية** — «📦 جلب المنتجات» يحفظ مرآةً لا أصنافاً؛
+    فمطابقةُ منتجٍ بصنفٍ قرارُ رموز (SKU) لم تتخذه النافذة، وهو مؤجَّل إلى مرحلة استيراد
+    الأصناف.
+  * **طلبات سلة لا تُنشئ عميلاً (`party`)** — الطلب يحمل الاسم والجوال كما يفعل
+    «فاتورة نقدية»؛ وربطُه بعميلٍ قائم مؤجَّل إلى شاشة العملاء نفسها.
+  * **كمية المتجر لا تُزامن مع المخزون** — `quantity` تُقرأ من المتجر ولا تُكتب إليه؛
+    ومزامنة المخزون مرحلةٌ أخرى (`stripSyncStocks`).
+  * **`SallaAuth.redirect_uri` عند الديسكتوب حرفيٌّ** (`"YOUR_REDIRECT_URI"`)؛ والسحابة
+    تبنيه من الطلب (`GET /integrations/salla/oauth/authorize`).
+* **`SettingPrint(Inv_Id=4)`** (نوع الطباعة وعدد النسخ) — إلى مرحلة التقارير.

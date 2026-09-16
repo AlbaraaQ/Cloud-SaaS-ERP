@@ -1,7 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { ALL_PERMISSIONS, DomainError, errorCodes, permissionRegistry } from '@erp/contracts';
-import { newId, withPlatformAdminTx, type DatabaseHandle } from '@erp/database';
+import {
+  ALL_PERMISSIONS,
+  DomainError,
+  canonicalizePermissionCode,
+  errorCodes,
+  findPermission,
+  isPlatformRoleCode,
+  permissionRegistry,
+  platformPermissionRegistry,
+  platformRoleCatalog,
+  type PermissionDto,
+} from '@erp/contracts';
+import { newId, withPlatformAdminTx, withTx, type DatabaseHandle } from '@erp/database';
 import { baselineRoles } from '@erp/config';
 
 import { DATABASE_HANDLE } from '../../../database/database.tokens.js';
@@ -304,9 +315,17 @@ export class PlatformAdminService {
           INSERT INTO roles (id, tenant_id, name, is_system, description)
           VALUES (${roleId}, ${tenantId}, ${role.name}, ${role.isSystem}, ${role.description})
         `);
+        // `*` expands to canonical tenant codes only — never deprecated spellings
+        // (deduped by construction) and never `console.*` (not in this registry).
         const codes = role.permissions.includes(ALL_PERMISSIONS)
-          ? permissionRegistry.map((permission) => permission.code)
-          : role.permissions.filter((permission) => permissionRegistry.some((entry) => entry.code === permission));
+          ? permissionRegistry.filter((entry) => !entry.deprecated).map((entry) => entry.code)
+          : [
+              ...new Set(
+                role.permissions
+                  .map((permission) => canonicalizePermissionCode(permission))
+                  .filter((code) => findPermission(code) && !code.startsWith('console.')),
+              ),
+            ];
         for (const permission of codes) {
           await tx.execute(sql`
             INSERT INTO role_permissions (role_id, permission_code) VALUES (${roleId}, ${permission})
@@ -537,13 +556,95 @@ export class PlatformAdminService {
       const result = await tx.execute(sql`
         SELECT u.id, u.email, u.full_name, u.status, u.is_platform_admin, u.must_change_password,
                u.last_login_at, u.created_at,
-               (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id AND m.deleted_at IS NULL)::int AS membership_count
+               (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id AND m.deleted_at IS NULL)::int AS membership_count,
+               COALESCE(
+                 (SELECT jsonb_agg(pm.role_code ORDER BY pm.role_code)
+                  FROM platform_memberships pm
+                  WHERE pm.user_id = u.id AND pm.revoked_at IS NULL),
+                 '[]'::jsonb
+               ) AS platform_roles
         FROM users u
         WHERE (${like}::text IS NULL OR lower(u.email) LIKE ${like} OR lower(u.full_name) LIKE ${like})
         ORDER BY u.created_at DESC
         LIMIT 500
       `);
       return result.rows;
+    });
+  }
+
+  // ----------------------------------------------------------------- platform roles
+
+  /** Family-A catalogue with live holder counts (2026-09 RBAC reorganisation). */
+  async listPlatformRoles() {
+    assertPlatformAdmin();
+    return withTx(this.database.db, async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT pr.code, pr.name, pr.description,
+               (SELECT COUNT(*) FROM platform_memberships pm
+                WHERE pm.role_code = pr.code AND pm.revoked_at IS NULL)::int AS holder_count
+        FROM platform_roles pr
+        ORDER BY pr.code
+      `);
+      const holders = new Map<string, number>(
+        result.rows.map((row) => [String(row.code), Number(row.holder_count ?? 0)]),
+      );
+      // The code catalogue is authoritative; the table only proves the seed ran.
+      return platformRoleCatalog.map((role) => ({
+        code: role.code,
+        name: role.nameEn,
+        nameAr: role.nameAr,
+        description: role.description,
+        permissions: [...role.permissions],
+        holderCount: holders.get(role.code) ?? 0,
+      }));
+    });
+  }
+
+  /** Platform-console permission registry served to apps/platform-admin. */
+  listPlatformPermissions(): PermissionDto[] {
+    assertPlatformAdmin();
+    return platformPermissionRegistry.map((entry) => ({
+      code: entry.code,
+      module: entry.module,
+      description: entry.description,
+    }));
+  }
+
+  async grantPlatformRole(userId: string, roleCode: string) {
+    assertPlatformAdmin();
+    if (!isPlatformRoleCode(roleCode)) {
+      throw new DomainError(errorCodes.VALIDATION_FAILED, `Unknown platform role: ${roleCode}`, 422, {
+        field: 'roleCode',
+      });
+    }
+    const auth = getAuthContext();
+    return withTx(this.database.db, async (tx) => {
+      const user = await tx.execute(sql`SELECT id FROM users WHERE id = ${userId}`);
+      if (user.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'User not found', 404);
+      // Re-granting revives a revoked row instead of duplicating it.
+      const result = await tx.execute(sql`
+        INSERT INTO platform_memberships (id, user_id, role_code, granted_by)
+        VALUES (${newId()}, ${userId}, ${roleCode}, ${auth.userId})
+        ON CONFLICT (user_id, role_code)
+          DO UPDATE SET revoked_at = NULL, granted_at = now(), granted_by = ${auth.userId}
+        RETURNING id, user_id, role_code, granted_at
+      `);
+      return result.rows[0];
+    });
+  }
+
+  async revokePlatformRole(userId: string, roleCode: string) {
+    assertPlatformAdmin();
+    return withTx(this.database.db, async (tx) => {
+      const result = await tx.execute(sql`
+        UPDATE platform_memberships SET revoked_at = now()
+        WHERE user_id = ${userId} AND role_code = ${roleCode} AND revoked_at IS NULL
+        RETURNING id, user_id, role_code, revoked_at
+      `);
+      if (result.rows.length === 0) {
+        throw new DomainError(errorCodes.NOT_FOUND, 'Active platform role grant was not found', 404);
+      }
+      return result.rows[0];
     });
   }
 }

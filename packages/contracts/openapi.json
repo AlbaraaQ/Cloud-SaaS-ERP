@@ -72,7 +72,7 @@
                   "mfaCode": {
                     "type": "string",
                     "minLength": 6,
-                    "maxLength": 6
+                    "maxLength": 12
                   }
                 },
                 "required": [
@@ -223,6 +223,284 @@
         "summary": "Change the caller password and revoke all sessions",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa": {
+      "get": {
+        "operationId": "MfaController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Status"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current 2FA state of the caller",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/enroll": {
+      "post": {
+        "operationId": "MfaController_enroll",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Secret issued; login unaffected until enable"
+          },
+          "409": {
+            "description": "2FA is already enabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate a TOTP secret (pending confirmation)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/enable": {
+      "post": {
+        "operationId": "MfaController_enable",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA enforced from the next login"
+          },
+          "400": {
+            "description": "Code does not match (VALIDATION_FAILED)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm the secret with a code; issues one-time recovery codes",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/disable": {
+      "post": {
+        "operationId": "MfaController_disable",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Disabled"
+          },
+          "400": {
+            "description": "Wrong password (VALIDATION_FAILED)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turn 2FA off (requires the account password)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/billing/plans": {
+      "get": {
+        "operationId": "BillingController_plans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List active subscription plans",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/webhook": {
+      "post": {
+        "operationId": "BillingController_webhook",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Receive Stripe subscription events",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "operationId": "BillingController_checkout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a Stripe subscription checkout session",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/activation-requests": {
+      "post": {
+        "operationId": "BillingController_requestActivation",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request manual tenant activation",
+        "tags": [
+          "billing"
+        ]
+      },
+      "get": {
+        "operationId": "BillingController_activationRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List pending activation requests for platform admins",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/subscription": {
+      "get": {
+        "operationId": "BillingController_subscription",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read the current tenant subscription",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/activation-requests/{id}/review": {
+      "post": {
+        "operationId": "BillingController_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve or reject a manual activation request",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -581,6 +859,76 @@
           }
         ],
         "summary": "Soft-delete a membership",
+        "tags": [
+          "tenancy"
+        ]
+      }
+    },
+    "/api/v1/memberships/{id}/scopes": {
+      "post": {
+        "operationId": "MembershipsController_replaceScopes",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "roleId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "branch",
+                            "warehouse",
+                            "cash_location",
+                            "pos_terminal"
+                          ]
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "roleId",
+                        "scopeType",
+                        "scopeId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "scopes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Updated membership with scopes"
+          },
+          "422": {
+            "description": "Scope references a role the membership does not hold"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the per-role scope restrictions of a membership",
         "tags": [
           "tenancy"
         ]
@@ -3155,6 +3503,7 @@
                           "payment_voucher",
                           "journal_entry",
                           "stock_adjustment",
+                          "stock_voucher",
                           "stock_transfer",
                           "cash_transfer",
                           "payroll_run",
@@ -3222,12 +3571,32 @@
                         "format": "uuid",
                         "nullable": true
                       },
+                      "exciseTaxAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
                       "inventoryAccountId": {
                         "type": "string",
                         "format": "uuid",
                         "nullable": true
                       },
                       "cogsAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "openingBalanceAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "inventoryAdjustmentAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "stockInTransitAccountId": {
                         "type": "string",
                         "format": "uuid",
                         "nullable": true
@@ -3248,6 +3617,11 @@
                         "nullable": true
                       },
                       "payableAccountId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "chequesInHandAccountId": {
                         "type": "string",
                         "format": "uuid",
                         "nullable": true
@@ -3370,6 +3744,482 @@
         ]
       }
     },
+    "/api/v1/platform/overview": {
+      "get": {
+        "operationId": "PlatformAdminController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Control-plane KPIs: customers, licences, MRR, pending activations",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants": {
+      "get": {
+        "operationId": "PlatformAdminController_listTenants",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every customer with its current licence",
+        "tags": [
+          "platform-admin"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformAdminController_createTenant",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a customer, its owner account and its default branch",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/status": {
+      "patch": {
+        "operationId": "PlatformAdminController_setTenantStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspend, reactivate or archive a customer",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/plans": {
+      "get": {
+        "operationId": "PlatformAdminController_listPlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List subscription plans including retired ones",
+        "tags": [
+          "platform-admin"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformAdminController_createPlan",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or update a subscription plan (upsert by code)",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/plans/{id}/active": {
+      "patch": {
+        "operationId": "PlatformAdminController_setPlanActive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate or retire a plan",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions": {
+      "get": {
+        "operationId": "PlatformAdminController_listSubscriptions",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every licence across all customers",
+        "tags": [
+          "platform-admin"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformAdminController_grantSubscription",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue or extend a licence manually",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions/{id}/cancel": {
+      "post": {
+        "operationId": "PlatformAdminController_cancelSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a licence",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/activation-requests": {
+      "get": {
+        "operationId": "PlatformAdminController_listActivationRequests",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Manual activation queue",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/activation-requests/{id}/review": {
+      "post": {
+        "operationId": "PlatformAdminController_reviewActivation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve or reject an activation request",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/users": {
+      "get": {
+        "operationId": "PlatformAdminController_listUsers",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search platform users across all tenants",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/roles": {
+      "get": {
+        "operationId": "PlatformAdminController_listPlatformRoles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Family-A platform role catalogue with holder counts",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/permissions": {
+      "get": {
+        "operationId": "PlatformAdminController_listPlatformPermissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Platform-console (console.*) permission registry",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/users/{id}/roles": {
+      "post": {
+        "operationId": "PlatformAdminController_grantPlatformRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant a platform role to a user",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/users/{id}/roles/{roleCode}": {
+      "delete": {
+        "operationId": "PlatformAdminController_revokePlatformRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a platform role from a user",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/signup/plans": {
+      "get": {
+        "operationId": "SignupController_plans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Plans a prospect can pick while signing up",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup": {
+      "post": {
+        "operationId": "SignupController_signup",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Tenant created; owner can log in immediately"
+          },
+          "409": {
+            "description": "Tenant code already taken (VERSION_CONFLICT)"
+          },
+          "422": {
+            "description": "Invalid payload or weak password (VALIDATION_FAILED)"
+          }
+        },
+        "summary": "Create a new tenant, its owner account and a pending activation request",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
     "/api/v1/organization/catalog/items": {
       "get": {
         "operationId": "CatalogController_list",
@@ -3405,10 +4255,454 @@
         ]
       }
     },
+    "/api/v1/organization/catalog/items/{id}": {
+      "patch": {
+        "operationId": "CatalogController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "CatalogController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/items/{id}/units": {
+      "get": {
+        "operationId": "CatalogController_itemUnits",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_setItemUnit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/items/{id}/units/{unitId}": {
+      "delete": {
+        "operationId": "CatalogController_removeItemUnit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/items/{id}/barcodes": {
+      "get": {
+        "operationId": "CatalogController_itemBarcodes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_addItemBarcode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/items/{id}/barcodes/{barcode}": {
+      "delete": {
+        "operationId": "CatalogController_removeItemBarcode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "barcode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/items/{id}/components": {
+      "get": {
+        "operationId": "CatalogController_itemComponents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_setItemComponent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/items/{id}/components/{componentItemId}": {
+      "delete": {
+        "operationId": "CatalogController_removeItemComponent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "componentItemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/api/v1/organization/catalog/categories": {
       "get": {
         "operationId": "CatalogController_categories",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_createCategory",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/categories/{id}": {
+      "patch": {
+        "operationId": "CatalogController_updateCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "CatalogController_removeCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/units": {
+      "get": {
+        "operationId": "CatalogController_units",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_createUnit",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/units/{id}": {
+      "patch": {
+        "operationId": "CatalogController_updateUnit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "CatalogController_removeUnit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/tax-groups": {
+      "get": {
+        "operationId": "CatalogController_taxGroups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "operationId": "CatalogController_createTaxGroup",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/organization/catalog/tax-groups/{id}": {
+      "patch": {
+        "operationId": "CatalogController_updateTaxGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -3429,7 +4723,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       },
       "post": {
@@ -3441,11 +4735,55 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
     "/api/v1/accounts/{id}": {
+      "patch": {
+        "operationId": "AccountingController_updateAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Edit an account card",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "delete": {
+        "operationId": "AccountingController_deleteAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an unused account",
+        "tags": [
+          "accounting"
+        ]
+      },
       "get": {
         "operationId": "AccountingController_readAccount",
         "parameters": [
@@ -3464,7 +4802,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3478,7 +4816,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3501,7 +4839,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3524,7 +4862,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3555,7 +4893,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3586,7 +4924,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3600,7 +4938,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3623,11 +4961,175 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/cost-centers": {
+      "get": {
+        "operationId": "AccountingController_listCostCenters",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List cost centres",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "operationId": "AccountingController_createCostCenter",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a cost centre",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/cost-centers/{id}": {
+      "patch": {
+        "operationId": "AccountingController_updateCostCenter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Edit a cost centre",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "delete": {
+        "operationId": "AccountingController_deleteCostCenter",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an unused cost centre",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/fiscal-years": {
+      "get": {
+        "operationId": "AccountingController_listFiscalYears",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List fiscal years",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "operationId": "AccountingController_createFiscalYear",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Open a fiscal year and generate its monthly periods",
+        "tags": [
+          "accounting"
         ]
       }
     },
     "/api/v1/journal-entries": {
+      "get": {
+        "operationId": "AccountingController_listJournalEntries",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fiscalPeriodId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Journal register (القيود اليومية) with per-entry totals",
+        "tags": [
+          "accounting"
+        ]
+      },
       "post": {
         "operationId": "AccountingController_postJournal",
         "parameters": [],
@@ -3636,8 +5138,33 @@
             "description": ""
           }
         },
+        "summary": "Post a balanced journal entry (branch and fiscal period are derived from the date when omitted)",
         "tags": [
-          "Accounting"
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/journal-entries/{id}": {
+      "get": {
+        "operationId": "AccountingController_readJournalEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Read one journal entry with its lines",
+        "tags": [
+          "accounting"
         ]
       }
     },
@@ -3660,7 +5187,7 @@
           }
         },
         "tags": [
-          "Accounting"
+          "accounting"
         ]
       }
     },
@@ -3901,6 +5428,55 @@
         ]
       }
     },
+    "/api/v1/payment-methods": {
+      "get": {
+        "operationId": "PartiesController_paymentMethods",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      },
+      "post": {
+        "operationId": "PartiesController_createPaymentMethod",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
+    "/api/v1/payment-methods/{id}": {
+      "put": {
+        "operationId": "PartiesController_updatePaymentMethod",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parties"
+        ]
+      }
+    },
     "/api/v1/allocations": {
       "post": {
         "operationId": "PartiesController_allocate",
@@ -3958,6 +5534,100 @@
               "type": "string"
             }
           },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/item-card": {
+      "get": {
+        "operationId": "InventoryController_itemCard",
+        "parameters": [
+          {
+            "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/in-transit": {
+      "get": {
+        "operationId": "InventoryController_inTransit",
+        "parameters": [
           {
             "name": "warehouse_id",
             "required": true,
@@ -4062,6 +5732,27 @@
       }
     },
     "/api/v1/inventory/transfers": {
+      "get": {
+        "operationId": "InventoryController_listTransfers",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
       "post": {
         "operationId": "InventoryController_transfer",
         "parameters": [],
@@ -4079,6 +5770,98 @@
       "post": {
         "operationId": "InventoryController_createTransfer",
         "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/{id}": {
+      "get": {
+        "operationId": "InventoryController_getTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/{id}/receive": {
+      "post": {
+        "operationId": "InventoryController_receiveTransferById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/{id}/close": {
+      "post": {
+        "operationId": "InventoryController_closeTransfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transfers/{id}/cancel": {
+      "post": {
+        "operationId": "InventoryController_cancelTransferById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": ""
@@ -4154,12 +5937,298 @@
         ]
       }
     },
+    "/api/v1/inventory/adjustments": {
+      "get": {
+        "operationId": "InventoryController_listAdjustments",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createAdjustment",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments/{id}": {
+      "get": {
+        "operationId": "InventoryController_getAdjustment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments/{id}/post": {
+      "post": {
+        "operationId": "InventoryController_postAdjustment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/vouchers": {
+      "get": {
+        "operationId": "InventoryController_listVouchers",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createVoucher",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/vouchers/{id}": {
+      "get": {
+        "operationId": "InventoryController_getVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/vouchers/{id}/post": {
+      "post": {
+        "operationId": "InventoryController_postVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/vouchers/{id}/void": {
+      "post": {
+        "operationId": "InventoryController_voidVoucher",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/barcode/{code}": {
+      "get": {
+        "operationId": "InventoryController_scan",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/expiry": {
+      "get": {
+        "operationId": "InventoryController_expiry",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/below-minimum": {
+      "get": {
+        "operationId": "InventoryController_belowMinimum",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/lots": {
       "get": {
         "operationId": "InventoryController_lots",
         "parameters": [
           {
             "name": "item_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
             "required": true,
             "in": "query",
             "schema": {
@@ -4189,6 +6258,29 @@
         ]
       }
     },
+    "/api/v1/inventory/lots/{id}": {
+      "delete": {
+        "operationId": "InventoryController_deleteLot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/serials": {
       "get": {
         "operationId": "InventoryController_serials",
@@ -4203,6 +6295,22 @@
           },
           {
             "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
             "required": true,
             "in": "query",
             "schema": {
@@ -4224,6 +6332,66 @@
         "parameters": [],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/generate": {
+      "post": {
+        "operationId": "InventoryController_generateSerials",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/{id}": {
+      "delete": {
+        "operationId": "InventoryController_deleteSerial",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/serials/{id}/documents": {
+      "get": {
+        "operationId": "InventoryController_serialTrace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -4285,6 +6453,403 @@
         },
         "tags": [
           "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests": {
+      "get": {
+        "operationId": "WarehouseDocumentsController_listRequests",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      },
+      "post": {
+        "operationId": "WarehouseDocumentsController_createRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests/{id}": {
+      "get": {
+        "operationId": "WarehouseDocumentsController_getRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests/{id}/submit": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_submitRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests/{id}/cancel": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_cancelRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests/{id}/approve": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_approveRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests/{id}/reject": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_rejectRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/requests/{id}/fulfil": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_fulfilRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/deliveries": {
+      "get": {
+        "operationId": "WarehouseDocumentsController_listDeliveries",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      },
+      "post": {
+        "operationId": "WarehouseDocumentsController_createDelivery",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/deliveries/outstanding": {
+      "get": {
+        "operationId": "WarehouseDocumentsController_outstanding",
+        "parameters": [
+          {
+            "name": "invoice_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/deliveries/{id}/deliver": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_confirmDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/deliveries/{id}/cancel": {
+      "post": {
+        "operationId": "WarehouseDocumentsController_cancelDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "WarehouseDocuments"
+        ]
+      }
+    },
+    "/api/v1/inventory/production-orders": {
+      "get": {
+        "operationId": "ProductionOrdersController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductionOrders"
+        ]
+      },
+      "post": {
+        "operationId": "ProductionOrdersController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductionOrders"
+        ]
+      }
+    },
+    "/api/v1/inventory/production-orders/{id}": {
+      "get": {
+        "operationId": "ProductionOrdersController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductionOrders"
+        ]
+      }
+    },
+    "/api/v1/inventory/production-orders/{id}/complete": {
+      "post": {
+        "operationId": "ProductionOrdersController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductionOrders"
+        ]
+      }
+    },
+    "/api/v1/inventory/production-orders/{id}/cancel": {
+      "post": {
+        "operationId": "ProductionOrdersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductionOrders"
         ]
       }
     },
@@ -4496,6 +7061,29 @@
         ]
       }
     },
+    "/api/v1/sales/adjustment-notes": {
+      "get": {
+        "operationId": "SalesController_notes",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
     "/api/v1/sales/adjustment-notes/{id}/post": {
       "post": {
         "operationId": "SalesController_postNote",
@@ -4522,6 +7110,55 @@
     "/api/v1/sales/offers/{id}/evaluate": {
       "post": {
         "operationId": "SalesController_evaluateOffer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/quotations": {
+      "get": {
+        "operationId": "SalesController_quotations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesController_createQuotation",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/quotations/{id}/convert": {
+      "post": {
+        "operationId": "SalesController_convertQuotation",
         "parameters": [
           {
             "name": "id",
@@ -4572,6 +7209,62 @@
       "get": {
         "operationId": "SalesController_salesmen",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesController_createSalesman",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales/salesmen/{id}": {
+      "patch": {
+        "operationId": "SalesController_updateSalesman",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sales"
+        ]
+      },
+      "delete": {
+        "operationId": "SalesController_deleteSalesman",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -4812,10 +7505,104 @@
         ]
       }
     },
+    "/api/v1/purchases/adjustment-notes": {
+      "get": {
+        "operationId": "PurchaseNotesController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PurchaseNotes"
+        ]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/adjustment-notes": {
+      "post": {
+        "operationId": "PurchaseNotesController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PurchaseNotes"
+        ]
+      }
+    },
+    "/api/v1/purchases/adjustment-notes/{id}/post": {
+      "post": {
+        "operationId": "PurchaseNotesController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PurchaseNotes"
+        ]
+      }
+    },
     "/api/v1/vouchers": {
       "get": {
         "operationId": "TreasuryController_vouchers",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -5041,6 +7828,50 @@
         "parameters": [],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      }
+    },
+    "/api/v1/expense-types/{id}": {
+      "patch": {
+        "operationId": "TreasuryController_updateExpenseType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Treasury"
+        ]
+      },
+      "delete": {
+        "operationId": "TreasuryController_deleteExpenseType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -5334,10 +8165,610 @@
         ]
       }
     },
+    "/api/v1/settings/backups": {
+      "get": {
+        "operationId": "OperationsController_listBackups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Backups taken for this file",
+        "tags": [
+          "operations"
+        ]
+      },
+      "post": {
+        "operationId": "OperationsController_createBackup",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Take a logical backup of this file",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/settings/backups/{id}/download": {
+      "get": {
+        "operationId": "OperationsController_downloadBackup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download a backup payload",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/settings/restores": {
+      "get": {
+        "operationId": "OperationsController_listRestores",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "operations"
+        ]
+      },
+      "post": {
+        "operationId": "OperationsController_restore",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Dry-run or apply a restore (additive: nothing is ever deleted)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/settings/maintenance-runs": {
+      "get": {
+        "operationId": "OperationsController_listRuns",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/settings/data-rotation": {
+      "post": {
+        "operationId": "OperationsController_rotation",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Preview or apply operational-log rotation (documents are never deleted)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/settings/invoice-maintenance": {
+      "post": {
+        "operationId": "OperationsController_invoiceMaintenance",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Scan invoices for inconsistencies; apply repairs drafts only",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/settings/company-files": {
+      "get": {
+        "operationId": "OperationsController_listCompanyFiles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "operations"
+        ]
+      },
+      "post": {
+        "operationId": "OperationsController_createCompanyFile",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a sibling company file (a new, unlicensed tenant) for the same owner",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/portal-access": {
+      "get": {
+        "operationId": "PortalController_listAllAccess",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/parties/{id}/portal-access": {
+      "get": {
+        "operationId": "PortalController_listAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      },
+      "post": {
+        "operationId": "PortalController_grantAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal-access/{id}": {
+      "patch": {
+        "operationId": "PortalController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      },
+      "delete": {
+        "operationId": "PortalController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal/me": {
+      "get": {
+        "operationId": "PortalController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal/invoices": {
+      "get": {
+        "operationId": "PortalController_invoices",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal/invoices/{id}": {
+      "get": {
+        "operationId": "PortalController_invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal/invoices/{id}/print": {
+      "get": {
+        "operationId": "PortalController_invoicePrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal/statement": {
+      "get": {
+        "operationId": "PortalController_statement",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
+    "/api/v1/portal/payments": {
+      "get": {
+        "operationId": "PortalController_payments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Portal"
+        ]
+      }
+    },
     "/api/v1/reports": {
       "get": {
         "operationId": "ReportingController_catalog",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/layouts": {
+      "get": {
+        "operationId": "ReportingController_listLayouts",
+        "parameters": [
+          {
+            "name": "report_key",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      },
+      "post": {
+        "operationId": "ReportingController_createLayout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/layouts/{id}": {
+      "patch": {
+        "operationId": "ReportingController_updateLayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      },
+      "delete": {
+        "operationId": "ReportingController_deleteLayout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/invoices/{id}": {
+      "get": {
+        "operationId": "ReportingController_invoicePrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/purchase-invoices/{id}": {
+      "get": {
+        "operationId": "ReportingController_purchaseInvoicePrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/vouchers/{id}": {
+      "get": {
+        "operationId": "ReportingController_voucherPrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/journal-entries/{id}": {
+      "get": {
+        "operationId": "ReportingController_journalPrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reporting"
+        ]
+      }
+    },
+    "/api/v1/reports/print/shifts/{id}": {
+      "get": {
+        "operationId": "ReportingController_shiftPrint",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -5386,52 +8817,6 @@
         ],
         "responses": {
           "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Reporting"
-        ]
-      }
-    },
-    "/api/v1/reports/print/invoices/{id}": {
-      "get": {
-        "operationId": "ReportingController_invoicePrint",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Reporting"
-        ]
-      }
-    },
-    "/api/v1/reports/print/shifts/{id}": {
-      "get": {
-        "operationId": "ReportingController_shiftPrint",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
             "description": ""
           }
         },
@@ -5574,6 +8959,34 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/sync/overview": {
+      "get": {
+        "operationId": "CompatController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Compat"
+        ]
+      }
+    },
+    "/api/v1/compat/sync/documents": {
+      "get": {
+        "operationId": "CompatController_documents",
+        "parameters": [],
         "responses": {
           "200": {
             "description": ""
@@ -5915,6 +9328,243 @@
         ]
       }
     },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "DevicesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List enrolled tenant devices",
+        "tags": [
+          "devices"
+        ]
+      },
+      "post": {
+        "operationId": "DevicesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "deviceType": {
+                    "type": "string",
+                    "enum": [
+                      "pos_terminal",
+                      "handheld",
+                      "kiosk",
+                      "printer_agent",
+                      "api_client",
+                      "compat",
+                      "other"
+                    ]
+                  },
+                  "deviceName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "capabilities": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "branchId",
+                  "deviceType",
+                  "deviceName"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Device enrolled with its one-time credential"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enrol a device; the credential is returned exactly once",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "patch": {
+        "operationId": "DevicesController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "branchId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "deviceType": {
+                    "type": "string",
+                    "enum": [
+                      "pos_terminal",
+                      "handheld",
+                      "kiosk",
+                      "printer_agent",
+                      "api_client",
+                      "compat",
+                      "other"
+                    ]
+                  },
+                  "capabilities": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update device details",
+        "tags": [
+          "devices"
+        ]
+      },
+      "delete": {
+        "operationId": "DevicesController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a device (soft-delete, burns its credential)",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/activate": {
+      "post": {
+        "operationId": "DevicesController_activate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activate a pending or suspended device",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/suspend": {
+      "post": {
+        "operationId": "DevicesController_suspend",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspend a device without burning its credential",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/revoke": {
+      "post": {
+        "operationId": "DevicesController_revoke",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a device permanently (burns its credential)",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{id}/rotate-credential": {
+      "post": {
+        "operationId": "DevicesController_rotate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rotate a device credential; the new secret is returned exactly once",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
     "/api/v1/pos/categories": {
       "get": {
         "operationId": "PosController_categories",
@@ -6100,6 +9750,20 @@
         ]
       }
     },
+    "/api/v1/pos/checkout": {
+      "post": {
+        "operationId": "PosController_checkout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
     "/api/v1/pos/tables/{sourceId}/merge/{targetId}": {
       "post": {
         "operationId": "PosController_merge",
@@ -6180,6 +9844,50 @@
         ]
       }
     },
+    "/api/v1/hrm/departments/{id}": {
+      "patch": {
+        "operationId": "HrmController_updateDepartment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "delete": {
+        "operationId": "HrmController_deleteDepartment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
     "/api/v1/hrm/jobs": {
       "get": {
         "operationId": "HrmController_jobs",
@@ -6206,6 +9914,50 @@
         ]
       }
     },
+    "/api/v1/hrm/jobs/{id}": {
+      "patch": {
+        "operationId": "HrmController_updateJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "delete": {
+        "operationId": "HrmController_deleteJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
     "/api/v1/hrm/employees": {
       "get": {
         "operationId": "HrmController_employees",
@@ -6224,6 +9976,50 @@
         "parameters": [],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      }
+    },
+    "/api/v1/hrm/employees/{id}": {
+      "patch": {
+        "operationId": "HrmController_updateEmployee",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
+      "delete": {
+        "operationId": "HrmController_deleteEmployee",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -6286,6 +10082,18 @@
       }
     },
     "/api/v1/hrm/adjustments": {
+      "get": {
+        "operationId": "HrmController_adjustments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hrm"
+        ]
+      },
       "post": {
         "operationId": "HrmController_createAdjustment",
         "parameters": [],
@@ -6682,6 +10490,27 @@
       }
     },
     "/api/v1/projects/{id}/progress-bills": {
+      "get": {
+        "operationId": "ProjectsController_bills",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      },
       "post": {
         "operationId": "ProjectsController_bill",
         "parameters": [
@@ -6784,6 +10613,534 @@
         },
         "tags": [
           "Projects"
+        ]
+      }
+    },
+    "/api/v1/contracting/contracts": {
+      "get": {
+        "operationId": "ContractingController_listContracts",
+        "parameters": [
+          {
+            "name": "project_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      },
+      "post": {
+        "operationId": "ContractingController_createContract",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/contracts/{id}": {
+      "get": {
+        "operationId": "ContractingController_getContract",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/contracts/{id}/activate": {
+      "post": {
+        "operationId": "ContractingController_activate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/contracts/{id}/close": {
+      "post": {
+        "operationId": "ContractingController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/contracts/{id}/cancel": {
+      "post": {
+        "operationId": "ContractingController_cancelContract",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/payments": {
+      "get": {
+        "operationId": "ContractingController_listPayments",
+        "parameters": [
+          {
+            "name": "contract_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/contracts/{id}/payments": {
+      "post": {
+        "operationId": "ContractingController_createPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/payments/{paymentId}/approve": {
+      "post": {
+        "operationId": "ContractingController_approve",
+        "parameters": [
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/payments/{paymentId}/pay": {
+      "post": {
+        "operationId": "ContractingController_pay",
+        "parameters": [
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/payments/{paymentId}/cancel": {
+      "post": {
+        "operationId": "ContractingController_cancelPayment",
+        "parameters": [
+          {
+            "name": "paymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/offers": {
+      "get": {
+        "operationId": "ContractingController_listOffers",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      },
+      "post": {
+        "operationId": "ContractingController_createOffer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/offers/{id}/send": {
+      "post": {
+        "operationId": "ContractingController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/offers/{id}/accept": {
+      "post": {
+        "operationId": "ContractingController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/offers/{id}/reject": {
+      "post": {
+        "operationId": "ContractingController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/offers/{id}/convert": {
+      "post": {
+        "operationId": "ContractingController_convert",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contracting"
+        ]
+      }
+    },
+    "/api/v1/contracting/returns": {
+      "get": {
+        "operationId": "ContractingReturnsController_list",
+        "parameters": [
+          {
+            "name": "project_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bill_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ContractingReturns"
+        ]
+      },
+      "post": {
+        "operationId": "ContractingReturnsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ContractingReturns"
+        ]
+      }
+    },
+    "/api/v1/contracting/returns/returnable": {
+      "get": {
+        "operationId": "ContractingReturnsController_returnable",
+        "parameters": [
+          {
+            "name": "bill_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ContractingReturns"
+        ]
+      }
+    },
+    "/api/v1/contracting/returns/{id}": {
+      "get": {
+        "operationId": "ContractingReturnsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ContractingReturns"
+        ]
+      }
+    },
+    "/api/v1/contracting/returns/{id}/post": {
+      "post": {
+        "operationId": "ContractingReturnsController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ContractingReturns"
+        ]
+      }
+    },
+    "/api/v1/contracting/returns/{id}/cancel": {
+      "post": {
+        "operationId": "ContractingReturnsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ContractingReturns"
         ]
       }
     },
@@ -6919,6 +11276,58 @@
         ]
       }
     },
+    "/api/v1/marina/bookings": {
+      "get": {
+        "operationId": "MarinaController_bookings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      },
+      "post": {
+        "operationId": "MarinaController_booking",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
+    "/api/v1/marina/violations": {
+      "get": {
+        "operationId": "MarinaController_violations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      },
+      "post": {
+        "operationId": "MarinaController_violation",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Marina"
+        ]
+      }
+    },
     "/api/v1/marina/groups": {
       "post": {
         "operationId": "MarinaController_group",
@@ -6993,20 +11402,6 @@
         ]
       }
     },
-    "/api/v1/marina/bookings": {
-      "post": {
-        "operationId": "MarinaController_booking",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Marina"
-        ]
-      }
-    },
     "/api/v1/marina/bookings/{id}/additions": {
       "post": {
         "operationId": "MarinaController_addition",
@@ -7053,20 +11448,6 @@
         ]
       }
     },
-    "/api/v1/marina/violations": {
-      "post": {
-        "operationId": "MarinaController_violation",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Marina"
-        ]
-      }
-    },
     "/api/v1/marina/operation-plans": {
       "post": {
         "operationId": "MarinaController_plan",
@@ -7078,6 +11459,212 @@
         },
         "tags": [
           "Marina"
+        ]
+      },
+      "get": {
+        "operationId": "MarinaOperationsController_plans",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/preparations": {
+      "get": {
+        "operationId": "MarinaOperationsController_preparations",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings/{id}/preparation": {
+      "post": {
+        "operationId": "MarinaOperationsController_prepare",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/preparations/{id}/return": {
+      "post": {
+        "operationId": "MarinaOperationsController_returnVessel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/rental-invoices": {
+      "get": {
+        "operationId": "MarinaOperationsController_rentals",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/bookings/uninvoiced": {
+      "get": {
+        "operationId": "MarinaOperationsController_uninvoiced",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/rental-invoices/link": {
+      "post": {
+        "operationId": "MarinaOperationsController_link",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/day-close": {
+      "get": {
+        "operationId": "MarinaOperationsController_daySummary",
+        "parameters": [
+          {
+            "name": "branch_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      },
+      "post": {
+        "operationId": "MarinaOperationsController_closeDay",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
+        ]
+      }
+    },
+    "/api/v1/marina/day-closings": {
+      "get": {
+        "operationId": "MarinaOperationsController_dayClosings",
+        "parameters": [
+          {
+            "name": "branch_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "MarinaOperations"
         ]
       }
     },
@@ -7245,6 +11832,18 @@
         "tags": [
           "Salla"
         ]
+      },
+      "get": {
+        "operationId": "SallaController_connections",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
       }
     },
     "/api/v1/integrations/salla/branch-mappings": {
@@ -7253,6 +11852,18 @@
         "parameters": [],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      },
+      "get": {
+        "operationId": "SallaController_mappings",
+        "parameters": [],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -7281,6 +11892,34 @@
         "parameters": [],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/products": {
+      "get": {
+        "operationId": "SallaController_products",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Salla"
+        ]
+      }
+    },
+    "/api/v1/integrations/salla/orders": {
+      "get": {
+        "operationId": "SallaController_orders",
+        "parameters": [],
+        "responses": {
+          "200": {
             "description": ""
           }
         },

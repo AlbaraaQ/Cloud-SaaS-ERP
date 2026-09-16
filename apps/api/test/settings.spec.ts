@@ -123,10 +123,10 @@ describe('tenant settings', () => {
     expect(String(response.body.detail)).toContain('not.a.key');
   });
 
-  it('requires platform.settings.manage', async () => {
+  it('requires tenant.settings.manage', async () => {
     const read = await api(ctx.server, 'get', '/api/v1/settings', { token: outsider.token });
     expect(read.status).toBe(403);
-    expect(read.body.detail).toBe('permission platform.settings.manage required');
+    expect(read.body.detail).toBe('permission tenant.settings.manage required');
 
     const write = await api(ctx.server, 'put', '/api/v1/settings/invoice.padding', {
       token: outsider.token,

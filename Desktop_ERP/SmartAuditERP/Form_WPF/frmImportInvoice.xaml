@@ -1,0 +1,449 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmImportInvoice"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxg="http://schemas.devexpress.com/winfx/2008/xaml/grid"
+    Title="إدراج الفواتير"
+    Width="1020" Height="640"
+    MinWidth="860" MinHeight="500"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══ Brushes ═══ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FilterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ImportBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <!-- ═══ Effects ═══ -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══ FieldLabel ═══ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <!-- ═══ ModernTextBox ═══ -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══ ModernComboBox ═══ -->
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══ ModernDatePicker ═══ -->
+        <Style x:Key="ModernDatePicker" TargetType="DatePicker">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══ ActionBtn ═══ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ClearBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <!-- ═══ DataGrid ═══ -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="6,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="30"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- لوحة الفلتر -->
+            <ColumnDefinition Width="270"/>
+            <!-- الجدول -->
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ══════════════════════════════════════════════ -->
+        <!--            لوحة الفلتر (يمين RTL)             -->
+        <!-- ══════════════════════════════════════════════ -->
+        <Border Grid.Column="0"
+                Background="{StaticResource FilterBrush}"
+                Effect="{StaticResource CardShadow}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Padding="12,14">
+                <StackPanel>
+
+                    <!-- عنوان -->
+                    <TextBlock Text="🔍 خيارات البحث"
+                               Foreground="White"
+                               FontSize="14" FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,16"/>
+
+                    <!-- نوع العملية -->
+                    <TextBlock Text="📋 نوع العملية"
+                               Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="cmbProcType"
+                              Style="{StaticResource ModernComboBox}"
+                              Margin="0,0,0,12"
+                              SelectionChanged="cmbProcType_SelectionChanged"/>
+
+                    <!-- رقم الفاتورة -->
+                    <TextBlock Text="🔢 رقم الفاتورة"
+                               Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="txtInvNo"
+                             Style="{StaticResource ModernTextBox}"
+                             Margin="0,0,0,12"
+                             TextChanged="txtInvNo_TextChanged"/>
+
+                    <!-- الفرع -->
+                    <TextBlock Text="🏢 الفرع"
+                               Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="cmbBranches"
+                              Style="{StaticResource ModernComboBox}"
+                              Margin="0,0,0,12"
+                              SelectionChanged="cmbBranches_SelectionChanged"/>
+
+                    <!-- كل الفترة -->
+                    <CheckBox x:Name="ckTotalPeriod"
+                              Content="📅 كل الفترة"
+                              IsChecked="True"
+                              Foreground="White"
+                              FontWeight="Bold"
+                              FontSize="11"
+                              Margin="0,0,0,8"
+                              Checked="ckTotalPeriod_CheckedChanged"
+                              Unchecked="ckTotalPeriod_CheckedChanged"/>
+
+                    <!-- من تاريخ -->
+                    <TextBlock Text="📅 من تاريخ"
+                               Style="{StaticResource FieldLabel}"/>
+                    <DatePicker x:Name="txtFromDate"
+                                Style="{StaticResource ModernDatePicker}"
+                                IsEnabled="False"
+                                Margin="0,0,0,8"
+                                SelectedDateChanged="txtFromDate_SelectedDateChanged"/>
+
+                    <!-- إلى تاريخ -->
+                    <TextBlock Text="📅 إلى تاريخ"
+                               Style="{StaticResource FieldLabel}"/>
+                    <DatePicker x:Name="txtToDate"
+                                Style="{StaticResource ModernDatePicker}"
+                                IsEnabled="False"
+                                Margin="0,0,0,12"
+                                SelectedDateChanged="txtToDate_SelectedDateChanged"/>
+
+                    <!-- اسم العميل -->
+                    <TextBlock Text="👤 اسم العميل / المورد"
+                               Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="txtClientName"
+                             Style="{StaticResource ModernTextBox}"
+                             Margin="0,0,0,12"
+                             TextChanged="txtClientName_TextChanged"/>
+
+                    <!-- الصافي -->
+                    <TextBlock Text="💰 الصافي"
+                               Style="{StaticResource FieldLabel}"/>
+
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="من" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtMinPrice"
+                                     Style="{StaticResource ModernTextBox}"
+                                     TextChanged="txtMinPrice_TextChanged"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="إلى" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtMaxPrice"
+                                     Style="{StaticResource ModernTextBox}"
+                                     TextChanged="txtMaxPrice_TextChanged"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- زر تصفية -->
+                    <Button x:Name="btnClear"
+                            Content="🔄 تصفية الحقول"
+                            Style="{StaticResource ClearBtn}"
+                            Margin="0,16,0,0"
+                            Click="btnClear_Click"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════ -->
+        <!--              جدول الفواتير                   -->
+        <!-- ══════════════════════════════════════════════ -->
+        <Border Grid.Column="1"
+                Background="White"
+                Margin="6,6,6,6"
+                CornerRadius="10"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- عنوان الجدول -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource HeaderBrush}"
+                        CornerRadius="10,10,0,0">
+                    <TextBlock Text="📄 قائمة الفواتير"
+                               Foreground="White"
+                               FontSize="14" FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Margin="14,0"/>
+                </Border>
+
+                <!-- DataGrid -->
+                <DataGrid x:Name="GridControl1"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                          RowStyle="{StaticResource DgvRow}"
+                          Background="White"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E8EBF5"
+                          AlternatingRowBackground="#F8F9FD"
+                          BorderThickness="0"
+                          FlowDirection="RightToLeft">
+
+                    <DataGrid.Columns>
+
+                        <!-- رقم الفاتورة -->
+                        <DataGridTextColumn Header="🔢 رقم الفاتورة"
+                                            Binding="{Binding InvNo}"
+                                            Width="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- الصافي -->
+                        <DataGridTextColumn Header="💰 الصافي"
+                                            Binding="{Binding InvNet, StringFormat={}{0:N2}}"
+                                            Width="130">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- التاريخ -->
+                        <DataGridTextColumn Header="📅 التاريخ"
+                                            Binding="{Binding InvDate, StringFormat={}{0:yyyy/MM/dd}}"
+                                            Width="120">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- العميل / المورد -->
+                        <DataGridTextColumn Header="👤 العميل / المورد"
+                                            Binding="{Binding InvClient}"
+                                            Width="*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="TextWrapping" Value="Wrap"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- InvGlobalId مخفي -->
+                        <DataGridTextColumn Header="InvGlobalId"
+                                            Binding="{Binding InvGlobalId}"
+                                            Width="0"
+                                            Visibility="Collapsed"/>
+
+                        <!-- زر الإدراج -->
+                        <DataGridTemplateColumn Header="⚡ إدراج"
+                                                Width="110">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="✅ إدراج"
+                                            Height="26"
+                                            Margin="4,2"
+                                            Cursor="Hand"
+                                            FontSize="11"
+                                            FontWeight="Bold"
+                                            Foreground="White"
+                                            BorderThickness="0"
+                                            Tag="{Binding InvGlobalId}"
+                                            Click="BtnImport_Click">
+                                        <Button.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#2CC36B" Offset="0"/>
+                                                <GradientStop Color="#1B8E4A" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Button.Background>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Bd"
+                                                        Background="{TemplateBinding Background}"
+                                                        CornerRadius="6"
+                                                        Padding="6,2">
+                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.7"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

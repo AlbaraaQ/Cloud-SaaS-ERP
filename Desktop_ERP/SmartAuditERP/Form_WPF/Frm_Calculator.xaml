@@ -1,0 +1,277 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.Frm_Calculator"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="🔢 الآلة الحاسبة" 
+        Height="450" Width="350"
+        FlowDirection="RightToLeft"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#F5F5F5"
+        ShowInTaskbar="False"
+        WindowStyle="SingleBorderWindow"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <!-- Gradient Brushes -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#2193b0" Offset="0"/>
+            <GradientStop Color="#6dd5ed" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="NumberGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E3F2FD" Offset="0"/>
+            <GradientStop Color="#BBDEFB" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="OperationGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFF3E0" Offset="0"/>
+            <GradientStop Color="#FFE0B2" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ClearGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFEBEE" Offset="0"/>
+            <GradientStop Color="#FFCDD2" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ConfirmGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1e7e34" Offset="0"/>
+            <GradientStop Color="#28a745" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="CancelGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#8B0000" Offset="0"/>
+            <GradientStop Color="#B22222" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Calculator Button Style -->
+        <Style x:Key="CalcButton" TargetType="Button">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#2c3e50"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="8"
+                                BorderThickness="1"
+                                BorderBrush="#BDBDBD">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="8" ShadowDepth="3" Opacity="0.5" Color="#2193b0"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.95" ScaleY="0.95"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Action Button Style -->
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="5">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Display -->
+        <Border Grid.Row="0" 
+                Background="White" 
+                CornerRadius="8" 
+                Padding="10"
+                Margin="0,0,0,15"
+                BorderBrush="{StaticResource HeaderGradient}"
+                BorderThickness="2">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="3" Opacity="0.2"/>
+            </Border.Effect>
+            <TextBox x:Name="TextBox1"
+                     FontSize="32"
+                     FontWeight="Bold"
+                     TextAlignment="Right"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     VerticalContentAlignment="Center"
+                     Height="50"
+                     Text="0"
+                     KeyDown="TextBox1_KeyDown"
+                     PreviewTextInput="TextBox1_PreviewTextInput"/>
+        </Border>
+
+        <!-- Message Label -->
+        <TextBlock x:Name="txtMsg" 
+                   Grid.Row="1"
+                   Text="أدخل الرقم"
+                   FontSize="12"
+                   Foreground="#2193b0"
+                   FontWeight="Bold"
+                   TextAlignment="Center"
+                   Margin="0,0,0,10"/>
+
+        <!-- Number Pad -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Row 1 -->
+            <Button x:Name="cmd7" 
+                    Grid.Row="0" Grid.Column="0"
+                    Content="7"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd7_Click"/>
+            <Button x:Name="cmd8" 
+                    Grid.Row="0" Grid.Column="1"
+                    Content="8"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd8_Click"/>
+            <Button x:Name="cmd9" 
+                    Grid.Row="0" Grid.Column="2"
+                    Content="9"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd9_Click"/>
+
+            <!-- Row 2 -->
+            <Button x:Name="cmd4" 
+                    Grid.Row="1" Grid.Column="0"
+                    Content="4"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd4_Click"/>
+            <Button x:Name="cmd5" 
+                    Grid.Row="1" Grid.Column="1"
+                    Content="5"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd5_Click"/>
+            <Button x:Name="cmd6" 
+                    Grid.Row="1" Grid.Column="2"
+                    Content="6"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd6_Click"/>
+
+            <!-- Row 3 -->
+            <Button x:Name="cmd135" 
+                    Grid.Row="2" Grid.Column="0"
+                    Content="1"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd135_Click"/>
+            <Button x:Name="cmd2" 
+                    Grid.Row="2" Grid.Column="1"
+                    Content="2"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd2_Click"/>
+            <Button x:Name="cmd3" 
+                    Grid.Row="2" Grid.Column="2"
+                    Content="3"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd3_Click"/>
+
+            <!-- Row 4 -->
+            <Button x:Name="cmdClearAll" 
+                    Grid.Row="3" Grid.Column="0"
+                    Content="C"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource ClearGradient}"
+                    Foreground="#c62828"
+                    Click="cmdClearAll_Click"/>
+            <Button x:Name="cmd0" 
+                    Grid.Row="3" Grid.Column="1"
+                    Content="0"
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource NumberGradient}"
+                    Click="cmd0_Click"/>
+            <Button x:Name="cmdDot" 
+                    Grid.Row="3" Grid.Column="2"
+                    Content="."
+                    Style="{StaticResource CalcButton}"
+                    Background="{StaticResource OperationGradient}"
+                    Click="Button3_Click"/>
+        </Grid>
+
+        <!-- Action Buttons -->
+        <Grid Grid.Row="3" Margin="0,15,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="Button1" 
+                    Grid.Column="0"
+                    Content="✅ تأكيد"
+                    Style="{StaticResource ActionButton}"
+                    Background="{StaticResource ConfirmGradient}"
+                    Click="Button1_Click"/>
+
+            <Button x:Name="Button2" 
+                    Grid.Column="1"
+                    Content="❌ إلغاء"
+                    Style="{StaticResource ActionButton}"
+                    Background="{StaticResource CancelGradient}"
+                    Click="Button2_Click"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { OrgProvisioningService } from '../../organization/provisioning/org-provisioning.service.js';
+import { RequiresPlatformRole } from '../decorators/requires-platform-role.decorator.js';
 import { PlatformAdminGuard } from '../guards/platform-admin.guard.js';
 
 import {
@@ -118,5 +119,33 @@ export class PlatformAdminController {
   @ApiOperation({ summary: 'Search platform users across all tenants' })
   async listUsers(@Query('search') search?: string) {
     return { data: await this.admin.listUsers(search) };
+  }
+
+  // ------------------------------------------------------------------ platform roles (2026-09)
+
+  @Get('roles')
+  @ApiOperation({ summary: 'Family-A platform role catalogue with holder counts' })
+  async listPlatformRoles() {
+    return { data: await this.admin.listPlatformRoles() };
+  }
+
+  @Get('permissions')
+  @ApiOperation({ summary: 'Platform-console (console.*) permission registry' })
+  async listPlatformPermissions() {
+    return { data: this.admin.listPlatformPermissions() };
+  }
+
+  @Post('users/:id/roles')
+  @RequiresPlatformRole('console.users.manage')
+  @ApiOperation({ summary: 'Grant a platform role to a user' })
+  async grantPlatformRole(@Param('id') id: string, @Body() body: { roleCode: string }) {
+    return { data: await this.admin.grantPlatformRole(id, body.roleCode) };
+  }
+
+  @Delete('users/:id/roles/:roleCode')
+  @RequiresPlatformRole('console.users.manage')
+  @ApiOperation({ summary: 'Revoke a platform role from a user' })
+  async revokePlatformRole(@Param('id') id: string, @Param('roleCode') roleCode: string) {
+    return { data: await this.admin.revokePlatformRole(id, roleCode) };
   }
 }

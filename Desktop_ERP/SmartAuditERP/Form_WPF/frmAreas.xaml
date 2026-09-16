@@ -1,0 +1,280 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmAreas"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="تعريف المناطق" 
+        Height="600" Width="800"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#F4F6F7"
+        WindowState="Maximized"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <!-- Gradients -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#4e54c8" Offset="0"/>
+            <GradientStop Color="#8f94fb" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Styles -->
+        <Style x:Key="ModernLabel" TargetType="Label">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="BorderBrush" Value="#D1D8E0"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" 
+                                          VerticalAlignment="Center" 
+                                          Padding="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Width" Value="50"/>
+            <Setter Property="Height" Value="50"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AddButton" TargetType="Button">
+            <Setter Property="Width" Value="35"/>
+            <Setter Property="Height" Value="35"/>
+            <Setter Property="Background" Value="#27AE60"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#229954"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="70"/>
+        </Grid.RowDefinitions>
+
+        <!-- المحتوى الرئيسي -->
+        <Border Grid.Row="0" Background="{StaticResource HeaderGradient}" Padding="15">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- بطاقة الإدخال -->
+                <Border Grid.Row="0" Background="White" CornerRadius="12" Padding="25" Margin="0,0,0,15">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="20" Opacity="0.2" ShadowDepth="0"/>
+                    </Border.Effect>
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- الدولة -->
+                        <Label Grid.Row="0" Grid.Column="0" Content="🌍 اسم الدولة" 
+                               Style="{StaticResource ModernLabel}" Margin="0,0,15,0"/>
+                        <ComboBox x:Name="cmbCountry" Grid.Row="0" Grid.Column="1" 
+                                  Style="{StaticResource ModernComboBox}"
+                                  SelectionChanged="cmbCountry_SelectionChanged"/>
+                        <Button x:Name="btnCountryAdd" Grid.Row="0" Grid.Column="2" 
+                                Content="➕" Style="{StaticResource AddButton}" 
+                                Margin="10,0,0,0" Click="btnCountryAdd_Click" ToolTip="إضافة دولة"/>
+
+                        <!-- المدينة -->
+                        <Label Grid.Row="1" Grid.Column="0" Content="🏙️ اسم المدينة" 
+                               Style="{StaticResource ModernLabel}" Margin="0,15,15,0"/>
+                        <ComboBox x:Name="cmbCity" Grid.Row="1" Grid.Column="1" 
+                                  Style="{StaticResource ModernComboBox}" Margin="0,15,0,0"/>
+                        <Button x:Name="btnCityAdd" Grid.Row="1" Grid.Column="2" 
+                                Content="➕" Style="{StaticResource AddButton}" 
+                                Margin="10,15,0,0" Click="btnCityAdd_Click" ToolTip="إضافة مدينة"/>
+
+                        <!-- المنطقة -->
+                        <Label Grid.Row="2" Grid.Column="0" Content="📍 اسم المنطقة" 
+                               Style="{StaticResource ModernLabel}" Margin="0,15,15,0"/>
+                        <TextBox x:Name="txtName" Grid.Row="2" Grid.Column="1" 
+                                 Style="{StaticResource ModernTextBox}" 
+                                 Grid.ColumnSpan="2" Margin="0,15,0,0"
+                                 KeyDown="txtName_KeyDown"/>
+                    </Grid>
+                </Border>
+
+                <!-- الجدول -->
+                <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="10">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="20" Opacity="0.2" ShadowDepth="0"/>
+                    </Border.Effect>
+
+                    <DataGrid x:Name="dgvAreas"
+                              AutoGenerateColumns="False" 
+                              IsReadOnly="True" 
+                              Background="Transparent" 
+                              BorderThickness="0" 
+                              AlternatingRowBackground="#F9FBFD" 
+                              RowHeight="45"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              SelectionChanged="dgvAreas_SelectionChanged"
+                              CanUserAddRows="False">
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="#2C3E50"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="FontSize" Value="12"/>
+                                <Setter Property="Padding" Value="10"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الرقم" Binding="{Binding Id}" Width="0" Visibility="Collapsed"/>
+                            <DataGridTextColumn Header="اسم الدولة" Binding="{Binding CountryName}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="اسم المدينة" Binding="{Binding CityName}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="اسم المنطقة" Binding="{Binding AreaName}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="Foreground" Value="#3498DB"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="CountryId" Binding="{Binding CountryId}" Width="0" Visibility="Collapsed"/>
+                            <DataGridTextColumn Header="CityId" Binding="{Binding CityId}" Width="0" Visibility="Collapsed"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- شريط الأدوات (في الأسفل) -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#E0E6ED" BorderThickness="0,1,0,0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" Opacity="0.1" ShadowDepth="0" Direction="90"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="15,0">
+
+                <Button x:Name="btnNew" Content="➕" Background="#4e54c8" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnNew_Click" ToolTip="جديد"/>
+
+                <Button x:Name="btnSave" Content="💾" Background="#27AE60" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnSave_Click" ToolTip="حفظ"/>
+
+                <Button x:Name="btnDelete" Content="🗑️" Background="#E74C3C" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnDelete_Click" ToolTip="حذف"/>
+
+                <Separator Width="2" Background="#D1D8E0" Margin="10,10"/>
+
+                <Button x:Name="btnLast" Content="⏮️" Background="#34495E" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnLast_Click" ToolTip="الأخير"/>
+
+                <Button x:Name="btnNext" Content="▶️" Background="#34495E" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnNext_Click" ToolTip="التالي"/>
+
+                <Button x:Name="btnPrevious" Content="◀️" Background="#34495E" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnPrevious_Click" ToolTip="السابق"/>
+
+                <Button x:Name="btnFirst" Content="⏭️" Background="#34495E" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnFirst_Click" ToolTip="الأول"/>
+
+                <Separator Width="2" Background="#D1D8E0" Margin="10,10"/>
+
+                <Button x:Name="btnClose" Content="✖️" Background="#C0392B" 
+                        Foreground="White" Style="{StaticResource IconButton}" 
+                        Click="btnClose_Click" ToolTip="إغلاق"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

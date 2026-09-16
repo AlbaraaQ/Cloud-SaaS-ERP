@@ -1,0 +1,812 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmRptInvAnalysis"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تقرير تحليل المبيعات"
+    Width="1050" Height="660"
+    MinWidth="900" MinHeight="580"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══ Brushes ═══ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SummaryBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2E4E9E" Offset="0"/>
+            <GradientStop Color="#213A7A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══ Styles ═══ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button"
+               BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <Style x:Key="SaveBtn" TargetType="Button"
+               BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+        </Style>
+
+        <Style x:Key="RadioStyle" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="CheckStyle" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- DataGrid Styles -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="BorderBrush" Value="#3A63C3"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="28"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CenterCell" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <!-- Summary Card Style -->
+        <Style x:Key="SumCard" TargetType="Border">
+            <Setter Property="Background" Value="#EEF2FB"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="MinWidth" Value="130"/>
+        </Style>
+
+        <Style x:Key="SumTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#2E4E9E"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="SumValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Panel1: منطقة الفلاتر -->
+            <RowDefinition Height="Auto"/>
+            <!-- Panel2: الجدول + المجاميع -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--                  Panel1 - منطقة الفلاتر             -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="White"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,0,0,1"
+                Effect="{StaticResource CardShadow}">
+            <StackPanel>
+
+                <!-- عنوان التقرير -->
+                <Border Background="{StaticResource HeaderBrush}"
+                        Padding="14,8"
+                        Margin="0,0,0,0">
+                    <TextBlock Text="📊 تقرير تحليل المبيعات"
+                               Foreground="White"
+                               FontSize="14" FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+                <Grid Margin="12,10,12,6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ═══ الصف 1: نوع التقرير (RadioButtons) ═══ -->
+                    <Border Grid.Row="0"
+                            Background="{StaticResource HeaderBrush}"
+                            CornerRadius="8"
+                            Padding="10,6"
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📋 نوع التقرير:"
+                                       Style="{StaticResource SectionLabel}"
+                                       Margin="0,0,14,0"/>
+                            <RadioButton x:Name="rdStock"
+                                         Content="المخزن"
+                                         IsChecked="True"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdStock_Checked"/>
+                            <RadioButton x:Name="rdCust"
+                                         Content="العميل"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdCust_Checked"/>
+                            <RadioButton x:Name="rdItem"
+                                         Content="الصنف"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdItem_Checked"/>
+                            <RadioButton x:Name="rdSalesman"
+                                         Content="مندوب البيع"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdSalesman_Checked"/>
+                            <RadioButton x:Name="rdEmp"
+                                         Content="المستخدم"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdEmp_Checked"/>
+                            <RadioButton x:Name="rdDay"
+                                         Content="الأيام"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdDay_Checked"/>
+                            <RadioButton x:Name="rdMonth"
+                                         Content="الشهور"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdMonth_Checked"/>
+                            <RadioButton x:Name="rdGroup"
+                                         Content="مجموعة الصنف"
+                                         Style="{StaticResource RadioStyle}"
+                                         Foreground="White"
+                                         Checked="rdGroup_Checked"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ═══ الصف 2: التواريخ + المستخدم + العميل ═══ -->
+                    <Grid Grid.Row="1" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- من تاريخ - بعد -->
+                        <DatePicker x:Name="txtDateFrom"
+            Height="30"
+            FontSize="11"
+            FontWeight="SemiBold"
+            SelectedDateFormat="Short"
+            Background="White"
+            BorderBrush="{StaticResource BorderLight}"
+            BorderThickness="1"
+            VerticalContentAlignment="Center"/>
+
+                        <!-- الى تاريخ - بعد -->
+                        <DatePicker x:Name="txtDateTo"
+            Height="30"
+            FontSize="11"
+            FontWeight="SemiBold"
+            SelectedDateFormat="Short"
+            Background="White"
+            BorderBrush="{StaticResource BorderLight}"
+            BorderThickness="1"
+            VerticalContentAlignment="Center"/>
+                        
+                        <!-- المستخدم -->
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="👤 المستخدم"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbEmp"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBox}"
+                                          IsEnabled="False"
+                                          DisplayMemberPath="name"
+                                          SelectedValuePath="id"/>
+                                <CheckBox x:Name="chkAllEmp"
+                                          Grid.Column="2"
+                                          Content="الكل"
+                                          IsChecked="True"
+                                          Style="{StaticResource CheckStyle}"
+                                          Checked="chkAllEmp_CheckedChanged"
+                                          Unchecked="chkAllEmp_CheckedChanged"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- العميل -->
+                        <StackPanel Grid.Column="6">
+                            <TextBlock Text="🧑‍💼 العميل"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbCust"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBox}"
+                                          IsEnabled="False"
+                                          DisplayMemberPath="name"
+                                          SelectedValuePath="id"/>
+                                <CheckBox x:Name="chkAllCust"
+                                          Grid.Column="2"
+                                          Content="الكل"
+                                          IsChecked="True"
+                                          Style="{StaticResource CheckStyle}"
+                                          Checked="chkAllCust_CheckedChanged"
+                                          Unchecked="chkAllCust_CheckedChanged"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- ═══ الصف 3: مجموعة الصنف + مندوب البيع + الصندوق + المستودع ═══ -->
+                    <Grid Grid.Row="2" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- مجموعة الصنف -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="📦 مجموعة الصنف"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbGroups"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBox}"
+                                          IsEnabled="False"
+                                          DisplayMemberPath="name"
+                                          SelectedValuePath="id"/>
+                                <CheckBox x:Name="chkAllGroups"
+                                          Grid.Column="2"
+                                          Content="الكل"
+                                          IsChecked="True"
+                                          Style="{StaticResource CheckStyle}"
+                                          Checked="chkAllGroups_CheckedChanged"
+                                          Unchecked="chkAllGroups_CheckedChanged"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- مندوب البيع -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="🤝 مندوب البيع"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbSales"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBox}"
+                                          IsEnabled="False"
+                                          DisplayMemberPath="name"
+                                          SelectedValuePath="id"/>
+                                <CheckBox x:Name="chkAllSales"
+                                          Grid.Column="2"
+                                          Content="الكل"
+                                          IsChecked="True"
+                                          Style="{StaticResource CheckStyle}"
+                                          Checked="chkAllSales_CheckedChanged"
+                                          Unchecked="chkAllSales_CheckedChanged"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- الصندوق -->
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="🏦 الصندوق"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbSafe"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBox}"
+                                          IsEnabled="False"
+                                          DisplayMemberPath="name"
+                                          SelectedValuePath="id"/>
+                                <CheckBox x:Name="chkAllSafe"
+                                          Grid.Column="2"
+                                          Content="الكل"
+                                          IsChecked="True"
+                                          Style="{StaticResource CheckStyle}"
+                                          Checked="chkAllSafe_CheckedChanged"
+                                          Unchecked="chkAllSafe_CheckedChanged"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- المستودع -->
+                        <StackPanel Grid.Column="6">
+                            <TextBlock Text="🏭 المستودع"
+                                       Style="{StaticResource FieldLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="cmbStock"
+                                          Grid.Column="0"
+                                          Style="{StaticResource ModernComboBox}"
+                                          IsEnabled="False"
+                                          DisplayMemberPath="name"
+                                          SelectedValuePath="id"/>
+                                <CheckBox x:Name="chkAllStock"
+                                          Grid.Column="2"
+                                          Content="الكل"
+                                          IsChecked="True"
+                                          Style="{StaticResource CheckStyle}"
+                                          Checked="chkAllStock_CheckedChanged"
+                                          Unchecked="chkAllStock_CheckedChanged"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- ═══ الصف 4: أزرار العمليات ═══ -->
+                    <Border Grid.Row="3"
+                            Background="{StaticResource FooterBrush}"
+                            FlowDirection="LeftToRight"
+                            CornerRadius="8"
+                            Padding="10,7"
+                            Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- زر الخروج يسار -->
+                            <Button x:Name="btnClose"
+                                    Grid.Column="0"
+                                    Content="✖ خروج"
+                                    Style="{StaticResource DangerBtn}"
+                                    Width="90"
+                                    Click="btnClose_Click"/>
+
+                            <!-- أزرار العمليات يمين -->
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal">
+                                <Button x:Name="btnExport"
+                                        Content="📊 تصدير اكسل"
+                                        Style="{StaticResource ActionBtn}"
+                                        Width="110"
+                                        Margin="0,0,6,0"
+                                        Click="btnExport_Click"/>
+                                <Button x:Name="btnPrint"
+                                        Content="🖨️ طباعة"
+                                        Style="{StaticResource ActionBtn}"
+                                        Width="90"
+                                        Margin="0,0,6,0"
+                                        Click="btnPrint_Click"/>
+                                <Button x:Name="btnPreview"
+                                        Content="👁️ معاينة"
+                                        Style="{StaticResource ActionBtn}"
+                                        Width="90"
+                                        Margin="0,0,6,0"
+                                        Click="btnPreview_Click"/>
+                                <Button x:Name="btnShow"
+                                        Content="🔍 عرض"
+                                        Style="{StaticResource SaveBtn}"
+                                        Width="90"
+                                        Click="btnShow_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- ═══ الصف 5: ProgressBar ═══ -->
+                    <ProgressBar x:Name="ProgressBar1"
+                                 Grid.Row="4"
+                                 Height="6"
+                                 Minimum="0" Maximum="100" Value="0"
+                                 Foreground="#2E4E9E"
+                                 Background="#D0D7E8"
+                                 Margin="0,0,0,4"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--              Panel2 - الجدول + المجاميع             -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- الجدول -->
+            <Border Grid.Row="0"
+                    Background="White"
+                    Margin="8,6,8,0"
+                    CornerRadius="10"
+                    Effect="{StaticResource CardShadow}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="40"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Background="{StaticResource HeaderBrush}"
+                            CornerRadius="10,10,0,0">
+                        <TextBlock Text="📋 بيانات تحليل المبيعات"
+                                   Foreground="White"
+                                   FontSize="13" FontWeight="Bold"
+                                   VerticalAlignment="Center"
+                                   Margin="14,0"/>
+                    </Border>
+
+                    <DataGrid x:Name="dgvItems"
+                              Grid.Row="1"
+                              AutoGenerateColumns="False"
+                              ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                              RowStyle="{StaticResource DgvRow}"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserReorderColumns="True"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              FlowDirection="RightToLeft"
+                              Background="White"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="#E8EBF5"
+                              AlternatingRowBackground="#F8F9FD"
+                              HeadersVisibility="Column"
+                              BorderThickness="0"
+                              RowHeaderWidth="0">
+                        <DataGrid.Columns>
+
+                            <!-- Column1: المستودع/التصنيف (الهيدر يتغير حسب النوع) -->
+                            <DataGridTextColumn x:Name="Column1"
+                                                Header="المستودع"
+                                                Binding="{Binding Column1}"
+                                                Width="150">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column8: فواتير -->
+                            <DataGridTextColumn x:Name="Column8"
+                                                Header="فواتير"
+                                                Binding="{Binding Column8}"
+                                                Width="70">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column9: صافي الكمية -->
+                            <DataGridTextColumn x:Name="Column9"
+                                                Header="صافي الكمية"
+                                                Binding="{Binding Column9}"
+                                                Width="90">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column5: صافي الإجمالي -->
+                            <DataGridTextColumn x:Name="Column5"
+                                                Header="صافي الإجمالي"
+                                                Binding="{Binding Column5}"
+                                                Width="100">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column10: صافي الخصم -->
+                            <DataGridTextColumn x:Name="Column10"
+                                                Header="صافي الخصم"
+                                                Binding="{Binding Column10}"
+                                                Width="90">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column2: صافي التكلفة -->
+                            <DataGridTextColumn x:Name="Column2"
+                                                Header="صافي التكلفة"
+                                                Binding="{Binding Column2}"
+                                                Width="90">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column3: صافي الربح -->
+                            <DataGridTextColumn x:Name="Column3"
+                                                Header="صافي الربح"
+                                                Binding="{Binding Column3}"
+                                                Width="90">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column4: نسبة الربح للتكلفة -->
+                            <DataGridTextColumn x:Name="Column4"
+                                                Header="نسبة الربح للتكلفة"
+                                                Binding="{Binding Column4}"
+                                                Width="110">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column6: نسبة الاجمالي لإجمالي البيع -->
+                            <DataGridTextColumn x:Name="Column6"
+                                                Header="نسبة الاجمالي لإجمالي البيع"
+                                                Binding="{Binding Column6}"
+                                                Width="130">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- Column7: نسبة الربح لإجمالي الربح -->
+                            <DataGridTextColumn x:Name="Column7"
+                                                Header="نسبة الربح لإجمالي الربح"
+                                                Binding="{Binding Column7}"
+                                                Width="120">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock"
+                                           BasedOn="{StaticResource CenterCell}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- ═══ Panel4 - بطاقات المجاميع ═══ -->
+            <Border Grid.Row="1"
+                    Background="White"
+                    BorderBrush="{StaticResource BorderLight}"
+                    BorderThickness="0,1,0,0"
+                    Margin="8,4,8,6"
+                    CornerRadius="10"
+                    Effect="{StaticResource CardShadow}">
+                <Grid Margin="10,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- txtSum1: صافي الكمية -->
+                    <Border Grid.Column="0" Style="{StaticResource SumCard}">
+                        <StackPanel>
+                            <TextBlock Text="📦 صافي الكمية"
+                                       Style="{StaticResource SumTitle}"/>
+                            <TextBlock x:Name="txtSum1"
+                                       Text="0"
+                                       Style="{StaticResource SumValue}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- txtSum2: صافي الإجمالي -->
+                    <Border Grid.Column="2" Style="{StaticResource SumCard}">
+                        <StackPanel>
+                            <TextBlock Text="💰 صافي الإجمالي"
+                                       Style="{StaticResource SumTitle}"/>
+                            <TextBlock x:Name="txtSum2"
+                                       Text="0"
+                                       Style="{StaticResource SumValue}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- txtSum3: صافي الخصم -->
+                    <Border Grid.Column="4" Style="{StaticResource SumCard}">
+                        <StackPanel>
+                            <TextBlock Text="🏷️ صافي الخصم"
+                                       Style="{StaticResource SumTitle}"/>
+                            <TextBlock x:Name="txtSum3"
+                                       Text="0"
+                                       Style="{StaticResource SumValue}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- txtSum4: صافي التكلفة -->
+                    <Border Grid.Column="6" Style="{StaticResource SumCard}">
+                        <StackPanel>
+                            <TextBlock Text="💳 صافي التكلفة"
+                                       Style="{StaticResource SumTitle}"/>
+                            <TextBlock x:Name="txtSum4"
+                                       Text="0"
+                                       Style="{StaticResource SumValue}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- txtSum5: صافي الربح -->
+                    <Border Grid.Column="8" Style="{StaticResource SumCard}">
+                        <StackPanel>
+                            <TextBlock Text="📈 صافي الربح"
+                                       Style="{StaticResource SumTitle}"/>
+                            <TextBlock x:Name="txtSum5"
+                                       Text="0"
+                                       Style="{StaticResource SumValue}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</dx:ThemedWindow>

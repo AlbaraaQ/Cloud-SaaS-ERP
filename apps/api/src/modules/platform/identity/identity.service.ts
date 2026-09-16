@@ -22,6 +22,7 @@ import {
 
 import type { AuthContextValue } from '../../../request-context/request-context.js';
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { resolvePlatformAccess } from '../auth/platform-access.js';
 import { toMembershipDto, toUserDto } from '../mappers.js';
 
 /** `GET /me` and `GET /permissions` — API_CONTRACT §1. */
@@ -52,6 +53,13 @@ export class IdentityService {
       throw new DomainError(errorCodes.UNAUTHENTICATED, 'User not found', 401);
     }
 
+    const platform = await resolvePlatformAccess(this.database, user.id, user.isPlatformAdmin);
+    const userRow = {
+      ...user,
+      isPlatformAdmin: platform.isPlatformAdmin,
+      platformRoles: platform.platformRoles,
+    };
+
     return withTenantTx(this.database.db, auth.claimedTenantId, async (tx) => {
       const rows = await tx
         .select({
@@ -63,6 +71,7 @@ export class IdentityService {
           status: memberships.status,
           isOwner: memberships.isOwner,
           branchScope: memberships.branchScope,
+          kind: memberships.kind,
         })
         .from(memberships)
         .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
@@ -82,7 +91,7 @@ export class IdentityService {
         .where(and(eq(membershipRoles.membershipId, membership.id), isNull(roles.deletedAt)));
 
       return {
-        user: toUserDto(user),
+        user: toUserDto(userRow),
         membership: await toMembershipDto(tx, membership),
         permissions: permissionRows.map((row) => row.code).sort(),
         branchScope: (membership.branchScope as string[] | null) ?? null,

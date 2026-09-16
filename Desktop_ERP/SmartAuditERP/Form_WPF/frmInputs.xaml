@@ -1,0 +1,165 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmInputs"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="إدخال"
+    Width="340" Height="200"
+    WindowStyle="None"
+    AllowsTransparency="True"
+    WindowStartupLocation="CenterOwner"
+    FlowDirection="RightToLeft"
+    Background="Transparent"
+    ResizeMode="NoResize"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <DropShadowEffect x:Key="WinShadow"
+                          BlurRadius="18" ShadowDepth="3"
+                          Direction="270" Opacity="0.35"
+                          Color="#000000"/>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="10,0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- الغلاف الخارجي مع الظل -->
+    <Border CornerRadius="14"
+            Effect="{StaticResource WinShadow}"
+            Background="Transparent">
+
+        <!-- الجسم الرئيسي -->
+        <Border CornerRadius="14"
+                ClipToBounds="True">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#2E3F8F" Offset="0"/>
+                    <GradientStop Color="#3B5BBF" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- الرأس -->
+                <Border Grid.Row="0"
+                        Padding="14,10"
+                        Background="#1D2F6F">
+                    <TextBlock x:Name="lblTitel"
+                               Text="أدخل رقم الطاولة"
+                               Foreground="White"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+                <!-- حقل الإدخال -->
+                <Border Grid.Row="1" Padding="20,14">
+                    <TextBox x:Name="txtInput"
+                             Height="40"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             TextAlignment="Center"
+                             VerticalContentAlignment="Center"
+                             Background="White"
+                             BorderBrush="#A0AFDF"
+                             BorderThickness="1"
+                             Padding="8,0"
+                             KeyDown="txtInput_KeyDown">
+                        <TextBox.Template>
+                            <ControlTemplate TargetType="TextBox">
+                                <Border x:Name="Bd"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="8">
+                                    <ScrollViewer x:Name="PART_ContentHost"
+                                                  Margin="4,0"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsFocused" Value="True">
+                                        <Setter TargetName="Bd" Property="BorderBrush"
+                                                Value="#4B7BFF"/>
+                                        <Setter TargetName="Bd" Property="BorderThickness"
+                                                Value="2"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </TextBox.Template>
+                    </TextBox>
+                </Border>
+
+                <!-- الأزرار -->
+                <Grid Grid.Row="2" Margin="16,0,16,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- إلغاء -->
+                    <Button x:Name="btnCancel"
+                            Grid.Column="0"
+                            Content="✖ إلغاء"
+                            Style="{StaticResource ActionBtn}"
+                            Click="btnCancel_Click">
+                        <Button.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#E35656" Offset="0"/>
+                                <GradientStop Color="#B92F2F" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background>
+                    </Button>
+
+                    <!-- موافق -->
+                    <Button x:Name="btnSave"
+                            Grid.Column="2"
+                            Content="✔ موافق"
+                            Style="{StaticResource ActionBtn}"
+                            Click="btnSave_Click">
+                        <Button.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#2CC36B" Offset="0"/>
+                                <GradientStop Color="#1B8E4A" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background>
+                    </Button>
+                </Grid>
+
+            </Grid>
+        </Border>
+    </Border>
+</dx:ThemedWindow>

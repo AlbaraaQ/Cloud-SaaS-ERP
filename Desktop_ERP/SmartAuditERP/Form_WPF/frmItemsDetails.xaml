@@ -1,0 +1,334 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmItemsDetails"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تفاصيل الأصناف"
+    Width="980"
+    Height="580"
+    WindowStartupLocation="CenterScreen"
+    ShowInTaskbar="False"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="frmInvoiceDetails_Load"
+    KeyDown="frmItemsSrch_KeyDown"
+    Closing="frmItemsSrch_FormClosing">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="10" ShadowDepth="2"
+                          Direction="270" Opacity="0.12"
+                          Color="#000000"/>
+
+        <Style x:Key="GridHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="GridCellText" TargetType="TextBlock">
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="GridRowStyle" TargetType="DataGridRow">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Background" Value="White"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#DCE7FF"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F4FF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SummaryBox" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="#EEF2FF"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="MinWidth" Value="80"/>
+        </Style>
+
+        <Style x:Key="SummaryLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="4,0,4,0"/>
+        </Style>
+
+        <Style x:Key="CloseBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="8,0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header / Close -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="btnClose"
+                        Grid.Column="0"
+                        Content="✖ إغلاق"
+                        Style="{StaticResource CloseBtn}"
+                        Margin="8,0,0,0"
+                        Click="btnClose_Click"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="📋 تفاصيل الأصناف"
+                           Foreground="White"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- DataGrid -->
+        <Border Grid.Row="1"
+                Margin="6"
+                Background="White"
+                CornerRadius="8"
+                Effect="{StaticResource CardShadow}">
+
+            <DataGrid x:Name="dgvItems"
+                      AutoGenerateColumns="False"
+                      HeadersVisibility="Column"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      RowStyle="{StaticResource GridRowStyle}"
+                      ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                      AlternatingRowBackground="#F8F9FD"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#E7ECF5"
+                      Background="White"
+                      RowHeaderWidth="0"
+                      SelectionChanged="dgvItems_SelectionChanged"
+                      MouseLeftButtonUp="dgvItems_CellClick">
+
+                <DataGrid.Columns>
+
+                    <DataGridTextColumn Header="#"
+                                        Binding="{Binding Col0}"
+                                        Width="40"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="رمز الصنف"
+                                        Binding="{Binding Col1}"
+                                        Width="80"
+                                        Visibility="Collapsed"/>
+
+                    <DataGridTextColumn Header="رقم الصنف"
+                                        Binding="{Binding Col2}"
+                                        Width="80"
+                                        Visibility="Collapsed"/>
+
+                    <DataGridTextColumn Header="الصنف"
+                                        Binding="{Binding Col3}"
+                                        Width="200"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="نوع العملية"
+                                        Binding="{Binding Col4}"
+                                        Width="100"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="رقم العملية"
+                                        Binding="{Binding Col5}"
+                                        Width="90"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="الوحدة"
+                                        Binding="{Binding Col6}"
+                                        Width="70"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="الكمية"
+                                        Binding="{Binding Col7}"
+                                        Width="60"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="متوسط التكلفة"
+                                        Binding="{Binding Col8}"
+                                        Width="90"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="إجمالي التكلفة"
+                                        Binding="{Binding Col9}"
+                                        Width="90"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="السعر"
+                                        Binding="{Binding Col10}"
+                                        Width="80"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="المجموع"
+                                        Binding="{Binding Col11}"
+                                        Width="90"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="الخصم"
+                                        Binding="{Binding Col12}"
+                                        Width="60"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="الإجمالي"
+                                        Binding="{Binding Col13}"
+                                        Width="80"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="الربح"
+                                        Binding="{Binding Col14}"
+                                        Width="80"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                    <DataGridTextColumn Header="نسبة الربح"
+                                        Binding="{Binding Col15}"
+                                        Width="70"
+                                        ElementStyle="{StaticResource GridCellText}"/>
+
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Summary Footer -->
+        <Border Grid.Row="2"
+                Background="{StaticResource FooterBrush}"
+                Padding="10,8">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal">
+
+                    <TextBlock x:Name="Label1"
+                               Text="إجمالي"
+                               Style="{StaticResource SummaryLabel}"
+                               Margin="0,0,8,0"/>
+
+                    <TextBlock Text="الكمية:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="txtTotalQty"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,8,0"/>
+
+                    <TextBlock Text="التكلفة الكلية:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="TxtTotCost"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,8,0"/>
+
+                    <TextBlock Text="التكلفة:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="txtTotalCost"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,8,0"/>
+
+                    <TextBlock Text="الإجمالي:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="txtTotal"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,8,0"/>
+
+                    <TextBlock Text="الخصم:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="txtTotalDisc"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,8,0"/>
+
+                    <TextBlock Text="المجموع:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="txtSum"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,8,0"/>
+
+                    <TextBlock Text="الربح:"
+                               Style="{StaticResource SummaryLabel}"/>
+                    <TextBox x:Name="txtTotalProfit"
+                             Style="{StaticResource SummaryBox}"
+                             Text="0"
+                             Margin="0,0,0,0"/>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>

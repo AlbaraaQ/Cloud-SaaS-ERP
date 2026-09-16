@@ -1,0 +1,764 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmVATReturn"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="الإقرار الضريبي - VAT Return"
+    WindowState="Maximized"
+    MinWidth="1000" MinHeight="600"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#EFEFF4"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="PrintBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#8E44AD" Offset="0"/>
+            <GradientStop Color="#6C3483" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="RefreshBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2E4E9E" Offset="0"/>
+            <GradientStop Color="#1A307A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+        <SolidColorBrush x:Key="SepColor" Color="#E6E6EB"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="14" ShadowDepth="3"
+                          Direction="270" Opacity="0.12"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ActionBtn -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="MinWidth" Value="100"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RefreshBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource RefreshBrush}"/>
+        </Style>
+
+        <Style x:Key="PrintBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource PrintBrush}"/>
+        </Style>
+
+        <!-- Card Title Style -->
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <!-- Value Label Style (كبير) -->
+        <Style x:Key="ValueLabelBig" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+
+        <!-- Value Label Style (عادي) -->
+        <Style x:Key="ValueLabelNormal" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Foreground" Value="#222222"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+
+        <!-- Caption Label Style -->
+        <Style x:Key="CaptionLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Foreground" Value="#6C757D"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Separator Style -->
+        <Style x:Key="CardSep" TargetType="Border">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{StaticResource SepColor}"/>
+            <Setter Property="Margin" Value="0,8"/>
+        </Style>
+
+        <!-- Filter Label -->
+        <Style x:Key="FilterLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="56"/>
+            <!-- Filters -->
+            <RowDefinition Height="Auto"/>
+            <!-- Main Cards -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Header ═══ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Effect="{StaticResource CardShadow}">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <TextBlock Text="📑 الإقرار الضريبي الموحد لضريبة القيمة المضافة (VAT)"
+                           Foreground="White"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           FontFamily="Cairo, Tahoma, Arial"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="بيانات الفترة الحالية والناتج النهائي"
+                           Foreground="#AAAACC"
+                           FontSize="11"
+                           FontFamily="Cairo, Tahoma, Arial"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══ Filters Panel ═══ -->
+        <Border Grid.Row="1"
+                Background="White"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10"
+                Effect="{StaticResource CardShadow}">
+            <StackPanel>
+
+                <!-- الصف 1: الفرع + نوع الإقرار -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="🏢 الفرع:"
+                               Style="{StaticResource FilterLabel}"/>
+
+                    <ComboBox x:Name="cmbBranch"
+                              Grid.Column="1"
+                              Height="32"
+                              FontSize="12"
+                              FontFamily="Cairo, Tahoma, Arial"
+                              DisplayMemberPath="name"
+                              SelectedValuePath="Id"
+                              SelectionChanged="cmbBranch_SelectionChanged"/>
+
+                    <CheckBox x:Name="chkAllBranches"
+                              Grid.Column="3"
+                              Content="📂 كل الفروع"
+                              FontSize="12"
+                              FontWeight="Bold"
+                              FontFamily="Cairo, Tahoma, Arial"
+                              VerticalAlignment="Center"
+                              Checked="chkAllBranches_CheckedChanged"
+                              Unchecked="chkAllBranches_CheckedChanged"/>
+
+                    <TextBlock Grid.Column="5"
+                               Text="📋 نوع الإقرار:"
+                               Style="{StaticResource FilterLabel}"/>
+
+                    <RadioButton x:Name="rbQuarterly"
+                                 Grid.Column="7"
+                                 Content="ربع سنوي (3 أشهر)"
+                                 FontSize="12"
+                                 FontFamily="Cairo, Tahoma, Arial"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,12,0"
+                                 Checked="rbQuarterly_Checked"/>
+
+                    <RadioButton x:Name="rbMonthly"
+                                 Grid.Column="9"
+                                 Content="شهري"
+                                 FontSize="12"
+                                 FontFamily="Cairo, Tahoma, Arial"
+                                 VerticalAlignment="Center"
+                                 Checked="rbMonthly_Checked"/>
+
+                </Grid>
+
+                <!-- الصف 2: عناصر الفترة + أزرار -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- عناصر الفترة الزمنية -->
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal">
+
+                        <!-- ربع سنوي -->
+                        <StackPanel x:Name="pnlQuarterControls"
+                                    Orientation="Horizontal"
+                                    Visibility="Collapsed">
+                            <TextBlock Text="السنة:"
+                                       Style="{StaticResource FilterLabel}"/>
+                            <TextBox x:Name="numYearQ"
+                                     Width="70" Height="32"
+                                     FontSize="12"
+                                     FontFamily="Cairo, Tahoma, Arial"
+                                     TextAlignment="Center"
+                                     Margin="0,0,8,0"
+                                     TextChanged="numYearQ_TextChanged"/>
+
+                            <TextBlock Text="الربع:"
+                                       Style="{StaticResource FilterLabel}"/>
+                            <ComboBox x:Name="cmbQuarter"
+                                      Width="200" Height="32"
+                                      FontSize="12"
+                                      FontFamily="Cairo, Tahoma, Arial"
+                                      Margin="0,0,8,0"
+                                      SelectionChanged="cmbQuarter_SelectionChanged"/>
+                        </StackPanel>
+
+                        <!-- شهري -->
+                        <StackPanel x:Name="pnlMonthControls"
+                                    Orientation="Horizontal"
+                                    Visibility="Visible">
+                            <TextBlock Text="السنة:"
+                                       Style="{StaticResource FilterLabel}"/>
+                            <TextBox x:Name="numYearM"
+                                     Width="70" Height="32"
+                                     FontSize="12"
+                                     FontFamily="Cairo, Tahoma, Arial"
+                                     TextAlignment="Center"
+                                     Margin="0,0,8,0"
+                                     TextChanged="numYearM_TextChanged"/>
+
+                            <TextBlock Text="الشهر:"
+                                       Style="{StaticResource FilterLabel}"/>
+                            <ComboBox x:Name="cmbMonth"
+                                      Width="200" Height="32"
+                                      FontSize="12"
+                                      FontFamily="Cairo, Tahoma, Arial"
+                                      Margin="0,0,8,0"
+                                      SelectionChanged="cmbMonth_SelectionChanged"/>
+                        </StackPanel>
+
+                        <!-- النطاق اليدوي -->
+                        <StackPanel Orientation="Horizontal" Margin="8,0,0,0">
+                            <TextBlock Text="من:"
+                                       Style="{StaticResource FilterLabel}"/>
+                            <dxe:DateEdit x:Name="dtFrom"
+                                          Width="130" Height="32"
+                                          FontSize="12"
+                                          FontFamily="Cairo, Tahoma, Arial"
+                                          Margin="0,0,8,0"/>
+
+                            <TextBlock Text="إلى:"
+                                       Style="{StaticResource FilterLabel}"/>
+                            <dxe:DateEdit x:Name="dtTo"
+                                          Width="130" Height="32"
+                                          FontSize="12"
+                                          FontFamily="Cairo, Tahoma, Arial"
+                                          Margin="0,0,8,0"/>
+                        </StackPanel>
+
+                    </StackPanel>
+
+                    <!-- أزرار التنفيذ -->
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal">
+
+                        <Button x:Name="BtnPrint"
+                                Content="🖨️ طباعة"
+                                Style="{StaticResource PrintBtn}"
+                                Width="100"
+                                Margin="0,0,6,0"
+                                Click="BtnPrint_Click"/>
+
+                        <Button x:Name="Button3"
+                                Content="👁️ معاينة"
+                                Style="{StaticResource PrintBtn}"
+                                Width="100"
+                                Margin="0,0,6,0"
+                                Click="Button3_Click"/>
+
+                        <Button x:Name="Button2"
+                                Content="📋 تفاصيل المشتريات"
+                                Style="{StaticResource ActionBtn}"
+                                Width="140"
+                                Margin="0,0,6,0"
+                                Click="Button2_Click"/>
+
+                        <Button x:Name="Button1"
+                                Content="📋 تفاصيل المبيعات"
+                                Style="{StaticResource ActionBtn}"
+                                Width="130"
+                                Margin="0,0,6,0"
+                                Click="Button1_Click"/>
+
+                        <Button x:Name="btnRefresh"
+                                Content="🔄 عرض"
+                                Style="{StaticResource RefreshBtn}"
+                                Width="90"
+                                Click="btnRefresh_Click"/>
+
+                    </StackPanel>
+                </Grid>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ═══ Main Cards: 3 أعمدة ═══ -->
+        <Grid Grid.Row="2" Margin="12,10,12,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ═════════════════════════════════════ -->
+            <!-- بطاقة ضريبة المخرجات (المبيعات)      -->
+            <!-- ═════════════════════════════════════ -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    CornerRadius="12"
+                    Padding="16"
+                    Effect="{StaticResource CardShadow}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Text="🔺 ضريبة المخرجات (المبيعات والإيرادات)"
+                                   Style="{StaticResource CardTitle}"/>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- المبيعات الخاضعة -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="المبيعات الخاضعة للضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblSalesTaxableValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- ضريبة المبيعات -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="ضريبة القيمة المضافة على المبيعات:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblSalesVATValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- التعديلات -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="التعديلات والفرق في الضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblExtraVATValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- إيرادات أخرى -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="إيرادات أخرى غير خاضعة للضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblOtherIncomeValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- صافي المبيعات الخاضعة -->
+                        <Border Background="#FFF3E0"
+                                CornerRadius="8"
+                                Padding="10,8"
+                                Margin="0,4,0,4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="صافي المبيعات الخاضعة للضريبة:"
+                                               FontSize="12"
+                                               FontWeight="Bold"
+                                               FontFamily="Cairo, Tahoma, Arial"
+                                               Foreground="#1B2642"/>
+                                    <TextBlock Text="هذا المبلغ الذي يتم وضعه في موقع الضريبة"
+                                               FontSize="10"
+                                               FontFamily="Cairo, Tahoma, Arial"
+                                               Foreground="#E74C3C"/>
+                                </StackPanel>
+                                <TextBlock x:Name="LblNetsale"
+                                           Grid.Column="1"
+                                           Text="0.00"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           FontFamily="Cairo, Tahoma, Arial"
+                                           Foreground="#C0392B"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- المبيعات المعفاة -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="المبيعات المعفاة من الضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblsalesnotax"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ═════════════════════════════════════ -->
+            <!-- بطاقة ضريبة المدخلات (المشتريات)     -->
+            <!-- ═════════════════════════════════════ -->
+            <Border Grid.Column="2"
+                    Background="White"
+                    CornerRadius="12"
+                    Padding="16"
+                    Effect="{StaticResource CardShadow}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Text="📥 ضريبة المدخلات (المشتريات والمصروفات)"
+                                   Style="{StaticResource CardTitle}"/>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- المشتريات الخاضعة -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="المشتريات الخاضعة للضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblPurchTaxableValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- ضريبة المشتريات -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="ضريبة القيمة المضافة على المشتريات:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblPurchVATValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- المصروفات الخاضعة -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="المصروفات الخاضعة للضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblExpensesValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- ضريبة المصروفات -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="ضريبة القيمة المضافة على المصروفات:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblExpensesVATValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- صافي المشتريات -->
+                        <Border Background="#FFF3E0"
+                                CornerRadius="8"
+                                Padding="10,8"
+                                Margin="0,4,0,4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="صافي المشتريات الخاضع للضريبة:"
+                                               FontSize="12"
+                                               FontWeight="Bold"
+                                               FontFamily="Cairo, Tahoma, Arial"
+                                               Foreground="#1B2642"/>
+                                    <TextBlock Text="هذا المبلغ الذي يتم وضعه في موقع الضريبة"
+                                               FontSize="10"
+                                               FontFamily="Cairo, Tahoma, Arial"
+                                               Foreground="#E74C3C"/>
+                                </StackPanel>
+                                <TextBlock x:Name="LblNetPurch"
+                                           Grid.Column="1"
+                                           Text="0.00"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           FontFamily="Cairo, Tahoma, Arial"
+                                           Foreground="#C0392B"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- المشتريات المعفاة -->
+                        <Grid Margin="0,6,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="المشتريات المعفاة من الضريبة:"
+                                       Style="{StaticResource CaptionLabel}"/>
+                            <TextBlock x:Name="lblpurchnotax"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       Style="{StaticResource ValueLabelNormal}"/>
+                        </Grid>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ═════════════════════════════════════ -->
+            <!-- بطاقة الملخص والنتيجة النهائية        -->
+            <!-- ═════════════════════════════════════ -->
+            <Border Grid.Column="4"
+                    Background="White"
+                    CornerRadius="12"
+                    Padding="16"
+                    Effect="{StaticResource CardShadow}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Text="✅ ملخص الإقرار والنتيجة النهائية"
+                                   Style="{StaticResource CardTitle}"/>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- إجمالي ضريبة المخرجات -->
+                        <Grid Margin="0,8,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="المجموع الكلي لضريبة المخرجات:"
+                                           Style="{StaticResource CaptionLabel}"/>
+                                <TextBlock Text="المبيعات"
+                                           FontSize="10"
+                                           FontFamily="Cairo, Tahoma, Arial"
+                                           Foreground="#E74C3C"/>
+                            </StackPanel>
+                            <TextBlock x:Name="lblOutputTotalValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       FontFamily="Cairo, Tahoma, Arial"
+                                       Foreground="#007BFF"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardSep}"/>
+
+                        <!-- إجمالي ضريبة المدخلات -->
+                        <Grid Margin="0,8,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="المجموع الكلي لضريبة المدخلات:"
+                                           Style="{StaticResource CaptionLabel}"/>
+                                <TextBlock Text="المشتريات"
+                                           FontSize="10"
+                                           FontFamily="Cairo, Tahoma, Arial"
+                                           Foreground="#E74C3C"/>
+                            </StackPanel>
+                            <TextBlock x:Name="lblInputTotalValue"
+                                       Grid.Column="1"
+                                       Text="0.00"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       FontFamily="Cairo, Tahoma, Arial"
+                                       Foreground="#007BFF"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- فاصل مزدوج -->
+                        <Border Height="2"
+                                Background="#C8C8CD"
+                                Margin="0,8"/>
+
+                        <!-- صافي الضريبة -->
+                        <Border Background="#F0F4FF"
+                                CornerRadius="10"
+                                Padding="14,12"
+                                Margin="0,6,0,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="lblNetResultLabel"
+                                           Text="صافي الضريبة (المستحقة أو المستردة)"
+                                           FontSize="12"
+                                           FontWeight="Bold"
+                                           FontFamily="Cairo, Tahoma, Arial"
+                                           Foreground="#2C3E50"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock x:Name="lblNetResultValue"
+                                           Text="0.00"
+                                           FontSize="28"
+                                           FontWeight="Bold"
+                                           FontFamily="Cairo, Tahoma, Arial"
+                                           Foreground="#28A745"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+        </Grid>
+    </Grid>
+</dx:ThemedWindow>

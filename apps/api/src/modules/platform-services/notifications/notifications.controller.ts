@@ -26,7 +26,7 @@ export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
-  @RequiresPermission('platform.notification.view')
+  @RequiresPermission('tenant.notification.view')
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   @ApiQuery({ name: 'filter[read]', required: false, description: 'true | false' })
@@ -44,7 +44,7 @@ export class NotificationsController {
   }
 
   @Get(':id')
-  @RequiresPermission('platform.notification.view')
+  @RequiresPermission('tenant.notification.view')
   @ApiOperation({ summary: 'Read one notification of the calling membership' })
   @ApiResponse({ status: 200, description: 'Notification' })
   @ApiResponse({ status: 404, description: 'Not found for this membership' })
@@ -58,7 +58,7 @@ export class NotificationsController {
   }
 
   @Post()
-  @RequiresPermission('platform.notification.manage')
+  @RequiresPermission('tenant.notification.manage')
   @zodApiBody(notificationCreateSchema)
   @ApiOperation({ summary: 'Create a notification for a membership of this tenant' })
   @ApiResponse({ status: 201, description: 'Notification created' })
@@ -77,7 +77,7 @@ export class NotificationsController {
   }
 
   @Post(':id/read')
-  @RequiresPermission('platform.notification.view')
+  @RequiresPermission('tenant.notification.view')
   @ApiOperation({ summary: 'Mark a notification read (idempotent)' })
   @ApiResponse({ status: 201, description: 'Notification' })
   @ApiResponse({ status: 404, description: 'Not found for this membership' })

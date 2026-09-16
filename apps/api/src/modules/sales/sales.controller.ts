@@ -3,7 +3,22 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { getTenantContext } from '../platform/context/tenant-context.js';
 import { RequiresPermission } from '../platform/decorators/requires-permission.decorator.js';
 
-import { SalesService, type PaymentInput, type PostingInput, type SalesInvoiceInput } from './sales.service.js';
+import {
+  SalesService,
+  type PaymentInput,
+  type PostingInput,
+  type SalesInvoiceInput,
+  type SalesmanInput,
+} from './sales.service.js';
+
+/**
+ * The screen sends «الكل» as a checkbox and the API answers both dialects — `1`,
+ * `true` and `on` all mean checked, and `undefined` has to stay `undefined` so the
+ * service can tell «لم يُرسل شيء» from «أُرسل لا»: both boxes default to checked.
+ */
+function flag(value?: string): boolean | undefined {
+  return value === undefined ? undefined : value === '1' || value === 'true' || value === 'on';
+}
 
 @Controller()
 export class SalesController {
@@ -27,7 +42,44 @@ export class SalesController {
   @Get('sales/offers') @RequiresPermission('sales.view') offers() { return this.sales.listOffers(getTenantContext().tenantId); }
   @Post('sales/offers') @RequiresPermission('sales.offer.manage') createOffer(@Body() body: Parameters<SalesService['createOffer']>[1]) { return this.sales.createOffer(getTenantContext().tenantId, body); }
   @Get('sales/salesmen') @RequiresPermission('sales.view') salesmen() { return this.sales.listSalesmen(getTenantContext().tenantId); }
-  @Post('sales/salesmen') @RequiresPermission('sales.salesman.manage') createSalesman(@Body() body: { name: string; employeeRef?: string; active?: boolean }) { return this.sales.createSalesman(getTenantContext().tenantId, body); }
-  @Patch('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') updateSalesman(@Param('id') id: string, @Body() body: { name?: string; employeeRef?: string | null; active?: boolean }) { return this.sales.updateSalesman(getTenantContext().tenantId, id, body); }
+  /** 👤 عميل نقدي — the desktop searches the invoices themselves, not a customer table. */
+  @Get('sales/cash-customers')
+  @RequiresPermission('sales.view')
+  cashCustomers(@Query('name') name?: string, @Query('mobile') mobile?: string) {
+    return this.sales.cashCustomers(getTenantContext().tenantId, { name, mobile });
+  }
+  /**
+   * 🧑‍💼 شاشة المندوبين — `frmSalesMen.xaml`: the card now carries the three
+   * commission rates (`عمولة المبيعات` · `عمولة التحصيل` · `عمولة الربح`), the three
+   * contacts and the link to the employee card. Nothing already answered by the old
+   * body stopped being accepted.
+   */
+  @Post('sales/salesmen') @RequiresPermission('sales.salesman.manage') createSalesman(@Body() body: SalesmanInput & { name: string }) { return this.sales.createSalesman(getTenantContext().tenantId, body); }
+  @Patch('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') updateSalesman(@Param('id') id: string, @Body() body: SalesmanInput) { return this.sales.updateSalesman(getTenantContext().tenantId, id, body); }
   @Delete('sales/salesmen/:id') @RequiresPermission('sales.salesman.manage') deleteSalesman(@Param('id') id: string) { return this.sales.deleteSalesman(getTenantContext().tenantId, id); }
+
+  /**
+   * 📋 طباعة فواتير مندوب وعمولاتهم — `frmInvBySalesMen.xaml` («مبيعات مندوب خلال
+   * فترة»): every فاتورة of the مندوب with the three commissions it earns, the
+   * «إشعار مدين» that takes some of them back, and the سندات القبض he collected.
+   */
+  @Get('sales/salesmen/commissions')
+  @RequiresPermission('sales.view')
+  salesmanCommissions(
+    @Query('salesman_id') salesmanId?: string,
+    @Query('all_salesmen') allSalesmen?: string,
+    @Query('all_period') allPeriod?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('branch_id') branchId?: string,
+  ) {
+    return this.sales.salesmanCommissions(getTenantContext().tenantId, {
+      salesmanId: salesmanId?.trim() || undefined,
+      allSalesmen: flag(allSalesmen),
+      allPeriod: flag(allPeriod),
+      from: from?.trim() || undefined,
+      to: to?.trim() || undefined,
+      branchId: branchId?.trim() || undefined,
+    });
+  }
 }

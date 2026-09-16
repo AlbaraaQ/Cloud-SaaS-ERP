@@ -1,0 +1,591 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmCities"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="🏙️ تعريف المدن"
+        Width="680"
+        Height="560"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        FlowDirection="RightToLeft"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+
+        <!-- ═══════════ GRADIENTS ═══════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#0D47A1" Offset="0"/>
+            <GradientStop Color="#1565C0" Offset="0.5"/>
+            <GradientStop Color="#1976D2" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#1565C0" Offset="0"/>
+            <GradientStop Color="#0D47A1" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="CardBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFF" Offset="0"/>
+            <GradientStop Color="#F5F8FF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- ═══════════ SHADOWS ═══════════ -->
+        <DropShadowEffect x:Key="WindowShadow"
+                          BlurRadius="20" ShadowDepth="4"
+                          Direction="270" Opacity="0.28"
+                          Color="#44000000"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="8" ShadowDepth="2"
+                          Direction="270" Opacity="0.12"
+                          Color="#44000000"/>
+
+        <DropShadowEffect x:Key="FieldShadow"
+                          BlurRadius="5" ShadowDepth="1"
+                          Direction="270" Opacity="0.1"
+                          Color="#44000000"/>
+
+        <!-- ═══════════ LABEL ═══════════ -->
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1A237E"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- ═══════════ TEXTBOX ═══════════ -->
+        <Style x:Key="ModernTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#90CAF9"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Effect="{StaticResource FieldShadow}">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Padding="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#1565C0"/>
+                                <Setter TargetName="border" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ COMBOBOX ═══════════ -->
+        <Style x:Key="ModernComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#90CAF9"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══════════ ADD BUTTON ═══════════ -->
+        <Style x:Key="AddButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#C8E6C9"/>
+            <Setter Property="BorderBrush" Value="#81C784"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#A5D6A7"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#81C784"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ NAV BUTTON ═══════════ -->
+        <Style x:Key="NavButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1565C0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Effect="{StaticResource FieldShadow}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1976D2"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#0D47A1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ ACTION BUTTON ═══════════ -->
+        <Style x:Key="ActionButtonStyle" TargetType="Button"
+               BasedOn="{StaticResource NavButtonStyle}">
+            <Setter Property="Width" Value="Auto"/>
+            <Setter Property="MinWidth" Value="70"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <!-- ═══════════ CLOSE BUTTON ═══════════ -->
+        <Style x:Key="CloseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#C62828"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#EF5350"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ WIN CLOSE ═══════════ -->
+        <Style x:Key="WinCloseStyle" TargetType="Button">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="#22FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#55FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ DATAGRID ═══════════ -->
+        <Style x:Key="ModernDataGridStyle" TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#BBDEFB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E3F2FD"/>
+            <Setter Property="RowHeight" Value="34"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="ColumnHeaderHeight" Value="36"/>
+            <Setter Property="AlternationCount" Value="2"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#1565C0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="BorderBrush" Value="#0D47A1"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+        </Style>
+
+        <Style TargetType="DataGridRow">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E3F2FD"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#BBDEFB"/>
+                    <Setter Property="Foreground" Value="#0D47A1"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self},
+                             Path=AlternationIndex}" Value="1">
+                    <Setter Property="Background" Value="#F8FBFF"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <!-- ═══════════ WINDOW BORDER ═══════════ -->
+    <Border CornerRadius="16"
+            Background="{StaticResource CardBrush}"
+            BorderBrush="#BBDEFB"
+            BorderThickness="1.5"
+            Effect="{StaticResource WindowShadow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="62"/>
+            </Grid.RowDefinitions>
+
+            <!-- ─── HEADER ─── -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource HeaderBrush}"
+                    CornerRadius="16,16,0,0"
+                    MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="🏙️" FontSize="22" Margin="8,0,0,0"/>
+                        <StackPanel Margin="8,0,0,0">
+                            <TextBlock Text="تعريف المدن"
+                                       Foreground="White"
+                                       FontFamily="Tahoma"
+                                       FontSize="17"
+                                       FontWeight="Bold"/>
+                            <TextBlock Text="إدارة بيانات المدن والدول"
+                                       Foreground="#90CAF9"
+                                       FontFamily="Tahoma"
+                                       FontSize="10"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource WinCloseStyle}"
+                            Click="btnClose_Click">
+                        <TextBlock Text="✖"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- ─── CONTENT ─── -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="16,12">
+                <StackPanel>
+
+                    <!-- بطاقة البيانات -->
+                    <Border Background="White"
+                            BorderBrush="#BBDEFB"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="16,14"
+                            Margin="0,0,0,10"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+
+                            <!-- عنوان القسم -->
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        Margin="0,0,0,12">
+                                <TextBlock Text="📋" FontSize="15" Margin="6,0,0,0"/>
+                                <TextBlock Text="ادخل بيانات المدن"
+                                           FontFamily="Tahoma"
+                                           FontSize="13"
+                                           FontWeight="Bold"
+                                           Foreground="#0D47A1"/>
+                            </StackPanel>
+
+                            <!-- الصف الأول: اسم الدولة + زر إضافة -->
+                            <StackPanel Margin="0,0,0,12">
+                                <TextBlock Text="🌍 اسم الدولة:"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button x:Name="btnCountryAdd"
+                                            Grid.Column="0"
+                                            Style="{StaticResource AddButtonStyle}"
+                                            Click="btnCountryAdd_Click"
+                                            ToolTip="إضافة دولة جديدة">
+                                        <TextBlock Text="➕" FontSize="14"/>
+                                    </Button>
+
+                                    <ComboBox x:Name="cmbCountry"
+                                              Grid.Column="2"
+                                              Style="{StaticResource ModernComboBoxStyle}"
+                                              IsTextSearchEnabled="True"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- الصف الثاني: اسم المدينة -->
+                            <StackPanel>
+                                <TextBlock Text="🏙️ اسم المدينة:"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                <TextBox x:Name="txtName"
+                                         Style="{StaticResource ModernTextBoxStyle}"
+                                         PreviewKeyDown="txtName_PreviewKeyDown"/>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </Border>
+
+                    <!-- جدول المدن -->
+                    <Border BorderBrush="#BBDEFB"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            ClipToBounds="True"
+                            Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <Border Background="#1565C0" Padding="14,8">
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Right">
+                                    <TextBlock Text="📊" FontSize="14" Margin="6,0,0,0"/>
+                                    <TextBlock Text="بيانات المدن"
+                                               Foreground="White"
+                                               FontFamily="Tahoma"
+                                               FontSize="13"
+                                               FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
+
+                            <DataGrid x:Name="dgvCities"
+                                      Style="{StaticResource ModernDataGridStyle}"
+                                      Height="240"
+                                      SelectionChanged="dgvCities_SelectionChanged">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="🌍 اسم الدولة"
+                                                        Binding="{Binding CountryName}"
+                                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="🏙️ اسم المدينة"
+                                                        Binding="{Binding CityName}"
+                                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ─── TOOLBAR ─── -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource ToolbarBrush}"
+                    CornerRadius="0,0,16,16"
+                    Effect="{StaticResource CardShadow}">
+                <Grid Margin="12,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- إغلاق -->
+                    <Button Grid.Column="0"
+                            x:Name="btnClose"
+                            Style="{StaticResource CloseButtonStyle}"
+                            Click="btnClose_Click"
+                            ToolTip="إغلاق">
+                        <TextBlock Text="✖" FontSize="16"/>
+                    </Button>
+
+                    <!-- أزرار التنقل -->
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+
+                        <Button x:Name="btnFirst"
+                                Style="{StaticResource NavButtonStyle}"
+                                Margin="3,0"
+                                Click="btnFirst_Click"
+                                ToolTip="الأول">
+                            <TextBlock Text="⏮" FontSize="16"/>
+                        </Button>
+
+                        <Button x:Name="btnPrevious"
+                                Style="{StaticResource NavButtonStyle}"
+                                Margin="3,0"
+                                Click="btnPrevious_Click"
+                                ToolTip="السابق">
+                            <TextBlock Text="◀" FontSize="16"/>
+                        </Button>
+
+                        <Border Background="#22FFFFFF"
+                                CornerRadius="8"
+                                Padding="12,0"
+                                Margin="4,0">
+                            <TextBlock x:Name="txtRecordIndicator"
+                                       Text="📍 سجل جديد"
+                                       Foreground="White"
+                                       FontFamily="Tahoma"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <Button x:Name="btnNext"
+                                Style="{StaticResource NavButtonStyle}"
+                                Margin="3,0"
+                                Click="btnNext_Click"
+                                ToolTip="التالي">
+                            <TextBlock Text="▶" FontSize="16"/>
+                        </Button>
+
+                        <Button x:Name="btnLast"
+                                Style="{StaticResource NavButtonStyle}"
+                                Margin="3,0"
+                                Click="btnLast_Click"
+                                ToolTip="الأخير">
+                            <TextBlock Text="⏭" FontSize="16"/>
+                        </Button>
+
+                    </StackPanel>
+
+                    <!-- أزرار العمليات -->
+                    <StackPanel Grid.Column="4"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+
+                        <Button x:Name="btnNew"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Margin="3,0"
+                                Click="btnNew_Click"
+                                ToolTip="جديد">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="➕" FontSize="13" Margin="0,0,4,0"/>
+                                <TextBlock Text="جديد"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Name="btnDelete"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Background="#E53935"
+                                Margin="3,0"
+                                Click="btnDelete_Click"
+                                ToolTip="حذف">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🗑️" FontSize="13" Margin="0,0,4,0"/>
+                                <TextBlock Text="حذف"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Name="btnSave"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Background="#2E7D32"
+                                Margin="3,0"
+                                Click="btnSave_Click"
+                                ToolTip="حفظ">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="💾" FontSize="13" Margin="0,0,4,0"/>
+                                <TextBlock Text="حفظ"/>
+                            </StackPanel>
+                        </Button>
+
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+</Window>

@@ -4,12 +4,14 @@ import {
   idParamSchema,
   membershipCreateSchema,
   membershipListQuerySchema,
+  membershipScopesSchema,
   membershipUpdateSchema,
   type IdParam,
   type ListEnvelope,
   type MembershipCreate,
   type MembershipDto,
   type MembershipListQueryDto,
+  type MembershipScopesRequest,
   type MembershipUpdate,
 } from '@erp/contracts';
 
@@ -29,7 +31,7 @@ export class MembershipsController {
   constructor(private readonly memberships: MembershipsService) {}
 
   @Get()
-  @RequiresPermission('platform.membership.manage')
+  @RequiresPermission('tenant.membership.manage')
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   @ApiQuery({ name: 'filter[status]', required: false })
@@ -44,7 +46,7 @@ export class MembershipsController {
   }
 
   @Get(':id')
-  @RequiresPermission('platform.membership.manage')
+  @RequiresPermission('tenant.membership.manage')
   @ApiOperation({ summary: 'Read one membership (404 when it belongs to another tenant)' })
   @ApiResponse({ status: 200, description: 'Membership' })
   @ApiResponse({ status: 404, description: 'Not found in this tenant' })
@@ -53,7 +55,7 @@ export class MembershipsController {
   }
 
   @Post()
-  @RequiresPermission('platform.membership.manage')
+  @RequiresPermission('tenant.membership.manage')
   @zodApiBody(membershipCreateSchema)
   @ApiOperation({ summary: 'Invite a user into the tenant (by e-mail) with roles and branch scope' })
   @ApiResponse({ status: 201, description: 'Membership created' })
@@ -66,7 +68,7 @@ export class MembershipsController {
   }
 
   @Patch(':id')
-  @RequiresPermission('platform.membership.manage')
+  @RequiresPermission('tenant.membership.manage')
   @zodApiBody(membershipUpdateSchema)
   @ApiOperation({ summary: 'Update a membership (display name, branch scope, status, roles)' })
   @ApiResponse({ status: 200, description: 'Updated membership' })
@@ -83,12 +85,33 @@ export class MembershipsController {
 
   @Delete(':id')
   @HttpCode(204)
-  @RequiresPermission('platform.membership.manage')
+  @RequiresPermission('tenant.membership.manage')
   @ApiOperation({ summary: 'Soft-delete a membership' })
   @ApiResponse({ status: 204, description: 'Deleted' })
   @ApiResponse({ status: 422, description: 'Cannot remove the last active owner' })
   async remove(@Param(new ZodValidationPipe(idParamSchema)) params: IdParam): Promise<void> {
     const tenant = getTenantContext();
     await this.memberships.remove(tenant.tenantId, getAuthContext().userId, params.id);
+  }
+
+  @Post(':id/scopes')
+  @RequiresPermission('tenant.membership.manage')
+  @zodApiBody(membershipScopesSchema)
+  @ApiOperation({ summary: 'Replace the per-role scope restrictions of a membership' })
+  @ApiResponse({ status: 201, description: 'Updated membership with scopes' })
+  @ApiResponse({ status: 422, description: 'Scope references a role the membership does not hold' })
+  async replaceScopes(
+    @Param(new ZodValidationPipe(idParamSchema)) params: IdParam,
+    @Body(new ZodValidationPipe(membershipScopesSchema)) body: MembershipScopesRequest,
+  ): Promise<{ data: MembershipDto }> {
+    const tenant = getTenantContext();
+    return {
+      data: await this.memberships.replaceScopes(
+        tenant.tenantId,
+        getAuthContext().userId,
+        params.id,
+        body.scopes,
+      ),
+    };
   }
 }

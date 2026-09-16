@@ -33,6 +33,7 @@ import { PortalModule } from './modules/portal/portal.module.js';
 import { ReportingModule } from './modules/reporting/reporting.module.js';
 import { MigrationModule } from './modules/migration/migration.module.js';
 import { CompatModule } from './modules/compat/compat.module.js';
+import { DevicesModule } from './modules/devices/devices.module.js';
 import { PosModule } from './modules/pos/pos.module.js';
 import { HrmModule } from './modules/hrm/hrm.module.js';
 import { InstallmentsModule } from './modules/installments/installments.module.js';
@@ -94,6 +95,7 @@ import { OpsModule } from './ops/ops.module.js';
     ReportingModule,
     MigrationModule,
     CompatModule,
+    DevicesModule,
     PosModule,
     HrmModule,
     InstallmentsModule,

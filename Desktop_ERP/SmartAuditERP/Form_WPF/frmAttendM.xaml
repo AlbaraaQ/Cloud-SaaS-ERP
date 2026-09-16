@@ -1,0 +1,483 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmAttendM"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="تحضير المراكب"
+    Width="780" Height="700"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══════════ Brushes ═══════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DarkBtnBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#505050" Offset="0"/>
+            <GradientStop Color="#303030" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="GreenBtnBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#1B7A1B" Offset="0"/>
+            <GradientStop Color="#004000" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="MaroonBtnBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#A03030" Offset="0"/>
+            <GradientStop Color="#800000" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══════════ Label Style ═══════════ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        
+
+        <!-- ═══════════ Button Styles ═══════════ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="MinWidth" Value="64"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DarkBtnBrush}"/>
+        </Style>
+
+        <Style x:Key="GreenBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource GreenBtnBrush}"/>
+        </Style>
+
+        <Style x:Key="MaroonBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource MaroonBtnBrush}"/>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <!-- ═══════════ RadioButton Style ═══════════ -->
+        <Style x:Key="ModernRadio" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="RedRadio" TargetType="RadioButton" BasedOn="{StaticResource ModernRadio}">
+            <Setter Property="Foreground" Value="#B92F2F"/>
+        </Style>
+
+        <!-- ═══════════ DataGrid Styles ═══════════ -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,0"/>
+        </Style>
+
+        <!-- أضف هذا في RowStyle -->
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="{Binding RowColor}"/>
+            <Setter Property="Foreground" Value="{Binding ForeColor}"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E3EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CenterCell" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ═══════════ Grid Button Style (inside DataGrid) ═══════════ -->
+        <Style x:Key="GridCellBtn" TargetType="Button">
+            <Setter Property="Background" Value="#E35656"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- GroupBox3 - منطقة الفلاتر والإعدادات       -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border x:Name="GroupBox3"
+                Grid.Row="0"
+                Background="White"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,0,0,1"
+                Padding="14,10"
+                Effect="{StaticResource CardShadow}">
+            <StackPanel>
+
+                <!-- عنوان البطاقة -->
+                <Border Background="{StaticResource HeaderBrush}"
+                        CornerRadius="8"
+                        Padding="12,7"
+                        Margin="0,0,0,12">
+                    <TextBlock Text="⚓ تحضير المراكب"
+                               Foreground="White"
+                               FontSize="14" FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+                <!-- الصف الأول: الفئة + ضمن/خارج الخطة + التاريخ -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="160"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- الفئة -->
+                    <TextBlock x:Name="Label1"
+                               Grid.Column="0"
+                               Text="📋 الفئة"
+                               Style="{StaticResource FieldLabel}"
+                               Margin="0,0,8,0"/>
+
+                    <ComboBox x:Name="cmbGroup"
+                              Grid.Column="1"
+                              Height="32"
+                              FontSize="13"
+                              FontWeight="SemiBold"
+                              VerticalContentAlignment="Center"
+                              SelectionChanged="cmbGroup_SelectionChanged"/>
+
+                    <!-- ضمن الخطة / خارج الخطة -->
+                    <RadioButton x:Name="ckInPlan"
+                                 Grid.Column="3"
+                                 Content="📌 ضمن الخطة"
+                                 Style="{StaticResource ModernRadio}"
+                                 IsChecked="True"
+                                 Checked="ckInPlan_Checked"/>
+
+                    <RadioButton x:Name="ckOutPlan"
+                                 Grid.Column="4"
+                                 Content="🚫 خارج الخطة"
+                                 Style="{StaticResource RedRadio}"
+                                 Checked="ckOutPlan_Checked"/>
+
+                    <!-- التاريخ -->
+                    <TextBlock x:Name="Label3"
+                               Grid.Column="6"
+                               Text="📅 التاريخ"
+                               Style="{StaticResource FieldLabel}"
+                               Margin="0,0,8,0"/>
+
+                    <dxe:DateEdit x:Name="txtDate"
+                                  Grid.Column="7"
+                                  Height="32"
+                                  FontSize="12"
+                                  EditValue="{x:Static sys:DateTime.Today}"
+                                  DisplayFormatString="d"
+                                  xmlns:sys="clr-namespace:System;assembly=mscorlib"/>
+                </Grid>
+
+                <!-- الصف الثاني: حضور/غياب + تاريخ بدء الفترة + إعادة إحتساب -->
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- GroupBox1 - حضور / غياب -->
+                    <Border x:Name="GroupBox1"
+                            Grid.Column="0"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="8,4">
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center">
+                            <RadioButton x:Name="RdAttend"
+                                         Content="🚢 مراكب تم تسجيل حضورها"
+                                         Style="{StaticResource ModernRadio}"
+                                         IsChecked="True"
+                                         Checked="RdAttend_Checked"/>
+
+                            <RadioButton x:Name="RbAbsent"
+                                         Content="⚠️ مراكب لم يسجل حضورها"
+                                         Style="{StaticResource RedRadio}"
+                                         Checked="RbAbsent_Checked"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- تاريخ بدء الفترة -->
+                    <TextBlock x:Name="Label2"
+                               Grid.Column="2"
+                               Text="📅 تاريخ بدء الفترة"
+                               Style="{StaticResource FieldLabel}"
+                               Margin="0,0,8,0"/>
+
+                    <dxe:DateEdit x:Name="txtLastDate"
+                                  Grid.Column="3"
+                                  Height="32"
+                                  FontSize="12"
+                                  IsEnabled="False"
+                                  EditValue="{x:Static sys:DateTime.Today}"
+                                  DisplayFormatString="d"
+                                  xmlns:sys="clr-namespace:System;assembly=mscorlib"/>
+
+                    <!-- إعادة إحتساب الرحلات -->
+                    <Button x:Name="btnResetPeriod"
+                            Grid.Column="5"
+                            Content="🔄 إعادة إحتساب الرحلات"
+                            Style="{StaticResource DarkBtn}"
+                            Width="180"
+                            Click="btnResetPeriod_Click"/>
+                </Grid>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Panel2 - جدول المراكب (dgvAttendM)         -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border x:Name="Panel2"
+                Grid.Row="1"
+                Background="White"
+                Margin="8,6,8,0"
+                CornerRadius="10"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- عنوان الجدول -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource HeaderBrush}"
+                        CornerRadius="10,10,0,0">
+                    <TextBlock Text="⚓ قائمة المراكب"
+                               Foreground="White"
+                               FontSize="14" FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Margin="14,0"/>
+                </Border>
+
+                <!-- DataGrid -->
+                <DataGrid x:Name="dgvAttendM"
+                          Grid.Row="1"
+                          AutoGenerateColumns="False"
+                          ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                          RowStyle="{StaticResource DgvRow}"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          FlowDirection="RightToLeft"
+                          Background="White"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E8EBF5"
+                          AlternatingRowBackground="#F8F9FD"
+                          MouseLeftButtonUp="dgvAttendM_CellClick">
+                    <DataGrid.Columns>
+
+                        <!-- Column3 - رقم الدور (مخفي) -->
+                        <DataGridTextColumn x:Name="Column3"
+                                            Header="رقم الدور"
+                                            Binding="{Binding RoleNumber}"
+                                            Width="60"
+                                            Visibility="Collapsed"/>
+
+                        <!-- Column4 - المركب (يملأ المساحة) -->
+                        <DataGridTextColumn x:Name="Column4"
+                                            Header="🚢 المركب"
+                                            Binding="{Binding BoatName}"
+                                            Width="*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Column6 - رقم المركب (مخفي) -->
+                        <DataGridTextColumn x:Name="Column6"
+                                            Header="رقم المركب"
+                                            Binding="{Binding BoatNumber}"
+                                            Width="100"
+                                            Visibility="Collapsed"/>
+
+                        <!-- Column7 - id (مخفي) -->
+                        <DataGridTextColumn x:Name="Column7"
+                                            Header="id"
+                                            Binding="{Binding Id}"
+                                            Width="80"
+                                            Visibility="Collapsed"/>
+
+                        <!-- Column1 - InOutMode (مخفي) -->
+                        <DataGridTextColumn x:Name="Column1"
+                                            Header="InOutMode"
+                                            Binding="{Binding InOutMode}"
+                                            Width="80"
+                                            Visibility="Collapsed"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Footer - أزرار التحكم                       -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border Grid.Row="2"
+                Background="{StaticResource FooterBrush}"
+                Padding="12,8"
+                Margin="0,6,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- تحضير يدوي -->
+                <Button x:Name="btnManualAttend"
+                        Grid.Column="1"
+                        Content="✅ تحضير يدوي"
+                        Style="{StaticResource GreenBtn}"
+                        Width="140"
+                        Click="btnManualAttend_Click"/>
+
+                <!-- إخراج مركب -->
+                <Button x:Name="btnExit"
+                        Grid.Column="3"
+                        Content="🚪 إخراج مركب"
+                        Style="{StaticResource MaroonBtn}"
+                        Width="140"
+                        Click="btnExit_Click"/>
+            </Grid>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>
