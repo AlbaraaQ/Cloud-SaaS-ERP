@@ -41,6 +41,17 @@ docs/
 ├── AI_DEVELOPMENT_PROTOCOL.md           ← Mandatory working rules for any AI executor
 ├── ARCHITECTURE_DECISION_RECORDS.md     ← ADR log (why each key decision was taken)
 │
+├── desktop-parity/
+│   ├── README.md                        ← Status of the 00–11 parity programme
+│   └── PHASE_00_SURVEY.md … PHASE_11_EINVOICING.md
+│
+├── roadmap/
+│   ├── README.md                        ← START HERE for a new session (index + gates)
+│   ├── AUDIT_PHASES_01_04.md            ← Method audit of parity phases 1–4 vs 5–11
+│   ├── INCOMPLETE_INVENTORY.md          ← Every open item, measured on 2026-09-17
+│   ├── PLATFORM_CONSOLE_PLAN.md         ← Platform console + email service (P-C1…P-C12)
+│   └── MARKETING_SITE_PLAN.md           ← Marketing site + CMS + campaigns (P-M1…P-M10)
+│
 └── phases/
     ├── PHASE_01_PROMPT.md … PHASE_23_PROMPT.md   ← Self-contained executor prompts
 ```
@@ -57,6 +68,9 @@ executor needs and reference the canonical docs above.
 2. `PROJECT_CONTRACT.md` — naming, conventions, frozen decisions.
 3. The docs listed in your phase prompt under `REQUIRED INPUT DOCUMENTS`.
 4. `DATABASE_DESIGN.md` — always, before touching any table.
+5. `roadmap/README.md` — for work that is **not** a numbered cloud phase (platform
+   console, marketing site, parity remediation): it holds the current measurements,
+   the standing owner constraints, and the definition of “done”.
 
 ---
 
