@@ -172,7 +172,7 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Accept (each part): every ported report matches desktop columns/filters; print-ready
   Arabic RTL; new tests + a re-runnable live script; a real route in the staff tree.
 
-## Phase 11 — Zatca / ETA / integrations 🟡 parts one–three done (2026-09, `PHASE_11_EINVOICING.md`)
+## Phase 11 — Zatca / ETA / integrations 🟡 parts one–three and five done (2026-09, `PHASE_11_EINVOICING.md`)
 
 - [x] Desktop (part one): `frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160),
   `Class/ZatcaService.cs` (546), `Class/ZatcaCredential.cs`,
@@ -206,7 +206,25 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   `rptInvSumByClient.repx`; and `POST /einvoice/sync` (permission `einvoice.submit`) is
   🔄 مزامنة ZATCA, which files the ticked rows and answers `sent` / `failed` / `skipped`
   per row. (16 tests + 53 live checks.)
-- [ ] Part four — 🇪🇬 `frmEtaSetting` + `EtaService` + `EtaReciptService`.
-- [ ] Part five — 💳 `Geidea.cs` · `NeoleapService.cs` · `WhatsAppSender.cs`.
+- [x] Part five — 💳 بوابات الدفع: `frmSettings.xaml` L1726-L1831
+  («إعدادات جيديا» + GroupBox «NeoLeap») with `Class/Geidea.cs` (57) and
+  `Class/NeoleapService.cs` (165), and the two POS save paths that charge a card
+  (`frmPOSBill.xaml.cs` L460-L492, `frmPOSPay.xaml.cs` L428-L441). Migration `0064` adds
+  `payment_gateway_settings` (the desktop's `GediaSetting` and `SettingNeoleap` rows, one
+  per tenant and provider) and `payment_gateway_transactions` — the log the desktop never
+  kept. `gateways/geidea.ts` speaks the provider's published API (KSA host
+  `https://api.ksamerchant.geidea.net`: create session, query the order by
+  `MerchantReferenceId`, HMAC-SHA256 signature) and `gateways/neoleap.ts` speaks the
+  connector's own `SALE` request and reads `00` / `01` / `02` back. Six endpoints:
+  `GET /payment-gateways`, `PUT /payment-gateways/:provider` (💾 حفظ),
+  `POST …/:provider/test` (🧪 TEST · 🧪 Test), `POST …/:provider/sale` (💳, settling an
+  approved amount on the invoice once), `GET /payment-gateways/transactions` (📜) and
+  `POST /payment-gateways/transactions/:id/refresh` (🔄). Staff
+  `/settings/payment-gateways`. (16 tests + 64 live checks.)
+- [⛔] Part four — 🇪🇬 `frmEtaSetting` + `EtaService` + `EtaReciptService`: **out of
+  scope by decision** — the product targets Saudi Arabia (ZATCA) today; the sources stay
+  listed in `PHASE_11_EINVOICING.md` §1 and the reason is recorded in §10. The two
+  ETA-only calls (🚫 إلغاء الفاتورة · ❌ رفض الفاتورة) go with it.
+- [ ] Part six — 📱 `WhatsAppSender.cs` (267): sending an invoice to a customer.
 - [ ] Accept: onboarding → sign → send → poll → credit/debit-note flow certified
-  against the Fatoora simulator; ETA sale receipts; payment-gateway tender in POS.
+  against the Fatoora simulator; payment-gateway tender in POS; WhatsApp delivery.

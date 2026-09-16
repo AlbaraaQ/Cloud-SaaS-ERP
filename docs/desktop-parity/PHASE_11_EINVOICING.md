@@ -12,8 +12,18 @@
 (§5). (3) «🔄 مزامنة الفواتير - ZATCA» من `Form_WPF/frmInvsSyncStatusZatca.xaml` (559) +
 `.xaml.cs` (1165): تقريرٌ مسجّل في محرّك التقارير بالأعمدة والمرشّحات نفسها، و
 `POST /einvoice/sync` يرسل ما يختاره الكاشير، و**16** اختباراً و**53** نقطة تحقّق حيّة،
-وشاشة `/settings/zatca/status` (§6). الأجزاء مبيّنة في §3، ومعايير القبول في §8، وما
-أُجِّل عن قصد في §9.
+وشاشة `/settings/zatca/status` (§6). (5) «💳 بوابات الدفع — جيديا · NeoLeap» من
+`Form_WPF/frmSettings.xaml` (L1726-L1831) و`.xaml.cs` (`BtnSaveGedia_Click` L2456 ·
+`testGedia` L2498 · `BtnTestGedia_Click` L2513 · `Btnsavneoleap_Click` L2535 ·
+`Btntestneoleap_Click` L4047) و`Class/Geidea.cs` (57) و`Class/NeoLeapService.cs`
+(165): جدولان (ترحيل `0064`)، وستة مسارات، و**16** اختباراً و**64** نقطة تحقّق حيّة،
+وشاشة `/settings/payment-gateways` (§7). الأجزاء مبيّنة في §3، ومعايير القبول في §9،
+وما أُجِّل عن قصد في §10.
+
+> **قرار:** 🇪🇬 مصر (`frmEtaSetting` · `EtaService` · `EtaReciptService`) **خارج
+> النطاق** — النظام موجّهٌ اليوم للسعودية (زاتكا)، فلا تُبنى بوابةٌ مصرية قبل أن
+> يُطلب ذلك؛ ويتبعها نداءا 🚫 إلغاء الفاتورة و❌ رفض الفاتورة لأنهما على وثيقة ETA.
+> مصادرها مثبتة في §1 وسببُ الإسقاط في §10.
 
 الغرض: نقل **التأهيل والإرسال** كما يفعل الديسكتوب — لا اختراع مسارٍ جديد. محرّك الفاتورة
 الإلكترونية موجود في السحابة منذ الإصدار الأول (`modules/einvoicing` بوثيقة UBL 2.1
@@ -31,9 +41,10 @@
 | إرسال الفاتورة | `Class/ZatcaService.cs` (546) — `IntegrateInvoice` L78 · `CallReportingAPI` L371/L377 · `LoadZatcaCredential` L430 · `GetEncodedInvoiceQRCode` L460 · `CallComplianceInvoiceAPI` L900 · `Class/InvoiceOper.cs` `SendZatca` L2209 |
 | نماذج الشهادة | `Class/ZatcaCredential.cs` (21: `CSR` · `PrivateKey` · `CSID` · `Secret`) · `Class/ZatcaResponse.cs` (11) · `Class/CustZatcaEndDate.cs` |
 | الجداول الثلاثة | `SettingZatca` (ID=1) · `CSRProperties` (Id=1) · `ZatcaCredential` (ID=1) — تُكتب من `frmZatcaSetting.xaml.cs` L200 وL230 وL262 |
-| مصر | `Form_WPF/frmEtaSetting.xaml` (348) + `.xaml.cs` (292) · `Class/EtaService.cs` (379) · `Class/EtaReciptService.cs` (268) · `EtaResultData.cs` |
+| مصر — **خارج النطاق** (§10) | `Form_WPF/frmEtaSetting.xaml` (348) + `.xaml.cs` (292) · `Class/EtaService.cs` (379) · `Class/EtaReciptService.cs` (268) · `EtaResultData.cs` |
 | حالة المزامنة | `Form_WPF/frmInvsSyncStatusZatca.xaml` (559) + `.xaml.cs` (1165) — `ShowInvs` L159 · `GetZatcaMessage` L310 · `RecalculateNetSummary` L329 · `btnShow` L347 · `btnSync` L392 · `BtnDetails` L414 · `SendZatcaAsync` L442 · `BuildZatcaResponse` L527 · `GetZatcaStartDate` L938 · `BuildWhereClause` L863 · `LoadInvTypes` L87 · `ExportToCsv` L1078 · `PrintReport` L970 · `Reports/rptInvSumByClient.repx` · `Form_WPF/frmSentEinvoice.xaml` |
-| التكاملات | `Class/Geidea.cs` (57) · `Class/NeoleapService.cs` (165) · `Class/WhatsAppSender.cs` (267) |
+| بوابات الدفع | `Form_WPF/frmSettings.xaml` L1726-L1831 («إعدادات جيديا» + GroupBox «NeoLeap») · `frmSettings.xaml.cs` L2456-L2620 وL4047-L4062 · `Class/Geidea.cs` (57) · `Class/NeoleapService.cs` (165) · `frmPOSBill.xaml.cs` L460-L492 · `frmPOSPay.xaml.cs` L428-L441 |
+| واتساب — الجزء السادس | `Class/WhatsAppSender.cs` (267) · `Class/Session.cs` L12-L21 · `frmInvSale.xaml.cs` L3177-L3188 |
 
 > **تنبيه:** كل نداءات البوابة في الديسكتوب تمرّ بمكتبة `AuditorAPI` المترجَمة
 > (`CSRGenerator` · `ApiRequestLogic` · `ZatcaIntegrationSDK`)، وهي ليست في هذا
@@ -68,8 +79,9 @@
 | 1 | ⚙️ إعدادات الربط الضريبي — `frmZatcaSetting` (الإعدادات · خصائص CSR · التأهيل الأربع · إيقاف الربط · التجديد) | ✅ مُنجز (§4) |
 | 2 | 🧾 الإرسال والتوقيع والسلسلة — `frmSentEinvoice` + `ZatcaService.IntegrateInvoice` (ترحيل/تخليص، QR بثمانية وسوم، إعادة المحاولة) | ✅ مُنجز (§5) |
 | 3 | 📊 حالة المزامنة — `frmInvsSyncStatusZatca` (شبكة الفواتير وحالاتها ومرشّحاتها) | ✅ مُنجز (§6) |
-| 4 | 🇪🇬 مصر — `frmEtaSetting` + `EtaService` + `EtaReciptService` | ⬜ |
-| 5 | 💳 التكاملات — `Geidea` · `NeoleapService` · `WhatsAppSender` | ⬜ |
+| 4 | 🇪🇬 مصر — `frmEtaSetting` + `EtaService` + `EtaReciptService` | ⛔ خارج النطاق (§10) |
+| 5 | 💳 بوابات الدفع — `Geidea` · `NeoleapService` (إعدادات · 🧪 اختبار · 💳 تحصيل · سجل) | ✅ مُنجز (§7) |
+| 6 | 📱 إرسال الفاتورة عبر واتساب — `WhatsAppSender` | ⬜ |
 
 ## 4. الجزء الأول — ⚙️ إعدادات الربط الضريبي - زاتكا ZATCA
 
@@ -334,7 +346,94 @@ ZATCA» في الرأس، و«🔍 خيارات البحث» في لوحةٍ ع�
 | التحقّق الحيّ | `scripts/verify-einvoice-zatca-sync.mjs` (53 نقطة في أحد عشر قسماً) |
 | الشاشة | `apps/staff/app/settings/zatca/status/page.tsx` + `apps/staff/lib/einvoice.ts` |
 
-## 7. الأمان
+## 7. الجزء الخامس — 💳 بوابات الدفع (جيديا · NeoLeap)
+
+### 7.1 النافذة وما تكتبه
+
+`Form_WPF/frmSettings.xaml` L1726-L1831 تابٌ بعنوان «إعدادات جيديا» وفيها بطاقتان: بطاقة
+«💳 إعدادات جيديا» وفيها «تفعيل الدفع عن طريق جيديا» و«طباعة ايصال» و«المنفذ» و«المبلغ»
+وزرّا «🧪 TEST» و«💾 حفظ»؛ و`GroupBox` بعنوان «NeoLeap» وفيها «تفعيل NeoLeap» و«طباعة إيصال
+NeoLeap» و«المنفذ» و«المبلغ» و«Token» وصندوق «Logging» وزرّا «🧪 Test» و«💾 حفظ».
+
+`BtnSaveGedia_Click` (L2456) يكتب صفّ `GediaSetting (id=1)` —
+`IsGediaActive` · `GediaPort` · `GediaEnableReceiptPrint` — و`Btnsavneoleap_Click` (L2535)
+يحذف صفّ `SettingNeoleap (id=1)` ويكتبه من جديد — `IsNeoLeapActive` · `NeoLeapPort` ·
+`NeoLeapEnableReceiptPrint` · `neoleaptoken`. وكلتاهما ترفضان الحفظ بغير كلمة سرّ المدير:
+«نأسف ليس لديك الصلاحية لتغيير الإعدادات».
+
+التحصيل نفسه ليس في هذه النافذة: `frmPOSBill.xaml.cs` L460-L492 و`frmPOSPay.xaml.cs`
+L428-L441 يطلبان البطاقة في أثناء حفظ الفاتورة، ولا يمرّ الحفظ إلا برمزٍ مقبول.
+
+### 7.2 من الديسكتوب إلى السحابة
+
+| الديسكتوب | السحابة | ملاحظة |
+|---|---|---|
+| `GediaSetting` (id=1) · `SettingNeoleap` (id=1) | `payment_gateway_settings` بمفتاح `(tenant_id, provider)` | الصفّ الوحيد يصير صفّاً لكل مؤسسة؛ الأعمدة نفسها |
+| `Geidea.ConnectGeidea(Payment)` — `"<هللة>;1;1!"` على COM1 بسرعة 38400 عبر `madaapi.dll`، والجواب خمسة بايتات | `gateways/geidea.ts` — نداءات جيديا المنشورة | لا COM على خادم؛ والمال والرموز هي هي |
+| الرموز المقبولة `000 · 001 · 003 · 007 · 087 · 089`، وإلا «العملية مرفوضة، يرجى إعادة الدفع» | `responseCode` · `detailedResponseCode` — `000` نجاح، وما عداه خطأ | المفردات نفسها |
+| `NeoleapService.ProcessSale` — `requestType` · `merchantToken` · `amount` · `ecrRef` · `ecrToken` · `printFlag` · `cashBack` | `gateways/neoleap.ts` — JSON الطلب نفسه | النقل كان داخل `neoleapconnector` المترجَمة، فصار عنواناً يُضبط |
+| `ParseResponse` — `ErrorMsg` ثم `TransactionResult.StatusCode` `00` · `01` · `02` | الحقول نفسها: `ApprovalCode` · `RRN` · `STAN` · `CardScheme.English` · `PAN` · `TransactionType.English` | لا «حالة معلّقة» عند نيوليب: الجهاز يجيب في الحال |
+| «المنفذ» (`txtportneoleap`) | `base_url`، ويفترض `http://127.0.0.1:<المنفذ>` | المنفذ وحده ليس عنواناً |
+| «Logging» (صندوقٌ في النافذة) | `payment_gateway_settings.last_test` | الجواب يبقى بعد إغلاق النافذة |
+| — | `payment_gateway_transactions` | **ليس في الديسكتوب**: لم يكن يسجّل شيئاً؛ طبع إيصالاً ومضى |
+
+### 7.3 المسارات
+
+| المسار | الصلاحية | ما يفعل |
+|---|---|---|
+| `GET /payment-gateways` | `pos.config.manage` | البطاقتان، والمفتاح مقنَّع |
+| `PUT /payment-gateways/:provider` | `pos.config.manage` | 💾 حفظ |
+| `POST /payment-gateways/:provider/test` | `pos.config.manage` | 🧪 TEST · 🧪 Test، وجوابه في «Logging» |
+| `POST /payment-gateways/:provider/sale` | `sales.invoice.pay` | 💳 التحصيل، وتقييده على الفاتورة إن مُرِّرت |
+| `GET /payment-gateways/transactions` | `sales.view` | 📜 السجل |
+| `POST /payment-gateways/transactions/:id/refresh` | `sales.invoice.pay` | 🔄 تحديث حالة جلسةٍ لم يدفعها صاحبها بعد |
+
+جيديا على مواصفتها المنشورة (https://docs.geidea.net): `POST
+/payment-intent/api/v2/direct/session` لفتح الجلسة، و`GET
+/pgw/api/v1/direct/order?MerchantReferenceId=…` لسؤالها، وصفحة الدفع
+`https://www.ksamerchant.geidea.net/hpp/checkout/?<sessionId>`؛ وتوقيعها
+`base64(HMAC-SHA256(كلمة السرّ، المعرّف العام ‖ المبلغ بعشرتين ‖ العملة ‖ المرجع ‖
+الطابع الزمني))`. ونيوليب على عقدها كما يظهر في `NeoleapService.cs`: طلب `SALE` واحد
+وجوابه `00`/`01`/`02`، بلا مسار حالة — فلا نخترع واحداً.
+
+### 7.4 خمس قواعد
+
+1. **«المنفذ» وحده لا يكفي، ولا يمنع.** الديسكتوب كان ينادي منفذاً على جهازه؛ والخادم
+   ينادي عنواناً، فإن لم يُكتب اشتُقّ من المنفذ (`http://127.0.0.1:<المنفذ>`).
+2. **🧪 Simulation مفتاحٌ عام، وهو مطفأٌ أبداً في الاختبارات.** كما في زاتكا: لا بوابة
+   حقيقيّة تُطلب، ولا بطاقة تُخصم. وفي المحاكاة يُقرَّر جواب صاحب البطاقة من بادئة
+   `ecrRef` (`DECLINE-` · `CANCEL-` · `ERROR-` · `UNKNOWN-` · `PENDING-`) — السبيل الوحيد
+   لاختبار الرفض بلا بطاقة.
+3. **المرجع (`ecrRef`) يحمي من الخصم مرتين.** هو مفتاحٌ فريد لكل `(مستأجر · بوابة)`؛
+   فالضغطتان على 💳 بمرجعٍ واحد هما عمليةٌ واحدة (`409 PAYMENT_REFERENCE_DUPLICATED`).
+4. **المقبولة تُقيَّد مرةً واحدة.** `SalesService.addPayment` بالوسيلة `card` وبمفتاح
+   التكرار نفسه، ثم يُوسَم الصفّ `settled` — فلا يُدفع مرتين وإن أُعيد السؤال.
+5. **المرفوضة تُسجَّل ولا تُبتلع.** «العملية مرفوضة، يرجى إعادة الدفع» كانت صندوقَ رسالةٍ
+   يمحوه الضغط على «موافق»؛ وهنا تبقى في السجل بكلمة البوابة (`Declined` ·
+   `Cancelled or Error` · «تعذّر الوصول») وبردّها الخامّ بعد حذف السرّ منه.
+
+### 7.5 ما اخترعناه
+
+| التسمية | السبب |
+|---|---|
+| «عنوان البوابة» بجانب «المنفذ» | المنفذ وحده ليس عنواناً لخدمةٍ على الشبكة |
+| «رابط الإرجاع» (callbackUrl) | صفحة جيديا المُستضافة تحتاج مكاناً تردّ إليه؛ والديسكتوب قرأ جوابه من الكبل فلم يحتجها |
+| 🧪 Simulation (مفتاح عام) | لا يوجد في نافذة الدفع؛ مأخوذٌ من نافذة زاتكا نفسها، وهو الضمان ألّا تُخصم بطاقةٌ حقيقية في عرضٍ أو اختبار |
+| بادئات المرجع في المحاكاة (`DECLINE-` · `CANCEL-` · `ERROR-` · `UNKNOWN-` · `PENDING-`) | الرفض قرارُ صاحب البطاقة على جهازه؛ ولا سبيل لاختباره إلا أن يُطلب |
+| «📜 آخر العمليات» | الديسكتوب لم يسجّل شيئاً؛ والسجل إضافةٌ مُلزِمة لخادمٍ يتولّى المال |
+
+### 7.6 الاختبارات والتحقّق الحيّ
+
+| | |
+|---|---|
+| الاختبارات | `apps/api/test/payment-gateways.spec.ts` (16) |
+| البوابتان | `apps/api/src/modules/payments/gateways/geidea.ts` · `neoleap.ts` · `index.ts` |
+| المسار | `apps/api/src/modules/payments/payments.controller.ts` · `payments.service.ts` |
+| الترحيل | `packages/database/migrations/0064_payment_gateways.sql` + `packages/database/src/schema/payments.ts` |
+| التحقّق الحيّ | `scripts/verify-payment-gateways.mjs` (64 نقطة في أحد عشر قسماً) |
+| الشاشة | `apps/staff/app/settings/payment-gateways/page.tsx` + `apps/staff/lib/payment-gateways.ts` |
+
+## 8. الأمان
 
 - الأسرار (المفتاح الخاص · CSID · السرّ، والثلاثة للإنتاج) مشفّرة بـ `aes-256-gcm` عند
   التخزين، ولا تُقرأ إلا مقنّعة `****` + آخر أربعة أحرف.
@@ -352,11 +451,12 @@ ZATCA» في الرأس، و«🔍 خيارات البحث» في لوحةٍ ع�
 - التصديرُ صلاحيةٌ وحدها: الشبكة تُقرأ بـ`reporting.view`، وملفُّها يُنتَج بـ
   `reporting.export.execute` — وهو فرقٌ مختبر بصلاحية المحاسب.
 
-## 8. معايير القبول
+## 9. معايير القبول
 
-1. كل تسميةٍ في الشاشات الثلاث من `frmZatcaSetting.xaml` و`frmSentEinvoice.xaml` و
-   `frmInvsSyncStatusZatca.xaml` نصّاً، وما اخترعناه مبرَّر في §4.5 و§5.5 و§6.5.
-2. ثلاثة عشر مساراً حقيقياً خلف الشاشات، لا محاكاة.
+1. كل تسميةٍ في الشاشات الأربع من `frmZatcaSetting.xaml` و`frmSentEinvoice.xaml` و
+   `frmInvsSyncStatusZatca.xaml` و`frmSettings.xaml` (L1726-L1831) نصّاً، وما اخترعناه
+   مبرَّر في §4.5 و§5.5 و§6.5 و§7.5.
+2. تسعة عشر مساراً حقيقياً خلف الشاشات، لا محاكاة.
 3. طلب التوقيع يقرأه `openssl` ويتحقق من توقيعه.
 4. الشبكة والملفّ والورقة من استعلامٍ واحد مسجّل في محرّك التقارير؛ و«الصافي» مجموعٌ من
    الصفوف المعروضة فلا يخالفها.
@@ -365,10 +465,14 @@ ZATCA» في الرأس، و«🔍 خيارات البحث» في لوحةٍ ع�
 6. الإرسال على الحقيقة: ضريبية إلى التخليص تعود بوثيقة مُصادَقة ورمزها منها، ومبسّطة إلى
    الترحيل تحتفظ برمزها المحسوب؛ والسلسلة تمشي خطوةً خطوة تحت `FOR UPDATE`؛ و🔄 مزامنة
    ZATCA تبلّغ ما أُرسل وما لم يُقبل سطراً سطراً.
-7. 50 اختباراً (18 + 16 + 16) + 170 نقطة تحقّق حيّة (64 + 53 + 53)، والسكربتات الثلاث
-   تُعاد تشغيلها بلا أثر.
-8. ثلاثة طرقٍ حقيقيّة تحت `/settings/zatca` بصلاحيّات `einvoice.view` و`einvoice.manage`
-   و`einvoice.submit`.
+7. 66 اختباراً (18 + 16 + 16 + 16) + 234 نقطة تحقّق حيّة (64 + 53 + 53 + 64)، والسكربتات
+   الأربعة تُعاد تشغيلها بلا أثر.
+8. أربعة طرقٍ حقيقيّة تحت `/settings/zatca` و`/settings/payment-gateways` بصلاحيّات
+   `einvoice.view` و`einvoice.manage` و`einvoice.submit` و`pos.config.manage` و
+   `sales.invoice.pay`.
+9. 💳 بوابة الدفع تُنادى على الحقيقة (جلسة جيديا وسؤالها على مواصفتها المنشورة، و`SALE`
+   نيوليب بعقدها)، والمرفوضة تُسجَّل بكلمة البوابة، والمقبولة تُقيَّد على الفاتورة مرةً
+   واحدة.
 
 1. كل تسميةٍ في الشاشة من `frmZatcaSetting.xaml` نصّاً، وما اخترعناه مبرَّر في §4.5.
 2. تسعة مسارات حقيقية خلف الشاشة، لا محاكاة.
@@ -378,14 +482,16 @@ ZATCA» في الرأس، و«🔍 خيارات البحث» في لوحةٍ ع�
 5. 18 اختباراً + 64 نقطة تحقّق حيّة، والسكربت يُعاد تشغيله بلا أثر.
 6. طريقٌ حقيقي في شجرة `/settings/zatca` بصلاحية `einvoice.view`.
 
-## 9. ما أُجِّل عن قصد
+## 10. ما أُجِّل عن قصد
 
 - 🏗️ Industry لا يُملأ من بطاقة المنشأة: لا عمودَ للنشاط التجاري في السحابة بعد؛
   ويُبلَّغ عنه كتحذير لا كفشل.
 - 🚫 إلغاء الفاتورة و❌ رفض الفاتورة من `frmSentEinvoice`: نداءان على وثيقة ETA، لا على
-  زاتكا — يأتيان مع الجزء الرابع (§5.1).
+  زاتكا — وهما خارج النطاق مع مصر نفسها (أدناه).
 - 🏦 المستودع و«نوع العملية» يظهران في الورقة المطبوعة ولا يظهران في الشبكة — كما
   يُخفيهما الديسكتوب (`DgvProcType` · `DgvStore` بـ`Visible="False"`).
-- 🇪🇬 مصر (`frmEtaSetting` · `EtaService` · `EtaReciptService`) والتكاملات
-  (`Geidea` · `NeoleapService` · `WhatsAppSender`) — الجزءان الرابع والخامس.
+- 🇪🇬 مصر (`frmEtaSetting` · `EtaService` · `EtaReciptService`) — **خارج النطاق بقرارٍ
+  صريح**: النظام موجّهٌ اليوم للسعودية (زاتكا)، فلا تُبنى بوابةٌ مصرية قبل أن يُطلب ذلك.
+  ملفاتها مثبتة في §1: تُقرأ يوم تُطلب، ويبقى `authority='eta'` في جداول الإرسال قائماً.
+- 📱 واتساب (`WhatsAppSender`) — الجزء السادس: نقلُ الفاتورة إلى العميل عبر واتساب.
 - توقيع XAdES المغلَّف وكتلة `UBLExtensions`: التوقيع يُنتَج، وتغليفُه لم يُنجز بعد.

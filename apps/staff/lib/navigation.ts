@@ -1581,6 +1581,17 @@ const settings: ModuleNode = {
             endpoint: 'GET /reports/einvoice-sync-status · POST /einvoice/sync',
           },
         ),
+        screen(
+          'payment-gateways',
+          'بوابات الدفع — جيديا · NeoLeap',
+          'Payment gateways',
+          '/settings/payment-gateways',
+          'ready',
+          {
+            permission: 'pos.config.manage',
+            endpoint: 'GET /payment-gateways · PUT · POST /:provider/test · POST /:provider/sale',
+          },
+        ),
       ],
     },
     {

@@ -935,6 +935,56 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   قصد: 🚫 إلغاء الفاتورة و❌ رفض الفاتورة (نداءان على وثيقة ETA — الجزء الرابع)،
   وتوقيع XAdES المغلَّف وكتلة `UBLExtensions`.
 
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء الخامس: 💳 بوابات الدفع (جيديا ·
+  NeoLeap)** (`Form_WPF/frmSettings.xaml` L1726-L1831: تاب «إعدادات جيديا» و`GroupBox`
+  «NeoLeap» فيه · `frmSettings.xaml.cs` `BtnSaveGedia_Click` (L2456) · `testGedia`
+  (L2498) · `BtnTestGedia_Click` (L2513) · `Btnsavneoleap_Click` (L2535) ·
+  `Btntestneoleap_Click` (L4047) · `Class/Geidea.cs` (57) · `Class/NeoleapService.cs`
+  (165) · `frmPOSBill.xaml.cs` L460-L492 · `frmPOSPay.xaml.cs` L428-L441). **كان
+  الديسكتوب يخصم البطاقة في أثناء حفظ الفاتورة ولا يسجّل شيئاً**: يطبع إيصالاً، ويترك
+  طريقة الدفع في الفاتورة تقول «شبكة». فحُفظ صفّاه (`GediaSetting` و`SettingNeoleap`)
+  كما هما — «تفعيل الدفع عن طريق جيديا» · «طباعة ايصال» · «المنفذ» · «المبلغ» ·
+  «Token» · «Logging» — وأُضيف **السجلّ الذي لم يكن له**: ترحيل `0064` يضيف
+  `payment_gateway_settings` بمفتاح `(tenant_id, provider)` و`payment_gateway_transactions`
+  بمرجعٍ فريد لكل `(مستأجر · بوابة)`، حتى لا تكون الضغطتان على 💳 خصمين. **وجيديا
+  تُنادي على مواصفتها المنشورة**: `POST /payment-intent/api/v2/direct/session` لفتح
+  الجلسة بتوقيع `base64(HMAC-SHA256(كلمة السرّ، المعرّف العام ‖ المبلغ بعشرتين ‖ العملة ‖
+  المرجع ‖ الطابع))`، و`GET /pgw/api/v1/direct/order?MerchantReferenceId=…` لسؤالها،
+  وصفحة الدفع `…/hpp/checkout/?<sessionId>` — فالجلسة تبقى ⏳ «بانتظار الدفع» حتى يدفع
+  صاحب البطاقة، و🔄 `POST /payment-gateways/transactions/:id/refresh` يسألها مرّةً أخرى.
+  **ونيوليب على عقدها كما في ملفّها**: طلب `SALE` واحد (`requestType` · `merchantToken` ·
+  `amount` · `ecrRef` · `ecrToken` · `printFlag` · `cashBack`) وجوابه يُقرأ بمنطق
+  `ParseResponse` نفسه — `ErrorMsg`، ثم `TransactionResult.StatusCode` `00` مقبولة ·
+  `01` مرفوضة · `02` ملغاة — ويُخرج `ApprovalCode` · `RRN` · `STAN` ·
+  `CardScheme.English` · `PAN` (مقنَّعاً `****4242`) · `TransactionType.English`؛
+  أمّا النقل فكان داخل `neoleapconnector` المترجَمة، فصار عنواناً يُضبط، و«المنفذ»
+  يبنيه (`http://127.0.0.1:<المنفذ>`)، ولا مسار حالة يُخترع لأنّ الجهاز يجيب في الحال.
+  **و🧪 Simulation مطفأٌ أبداً في الاختبارات** (كما في زاتكا): لا بوابة تُطلب ولا بطاقة
+  تُخصم، وجواب صاحب البطاقة يُقرَّر من بادئة `ecrRef` (`DECLINE-` · `CANCEL-` ·
+  `ERROR-` · `UNKNOWN-` · `PENDING-`) — السبيل الوحيد لاختبار الرفض بلا بطاقة.
+  **والمقبولة تُقيَّد مرّةً واحدة** عبر `SalesService.addPayment` بالوسيلة `card`
+  ومفتاح التكرار نفسه، ثم يُوسَم الصفّ `settled`، فلا تُدفع الفاتورة مرتين وإن أُعيد
+  السؤال. **والمرفوضة تُسجَّل ولا تُبتلع**: «العملية مرفوضة، يرجى إعادة الدفع» كانت
+  صندوقَ رسالةٍ يمحوه «موافق»، وصارت صفّاً بكلمة البوابة (`Declined` ·
+  `Cancelled or Error` · «تعذّر الوصول إلى بوابة NeoLeap») وبردّها الخامّ بعد حذف السرّ
+  منه. **ستة مسارات بثلاث صلاحيّات**: `GET /payment-gateways` و`PUT …/:provider` و
+  `POST …/:provider/test` بـ`pos.config.manage` (الإعدادات للمدير)، و
+  `POST …/:provider/sale` و`POST …/transactions/:id/refresh` بـ`sales.invoice.pay`
+  (التحصيل للكاشير)، و`GET …/transactions` بـ`sales.view` (السجلّ لمن يقرأ) — مختبرة
+  بأدوارٍ حقيقيّة (المحاسب يقرأ ولا يُحصِّل، والكاشير يُحصِّل ولا يضبط البوابة).
+  وثمانية رفضٍ بعباراتها: بوابة موقوفة 409 `PAYMENT_GATEWAY_DISABLED` · مبلغٌ غير موجب
+  422 · فاتورة غير مرحَّلة 409 · أكثر من المتبقي 422 · مرجعٌ مكرَّر 409 · منفذٌ خارج
+  النطاق 422 · بوابة مجهولة 422 · مفتاحٌ لا يُفكّ 500. وشاشة
+  `/settings/payment-gateways` بتسميات النافذة وبطاقتيها وصندوق «Logging» و«📜 آخر
+  العمليات». `apps/api/test/payment-gateways.spec.ts` (**16** اختباراً) و
+  `scripts/verify-payment-gateways.mjs` (**64** نقطة تحقّق حيّة في أحد عشر قسماً، ثلاث
+  تشغيلات خضراء، تُعيد إعدادات البوابتين إلى خطّ أساسها). **934** اختبار API (كان 918) ·
+  36 staff · 71 contract · tsc وlint وbuild أخضران. **وقرارٌ صريح: 🇪🇬 مصر
+  (`frmEtaSetting` · `EtaService` · `EtaReciptService`) خارج النطاق** — النظام موجّهٌ
+  اليوم للسعودية، ويتبعه نداءا 🚫 إلغاء الفاتورة و❌ رفض الفاتورة لأنّهما على وثيقة
+  ETA؛ ومصادرها مثبتة في الوثيقة تُقرأ يوم تُطلب. ومؤجَّل: الجزء السادس (📱 واتساب)،
+  وتوقيع XAdES المغلَّف وكتلة `UBLExtensions`.
+
 * **المرحلة 11 — الفاتورة الإلكترونية، الجزء الثاني: 🧾 الإرسال والتوقيع والسلسلة**
   (`Form_WPF/frmSentEinvoice.xaml` (358) + `.xaml.cs` (304) · أعمدة
   `frmInvsSyncStatusZatca.xaml` (559) · `Class/ZatcaService.cs` `IntegrateInvoice`
