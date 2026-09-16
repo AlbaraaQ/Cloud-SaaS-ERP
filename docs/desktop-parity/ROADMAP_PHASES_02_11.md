@@ -172,7 +172,7 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Accept (each part): every ported report matches desktop columns/filters; print-ready
   Arabic RTL; new tests + a re-runnable live script; a real route in the staff tree.
 
-## Phase 11 — Zatca / ETA / integrations 🟡 parts one–three and five done (2026-09, `PHASE_11_EINVOICING.md`)
+## Phase 11 — Zatca / ETA / integrations 🟡 parts one–three, five and six done (2026-09, `PHASE_11_EINVOICING.md`)
 
 - [x] Desktop (part one): `frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160),
   `Class/ZatcaService.cs` (546), `Class/ZatcaCredential.cs`,
@@ -223,8 +223,22 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   `/settings/payment-gateways`. (16 tests + 64 live checks.)
 - [⛔] Part four — 🇪🇬 `frmEtaSetting` + `EtaService` + `EtaReciptService`: **out of
   scope by decision** — the product targets Saudi Arabia (ZATCA) today; the sources stay
-  listed in `PHASE_11_EINVOICING.md` §1 and the reason is recorded in §10. The two
+  listed in `PHASE_11_EINVOICING.md` §1 and the reason is recorded in §11. The two
   ETA-only calls (🚫 إلغاء الفاتورة · ❌ رفض الفاتورة) go with it.
-- [ ] Part six — 📱 `WhatsAppSender.cs` (267): sending an invoice to a customer.
+- [x] Part six — 📱 واتساب: `frmInvSale.xaml` L1190 «💬 واتساب» and its handler
+  (`frmInvSale.xaml.cs` L3124-L3199 `printwhatsapp`), behind `Class/WhatsAppSender.cs`
+  (267 — Selenium ChromeDriver over a persistent `chrome-profile`) and
+  `Class/Session.cs` (L12-L31). Migration `0065` adds `whatsapp_settings` — the number,
+  the sealed token, the country code, 📎 and 🧪 — and `whatsapp_messages`, the log the
+  desktop never kept. `modules/integrations/whatsapp/**` speaks the Cloud API as
+  published (Graph `v21.0`: text message, `POST /{phone-number-id}/media` upload, document
+  message, and `GET /{phone-number-id}` for 🧪 اختبار), builds the desktop's own greeting
+  («🧾 مرحباً … هذه فاتورتك رقم … من …») and dials the number the desktop's own rule
+  produces (`if (!text.StartsWith("966")) text = "966" + text.TrimStart('0');`). Five
+  endpoints: `GET`/`PUT /whatsapp/settings` (💾 حفظ), `POST /whatsapp/test` (🧪 اختبار),
+  `POST /whatsapp/send` (💬 واتساب, `sales.view` — whoever may open the invoice window)
+  and `GET /whatsapp/messages` (📜). Staff `/settings/whatsapp`, plus a «💬 واتساب» card
+  with its own 📜 سجل الإرسال on the invoice window itself. (17 tests + 71 live checks.)
 - [ ] Accept: onboarding → sign → send → poll → credit/debit-note flow certified
-  against the Fatoora simulator; payment-gateway tender in POS; WhatsApp delivery.
+  against the Fatoora simulator; payment-gateway tender in POS; WhatsApp delivery against
+  a live number (🧪 محاكاة is what the tests and the live script exercise today).

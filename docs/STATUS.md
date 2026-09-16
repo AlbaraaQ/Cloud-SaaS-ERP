@@ -935,6 +935,47 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   قصد: 🚫 إلغاء الفاتورة و❌ رفض الفاتورة (نداءان على وثيقة ETA — الجزء الرابع)،
   وتوقيع XAdES المغلَّف وكتلة `UBLExtensions`.
 
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء السادس: 📱 إرسال الفاتورة عبر واتساب**
+  (`Form_WPF/frmInvSale.xaml` L1190 «💬 واتساب» · `frmInvSale.xaml.cs`
+  `SendWhatsapp_Click` L3124-L3126 ثم `printwhatsapp` L3128-L3199 ·
+  `Class/WhatsAppSender.cs` (267) · `Class/Session.cs` L12-L31). **كان الديسكتوب يرسل
+  الفاتورة من متصفّح الكاشير**: `WhatsAppSender` يفتح Chrome على ملفّ تعريفٍ دائم
+  (`%LocalAppData%\MyApp\chrome-profile`، L43-L48)، فيجب أن يكون أحدهم قد مسح رمز QR
+  (`InitializeWhatsAppAsync` L66)، ثم ينتظر صندوق الكتابة خمساً وعشرين ثانية (L119-L142)
+  ويكتب الرسالة (L151-L153) ويمرّر ملفّ PDF إلى `input[type='file']` (L188)، ولا يسجّل
+  شيئاً: صندوق رسالة يمحوه «موافق». **فصار الاتصال إعداداً يُضبط مرّة**: ترحيل `0065`
+  يضيف `whatsapp_settings` (صفٌّ واحد لكل مستأجر: تفعيل · «عنوان الواتساب» Phone Number
+  ID · «الرمز» مشفّراً بـ`aes-256-gcm` ولا يُقرأ إلا مقنَّعاً · «رمز الدولة» · 📎 · 🧪)
+  و`whatsapp_messages` — **السجلّ الذي لم يكن له**: الرقم · النصّ · اسم المرفق وحالته ·
+  معرّف ميتا · الخطأ، فيُجاب «هل وصلت الفاتورة؟» من جدول لا من ذاكرة كاشير. **والنداء
+  على Cloud API كما نُشرت** (Graph `v21.0` على `https://graph.facebook.com`): رسالة نصّ،
+  ثم `POST /{phone-number-id}/media` لرفع الملفّ، ثم رسالة مستند، و`GET
+  /{phone-number-id}` ل🧪 اختبار — وهو سؤال «هل هذا الرقم لنا وهذا الرمز صالح له؟» الذي
+  لم يكن للديسكتوب جوابٌ عنه. **والتحية تحية الديسكتوب نصّاً**:
+  «🧾 مرحباً {custName}، هذه فاتورتك رقم {invRef} من {foundName}» (L3182-L3183) باسم
+  المنشأة من `companyProfiles.nameAr` كما كان من `Common.FoundationInfoDT.Rows[0]["nameA"]`.
+  **والرقم بقاعدته نفسها**: `0551234567` → `966551234567` بقاعدة
+  `if (!text.StartsWith("966")) text = "966" + text.TrimStart('0');` (L113-L116)، إلا أنّ
+  رمز الدولة صار إعداداً لا ثابتاً. **و🧪 محاكاة مفعلةٌ أبداً في الاختبارات**: لا رقم
+  حقيقي يُنادى، و«❌ الرقم غير مرتبط بحساب WhatsApp أو لم يتم تحميل المحادثة.» (L142)
+  يُسجَّل صفّاً لا صندوقاً. **وخمسة مسارات بصلاحيّتين**: `GET/PUT /whatsapp/settings`
+  و`POST /whatsapp/test` بـ`tenant.settings.manage` (الضبط لمن يملك الإعدادات)، و
+  `POST /whatsapp/send` و`GET /whatsapp/messages` بـ`sales.view` (الإرسال لمن يرى
+  الفاتورة — المحاسب والكاشير كلاهما). **وسبعة رفضٍ بعباراتها**: فاتورة غير مرحَّلة 409
+  `SALES_INVOICE_NOT_POSTED` «لا يمكن إرسال الفاتورة قبل ترحيلها — رحّلها أولاً.» ·
+  بوابة موقوفة 409 `WHATSAPP_DISABLED` «الرجاء تفعيل الإرسال عبر واتساب.» · بلا جوال
+  422 `WHATSAPP_PHONE_MISSING` «❌ لا يوجد رقم جوال للعميل» · رقمٌ تالف 422
+  `WHATSAPP_PHONE_INVALID` · غير مضبوطة 404 `WHATSAPP_NOT_CONFIGURED` · فاتورة غير
+  موجودة 404 · رمزٌ لا يُفكّ 500 `SECRET_DECRYPT_FAILED`. **وشاشتان**:
+  `/settings/whatsapp` بتسميات النافذة وصندوق «Logging»، وبطاقة «💬 واتساب» بسجلّها على
+  نافذة الفاتورة نفسها. `apps/api/test/whatsapp-invoice.spec.ts` (**17** اختباراً) و
+  `scripts/verify-whatsapp.mjs` (**71** نقطة تحقّق حيّة في أحد عشر قسماً، ثلاث تشغيلات
+  خضراء، تُعيد الإعدادات إلى خطّ أساسها). **951** اختبار API (كان 934) · 36 staff · 71
+  contract · tsc وlint وbuild أخضران. **وملفّ الفاتورة نصٌّ عربي UTF-8 لا PDF**: لا
+  مكتبة PDF في المشروع، وتصديرٌ على الخادم لملفٍّ عربي يحتاج خطّاً يشكّل الحروف،
+  والطباعة عندنا صفحة HTML يطبعها المتصفّح — و`text/plain` نوع مستندٍ تقبله ميتا.
+  ومؤجَّل: توقيع XAdES المغلَّف وكتلة `UBLExtensions`.
+
 * **المرحلة 11 — الفاتورة الإلكترونية، الجزء الخامس: 💳 بوابات الدفع (جيديا ·
   NeoLeap)** (`Form_WPF/frmSettings.xaml` L1726-L1831: تاب «إعدادات جيديا» و`GroupBox`
   «NeoLeap» فيه · `frmSettings.xaml.cs` `BtnSaveGedia_Click` (L2456) · `testGedia`
@@ -982,8 +1023,8 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   36 staff · 71 contract · tsc وlint وbuild أخضران. **وقرارٌ صريح: 🇪🇬 مصر
   (`frmEtaSetting` · `EtaService` · `EtaReciptService`) خارج النطاق** — النظام موجّهٌ
   اليوم للسعودية، ويتبعه نداءا 🚫 إلغاء الفاتورة و❌ رفض الفاتورة لأنّهما على وثيقة
-  ETA؛ ومصادرها مثبتة في الوثيقة تُقرأ يوم تُطلب. ومؤجَّل: الجزء السادس (📱 واتساب)،
-  وتوقيع XAdES المغلَّف وكتلة `UBLExtensions`.
+  ETA؛ ومصادرها مثبتة في الوثيقة تُقرأ يوم تُطلب. ومؤجَّل: توقيع XAdES المغلَّف وكتلة
+  `UBLExtensions`.
 
 * **المرحلة 11 — الفاتورة الإلكترونية، الجزء الثاني: 🧾 الإرسال والتوقيع والسلسلة**
   (`Form_WPF/frmSentEinvoice.xaml` (358) + `.xaml.cs` (304) · أعمدة

@@ -1592,6 +1592,17 @@ const settings: ModuleNode = {
             endpoint: 'GET /payment-gateways · PUT · POST /:provider/test · POST /:provider/sale',
           },
         ),
+        screen(
+          'whatsapp',
+          'واتساب — إرسال الفواتير',
+          'WhatsApp',
+          '/settings/whatsapp',
+          'ready',
+          {
+            permission: 'tenant.settings.manage',
+            endpoint: 'GET /whatsapp/settings · PUT · POST /whatsapp/test · POST /whatsapp/send · GET /whatsapp/messages',
+          },
+        ),
       ],
     },
     {

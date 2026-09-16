@@ -25,6 +25,13 @@ import {
 } from '../../../../lib/lookups';
 import { useSession } from '../../../../lib/session';
 import { useQuery } from '../../../../lib/use-query';
+import {
+  ATTACHMENT_STATUS_LABELS,
+  sendWhatsapp,
+  whatsappMessages,
+  WHATSAPP_STATUS_LABELS,
+  type WhatsappMessageRow,
+} from '../../../../lib/whatsapp';
 
 type InvoiceLine = { id: string; lineNo: number; itemId: string | null; description: string | null; quantity: string; unitPrice: string; net: string; tax: string; total: string };
 type Payment = { id: string; method: string; amount: string; reference: string | null; createdAt: string };
@@ -37,6 +44,7 @@ type Invoice = {
   warehouseId: string | null;
   partyId: string | null;
   cashCustomerName: string | null;
+  cashCustomerMobile: string | null;
   currency: string;
   subtotal: string;
   taxTotal: string;
@@ -61,11 +69,20 @@ export default function SalesInvoiceDetailPage() {
   const [settlement, setSettlement] = useState<'credit' | 'cash' | 'bank'>('credit');
   const [settleLocationId, setSettleLocationId] = useState('');
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info'; text: string } | undefined>();
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'danger' | 'info' | 'warn'; text: string } | undefined>();
   const [payAmountText, setPayAmountText] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
   const [payLocationId, setPayLocationId] = useState('');
   const [voidReason, setVoidReason] = useState('');
+
+  // 📱 «💬 واتساب» — `Form_WPF/frmInvSale.xaml` L1190, handled at L3130-L3195.
+  const [waMessage, setWaMessage] = useState('');
+  const [waAttach, setWaAttach] = useState(true);
+  const [waBusy, setWaBusy] = useState(false);
+  const sent = useQuery<WhatsappMessageRow[]>(
+    () => whatsappMessages({ invoiceId, limit: 20 }).then((view) => view.messages),
+    [invoiceId],
+  );
 
   if (invoice.status === 'loading') return <Loading />;
   if (invoice.status !== 'success' || !invoice.data) {
@@ -81,6 +98,12 @@ export default function SalesInvoiceDetailPage() {
     ? `${doc.cashCustomerName} (نقدي)`
     : partyLabel((parties.data ?? []).find((row) => row.id === doc.partyId) ?? { id: '', name: '—' });
   const dueValue = Number(doc.total) - Number(doc.paidTotal);
+  // 📱 «💬 واتساب» — the number the server will dial: `parties.phone`, or
+  // `salesInvoices.cashCustomerMobile` for a cash sale (`frmInvSale.xaml.cs` L3150-L3165),
+  // normalised the way `WhatsAppSender.SendInvoiceAsync` did it (L113-L116).
+  const mobile = doc.cashCustomerMobile ?? (parties.data ?? []).find((row) => row.id === doc.partyId)?.phone ?? '';
+  const digits = mobile.replace(/\D+/g, '');
+  const previewPhone = digits ? (digits.startsWith('966') ? digits : `966${digits.replace(/^0+/, '')}`) : '';
 
   async function run(action: () => Promise<unknown>, okText: string) {
     setBusy(true);
@@ -260,6 +283,90 @@ export default function SalesInvoiceDetailPage() {
 
           {doc.status === 'voided' && <p className="alert warn">هذه الفاتورة ملغاة.</p>}
         </div>
+      </div>
+
+      <div className="card">
+        <div className="toolbar">
+          <h2>💬 واتساب</h2>
+          <span className="chip">يُرسل إلى {previewPhone ? <span dir="ltr">{previewPhone}</span> : '— لا رقم —'}</span>
+        </div>
+        {doc.status !== 'posted' ? (
+          // «لا يمكن إرسال الفاتورة قبل الحفظ» — `frmInvSale.xaml.cs` L3137.
+          <p className="alert warn">لا يمكن إرسال الفاتورة قبل الحفظ.</p>
+        ) : !previewPhone ? (
+          // «❌ لا يوجد رقم جوال للعميل» — `frmInvSale.xaml.cs` L3160.
+          <p className="alert warn">❌ لا يوجد رقم جوال للعميل — أضف رقم الجوال في بطاقة العميل، أو أضفه في الفاتورة النقدية.</p>
+        ) : can('sales.view') ? (
+          <>
+            <div className="form-grid">
+              <label className="field wide">
+                <span>نص الرسالة</span>
+                <input
+                  className="input"
+                  value={waMessage}
+                  onChange={(event) => setWaMessage(event.target.value)}
+                  placeholder={`🧾 مرحباً ${doc.cashCustomerName ?? partyName}، هذه فاتورتك رقم INV${doc.number ?? ''} من …`}
+                />
+                <small className="muted">إن تُرك فارغاً كُتبت التحية نفسها التي كانت تكتبها النسخة المكتبية.</small>
+              </label>
+              <div className="field">
+                <span>المرفق</span>
+                <label className="check">
+                  <input type="checkbox" checked={waAttach} onChange={(event) => setWaAttach(event.target.checked)} />
+                  <span>📎 إرفاق الفاتورة</span>
+                </label>
+              </div>
+            </div>
+            <button
+              className="btn primary"
+              type="button"
+              disabled={waBusy}
+              onClick={() => {
+                setWaBusy(true);
+                setNotice(undefined);
+                void sendWhatsapp({
+                  invoiceId: doc.id,
+                  attach: waAttach,
+                  ...(waMessage.trim() ? { message: waMessage.trim() } : {}),
+                })
+                  .then((result) => {
+                    setNotice({
+                      kind: result.message.status === 'sent' ? 'ok' : 'warn',
+                      text: `${WHATSAPP_STATUS_LABELS[result.message.status] ?? result.message.status} — ${result.message.phone}${result.attachment === 'sent' ? ` · ${ATTACHMENT_STATUS_LABELS.sent}` : ''}${result.message.error ? ` · ${result.message.error}` : ''}`,
+                    });
+                    void sent.reload();
+                  })
+                  .catch((error: unknown) => setNotice({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) }))
+                  .finally(() => setWaBusy(false));
+              }}
+            >
+              {waBusy ? 'جارٍ الإرسال…' : '💬 واتساب'}
+            </button>
+
+            <h3>📜 سجل الإرسال</h3>
+            {sent.status === 'loading' ? (
+              <p className="muted">جارٍ التحميل…</p>
+            ) : (sent.data ?? []).length === 0 ? (
+              <p className="muted">لم تُرسل هذه الفاتورة بعد.</p>
+            ) : (
+              <DataTable
+                rows={sent.data ?? []}
+                rowKey={(row) => row.id}
+                columns={[
+                  { key: 'at', header: 'التاريخ', align: 'ltr', cell: (row) => (row.createdAt ? dateTime(row.createdAt) : '—') },
+                  { key: 'phone', header: 'الرقم', align: 'ltr', cell: (row) => row.phone },
+                  { key: 'status', header: 'الحالة', cell: (row) => WHATSAPP_STATUS_LABELS[row.status] ?? row.status },
+                  { key: 'attach', header: 'المرفق', cell: (row) => ATTACHMENT_STATUS_LABELS[row.attachmentStatus] ?? row.attachmentStatus },
+                  { key: 'message', header: 'الرسالة', cell: (row) => row.message },
+                  { key: 'error', header: 'الخطأ', cell: (row) => row.error ?? '—' },
+                  { key: 'sim', header: '🧪', cell: (row) => (row.simulation ? 'محاكاة' : 'فعلي') },
+                ]}
+              />
+            )}
+          </>
+        ) : (
+          <p className="muted">لا تملك صلاحية إرسال الفاتورة.</p>
+        )}
       </div>
 
       <div className="card">

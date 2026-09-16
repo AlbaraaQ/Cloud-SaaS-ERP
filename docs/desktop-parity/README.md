@@ -40,7 +40,16 @@ Postgres, multi-tenant, RBAC).
   وأجوبته `00`/`01`/`02`؛ ستة مسارات (`GET /payment-gateways` · `PUT …/:provider` ·
   `POST …/:provider/test` · `POST …/:provider/sale` · `GET …/transactions` ·
   `POST …/transactions/:id/refresh`) وشاشة `/settings/payment-gateways` (16 tests +
-  64 live checks). 🇪🇬 مصر خارج النطاق بقرارٍ صريح (§10) | `PHASE_11_EINVOICING.md` §1–§10 |
+  64 live checks). و**(6) 📱 واتساب**: «💬 واتساب» من `frmInvSale.xaml` (L1190) ومعالجه
+  `printwhatsapp` (L3124-L3199) مع `WhatsAppSender.cs` (267) و`Session.cs` (L12-L31) —
+  ترحيل `0065` يضيف `whatsapp_settings` (الرقم · الرمز المشفَّر · رمز الدولة · 📎 · 🧪)
+  و`whatsapp_messages` (السجلّ الذي لم يكن عند الديسكتوب)، والنداء على Cloud API كما
+  نُشرت (Graph `v21.0`: نصّ، ثم رفع ملفّ، ثم رسالة مستند، و`GET /{phone-number-id}`
+  ل🧪 اختبار)، والتحية تحية الديسكتوب والرقم بقاعدته؛ خمسة مسارات (`GET/PUT
+  /whatsapp/settings` · `POST /whatsapp/test` · `POST /whatsapp/send` · `GET
+  /whatsapp/messages`) وشاشة `/settings/whatsapp` + بطاقة «💬 واتساب» وسجلّها على نافذة
+  الفاتورة (17 tests + 71 live checks). 🇪🇬 مصر خارج النطاق بقرارٍ صريح (§11) |
+  `PHASE_11_EINVOICING.md` §1–§11 |
 
 Deferred by the owner: marketing CMS, per-tenant mobile-shop module.
 Done earlier, outside this programme: RBAC reorganisation (PR #4), desktop chart

@@ -44,6 +44,7 @@ import { OpticsModule } from './modules/optics/optics.module.js';
 import { SallaModule } from './modules/integrations/salla/salla.module.js';
 import { TailoringModule } from './modules/tailoring/tailoring.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
+import { WhatsappModule } from './modules/integrations/whatsapp/whatsapp.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
 import { MetricsInterceptor } from './ops/metrics.interceptor.js';
 import { OpsModule } from './ops/ops.module.js';
@@ -107,6 +108,7 @@ import { OpsModule } from './ops/ops.module.js';
     FitmentModule,
     SallaModule,
     PaymentsModule,
+    WhatsappModule,
   ],
   controllers: [HealthController],
   providers: [

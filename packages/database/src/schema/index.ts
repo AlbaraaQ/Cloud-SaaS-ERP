@@ -16,6 +16,7 @@ export * from './compat.js';
 export * from './devices.js';
 export * from './pos.js';
 export * from './payments.js';
+export * from './messaging.js';
 export * from './printing.js';
 export * from './hrm.js';
 export * from './projects.js';
