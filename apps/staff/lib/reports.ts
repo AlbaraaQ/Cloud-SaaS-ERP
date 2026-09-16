@@ -68,9 +68,10 @@ export const REPORT_GROUP_LABELS: Record<string, string> = {
   hrm: 'الموظفين والرواتب',
   marina: 'إدارة المراسي',
   projects: 'إدارة المشاريع',
+  zatca: 'الفواتير الإلكترونية',
 };
 
-export const REPORT_GROUP_ORDER = ['sales', 'purchases', 'inventory', 'accounting', 'pos', 'hrm', 'marina', 'projects'];
+export const REPORT_GROUP_ORDER = ['sales', 'purchases', 'inventory', 'accounting', 'pos', 'hrm', 'marina', 'projects', 'zatca'];
 
 export const fetchReportCatalog = () => apiFetch<ReportEntry[]>('/reports');
 
@@ -194,13 +195,20 @@ export function saveExport(result: ExportResult): void {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-/** Opens the print-ready page in its own window and hands it to the printer ("حفظ كـ PDF"). */
-export function openPrintable(html: string): boolean {
+/**
+ * Opens the print-ready page in its own window — 👁️ معاينة as it is, and 🖨️ طباعة with the
+ * printer dialog raised once the document has settled.
+ */
+export function openPrintable(html: string, options: { print?: boolean } = {}): boolean {
   const printWindow = window.open('', '_blank', 'width=1100,height=800');
   if (!printWindow) return false;
   printWindow.document.open();
   printWindow.document.write(html);
   printWindow.document.close();
+  if (options.print) {
+    printWindow.focus();
+    printWindow.setTimeout(() => printWindow.print(), 400);
+  }
   return true;
 }
 

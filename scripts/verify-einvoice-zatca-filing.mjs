@@ -88,10 +88,19 @@ async function refused(method, path, body) {
 }
 
 async function signIn(credentials) {
-  const login = await request('post', '/auth/login', { tenantCode, ...credentials });
-  const next = login.accessToken ?? login.access_token ?? login.token;
-  if (!next) throw new Error(`login failed for ${credentials.email}`);
-  return next;
+  // The platform throttles /auth/login per address, and a run signs in three times; a 429
+  // is not a failed check, so wait the window out and ask again before giving up.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const login = await request('post', '/auth/login', { tenantCode, ...credentials });
+      const next = login.accessToken ?? login.access_token ?? login.token;
+      if (!next) throw new Error(`login failed for ${credentials.email}`);
+      return next;
+    } catch (error) {
+      if (error.status !== 429 || attempt === 3) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 4_000));
+    }
+  }
 }
 
 const get = (path) => request('get', path);

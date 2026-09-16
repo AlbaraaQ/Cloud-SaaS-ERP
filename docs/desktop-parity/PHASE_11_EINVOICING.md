@@ -1,6 +1,6 @@
 # المرحلة 11 — الفاتورة الإلكترونية: زاتكا · ETA · التكاملات
 
-**الحالة: الجزءان الأول والثاني مُنجزان** — (1) «⚙️ إعدادات الربط الضريبي - زاتكا ZATCA» من
+**الحالة: الأجزاء الأول والثاني والثالث مُنجزة** — (1) «⚙️ إعدادات الربط الضريبي - زاتكا ZATCA» من
 `Form_WPF/frmZatcaSetting.xaml` (472 سطراً) + `.xaml.cs` (1160) و`Class/ZatcaService.cs`
 (546): جدول `einvoice_settings` (ترحيل `0062`) وأعمدة الشهادة على
 `einvoice_credentials`، وتسعة مسارات حقيقيّة، و**18** اختباراً و**64** نقطة تحقّق حيّة،
@@ -9,7 +9,11 @@
 `IntegrateInvoice` (L78-L410) و`Class/InvoiceOper.cs` `SendZatca` (L2209): الترحيل والتخليص
 ووثيقة الهيئة المُصادَقة ورمزها، وأعمدة على `einvoice_submissions` (ترحيل `0063`)، وثلاثة
 مسارات جديدة، و**16** اختباراً و**53** نقطة تحقّق حيّة، وشاشة `/settings/zatca/sent`
-(§5). الأجزاء مبيّنة في §3، ومعايير القبول في §7، وما أُجِّل عن قصد في §8.
+(§5). (3) «🔄 مزامنة الفواتير - ZATCA» من `Form_WPF/frmInvsSyncStatusZatca.xaml` (559) +
+`.xaml.cs` (1165): تقريرٌ مسجّل في محرّك التقارير بالأعمدة والمرشّحات نفسها، و
+`POST /einvoice/sync` يرسل ما يختاره الكاشير، و**16** اختباراً و**53** نقطة تحقّق حيّة،
+وشاشة `/settings/zatca/status` (§6). الأجزاء مبيّنة في §3، ومعايير القبول في §8، وما
+أُجِّل عن قصد في §9.
 
 الغرض: نقل **التأهيل والإرسال** كما يفعل الديسكتوب — لا اختراع مسارٍ جديد. محرّك الفاتورة
 الإلكترونية موجود في السحابة منذ الإصدار الأول (`modules/einvoicing` بوثيقة UBL 2.1
@@ -28,7 +32,7 @@
 | نماذج الشهادة | `Class/ZatcaCredential.cs` (21: `CSR` · `PrivateKey` · `CSID` · `Secret`) · `Class/ZatcaResponse.cs` (11) · `Class/CustZatcaEndDate.cs` |
 | الجداول الثلاثة | `SettingZatca` (ID=1) · `CSRProperties` (Id=1) · `ZatcaCredential` (ID=1) — تُكتب من `frmZatcaSetting.xaml.cs` L200 وL230 وL262 |
 | مصر | `Form_WPF/frmEtaSetting.xaml` (348) + `.xaml.cs` (292) · `Class/EtaService.cs` (379) · `Class/EtaReciptService.cs` (268) · `EtaResultData.cs` |
-| حالة المزامنة | `Form_WPF/frmInvsSyncStatusZatca.xaml` (559) + `.xaml.cs` (1165) · `Form_WPF/frmSentEinvoice.xaml` |
+| حالة المزامنة | `Form_WPF/frmInvsSyncStatusZatca.xaml` (559) + `.xaml.cs` (1165) — `ShowInvs` L159 · `GetZatcaMessage` L310 · `RecalculateNetSummary` L329 · `btnShow` L347 · `btnSync` L392 · `BtnDetails` L414 · `SendZatcaAsync` L442 · `BuildZatcaResponse` L527 · `GetZatcaStartDate` L938 · `BuildWhereClause` L863 · `LoadInvTypes` L87 · `ExportToCsv` L1078 · `PrintReport` L970 · `Reports/rptInvSumByClient.repx` · `Form_WPF/frmSentEinvoice.xaml` |
 | التكاملات | `Class/Geidea.cs` (57) · `Class/NeoleapService.cs` (165) · `Class/WhatsAppSender.cs` (267) |
 
 > **تنبيه:** كل نداءات البوابة في الديسكتوب تمرّ بمكتبة `AuditorAPI` المترجَمة
@@ -53,6 +57,9 @@
 | `ZatcaResponse` (رسالة الهيئة) | `einvoice_submissions.authority_status` · `response.errorMessages` · `response.warningMessages` · `cleared_invoice` (ترحيل `0063`) | `insert ZatcaResponse` بعد كل إرسال؛ و`ClearedInvoice` وثيقة الهيئة لا وثيقتنا |
 | `Inv.EncodedInvoice` · `QRCode` · `InvoiceHash` · `UUID` · `ZatcaSent` | `sales_invoices.zatca_encoded_invoice` · `zatca_qr` · `zatca_hash` · `zatca_uuid` · `zatca_status` | تُكتب بعد كل إرسال ناجح (L388-L391) |
 | `PIH` · `InvoiceNo` (ICV) | `einvoice_chain.last_hash` · `counter` | صفٌّ واحد لكل `(مستأجر · سلطة · بيئة)` |
+| `Inv.ZatcaSent` | `sales_invoices.zatca_status ∈ (cleared, reported)` | الحالة تُكتبها خطوة الإرسال، لا تُحسب عند العرض |
+| `Inv` ∪ `InvContratct` | `sales_invoices` وحدها | فاتورة المقاولات في السحابة **هي** فاتورة بيع (`projects.service.postBill`)، و`progress_bills.invoice_id` يشير إليها |
+| `zatcaresponse.Message` | «الرسالة»: `error` ثم `response.errorMessages` ∪ `warningMessages` ثم `response.message` | الديسكتوب يقرأ أول صفٍّ يصادفه؛ هنا أحدث صفّ |
 
 ## 3. الأجزاء
 
@@ -60,7 +67,7 @@
 |---|---|---|
 | 1 | ⚙️ إعدادات الربط الضريبي — `frmZatcaSetting` (الإعدادات · خصائص CSR · التأهيل الأربع · إيقاف الربط · التجديد) | ✅ مُنجز (§4) |
 | 2 | 🧾 الإرسال والتوقيع والسلسلة — `frmSentEinvoice` + `ZatcaService.IntegrateInvoice` (ترحيل/تخليص، QR بثمانية وسوم، إعادة المحاولة) | ✅ مُنجز (§5) |
-| 3 | 📊 حالة المزامنة — `frmInvsSyncStatusZatca` (شبكة الفواتير وحالاتها ومرشّحاتها) | ⬜ |
+| 3 | 📊 حالة المزامنة — `frmInvsSyncStatusZatca` (شبكة الفواتير وحالاتها ومرشّحاتها) | ✅ مُنجز (§6) |
 | 4 | 🇪🇬 مصر — `frmEtaSetting` + `EtaService` + `EtaReciptService` | ⬜ |
 | 5 | 💳 التكاملات — `Geidea` · `NeoleapService` · `WhatsAppSender` | ⬜ |
 
@@ -248,7 +255,86 @@ ZATCA»:
 | التحقّق الحيّ | `scripts/verify-einvoice-zatca-filing.mjs` (53 نقطة في أحد عشر قسماً) |
 | الشاشة | `apps/staff/app/settings/zatca/sent/page.tsx` + `apps/staff/lib/einvoice.ts` |
 
-## 6. الأمان
+## 6. الجزء الثالث — 📊 حالة المزامنة (`frmInvsSyncStatusZatca`)
+
+### 6.1 النافذة
+
+`Form_WPF/frmInvsSyncStatusZatca.xaml` (559) + `.xaml.cs` (1165): «🔄 مزامنة الفواتير -
+ZATCA» في الرأس، و«🔍 خيارات البحث» في لوحةٍ على اليمين، وشبكةٌ من اثني عشر عموداً،
+وشريطٌ سفليّ فيه 📊 تصدير Excel · 🖨️ طباعة · 👁️ معاينة · ✖ خروج. ما تبحث عنه النافذة هو
+سؤال الكاشير في آخر النهار: **أيّ هذه الفواتير قبلتها زاتكا؟**
+
+المرشّحات، من اللوحة نصّاً:
+
+| المرشّح | القيم | في السحابة |
+|---|---|---|
+| 🔄 حالة المزامنة ZATCA | 🔵 الكل · ✅ مرسل · ❌ غير مرسل | `zatca_status ∈ (cleared, reported)` |
+| 📋 نوع الفاتورة | مبيعات · نقطة بيع · إشعار · مقاولات · أندرويد (+ صندوق «الكل» يعطّل القائمة) | `kind` و`order_type`/`shift_id` و`progress_bills.invoice_id` |
+| 📅 الفترة الزمنية | 📌 كل الفترة · من · إلى | `posted_at::date` |
+| الفرع | — | `branchId` (الديسكتوب يقيدها بفرع الجهاز) |
+
+والأعمدة كذلك: م · ID · الفرع · نوع الفاتورة · رقم الفاتورة · التاريخ · العميل · المستخدم ·
+الصافي · الرسالة · حالة المزامنة · تفاصيل — وعمودان مخفيّان (`DgvProcType` · `DgvStore`)
+يطبعهما التقرير ولا ترسمهما الشبكة.
+
+### 6.2 من الديسكتوب إلى السحابة
+
+| الديسكتوب | السحابة |
+|---|---|
+| `SELECT … FROM Inv UNION ALL SELECT … FROM InvContratct` (L176-L186) | `sales_invoices` وحدها؛ وفاتورة المقاولات تُعرف بـ`EXISTS (progress_bills…)` |
+| `proc_type IN (1,2)` و`IS_Deleted=0` (L866 وL935) | `kind ∈ (sale, sale_return, credit_note, debit_note)` و`status='posted'` و`voided_at IS NULL` |
+| `ZatcaSent` (L899-L904) | `zatca_status ∈ (cleared, reported)` |
+| `GetZatcaMessage` (L310-L327) | «الرسالة»: الغلطة، ثم رسائل التحقّق والتحذير، ثم سبب التوقّف |
+| `GetInvoiceTypeAr` + `GetCustomerTaxType` (L346 · L302) | «نوع الفاتورة»: عميلٌ له رقم ضريبي ⇒ ضريبية، وإلا مبسّطة؛ والمرتجع إشعارٌ دائن |
+| `RecalculateNetSummary` (L329-L345) و`NetTotal` (L1058) | ثلاث بطاقات: الفواتير · المرتجعات والإشعارات · الصافي (= الأولى ناقص الثانية) |
+| `BuildZatcaResponse` (L527-L565) | صفّ `einvoice_submissions` بـ`authority_status` و`response` |
+| `SendZatcaAsync`: «هل انت متأكد من مزامنة الفواتير المختارة ؟» ثم إرسالٌ سطراً سطراً (L442-L565) | `POST /einvoice/sync` بـ`{ ids }`، ونتيجةٌ لكل سطر |
+| `ExportToCsv` (L1078) | `POST /reports/einvoice-sync-status/export` — ملفٌّ حقيقي من الخادم |
+| `PrintReport` (L970) و`rptInvSumByClient.repx` | `GET /reports/print/einvoice-sync-status` — ورقة محرّك الطباعة بالترويسة والتذييل والختم |
+
+### 6.3 🔄 مزامنة ZATCA
+
+| المسار | الصلاحية | ما هو |
+|---|---|---|
+| `GET /reports/einvoice-sync-status` | `reporting.view` | الشبكة والمرشّحات، كما يعرضها محرّك التقارير |
+| `POST /einvoice/sync` | `einvoice.submit` | 🔄 مزامنة ZATCA: يرسل المحدَّد سطراً سطراً، ويُرجع نتيجة كل سطر |
+
+و`POST /einvoice/sync` يُجيب بـ`{ requested, sent, failed, skipped, results[], message }`:
+«تمت العملية بنجاح ✅» حين تُقبل كلها، وعددَ ما أُرسل وما لم يُقبل حين لا تُقبل،
+وعبارةً لكل سطر — لأنّ دفعةً نصفُها ناجح يجب أن تقول نصفها الآخر.
+
+### 6.4 أربع قواعد
+
+1. **المسوَّدة والمُرسلة صفوفٌ مُتجاوَزة لا فاشلة.** الديسكتوب يعيد إرسالها فتردّها الهيئة؛
+   ونحن نرفض الإرسال الثاني أصلاً (الجزء الثاني)، فتُبلَّغ هنا عبارةً أمام السطر.
+2. **⏸ إيقاف الربط يقولها.** الديسكتوب يخفي النداء خلف `if (ZatcaIntegerationActive)`
+   فيصمت الزرّ؛ هنا كل سطر «مُتجاوَز» ورسالته «الربط موقوف…»، ولا وثيقة تُحفظ.
+3. **الشبكة والملفّ والورقة مصدرها واحد.** التقرير مسجّل في محرّك التقارير، فالتصدير
+   يُعيد تشغيله على الخادم والورقةُ تُطبع منه — لا يمكن أن يختلف الملفّ عمّا على الشاشة.
+4. **الورقة تحمل مجاميعها.** `RecalculateNetSummary` تحسب مجموعين والديسكتوب يطبع
+   فرقهما؛ ونحن نعرض الثلاثة، لأنّ المفتّش يسأل عنها كلها.
+
+### 6.5 ما اخترعناه
+
+| التسمية | السبب |
+|---|---|
+| ثلاث بطاقات («إجمالي الفواتير» · «إجمالي المرتجعات والإشعارات» · «الصافي») | `RecalculateNetSummary` تحسب الاثنين و`BuildReportDataSet` يطبع فرقهما وحده؛ فالثاني والثالث اسمان لموجود، والأول كذلك |
+| «تحديد الكل» | `SelectionMode="MultipleRow"` عند الديسكتوب مربّعٌ في رأس الشبكة؛ ولا مقابلَ لاسمه في ملفّاته |
+| «مزامنة الفواتير» في فتات الخبز | النافذة لا تُفتح من قائمةٍ في الديسكتوب؛ والعنوان من `Title` نفسها |
+| حدٌّ لعدد الفواتير في الدفعة (200) | الديسكتوب يعمل على جهازٍ واحد وقاعدةٍ واحدة فلا يحتاجه؛ و`422 EINVOICE_SYNC_TOO_MANY` عبارةٌ صريحة |
+| 📊 تصدير Excel يُنتج `xlsx` | الزرّ باسم Excel، والديسكتوب يكتب `.csv` خلفه؛ والملفّ الحقيقي أوفى بالاسم |
+
+### 6.6 الاختبارات والتحقّق الحيّ
+
+| | |
+|---|---|
+| الاختبارات | `apps/api/test/einvoicing-zatca-sync.spec.ts` (16) |
+| التقرير | `apps/api/src/modules/reporting/report-catalog.ts` — `einvoice-sync-status` |
+| المسار | `apps/api/src/modules/einvoicing/einvoicing.controller.ts` · `einvoicing.service.ts` (`sync`) |
+| التحقّق الحيّ | `scripts/verify-einvoice-zatca-sync.mjs` (53 نقطة في أحد عشر قسماً) |
+| الشاشة | `apps/staff/app/settings/zatca/status/page.tsx` + `apps/staff/lib/einvoice.ts` |
+
+## 7. الأمان
 
 - الأسرار (المفتاح الخاص · CSID · السرّ، والثلاثة للإنتاج) مشفّرة بـ `aes-256-gcm` عند
   التخزين، ولا تُقرأ إلا مقنّعة `****` + آخر أربعة أحرف.
@@ -261,21 +347,28 @@ ZATCA»:
 - التجزئة والعدّاد يُسحبان في استعلامٍ واحد بـ`SELECT … FOR UPDATE`: لا فاتورتان تشتركان
   في عدّاد، ولا تُترك ثغرةٌ بين القراءة والكتابة.
 - القراءةُ غيرُ الكتابة: `einvoice.view` للشبكة وتفاصيلها والسلسلة، و`einvoice.submit`
-  للإرسال وإعادته، و`einvoice.credentials.manage` للتأهيل — مختبرة بصلاحياتٍ حقيقيّة
-  (المحاسب يقرأ ولا يُصدر شهادة، وأمين الصندوق لا يقرأ).
+  للإرسال وإعادته ومزامنته، و`einvoice.credentials.manage` للتأهيل — مختبرة بصلاحياتٍ
+  حقيقيّة (المحاسب يقرأ ويُرسل ولا يُصدر شهادة، وأمين الصندوق لا يقرأ).
+- التصديرُ صلاحيةٌ وحدها: الشبكة تُقرأ بـ`reporting.view`، وملفُّها يُنتَج بـ
+  `reporting.export.execute` — وهو فرقٌ مختبر بصلاحية المحاسب.
 
-## 7. معايير القبول
+## 8. معايير القبول
 
-1. كل تسميةٍ في الشاشتين من `frmZatcaSetting.xaml` و`frmSentEinvoice.xaml` و
-   `frmInvsSyncStatusZatca.xaml` نصّاً، وما اخترعناه مبرَّر في §4.5 و§5.5.
-2. اثنا عشر مساراً حقيقياً خلف الشاشتين، لا محاكاة.
+1. كل تسميةٍ في الشاشات الثلاث من `frmZatcaSetting.xaml` و`frmSentEinvoice.xaml` و
+   `frmInvsSyncStatusZatca.xaml` نصّاً، وما اخترعناه مبرَّر في §4.5 و§5.5 و§6.5.
+2. ثلاثة عشر مساراً حقيقياً خلف الشاشات، لا محاكاة.
 3. طلب التوقيع يقرأه `openssl` ويتحقق من توقيعه.
-4. الترتيب محفوظ: لا CSID إنتاج قبل امتثال، ولا امتثال قبل CSR، ولا اختبار ربط قبل
+4. الشبكة والملفّ والورقة من استعلامٍ واحد مسجّل في محرّك التقارير؛ و«الصافي» مجموعٌ من
+   الصفوف المعروضة فلا يخالفها.
+5. الترتيب محفوظ: لا CSID إنتاج قبل امتثال، ولا امتثال قبل CSR، ولا اختبار ربط قبل
    الاثنين — ولكل منعٍ عبارة الديسكتوب.
-5. الإرسال على الحقيقة: ضريبية إلى التخليص تعود بوثيقة مُصادَقة ورمزها منها، ومبسّطة إلى
-   الترحيل تحتفظ برمزها المحسوب؛ والسلسلة تمشي خطوةً خطوة تحت `FOR UPDATE`.
-6. 34 اختباراً (18 + 16) + 117 نقطة تحقّق حيّة (64 + 53)، والسكربتان يُعاد تشغيلهما بلا أثر.
-7. طريقان حقيقيان تحت `/settings/zatca` بصلاحيّتَي `einvoice.view` و`einvoice.manage`.
+6. الإرسال على الحقيقة: ضريبية إلى التخليص تعود بوثيقة مُصادَقة ورمزها منها، ومبسّطة إلى
+   الترحيل تحتفظ برمزها المحسوب؛ والسلسلة تمشي خطوةً خطوة تحت `FOR UPDATE`؛ و🔄 مزامنة
+   ZATCA تبلّغ ما أُرسل وما لم يُقبل سطراً سطراً.
+7. 50 اختباراً (18 + 16 + 16) + 170 نقطة تحقّق حيّة (64 + 53 + 53)، والسكربتات الثلاث
+   تُعاد تشغيلها بلا أثر.
+8. ثلاثة طرقٍ حقيقيّة تحت `/settings/zatca` بصلاحيّات `einvoice.view` و`einvoice.manage`
+   و`einvoice.submit`.
 
 1. كل تسميةٍ في الشاشة من `frmZatcaSetting.xaml` نصّاً، وما اخترعناه مبرَّر في §4.5.
 2. تسعة مسارات حقيقية خلف الشاشة، لا محاكاة.
@@ -285,13 +378,14 @@ ZATCA»:
 5. 18 اختباراً + 64 نقطة تحقّق حيّة، والسكربت يُعاد تشغيله بلا أثر.
 6. طريقٌ حقيقي في شجرة `/settings/zatca` بصلاحية `einvoice.view`.
 
-## 8. ما أُجِّل عن قصد
+## 9. ما أُجِّل عن قصد
 
 - 🏗️ Industry لا يُملأ من بطاقة المنشأة: لا عمودَ للنشاط التجاري في السحابة بعد؛
   ويُبلَّغ عنه كتحذير لا كفشل.
 - 🚫 إلغاء الفاتورة و❌ رفض الفاتورة من `frmSentEinvoice`: نداءان على وثيقة ETA، لا على
   زاتكا — يأتيان مع الجزء الرابع (§5.1).
-- 📊 حالة المزامنة بوصفها نافذةً مستقلّة (مزامنة جماعية وفلاترها الستة) — الجزء الثالث.
+- 🏦 المستودع و«نوع العملية» يظهران في الورقة المطبوعة ولا يظهران في الشبكة — كما
+  يُخفيهما الديسكتوب (`DgvProcType` · `DgvStore` بـ`Visible="False"`).
 - 🇪🇬 مصر (`frmEtaSetting` · `EtaService` · `EtaReciptService`) والتكاملات
   (`Geidea` · `NeoleapService` · `WhatsAppSender`) — الجزءان الرابع والخامس.
 - توقيع XAdES المغلَّف وكتلة `UBLExtensions`: التوقيع يُنتَج، وتغليفُه لم يُنجز بعد.

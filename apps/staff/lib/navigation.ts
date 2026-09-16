@@ -1570,6 +1570,17 @@ const settings: ModuleNode = {
           'ready',
           { permission: 'einvoice.view', endpoint: '/einvoice/filings' },
         ),
+        screen(
+          'zatca-status',
+          'مزامنة الفواتير - ZATCA',
+          'ZATCA invoice sync',
+          '/settings/zatca/status',
+          'ready',
+          {
+            permission: 'einvoice.view',
+            endpoint: 'GET /reports/einvoice-sync-status · POST /einvoice/sync',
+          },
+        ),
       ],
     },
     {

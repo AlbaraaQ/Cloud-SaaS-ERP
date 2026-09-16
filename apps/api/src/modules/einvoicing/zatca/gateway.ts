@@ -232,7 +232,7 @@ export function httpGateway(baseUrl: string): ZatcaGateway {
       if (reportingStatus === 'REPORTED') return { status: 'REPORTED', validationResults: messages };
       return { status: 'FAILED', validationResults: messages.length > 0 ? messages : [`ZATCA returned no acceptance status (${clearanceStatus || reportingStatus || 'empty'})`] };
     },
-    async reportInvoice({ findings, ...input }) {
+    async reportInvoice({ findings: _findings, ...input }) {
       const payload = await invoiceCall(ENDPOINTS.reporting, false, input);
       const reportingStatus = String(payload.reportingStatus ?? '');
       const accepted = reportingStatus === 'REPORTED';
@@ -242,7 +242,7 @@ export function httpGateway(baseUrl: string): ZatcaGateway {
         validationResults: validationResultsOf(payload, accepted, reportingStatus),
       };
     },
-    async clearInvoice({ findings, ...input }) {
+    async clearInvoice({ findings: _findings, ...input }) {
       const payload = await invoiceCall(ENDPOINTS.clearance, true, input);
       const clearanceStatus = String(payload.clearanceStatus ?? '');
       const accepted = clearanceStatus === 'CLEARED';

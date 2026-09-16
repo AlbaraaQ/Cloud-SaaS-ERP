@@ -207,3 +207,34 @@ export const retryFiling = (id: string) => apiFetch<{ status: string; message?: 
 /** 🧾 إرسال — files one posted sales invoice. */
 export const submitInvoiceEinvoice = (invoiceId: string, body: { authority?: 'zatca' | 'eta'; environment?: 'simulation' | 'production' } = {}) =>
   apiFetch<FilingRow>(`/sales-invoices/${invoiceId}/einvoice/submit`, { method: 'POST', body: JSON.stringify(body) });
+
+// ── 📊 حالة المزامنة — `frmInvsSyncStatusZatca.xaml` ─────────────────────────────────────
+
+/** One row of 🔄 مزامنة ZATCA: what happened to the invoice the clerk ticked. */
+export type SyncResult = {
+  invoiceId: string;
+  number: string | null;
+  /** `sent` — the authority accepted it · `failed` — refused · `skipped` — never sent. */
+  outcome: 'sent' | 'failed' | 'skipped';
+  status: string | null;
+  authorityStatus: string | null;
+  message: string | null;
+};
+
+export type SyncReport = {
+  requested: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  environment: string;
+  authority: string;
+  message: string;
+  results: SyncResult[];
+};
+
+/**
+ * 🔄 مزامنة ZATCA — `btnSync_Click` (`frmInvsSyncStatusZatca.xaml.cs` L392-L412) files every
+ * row the clerk selected and answers with what happened to each one, because a batch that
+ * half-failed must say which half.
+ */
+export const syncEinvoices = (ids: string[]) => apiFetch<SyncReport>('/einvoice/sync', { method: 'POST', body: JSON.stringify({ ids }) });

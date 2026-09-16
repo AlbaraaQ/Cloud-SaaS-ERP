@@ -51,7 +51,7 @@ export type ReportColumn = { key: string; labelAr: string; type: ReportColumnTyp
 /** One summary card under the grid: the column it sums and the label it prints. */
 export type ReportGrandTotal = { key: string; labelAr: string };
 
-export type ReportGroup = 'sales' | 'purchases' | 'inventory' | 'accounting' | 'pos' | 'hrm' | 'projects' | 'marina';
+export type ReportGroup = 'sales' | 'purchases' | 'inventory' | 'accounting' | 'pos' | 'hrm' | 'projects' | 'marina' | 'zatca';
 
 export type ReportFilters = {
   from?: string;
@@ -281,6 +281,44 @@ const ITEM: ReportParam = { name: 'itemId', labelAr: 'الصنف', kind: 'item' 
 const CATEGORY: ReportParam = { name: 'categoryId', labelAr: 'المجموعة', kind: 'category' };
 const SALESMAN: ReportParam = { name: 'salesmanId', labelAr: 'المندوب', kind: 'salesman' };
 const COST_CENTER: ReportParam = { name: 'costCenterId', labelAr: 'مركز التكلفة', kind: 'costCenter' };
+
+/**
+ * 🔄 حالة المزامنة ZATCA — the three radios of `frmInvsSyncStatusZatca.xaml` (L470-L478):
+ * 🔵 الكل · ✅ مرسل · ❌ غير مرسل, read off `Inv.ZatcaSent` (`BuildWhereClause` L900-L904).
+ */
+const SYNC_STATE: ReportParam = {
+  name: 'status',
+  labelAr: 'حالة المزامنة ZATCA',
+  kind: 'select',
+  options: [
+    { value: 'sent', labelAr: '✅ مرسل' },
+    { value: 'unsent', labelAr: '❌ غير مرسل' },
+  ],
+};
+/**
+ * 📋 نوع الفاتورة — `cmbInvType` of the same window (`LoadInvTypes` L87-L105). The five
+ * items are «مبيعات» · «نقطة بيع» · «إشعار» · «مقاولات» · «أندرويد», and the desktop
+ * translates the selected index into `inv.inv_type` 2 · 3 · 21 · 20 — with «أندرويد»
+ * (index 4) falling through the `switch` to **no condition at all** (L913-L920), which is
+ * why the window shows every invoice when it is picked. Kept as-is, quirk included.
+ */
+const ZATCA_INVOICE_KIND: ReportParam = {
+  name: 'kind',
+  labelAr: 'نوع الفاتورة',
+  kind: 'select',
+  options: [
+    { value: 'sale', labelAr: 'مبيعات' },
+    { value: 'pos', labelAr: 'نقطة بيع' },
+    { value: 'notice', labelAr: 'إشعار' },
+    { value: 'contracting', labelAr: 'مقاولات' },
+    { value: 'android', labelAr: 'أندرويد' },
+  ],
+};
+/** 📅 الفترة الزمنية — «من» و«إلى» beside the 📌 كل الفترة check box (L510-L520). */
+const ZATCA_PERIOD: ReportParam[] = [
+  { name: 'from', labelAr: 'من', kind: 'date' },
+  { name: 'to', labelAr: 'إلى', kind: 'date' },
+];
 
 const text = (key: string, labelAr: string): ReportColumn => ({ key, labelAr, type: 'text' });
 const money = (key: string, labelAr: string): ReportColumn => ({ key, labelAr, type: 'money' });
@@ -606,6 +644,32 @@ const purchaseLinesScope = (tenantId: string, f: ReportFilters): SQL => sql`
 const kindScope = (invType?: string): SQL =>
   invType === 'pos' ? sql`si.party_id IS NULL` : invType === 'sale' ? sql`si.party_id IS NOT NULL` : all;
 const eqIf = (column: SQL, value?: string): SQL => (value ? sql`${column} = ${value}::uuid` : all);
+
+/**
+ * 📋 نوع الفاتورة of «مزامنة الفواتير - ZATCA» — `BuildWhereClause` L872-L920.
+ *
+ * A فاتورة نقطة بيع is the sale captured at the till: `order_type` set, or taken inside an
+ * open shift. «مقاولات» is the invoice a posted progress bill issued. «أندرويد» is the
+ * desktop's fall-through — it adds nothing, so the window shows every invoice.
+ */
+const zatcaKindScope = (kind?: string): SQL =>
+  kind === 'pos'
+    ? sql`si.kind IN ('sale', 'sale_return') AND (si.order_type IS NOT NULL OR si.shift_id IS NOT NULL)`
+    : kind === 'sale'
+      ? sql`si.kind IN ('sale', 'sale_return') AND si.order_type IS NULL AND si.shift_id IS NULL`
+      : kind === 'notice'
+        ? sql`si.kind IN ('credit_note', 'debit_note')`
+        : kind === 'contracting'
+          ? sql`EXISTS (SELECT 1 FROM progress_bills pb WHERE pb.tenant_id = si.tenant_id AND pb.invoice_id = si.id)`
+          : all;
+
+/** 🔄 حالة المزامنة — `inv.ZatcaSent=1` / `=0` (L899-L904). */
+const zatcaSyncScope = (status?: string): SQL =>
+  status === 'sent'
+    ? sql`si.zatca_status IN ('cleared', 'reported')`
+    : status === 'unsent'
+      ? sql`coalesce(si.zatca_status, '') NOT IN ('cleared', 'reported')`
+      : all;
 
 // Party display name, tolerant of the cash-customer case where no party row exists.
 const partyName = sql`coalesce(party.name, '—')`;
@@ -4625,6 +4689,136 @@ const definitions: ReportDefinition[] = [
     },
   },
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // 🔄 مزامنة الفواتير - ZATCA — `Form_WPF/frmInvsSyncStatusZatca.xaml` (559) +
+  //    `.xaml.cs` (1165), phase 11 part three.
+  //
+  // The window is the desktop's answer to «which of my invoices did ZATCA accept?»: it
+  // reads `Inv` and `InvContratct` (`ShowInvs` L176-L186), joins the authority's answer
+  // from `zatcaresponse` (`GetZatcaMessage` L310-L327) and paints ✅ مرسل / ❌ لم يُرسل
+  // from `Inv.ZatcaSent` (the `DataTrigger` of `DgvSyncStatus`).
+  //
+  // What the cloud does differently, and why:
+  //
+  //   • `Inv` ∪ `InvContratct` → one table. A contracting progress bill *is* a sales
+  //     invoice here (`projects.service.postBill` creates one and stores it on
+  //     `progress_bills.invoice_id`), so «مقاولات» is a real condition on `progress_bills`
+  //     rather than a second `SELECT` glued on with `UNION ALL`.
+  //   • `ZatcaSent` is not a column we keep: acceptance is `sales_invoices.zatca_status`
+  //     ∈ {`cleared`, `reported`}, written by the filing step itself.
+  //   • `RecalculateNetSummary` (L329-L345) keeps two running sums — `sum` for
+  //     `proc_type = 1` and `sum1` for `proc_type = 2` — and the printed `NetTotal` is
+  //     `sum - sum1` (`BuildReportDataSet` L1058). Three hidden columns carry them, so
+  //     the cards under the grid are the grid's own numbers.
+  //   • The desktop takes the *first* `zatcaresponse` row it happens to read; this takes
+  //     the latest, ordered by `created_at`.
+  // ════════════════════════════════════════════════════════════════════════════
+  {
+    key: 'einvoice-sync-status',
+    titleAr: 'مزامنة الفواتير - ZATCA',
+    group: 'zatca',
+    hintAr:
+      'كل فاتورةٍ مرحَّلة وحالة مزامنتها مع هيئة الزكاة: «✅ مرسل» لمن قُبل ترحيله أو تخليصه، و«❌ غير مرسل» لمن لم يُقبل بعد أو فشل. والرسالةُ نصُّ الهيئة نفسها. 🔄 مزامنة ZATCA تُرسل ما اخترته.',
+    params: [SYNC_STATE, ZATCA_INVOICE_KIND, ZATCA_PERIOD[0]!, ZATCA_PERIOD[1]!, BRANCH],
+    columns: [
+      int('seq', 'م'),
+      text('id', 'ID'),
+      text('branch_name', 'الفرع'),
+      text('kind_name', 'نوع الفاتورة'),
+      text('number', 'رقم الفاتورة'),
+      text('issued_at', 'التاريخ'),
+      text('party_name', 'العميل'),
+      text('user_name', 'المستخدم'),
+      money('net', 'الصافي'),
+      text('message', 'الرسالة'),
+      text('sync_status', 'حالة المزامنة'),
+      // «المستودع» — `DgvStore`, a column the window keeps hidden and the report prints
+      // as `SafeName` (`BuildReportDataSet` L1046).
+      { key: 'store_name', labelAr: 'المستودع', type: 'text', hidden: true },
+      // 🔄 مزامنة ZATCA works on the rows the clerk ticked; the grid's checkbox needs the
+      // invoice id even though the visible «ID» column already prints it.
+      { key: 'invoice_id', labelAr: 'معرّف الفاتورة', type: 'text', hidden: true },
+      { key: 'net_sale', labelAr: 'إجمالي الفواتير', type: 'money', hidden: true },
+      { key: 'net_return', labelAr: 'إجمالي المرتجعات', type: 'money', hidden: true },
+      { key: 'net_signed', labelAr: 'الصافي', type: 'money', hidden: true },
+    ],
+    grandTotal: [
+      { key: 'net_sale', labelAr: 'إجمالي الفواتير' },
+      { key: 'net_return', labelAr: 'إجمالي المرتجعات والإشعارات' },
+      // `NetTotal` of `rptInvSumByClient.repx` — المبيعات ناقص المردودات.
+      { key: 'net_signed', labelAr: 'الصافي' },
+    ],
+    emptyAr: 'لا توجد عمليات بالجدول',
+    signature: true,
+    build: (tenantId, f) => sql`
+      WITH latest AS (
+        SELECT DISTINCT ON (s.invoice_id)
+               s.invoice_id, s.status, s.error, coalesce(s.response, '{}'::jsonb) AS response
+        FROM einvoice_submissions s
+        WHERE s.tenant_id = ${tenantId}
+        ORDER BY s.invoice_id, s.created_at DESC, s.id DESC
+      ), answers AS (
+        SELECT l.invoice_id, l.status, l.error, l.response,
+               CASE WHEN jsonb_typeof(l.response -> 'errorMessages') = 'array'
+                    THEN l.response -> 'errorMessages' ELSE '[]'::jsonb END
+               || CASE WHEN jsonb_typeof(l.response -> 'warningMessages') = 'array'
+                    THEN l.response -> 'warningMessages' ELSE '[]'::jsonb END AS lines
+        FROM latest l
+      )
+      SELECT (row_number() OVER w)::text AS seq,
+             si.id::text AS id,
+             si.id::text AS invoice_id,
+             coalesce(branch.name_ar, '—') AS branch_name,
+             -- «نوع الفاتورة» — 'InvoiceOper.GetInvoiceTypeAr' (L346-L378) for the four
+             -- 'inv_type's this window reads, with 'GetCustomerTaxType' (L302) deciding
+             -- between الضريبية and المبسطة: a customer with a tax number is 0100000.
+             CASE WHEN coalesce(btrim(coalesce(party.tax_no, '')), '') <> '' THEN
+                    CASE WHEN si.kind IN ('sale_return', 'credit_note')
+                         THEN 'إشعار دائن للفاتورة الضريبية'
+                         ELSE 'فاتورة ضريبية' END
+                  ELSE CASE WHEN si.kind IN ('sale_return', 'credit_note')
+                         THEN 'إشعار دائن للفاتورة الضريبية المبسطة'
+                         ELSE 'فاتورة ضريبية مبسطة' END
+             END AS kind_name,
+             coalesce(si.number, '—') AS number,
+             to_char(si.posted_at, 'YYYY-MM-DD HH24:MI:SS') AS issued_at,
+             coalesce(party.name, si.cash_customer_name, '—') AS party_name,
+             coalesce(usr.full_name, '—') AS user_name,
+             round(si.total, 2)::text AS net,
+             -- «الرسالة» — what the authority answered ('ZatcaResponse.Message'), in the
+             -- desktop's own order: the filing's error, then its validation messages,
+             -- then why it never left.
+             coalesce(
+               nullif(btrim(coalesce(a.error, '')), ''),
+               nullif((SELECT string_agg(t.value, ' · ' ORDER BY t.ord)
+                         FROM jsonb_array_elements_text(a.lines) WITH ORDINALITY AS t(value, ord)), ''),
+               nullif(btrim(coalesce(a.response ->> 'message', '')), ''),
+               ''
+             ) AS message,
+             CASE WHEN si.zatca_status IN ('cleared', 'reported') THEN '✅ مرسل' ELSE '❌ لم يُرسل' END AS sync_status,
+             coalesce(wh.name, '—') AS store_name,
+             round(CASE WHEN si.kind IN ('sale', 'debit_note') THEN si.total ELSE 0 END, 2)::text AS net_sale,
+             round(CASE WHEN si.kind IN ('sale_return', 'credit_note') THEN si.total ELSE 0 END, 2)::text AS net_return,
+             round(CASE WHEN si.kind IN ('sale', 'debit_note') THEN si.total ELSE -si.total END, 2)::text AS net_signed
+      FROM sales_invoices si
+      LEFT JOIN branches branch ON branch.id = si.branch_id
+      LEFT JOIN parties party ON party.id = si.party_id
+      LEFT JOIN users usr ON usr.id = si.created_by
+      LEFT JOIN warehouses wh ON wh.id = si.warehouse_id
+      LEFT JOIN answers a ON a.invoice_id = si.id
+      WHERE si.tenant_id = ${tenantId}
+        AND si.status = 'posted'
+        AND si.voided_at IS NULL
+        -- 'proc_type IN (1,2)' — a فاتورة and its مرتجع, never a مسوَّدة or a عرض سعر.
+        AND si.kind IN ('sale', 'sale_return', 'credit_note', 'debit_note')
+        AND ${onDate(sql`si.posted_at::date`, f.from, f.to)}
+        AND ${eqIf(sql`si.branch_id`, f.branchId)}
+        AND ${zatcaKindScope(f.kind)}
+        AND ${zatcaSyncScope(f.status)}
+      WINDOW w AS (ORDER BY si.posted_at DESC NULLS LAST, si.number DESC NULLS LAST)
+      ORDER BY si.posted_at DESC NULLS LAST, si.number DESC NULLS LAST
+      LIMIT 2000`,
+  },
 ];
 
 export const REPORT_DEFINITIONS: ReportDefinition[] = definitions;

@@ -98,7 +98,7 @@ describe('staff navigation tree', () => {
   });
 
   it('implements the operational screens promised by the desktop menu', () => {
-    for (const key of ['expense-card', 'barcode', 'sn-credit', 'sales-debit-note', 'zatca-settings', 'zatca-sent', 'sync-zatca', 'sync-prices', 'import-export', 'offers']) {
+    for (const key of ['expense-card', 'barcode', 'sn-credit', 'sales-debit-note', 'zatca-settings', 'zatca-sent', 'zatca-status', 'sync-zatca', 'sync-prices', 'import-export', 'offers']) {
       const item = allScreens.find((screen) => screen.key === key);
       expect(item, key).toBeDefined();
       expect(item?.status, key).toBe('ready');

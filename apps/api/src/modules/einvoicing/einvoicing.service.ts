@@ -66,6 +66,24 @@ function maskEncrypted(value?: string | null): string | null {
 /** The statuses that mean «the authority has this invoice» — re-filing one is a duplicate. */
 const ACCEPTED = ['cleared', 'reported'];
 
+/** ⏸ إيقاف الربط — the desktop hides the whole call behind the flag; we say why. */
+const LINK_PAUSED_MESSAGE = 'الربط موقوف — شغّله من «⚙️ إعدادات الربط الضريبي - زاتكا ZATCA» (▶ تشغيل).';
+/** 409 `EINVOICE_ALREADY_ACCEPTED`, in the words the single-invoice path already uses. */
+const ALREADY_ACCEPTED_MESSAGE = 'تم إرسال هذه الفاتورة مسبقاً — استخدم «🔁 إعادة الإرسال» إن فشل الإرسال.';
+/** 🔄 مزامنة ZATCA — how many rows one call may file. */
+const SYNC_BATCH_LIMIT = 200;
+
+/** One row of a 🔄 مزامنة ZATCA run: what happened to the invoice the clerk ticked. */
+export type SyncRow = {
+  invoiceId: string;
+  number: string | null;
+  /** `sent` — the authority accepted it · `failed` — it was refused · `skipped` — it was never sent. */
+  outcome: 'sent' | 'failed' | 'skipped';
+  status: string | null;
+  authorityStatus: string | null;
+  message: string | null;
+};
+
 @Injectable()
 export class EinvoicingService {
   private readonly logger = new Logger(EinvoicingService.name);
@@ -238,7 +256,7 @@ export class EinvoicingService {
         .select({ id: einvoiceSubmissions.id })
         .from(einvoiceSubmissions)
         .where(and(eq(einvoiceSubmissions.tenantId, tenantId), eq(einvoiceSubmissions.invoiceId, invoiceId), or(...ACCEPTED.map((status) => eq(einvoiceSubmissions.status, status)))));
-      if (accepted) throw new DomainError('EINVOICE_ALREADY_ACCEPTED', 'تم إرسال هذه الفاتورة مسبقاً — استخدم «🔁 إعادة الإرسال» إن فشل الإرسال.', 409);
+      if (accepted) throw new DomainError('EINVOICE_ALREADY_ACCEPTED', ALREADY_ACCEPTED_MESSAGE, 409);
 
       const document = await this.buildDocument(tx, tenantId, invoice, authority, context.environment);
       const privateKey = context.privateKey;
@@ -329,7 +347,7 @@ export class EinvoicingService {
       return this.recordStop(tenantId, submission, 'NO_CREDENTIALS', 'لم تُرفع بيانات الاعتماد (مفتاح وشهادة ZATCA) بعد — الفاتورة مُجهَّزة ورمز QR للمرحلة الأولى صالح.');
     }
     if (!context.settings.active) {
-      return this.recordStop(tenantId, submission, 'LINK_PAUSED', 'الربط موقوف — شغّله من «⚙️ إعدادات الربط الضريبي - زاتكا ZATCA» (▶ تشغيل).');
+      return this.recordStop(tenantId, submission, 'LINK_PAUSED', LINK_PAUSED_MESSAGE);
     }
     if (!context.csid || !context.secret) {
       // The desktop's `LoadZatcaCredential` reads `P_CSID`/`P_Secret`; with no CSID there is
@@ -560,6 +578,108 @@ export class EinvoicingService {
     if (!xml) throw new DomainError('EINVOICE_SUBMISSION_NOT_FOUND', 'Submission has no stored document to re-file', 409);
     const profile = String((context.requestPayload as Record<string, unknown>).profile ?? 'simplified');
     return this.fileWithAuthority(tenantId, context, xml, profile, filingContext);
+  }
+
+  // ── 📊 حالة المزامنة — `frmInvsSyncStatusZatca.xaml` ──────────────────────────────────────
+
+  /**
+   * 🔄 مزامنة ZATCA — `btnSync_Click` (L392-L412) and `SendZatcaAsync` (L442-L565).
+   *
+   * The desktop asks «هل انت متأكد من مزامنة الفواتير المختارة ؟», then walks the rows the
+   * clerk ticked: `IntegrateInvoice`, `UPDATE Inv SET ZatcaSent=1, InvoiceHash=…` for the
+   * ones the authority accepted, and `InsertZatcaResponse` for every one of them — so the
+   * window's grid can show «تمت العملية بنجاح ✅» next to the ones that failed.
+   *
+   * Two differences, both deliberate:
+   *
+   *   • **A paused link says so.** The desktop's `btnSync_Click` wraps the whole call in
+   *     `if (MainSetting.ZatcaIntegerationActive)`, so pressing the button with the link
+   *     off does nothing at all — silently. Here every row comes back `skipped` with the
+   *     reason, because an operator who pressed a button deserves to know why nothing
+   *     happened.
+   *   • **An invoice the authority already has is skipped, not re-filed.** The desktop
+   *     would send it again and let ZATCA reject the duplicate; part two refuses that
+   *     (409 `EINVOICE_ALREADY_ACCEPTED`) and the bulk path reports it per row instead of
+   *     aborting the batch.
+   */
+  async sync(tenantId: string, input: { ids?: string[] } = {}) {
+    const ids = [...new Set((input.ids ?? []).map((value) => String(value ?? '').trim()).filter(Boolean))];
+    // «لا توجد صفوف محددة.» — the desktop's own words for an empty selection (L457).
+    if (ids.length === 0) throw new DomainError('EINVOICE_SYNC_EMPTY', 'لا توجد صفوف محددة.', 422);
+    // A guard the desktop has no need for: it runs on one machine against one database.
+    if (ids.length > SYNC_BATCH_LIMIT) throw new DomainError('EINVOICE_SYNC_TOO_MANY', `يمكن مزامنة ${SYNC_BATCH_LIMIT} فاتورة في المرة الواحدة — اختر عدداً أقل.`, 422);
+
+    const context = await this.onboarding.filingContext(tenantId, 'zatca');
+    if (!context.settings.active) {
+      return this.syncReport(ids, ids.map((invoiceId) => ({ invoiceId, number: null, outcome: 'skipped' as const, status: null, authorityStatus: null, message: LINK_PAUSED_MESSAGE })), context.environment);
+    }
+
+    const results: SyncRow[] = [];
+    for (const invoiceId of ids) {
+      const [invoice] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select({ id: salesInvoices.id, number: salesInvoices.number, status: salesInvoices.status }).from(salesInvoices).where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, invoiceId))));
+      if (!invoice) {
+        results.push({ invoiceId, number: null, outcome: 'skipped', status: null, authorityStatus: null, message: 'الفاتورة غير موجودة.' });
+        continue;
+      }
+      if (invoice.status !== 'posted') {
+        results.push({ invoiceId, number: invoice.number, outcome: 'skipped', status: null, authorityStatus: null, message: 'الفاتورة غير مرحَّلة — لا تُرسل إلا بعد ترحيلها.' });
+        continue;
+      }
+      const [accepted] = await withTenantTx(this.database.db, tenantId, (tx) => tx
+        .select({ id: einvoiceSubmissions.id })
+        .from(einvoiceSubmissions)
+        .where(and(eq(einvoiceSubmissions.tenantId, tenantId), eq(einvoiceSubmissions.invoiceId, invoiceId), or(...ACCEPTED.map((status) => eq(einvoiceSubmissions.status, status))))));
+      if (accepted) {
+        results.push({ invoiceId, number: invoice.number, outcome: 'skipped', status: null, authorityStatus: null, message: ALREADY_ACCEPTED_MESSAGE });
+        continue;
+      }
+
+      try {
+        const submission = await this.submitSalesInvoice(tenantId, invoiceId, 'zatca');
+        if (!submission) {
+          results.push({ invoiceId, number: invoice.number, outcome: 'failed', status: null, authorityStatus: null, message: 'لم تُنتَج وثيقة إرسال لهذه الفاتورة.' });
+          continue;
+        }
+        const outcome = ACCEPTED.includes(submission.status) ? 'sent' : submission.status === 'failed' ? 'failed' : 'skipped';
+        const response = (submission.response ?? {}) as Record<string, unknown>;
+        results.push({
+          invoiceId,
+          number: invoice.number,
+          outcome,
+          status: submission.status,
+          authorityStatus: submission.authorityStatus ?? null,
+          message: submission.error ?? (typeof response.message === 'string' ? response.message : null),
+        });
+      } catch (error) {
+        // One invoice that cannot be filed must not stop the ones behind it — the desktop
+        // keeps walking its grid too, and writes the failure on the row that earned it.
+        const code = error instanceof DomainError ? error.code : '';
+        results.push({
+          invoiceId,
+          number: invoice.number,
+          outcome: code === 'EINVOICE_ALREADY_ACCEPTED' || code === 'EINVOICE_INVOICE_NOT_POSTED' ? 'skipped' : 'failed',
+          status: null,
+          authorityStatus: null,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return this.syncReport(ids, results, context.environment);
+  }
+
+  /** The counts and the one line the window shows — «تمت العملية بنجاح ✅» (L563). */
+  private syncReport(ids: string[], results: SyncRow[], environment: string) {
+    const sent = results.filter((row) => row.outcome === 'sent').length;
+    const failed = results.filter((row) => row.outcome === 'failed').length;
+    const skipped = results.filter((row) => row.outcome === 'skipped').length;
+    const message =
+      sent === 0 && failed === 0
+        ? 'لم تُرسل أي فاتورة — راجع «الرسالة» أمام كل صف.'
+        : sent > 0 && failed === 0
+          ? 'تمت العملية بنجاح ✅'
+          : `أُرسلت ${sent} من ${ids.length} فاتورة، ولم تُقبل ${failed}. راجع «الرسالة» أمام كل صف.`;
+    return { requested: ids.length, sent, failed, skipped, environment, authority: 'zatca', message, results };
   }
 
   private async createEtaStub(tenantId: string, invoiceId: string, environment: 'simulation' | 'production') { const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(einvoiceSubmissions).values({ id: newId(), tenantId, invoiceId, authority: 'eta', environment, status: 'not_implemented', error: 'ETA adapter is stubbed until certification scope is approved' }).returning()); return row; }

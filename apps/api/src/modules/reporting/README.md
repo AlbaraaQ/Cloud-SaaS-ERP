@@ -39,6 +39,20 @@ And two filter kinds: **`time`** (⏰ الوقت (HH:mm:ss), glued to the date b
 resolved from the caller. It is declared before `@Get(':key')` for the same reason
 `layouts` is.
 
+## 🔄 مزامنة الفواتير - ZATCA — `frmInvsSyncStatusZatca` (phase 11, part three)
+
+`einvoice-sync-status` is registered here rather than in the ZATCA module, because the
+window is a grid with filters that prints and exports — which is what this catalogue is
+for — glued to one action (`POST /einvoice/sync`, permission `einvoice.submit`). The
+window's own filters are 🔄 حالة المزامنة (`status`), 📋 نوع الفاتورة (`kind`:
+مبيعات · نقطة بيع · إشعار · مقاولات · أندرويد) and 📅 الفترة الزمنية (`from`/`to`), and its
+💰 cards are `RecalculateNetSummary`'s two sums and their difference, so the number under
+the grid is the grid's own arithmetic.
+
+One quirk is kept on purpose: «أندرويد» is index 4 of the desktop's combo, and its
+`switch` has no case for it (`frmInvsSyncStatusZatca.xaml.cs` L913-L920), so picking it
+adds **no condition at all** and the window shows every invoice.
+
 ## 📦 تقارير الأصناف — `frmRptItems*` (phase 10, part two)
 
 Six desktop windows that all read `inv_sub` grouped over `Items`, registered here as seven

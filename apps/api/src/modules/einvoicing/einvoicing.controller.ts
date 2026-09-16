@@ -81,6 +81,16 @@ export class EinvoicingController {
   @Get('einvoice/chain') @RequiresPermission('einvoice.view')
   chain() { return this.einvoicing.chain(getTenantContext().tenantId); }
 
+  // ── 📊 حالة المزامنة (`frmInvsSyncStatusZatca.xaml`) ──────────────────────────────────
+
+  /**
+   * 🔄 مزامنة ZATCA — files the invoices the clerk ticked in «مزامنة الفواتير - ZATCA».
+   * Every row comes back with what happened to it, so a partial failure is visible next
+   * to the invoice that earned it rather than hidden behind one message.
+   */
+  @Post('einvoice/sync') @RequiresPermission('einvoice.submit')
+  sync(@Body() body: { ids?: string[] } = {}) { return this.einvoicing.sync(getTenantContext().tenantId, body ?? {}); }
+
   @Put('einvoice/credentials') @RequiresPermission('einvoice.credentials.manage') putCredentials(@Body() body: CredentialInput) { return this.einvoicing.upsertCredentials(getTenantContext().tenantId, body); }
   @Get('einvoice/credentials') @RequiresPermission('einvoice.view') credentials() { return this.einvoicing.listCredentials(getTenantContext().tenantId); }
   @Get('einvoice/submissions') @RequiresPermission('einvoice.view') submissions(@Query('status') status?: string) { return this.einvoicing.submissions(getTenantContext().tenantId, status); }

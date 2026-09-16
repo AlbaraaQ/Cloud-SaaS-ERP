@@ -138,6 +138,35 @@ Four rules worth knowing before you touch this code:
 - **`cbc:PrepaidAmount` is always `0.00`.** The desktop's document model has no prepayment
   field, and declaring the till's cash as a prepayment would force `PayableAmount` to zero.
 
+## Phase 11 part three — 📊 حالة المزامنة (`frmInvsSyncStatusZatca`)
+
+The window that answers «which of these invoices did ZATCA take?» is now a registered
+report (`einvoice-sync-status`, in `modules/reporting/report-catalog.ts`) plus one action
+endpoint. Registering it is what makes 🖨️ طباعة, 👁️ معاينة and 📊 تصدير Excel the same
+engine every `frmRpt*` window uses — the desktop prints `Reports/rptInvSumByClient.repx`,
+and the exported workbook is now a real one instead of the CSV the desktop writes behind
+that label.
+
+| endpoint | permission | what it is |
+|---|---|---|
+| `GET /reports/einvoice-sync-status?status&kind&from&to&branchId` | `reporting.view` | the grid: every posted invoice with ✅ مرسل / ❌ لم يُرسل, the authority's «الرسالة», and the summary cards |
+| `POST /einvoice/sync` | `einvoice.submit` | 🔄 مزامنة ZATCA — files the invoices the clerk ticked, one by one, and reports what happened to each |
+
+What `POST /einvoice/sync` answers:
+
+| outcome | when |
+|---|---|
+| `sent` | the authority accepted it (`reported` or `cleared`) |
+| `failed` | it was dialled and refused — the message is the authority's own |
+| `skipped` | a draft, an invoice the authority already has, or ⏸ إيقاف الربط — with the reason |
+
+`message` is «تمت العملية بنجاح ✅», the desktop's own line, when every selected row was
+accepted, and the count of what was not otherwise.
+
+Reading the grid is `reporting.view` because the grid *is* a report; filing is
+`einvoice.submit`; producing the file is `reporting.export.execute`. Three separate
+permissions, because three different people press those buttons.
+
 ## Runbook
 
 1. Fill in بطاقة المنشأة — a missing VAT number makes every document invalid.
@@ -159,6 +188,10 @@ Four rules worth knowing before you touch this code:
 6. `node scripts/verify-einvoice-zatca-filing.mjs` drives the whole path against a running
    stack — sign, clear, report, chain, credit note, pause, retry, paging, permissions — through
    the 🧪 simulator, and restores what it changed.
+7. 🔄 مزامنة الفواتير - ZATCA (`/settings/zatca/status`) is where a day's work is swept up:
+   filter by ❌ غير مرسل, tick what should have gone, press 🔄 مزامنة ZATCA. Unsent invoices
+   are the ones the authority does not have — a failed filing is a stored document waiting
+   for 🔁 إعادة الإرسال, and a skipped one never left the building.
 
 Egypt ETA keeps the same adapter boundary and returns an explicit `501 ETA_NOT_IMPLEMENTED`
 until certification scope is approved.

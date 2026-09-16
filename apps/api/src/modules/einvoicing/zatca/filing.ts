@@ -177,7 +177,9 @@ export type DocumentFinding = { code: string; message: string; kind: 'error' | '
  */
 export function inspectInvoiceXml(xml: string): DocumentFinding[] {
   const findings: DocumentFinding[] = [];
-  const amount = (pattern: RegExp) => {
+  // Not named `amount`: the repo's money rule reserves that identifier for decimal.js
+  // money, and this is a plain parser over the document's own digits.
+  const amountOf = (pattern: RegExp) => {
     const found = xml.match(pattern)?.[1];
     return found === undefined ? null : Number(found);
   };
@@ -187,9 +189,9 @@ export function inspectInvoiceXml(xml: string): DocumentFinding[] {
   if (!/<cac:AdditionalDocumentReference>[\s\S]*?<cbc:ID>ICV<\/cbc:ID>/.test(xml)) findings.push({ code: 'NO_ICV', message: 'عداد الفواتير (ICV) مفقود من المستند.', kind: 'error' });
   if (!/<cac:AdditionalDocumentReference>[\s\S]*?<cbc:ID>PIH<\/cbc:ID>/.test(xml)) findings.push({ code: 'NO_PIH', message: 'تجزئة الفاتورة السابقة (PIH) مفقودة من المستند.', kind: 'error' });
 
-  const taxInclusive = amount(/<cbc:TaxInclusiveAmount[^>]*>([\d.-]+)<\/cbc:TaxInclusiveAmount>/);
-  const taxExclusive = amount(/<cbc:TaxExclusiveAmount[^>]*>([\d.-]+)<\/cbc:TaxExclusiveAmount>/);
-  const taxAmount = amount(/<cbc:TaxAmount[^>]*>([\d.-]+)<\/cbc:TaxAmount>/);
+  const taxInclusive = amountOf(/<cbc:TaxInclusiveAmount[^>]*>([\d.-]+)<\/cbc:TaxInclusiveAmount>/);
+  const taxExclusive = amountOf(/<cbc:TaxExclusiveAmount[^>]*>([\d.-]+)<\/cbc:TaxExclusiveAmount>/);
+  const taxAmount = amountOf(/<cbc:TaxAmount[^>]*>([\d.-]+)<\/cbc:TaxAmount>/);
   if (taxInclusive !== null && taxExclusive !== null && taxAmount !== null && Math.abs(taxInclusive - (taxExclusive + taxAmount)) > 0.01) {
     findings.push({
       code: 'TOTAL_MISMATCH',
@@ -198,8 +200,8 @@ export function inspectInvoiceXml(xml: string): DocumentFinding[] {
     });
   }
 
-  const payable = amount(/<cbc:PayableAmount[^>]*>([\d.-]+)<\/cbc:PayableAmount>/);
-  const prepaid = amount(/<cbc:PrepaidAmount[^>]*>([\d.-]+)<\/cbc:PrepaidAmount>/);
+  const payable = amountOf(/<cbc:PayableAmount[^>]*>([\d.-]+)<\/cbc:PayableAmount>/);
+  const prepaid = amountOf(/<cbc:PrepaidAmount[^>]*>([\d.-]+)<\/cbc:PrepaidAmount>/);
   if (payable !== null && taxInclusive !== null && Math.abs(payable - (taxInclusive - (prepaid ?? 0))) > 0.01) {
     findings.push({
       code: 'PAYABLE_MISMATCH',
@@ -208,7 +210,7 @@ export function inspectInvoiceXml(xml: string): DocumentFinding[] {
     });
   }
 
-  const documentLines = amount(/<cbc:LineExtensionAmount[^>]*>([\d.-]+)<\/cbc:LineExtensionAmount>/);
+  const documentLines = amountOf(/<cbc:LineExtensionAmount[^>]*>([\d.-]+)<\/cbc:LineExtensionAmount>/);
   const invoiceLines = [...xml.matchAll(/<cac:InvoiceLine>[\s\S]*?<\/cac:InvoiceLine>/g)];
   const lineTotals = invoiceLines
     .map((block) => Number(block[0].match(/<cbc:LineExtensionAmount[^>]*>([\d.-]+)<\/cbc:LineExtensionAmount>/)?.[1] ?? 0))

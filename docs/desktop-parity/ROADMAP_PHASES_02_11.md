@@ -172,7 +172,7 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Accept (each part): every ported report matches desktop columns/filters; print-ready
   Arabic RTL; new tests + a re-runnable live script; a real route in the staff tree.
 
-## Phase 11 — Zatca / ETA / integrations 🟡 parts one–two done (2026-09, `PHASE_11_EINVOICING.md`)
+## Phase 11 — Zatca / ETA / integrations 🟡 parts one–three done (2026-09, `PHASE_11_EINVOICING.md`)
 
 - [x] Desktop (part one): `frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160),
   `Class/ZatcaService.cs` (546), `Class/ZatcaCredential.cs`,
@@ -198,8 +198,14 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
   the chain slot) and `GET /einvoice/chain`; `POST /einvoice/submissions/:id/retry`
   re-files a stored document without moving its hash. Staff `/settings/zatca/sent`.
   (16 tests + 53 live checks.)
-- [ ] Part three — 📊 `frmInvsSyncStatusZatca`: the sync-status grid, its filters and its
-  statuses.
+- [x] Part three — 📊 `frmInvsSyncStatusZatca.xaml` (559) + `.xaml.cs` (1165): the window is
+  a registered report (`einvoice-sync-status`) — the grid's eleven columns, 🔄 حالة
+  المزامنة, 📋 نوع الفاتورة (مبيعات · نقطة بيع · إشعار · مقاولات · أندرويد), 📅 الفترة
+  الزمنية, 💰 «الصافي» = المبيعات − المردودات — so 🖨️ طباعة, 👁️ معاينة and 📊 تصدير Excel
+  go through the report engine the way the desktop's `PrintReport` goes through
+  `rptInvSumByClient.repx`; and `POST /einvoice/sync` (permission `einvoice.submit`) is
+  🔄 مزامنة ZATCA, which files the ticked rows and answers `sent` / `failed` / `skipped`
+  per row. (16 tests + 53 live checks.)
 - [ ] Part four — 🇪🇬 `frmEtaSetting` + `EtaService` + `EtaReciptService`.
 - [ ] Part five — 💳 `Geidea.cs` · `NeoleapService.cs` · `WhatsAppSender.cs`.
 - [ ] Accept: onboarding → sign → send → poll → credit/debit-note flow certified
