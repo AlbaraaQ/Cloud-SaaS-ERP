@@ -1631,6 +1631,15 @@ const settings: ModuleNode = {
           permission: 'tenant.settings.manage',
           endpoint: '/settings',
         }),
+        // 🖨️ إعدادات الطباعة — `SettingPrint` of the desktop (`frmSettings.xaml`
+        // «خيارات الطباعة» + `frmInvRptType.xaml`). Reading them is part of viewing a
+        // report; changing them is part of owning the report designer's surface, so the
+        // screen carries `reporting.layout.manage`.
+        screen('printing-settings', 'إعدادات الطباعة', 'Printing settings', '/settings/printing', 'ready', {
+          permission: 'reporting.layout.manage',
+          endpoint: 'GET·PUT·DELETE /reports/print-settings/:scope',
+          description: 'frmSettings.xaml «خيارات الطباعة» · frmInvRptType.xaml · Class/Print.cs — رأس · تذييل · ختم · عدد النسخ · الطابعة',
+        }),
         screen('language', 'اللغة', 'Language', '/settings/language', 'ready', {
           endpoint: 'client-side preference (localStorage)',
         }),

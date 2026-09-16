@@ -206,6 +206,78 @@ paid, «نقدي»/«شبكة» when one leg settled the invoice, «متعدد»
   («📅 السنة» — مربّع نصّي كصاحبه في `frmRptSalary`)، و«👤 المستخدم» يركب فلتر الموظف
   لأنّ السجلّ يسمّي الفاعل والديسكتوب يسمّي الموظف، والطريق بينهما العضوية.
 
+## 🖨️ إعدادات الطباعة — `frmSettings.xaml` «خيارات الطباعة» · `frmInvRptType` · `Print.cs` (phase 10, part seven)
+
+`SettingPrint` is the desktop's print profile: one row per document kind, read by 69 `.cs`
+files through `Class/Print.cs` and written by `frmSettings.xaml.cs` L2125-L2156 (delete +
+insert). The cloud keeps the table, the field names and the defaults, and replaces the
+`Inv_Id` integer with a **named scope**, because the desktop's own windows disagree about
+what those integers mean: `frmSettings` saves 0 الإفتراضي · 1 مشتريات · 2 مبيعات · 3 نقطة بيع ·
+4 تأجير · 5 عقود · 6 تقارير (L2095-L2116), while `frmRptKhzna` L106 reads `Inv_Id=12`,
+`frmRptEntries` reads 9 and `frmRptRentInvoices` L541 reads 14.
+
+| Scope | الديسكتوب | `Inv_Id` في `frmSettings` |
+|---|---|---|
+| `default` | «الإفتراضي» | 0 |
+| `purchases` | «مشتريات» | 1 |
+| `sales` | «مبيعات» | 2 |
+| `pos` | «نقطة بيع» | 3 |
+| `rental` | «تأجير» | 4 |
+| `contracts` | «عقود» | 5 |
+| `reports` | «تقارير» | 6 |
+| `report:<key>` | — | — |
+
+`print_settings` (migration `0061`) is tenant-scoped and RLS-protected like every other
+tenant table. A report's own scope is consulted first, then `reports`, then `default` —
+`PrintSettingsService.effective()` walks that chain, so «🧩 تفعيل إعدادات الطباعة» keeps
+working the way the radios promise.
+
+| Route | Permission |
+|---|---|
+| `GET /reports/print-settings` | `reporting.view` |
+| `GET /reports/print-settings/:scope` | `reporting.view` |
+| `PUT /reports/print-settings/:scope` | `reporting.layout.manage` |
+| `DELETE /reports/print-settings/:scope` | `reporting.layout.manage` |
+
+What the printed sheet honours (`PrintTemplatesService.reportSheet`):
+
+- **`printNo` — عدد النسخ.** `Printing()` loops `Print()` that many times (L201-L206); the
+  sheet is repeated that many times, each copy on its own page, and the doc-meta line prints
+  «عدد النسخ: N». «👁️ معاينة الطباعة» and «طباعة / PDF» print the same sheet — both call
+  `ReportingService.printOptionsFor()`, so the desktop's one `Print.cs` stays one code path.
+- **`printType` — نوع الورقة.** 1 = A4 landscape, 2 = 🧾 ورق صغير (80mm). The two radios of
+  `frmInvRptType.xaml` «🖨️ افتراضي طباعة الفواتير».
+- **`printHeader` · `printFooter` — الترويسة والتذييل.** `Printing()` injects `header.repx`
+  and `footer.repx` into the `headerRpt` / `footerRpt` subreports; here the company block
+  (name · tax no · CR · contact) and the contact line under the grid are what appear.
+- **`printStamp` · `stampImageUrl` — الختم.** The stamp image prints under the signatures.
+- **`note` — ملاحظات التقرير.** Printed under the grid, `txtNote` of `frmSettings`.
+- **`casherPrinter` · `kitchenPrinter` — الطابعتان.** Saved, and shown beside the print
+  button (a `.no-print` toolbar note). A server cannot reach a shop's printer; the
+  browser's print dialog is the operator's.
+
+`?copies=` and `?paper=a4|small` override the row for one print without saving anything —
+the cashier who needs four copies once does not have to change the shop's defaults.
+
+Documents read their own scope through `PrintTemplatesService.documentPage()`, because
+`Print.cs` is the desktop's invoice printer before it is its report printer: `frmPurchInv`
+prints with `new Print(1)` → `purchases`, `frmSalesInvoice` with `new Print(InvType)` = 2 →
+`sales`, `frmCloseShift` reads `SettingPrint WHERE Inv_Id = 6` → `reports`, and the voucher
+(`frmSandQD`, `new Print(11)`) and the journal entry (`FrmNewEntry`, `Inv_Id=9`) use numbers
+no radio of `frmSettings` can write, so they fall through to `default`. Each document gets
+the same treatment: `printNo` copies, the paper of `printType`, `header.repx` / `footer.repx`
+and the stamp.
+
+Defaults when no row exists are `Print.cs` L54-L64 (`PrintHeader=true`, `PrintFooter=false`,
+`printNo=1`, `printItemType=1`) with `printType=1`, because this platform prints A4 PDFs and
+`frmInvRptType` opens on «📄 ورقة A4». Images are URLs, not the desktop's `[image]` bytes:
+this service has no byte store.
+
+Validation is a gate, not a suggestion: `printNo` 1..50, `printType` 1|2, images must be
+`http(s)` URLs, an unknown scope is 404 `PRINT_SCOPE_INVALID`, and `report:<key>` is
+rejected unless the report is registered. A typo therefore cannot create a row that
+silently prints nothing.
+
 ## Saved layouts — مصمم التقارير
 
 `report_layouts` (migration `0028`) is the whole persistence of the report designer, and it

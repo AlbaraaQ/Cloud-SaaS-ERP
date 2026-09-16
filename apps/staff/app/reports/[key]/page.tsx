@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { use, useEffect, useMemo, useState } from 'react';
 
 import { DataTable, Notice, QueryView } from '../../../components/data-view';
@@ -169,6 +170,10 @@ export default function ReportRunnerPage({ params }: { params: Promise<{ key: st
           <button type="button" className="btn no-print" disabled={!result || busy !== null} onClick={() => void download('pdf')}>
             {busy === 'pdf' ? 'جارٍ التجهيز…' : 'طباعة / PDF'}
           </button>
+          {/* 🖨️ «طباعة / PDF» يطبع الورقة بإعدادات «خيارات الطباعة» (SettingPrint) — وهذا رابطها. */}
+          <Link className="btn no-print" href="/settings/printing">
+            إعدادات الطباعة
+          </Link>
         </>
       }
     >

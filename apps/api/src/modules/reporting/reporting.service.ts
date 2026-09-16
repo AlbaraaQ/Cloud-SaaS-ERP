@@ -7,6 +7,7 @@ import { withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 
+import { PrintSettingsService, reportScope } from './print-settings.service.js';
 import { PrintTemplatesService } from './print-templates.service.js';
 import {
   REPORT_DEFINITIONS,
@@ -117,7 +118,24 @@ export class ReportingService {
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly layouts: ReportLayoutsService,
     private readonly print: PrintTemplatesService,
+    private readonly printSettings: PrintSettingsService,
   ) {}
+
+  /**
+   * 🖨️ إعدادات الطباعة الفعلية لتقرير واحد — the `SettingPrint` row through the
+   * `report:<key>` → «تقارير» → «الإفتراضي» chain, plus the one-print overrides of the
+   * query string (`?copies=` · `?paper=`), which is what a cashier changing the number of
+   * copies for a single print needs.
+   */
+  private async printOptionsFor(tenantId: string, key: string, params: Record<string, string | undefined>) {
+    const settings = await this.printSettings.effective(tenantId, [reportScope(key), 'reports', 'default']);
+    const requested = params.paper === 'small' || params.paper === 'a4' ? params.paper : undefined;
+    return {
+      settings,
+      copies: clampPrintNo(params.copies ?? settings.printNo),
+      paper: (requested ?? (settings.printType === 2 ? 'small' : 'a4')) as 'a4' | 'small',
+    };
+  }
 
   /** Everything a client needs to render every report without hard-coding any of them. */
   catalog() {
@@ -198,6 +216,8 @@ export class ReportingService {
         generatedAt: report.generatedAt,
         emptyAr: definition.emptyAr,
         signature: definition.signature ?? false,
+        // 🖨️ كيف تُطبع هذه الورقة — `Print.cs` `Printing()` reads the same fields.
+        print: await this.printOptionsFor(tenantId, key, params),
       },
       userId,
     );
@@ -260,6 +280,9 @@ export class ReportingService {
         generatedAt: report.generatedAt,
         emptyAr: definition.emptyAr,
         signature: definition.signature ?? false,
+        // 🖨️ «طباعة / PDF» and «👁️ معاينة الطباعة» print the same sheet, so both honor
+        // `SettingPrint` — the desktop has one `Print.cs` for both buttons too.
+        print: await this.printOptionsFor(tenantId, key, params),
       });
       return { ...base, filename: `${key}-${stamp}.html`, mimeType: 'text/html; charset=utf-8', encoding: 'utf-8' as const, content: html, printable: true as const };
     }
@@ -364,6 +387,13 @@ export function toCsv(columns: ReportColumn[], rows: Array<Record<string, string
 }
 
 export function isNumericColumn(column: ReportColumn): boolean { return NUMERIC_TYPES.has(column.type); }
+
+/** 🔢 عدد النسخ — `printNo` of `SettingPrint`, clamped the way the desktop's loop is (1..50). */
+function clampPrintNo(value: number | string | undefined): number {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.min(50, Math.max(1, Math.trunc(parsed)));
+}
 
 function rowsOf(result: unknown): Array<Record<string, unknown>> {
   return Array.isArray(result) ? (result as Array<Record<string, unknown>>) : ((result as { rows?: Array<Record<string, unknown>> }).rows ?? []);

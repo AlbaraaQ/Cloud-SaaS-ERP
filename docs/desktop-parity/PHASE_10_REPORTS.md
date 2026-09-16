@@ -1,9 +1,12 @@
 # المرحلة 10 — التقارير (94 `.repx` → محرّك التقارير في السحابة)
 
-**الحالة: الجزء الأول مُنجز** — 📊 حركة المبيعات (`Form_WPF/frmRptSalesInPeriod` +
-`Reports/RptSalesInPeriod1.repx` + `RptSalesInPeriod2.repx`؛ **10** اختبارات API و**59**
-نقطة تحقّق حيّة، **777** اختبار API). ما بقي من المرحلة 10 ستة أجزاء مبيّنة في §3،
-و`SettingPrint` (إعدادات الطباعة) مؤجَّل إلى جزءٍ لاحق (§6).
+**الحالة: الأجزاء السبعة مُنجزة** — من 📊 حركة المبيعات (`Form_WPF/frmRptSalesInPeriod`
++ `Reports/RptSalesInPeriod1.repx` + `RptSalesInPeriod2.repx`) إلى آخرها 🖨️ إعدادات
+الطباعة: `frmSettings.xaml` «خيارات الطباعة» + `frmInvRptType.xaml` «🖨️ افتراضي طباعة
+الفواتير» + `Class/Print.cs` + `Reports/header.repx`/`footer.repx`، وجدول
+`print_settings` (migration `0061`) بسبعة نطاقات ونطاقٍ لكل تقرير؛ **15** اختباراً
+و**34** نقطة تحقّق حيّة في الجزء السابع، و**852** اختبار API في المجموع. الأجزاء
+مبيّنة في §3، ومعايير القبول في §11، وما أُجِّل عن قصد في §12.
 
 الغرض: نقل **التقارير** كما يبنيها الديسكتوب — أعمدتها وفلاترها ومجاميعها وصفحة
 طباعتها — لا اختراع تقارير جديدة. المحرّك موجود في السحابة منذ الإصدار الأول
@@ -22,7 +25,7 @@
 | نوافذ العرض والترشيح | `Form_WPF/frmRpt*.xaml` + `.xaml.cs` — **32** نافذة (الجدول أدناه) |
 | حشو البيانات وطباعتها | `Class/Report.cs` (610 سطراً: `BindToData` L380 وL533 · `Printing` L463 · `CreateDgv` L19 · `LoadDGvSetting` L248) · `Class/Print.cs` · `Class/InvPrinter.cs` |
 | الرأس والتذييل | `Reports/header.repx` (المنشأة · النشاط · الرقم الضريبي · السجل التجاري · هاتف · جوال) · `Reports/footer.repx` (العنوان · هاتف) · `Common.FoundationInfoDT` |
-| إعدادات الطباعة | جدول `SettingPrint` — `CrystalLiteDB.txt` L2260 (`Inv_Id` · `PrintHeader` · `PrintFooter` · `PrintStamp` · `printNo` · `printType` · `CasherPrinter` · `RptUrl` · `RptName`)؛ `frmRptSalesInPeriod` يقرأ `Inv_Id=12` |
+| إعدادات الطباعة | جدول `SettingPrint` — `CrystalLiteDB.txt` L2260-L2280 (`Inv_Id` · `PrintTotItem` · `PrintTotGroup` · `PrintHeader` · `PrintFooter` · `PrintStamp` · `printNo` · `printType` · `CasherPrinter` · `Kitchenprinter` · `RptName` · `RptUrl` · `note` · `PrintItemType` · `PrintComponentsItemsIndividually` · `printmakpay` والصور الثلاث)؛ تكتبه `frmSettings.xaml.cs` L2125-L2156 وتقرأه `Class/Print.cs`؛ و`frmRptSalesInPeriod` يقرأ `Inv_Id=12` و`frmRptKhzna` يقرأ 12 و`frmRptEntries` يقرأ 9 و`frmRptRentInvoices` يقرأ 14 — نُقل في الجزء السابع (§10) |
 
 ### النوافذ الاثنتان والثلاثون (`Form_WPF/frmRpt*`)
 
@@ -89,7 +92,7 @@
 | 4 | 📚 تقارير المخزون والأرقام التسلسلية — `frmRptInventory` · `frmRptItemsActivity(Detailed)` · `frmRptItemsExpiration` · `frmRptSerialNo` · `frmRptSerialNoSummary` · `frmRptProducedItems` | ✅ مُنجز (§7) |
 | 5 | 📒 تقارير المحاسبة — `frmRptBalances` · `frmRptEntries` · `frmRptIncomeStatement` · `frmRptCostCenter` · `frmTaxRptPeriod` | ✅ مُنجز (§8) |
 | 6 | 💰 تقارير الخزينة والرواتب والمستخدمين — `frmRptKhzna` · `frmRptSalary` · `frmRptReseved` · `frmrptUsersRecords` · `frmRptRentInvoices` · `frmInvRptType` | ✅ مُنجز (§9) — و`frmInvRptType` إلى الجزء السابع |
-| 7 | 🖨️ إعدادات الطباعة — `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة) و`Reports/header.repx`/`footer.repx` لكل تقرير | ⬜ |
+| 7 | 🖨️ إعدادات الطباعة — `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة) و`Reports/header.repx`/`footer.repx` لكل تقرير | ✅ مُنجز (§10) |
 
 ## 4. الجزء الأول — 📊 حركة المبيعات (`frmRptSalesInPeriod`)
 
@@ -714,7 +717,7 @@
 
 ونافذةٌ سادسة، `frmInvRptType.xaml` «🖨️ افتراضي طباعة الفواتير» (122/72)، نافذةُ إعدادٍ
 راديوان («📄 ورقة A4» · «🧾 ورق صغير») تكتب `UPDATE sett SET val = 1|2 WHERE id = 1`
-ولا تعرض شبكةً واحدة — فهي من إعدادات الطباعة، مؤجَّلة إلى الجزء السابع (§11).
+ولا تعرض شبكةً واحدة — فهي من إعدادات الطباعة، وقد نُقلت في الجزء السابع (§10.1 و§10.4).
 
 ### 9.2 السطح (نقاط النهاية)
 
@@ -774,9 +777,9 @@
 7. **أعمدةٌ سحابيةٌ زائدة** — «قيمة الفترة · الإضافات · التأمين · الإجمالي · المرافقون»
    في «فواتير التأجير» (كما أُضيف «رقم الأمر والمرجع والحالة» في الجزء الرابع).
 8. **«إجمالي الفترة:» لم يُنقل** — تسميةٌ في `frmRptRentInvoices` (L500) بلا صندوقِ
-   قيمةٍ في النافذة نفسها: لا رقمَ لها عند الديسكتوب فلا رقمَ لها عندنا (§11).
+   قيمةٍ في النافذة نفسها: لا رقمَ لها عند الديسكتوب فلا رقمَ لها عندنا (§12).
 9. **📱 الجوال عمودٌ لا فلتر** — النافذة تعرّض مربّعاً نصّياً للجوال، والبحثُ النصّيُّ
-   على رقم هاتف ليس فلتراً في محرّك التقارير (§11).
+   على رقم هاتف ليس فلتراً في محرّك التقارير (§12).
 
 ### 9.6 الاختبارات والتحقّق الحيّ
 
@@ -793,7 +796,137 @@
   مراتٍ متتالية بصفر فشل؛ ويُنهِي التشغيلُ خدمةَ من استخدمهم من الموظفين ليبدأ
   التشغيلُ التالي بعدّادٍ من اثنين.
 
-## 10. معايير القبول لكل جزء
+## 10. الجزء السابع — 🖨️ إعدادات الطباعة (`frmSettings.xaml` «خيارات الطباعة» · `frmInvRptType.xaml` · `Class/Print.cs`)
+
+### 10.1 النوافذ وما تقرأه
+
+| الملف | ما هو | ما يقرأه/يكتبه |
+|---|---|---|
+| `Form_WPF/frmSettings.xaml` (2364 سطراً) | نافذة الإعدادات، وتبويب «خيارات الطباعة» فيها (الأسطر 889-1312) | يقرأ `SettingPrint WHERE Inv_Id=@id` (L1237) و`PrinterSettings` (L1293)، ويكتب بـ`delete` ثم `insert` (L2125-L2156) |
+| `Form_WPF/frmInvRptType.xaml` (122 سطراً) | «🖨️ افتراضي طباعة الفواتير» | راديوان: «📄 ورقة A4» · «🧾 ورق صغير» → `UPDATE sett SET val = 1|2 WHERE id = 1` |
+| `Class/Print.cs` (1237 سطراً) | محرّك الطباعة لكل نافذة | `Print(int RptId)` يقرأ الصف، و`Printing()` يُصدِر الورقة |
+| `Reports/header.repx` · `Reports/footer.repx` | الترويسة والتذييل | يربطان `Common.FoundationInfoDT`: الاسم بالعربية والإنجليزية · النشاط · الرقم الضريبي · الجوال · الهاتف · السجل التجاري |
+
+`SettingPrint` عموداً عموداً (`CrystalLiteDB.txt` L2260-L2280)، ومقابلُه في السحابة:
+
+| العمود | الشاشة | في السحابة |
+|---|---|---|
+| `Inv_Id` | راديوات «🧩 تفعيل إعدادات الطباعة» | **`scope` نصّي**: `default` · `purchases` · `sales` · `pos` · `rental` · `contracts` · `reports` · `report:<key>` |
+| `printType` | راديوا `frmInvRptType` | `print_type` 1 = A4 · 2 = ورق صغير |
+| `PrintHeader` | «طباعة ترويسة الفاتورة» (`chkInvHeader`) | `print_header` |
+| `PrintFooter` | «طباعة تذييل الفاتورة» (`chkInvFooter`) | `print_footer` |
+| `PrintStamp` | «طباعة الختم» (`ckPrintStamp`) | `print_stamp` |
+| `PrintTotItem` | «طباعة تفاصيل الأصناف» (`ckPrintItems`) | `print_item_details` |
+| `PrintTotGroup` | «طباعة مجموعات الأصناف مع إغلاق اليومية» (`ckPrintGroups`) | `print_item_groups` |
+| `PrintComponentsItemsIndividually` | «طباعة مكونات الأصناف المركبة بشكل منفرد» | `print_components_individually` |
+| `printmakpay` | «طباعة make pay» | `print_make_pay` |
+| `printNo` | «عدد النسخ» (`cmbPrintNo`) | `print_no` 1..50 |
+| `PrintItemType` | — | `print_item_type` |
+| `CasherPrinter` · `kitchenprinter` | «طابعة الكاشير» · «طابعة المطبخ» | `casher_printer` · `kitchen_printer` |
+| `RptName` · `RptURl` | «اسم التقرير» · «مسار التقرير» | `rpt_name` · `rpt_url` |
+| `note` | «ملاحظات التقرير» (`txtNote`) | `note` |
+| `HeaderImage` · `FooterImage` · `StampImage` | «الترويـسة» · «التـذيـيـل» · «الخـتـم» (📂 رفع · 🗑️ حذف) | `header_image_url` · `footer_image_url` · `stamp_image_url` |
+
+### 10.2 السطح (نقاط النهاية)
+
+| الطريقة | المسار | الإذن |
+|---|---|---|
+| `GET` | `/reports/print-settings` | `reporting.view` |
+| `GET` | `/reports/print-settings/:scope` | `reporting.view` |
+| `PUT` | `/reports/print-settings/:scope` | `reporting.layout.manage` |
+| `DELETE` | `/reports/print-settings/:scope` | `reporting.layout.manage` |
+| `GET` | `/reports/print/:key` (قائم) | `reporting.view` — يقرأ الإعدادات الآن |
+| `POST` | `/reports/:key/export?format=pdf` (قائم) | `reporting.export.execute` — الورقة نفسها |
+| `GET` | `/reports/print/invoices/:id` · `/purchase-invoices/:id` · `/vouchers/:id` · `/journal-entries/:id` · `/shifts/:id` (قائمة) | `reporting.view` — تقرأ الإعدادات الآن |
+
+والوثائق الخمس تقرأ نطاقها كما يقرأها الديسكتوب: `frmPurchInv` يطبع بـ`new Print(1)`
+«مشتريات»، و`frmSalesInvoice` بـ`new Print(InvType)` = 2 «مبيعات»، و`frmCloseShift` يقرأ
+`SettingPrint WHERE Inv_Id = 6` «تقارير»، و`frmSandQD` بـ`new Print(11)` و`FrmNewEntry`
+بـ`Inv_Id=9` — عددان لا راديوَ لهما في `frmSettings` فيرجعان إلى «الإفتراضي».
+
+والشاشة `/settings/printing` في `apps/staff` (ضمن وحدة «الإعدادات»)، ومن كل تقريرٍ زرّ
+«إعدادات الطباعة» بجانب «طباعة / PDF».
+
+### 10.3 مطابقة التسميات
+
+كل تسمية في الشاشة مأخوذة نصّاً من `frmSettings.xaml`: «🧩 تفعيل إعدادات الطباعة» ·
+«الإفتراضي» · «مشتريات» · «مبيعات» · «نقطة بيع» · «تأجير» · «عقود» · «تقارير» ·
+«طابعة الكاشير» · «طابعة المطبخ» · «عدد النسخ» · «اسم التقرير» · «مسار التقرير» ·
+«ملاحظات التقرير» · «طباعة ترويسة الفاتورة» · «طباعة تذييل الفاتورة» · «طباعة الختم» ·
+«طباعة تفاصيل الأصناف» · «طباعة مجموعات الأصناف مع إغلاق اليومية» · «طباعة مكونات الأصناف
+المركبة بشكل منفرد» · «طباعة make pay» · «الترويـسة» · «التـذيـيـل» · «الخـتـم» ·
+«📄 ورقة A4» · «🧾 ورق صغير». نسبة المطابقة **100٪**، والتسميتان المضافتان — «💾 حفظ» و
+«🗑️ إرجاع إلى الإفتراضي» — على النمط نفسه الذي استخدمه الديسكتوب في تبويباته الأخرى
+(«💾 حفظ إعدادات المزامنة» · «💾 حفظ إعدادات الإغلاق»).
+
+### 10.4 القواعد المنقولة كما هي
+
+1. **نطاقٌ واحد لكل قسم، والإفتراضي يسري على ما لم يُحدَّد** — `frmSettings.xaml.cs`
+   L2095-L2116 تحفظ 0 للإفتراضي و1..6 للأقسام؛ والسحابة تحفظ الاسم، وتبحث في
+   `report:<key>` أولاً ثم «تقارير» ثم «الإفتراضي» (`PrintSettingsService.effective`).
+2. **🔢 عدد النسخ حلقةُ طباعة** — `Printing()` (L201-L206) يكرّر `Print()` بقدر `PrintNo`؛
+   والورقة السحابية تتكرّر بقدرها، كل نسخة في صفحة (`page-break-before`)، ويُطبع
+   «عدد النسخ: N» في رأس الورقة حين يزيد عن واحدة.
+3. **📄 نوع الورقة راديوان لا ثلاثة** — `frmInvRptType` يكتب 1 أو 2 في `sett`؛
+   و`print_type` هنا 1 = A4 (عرضي كما أوراق التقارير) و2 = 80mm.
+4. **🏛️ الترويسة والتذييل تقريران فرعيّان** — `Printing()` يُدخِل `header.repx` و
+   `footer.repx` في `headerRpt` و`footerRpt`؛ وعندنا كتلة المنشأة (الاسم · الرقم الضريبي ·
+   السجل التجاري · الهاتف) فوق الجدول، وسطرُ الاتصال (`footer.repx`: الهاتف · الجوال ·
+   العنوان) تحته.
+5. **🔖 الختم تحت التواقيع** — «أعده · راجعه · المدير» ثم صورة الختم.
+6. **📝 ملاحظات التقرير تحت الجدول** — `txtNote`، لا في الرأس.
+7. **الإعدادات الافتراضية بلا صف** — `Print.cs` L54-L64: `PrintType=2` و
+   `PrintHeader=true` و`PrintFooter=false` و`PrintNo=1` و`PrintItemType=1`.
+8. **🖨️ زرّا الطباعة والمعاينة ورقةٌ واحدة** — «👁️ معاينة» و«🖨️ طباعة» عند الديسكتوب
+   يمرّان بـ`Print.cs` نفسه؛ وعندنا `/reports/print/:key` و`export?format=pdf` يمرّان
+   بـ`ReportingService.printOptionsFor()` نفسه.
+9. **🧾 الوثائق تقرأ الإعدادات مثل التقارير** — الفاتورة والسند والقيد والإغلاق تمرّ
+   بـ`PrintTemplatesService.documentPage()`: «عدد النسخ» نسخاً، ونوع الورق، والترويسة
+   (`header.repx`)، والتذييل (`footer.repx`)، والختم — لأنّ `Print.cs` هو محرّك الوثائق
+   قبل أن يكون محرّك التقارير.
+
+### 10.5 التحويلات عن الديسكتوب (مبرَّرة)
+
+1. **النطاق اسمٌ لا عدد (`Inv_Id`)** — نافذتان في الديسكتوب لا تتفقان على معنى الأعداد:
+   `frmSettings` يحفظ 0..6، و`frmRptKhzna` (L106) يقرأ 12، و`frmRptEntries` يقرأ 9،
+   و`frmRptRentInvoices` (L541) يقرأ 14. حفظنا المعنى واسمينا النطاق، وأضفنا
+   `report:<key>` ليحمل تقريرٌ بعينه إعداداته — وهو ما أرادته النوافذ بالأعداد المختلفة.
+2. **الصور روابط لا بايتات** — `HeaderImage` · `FooterImage` · `StampImage` أعمدةُ
+   `[image]` في SQL Server؛ والسحابة لا تخزّن ملفات (سَبقَتها `vessel_groups.image_url`)،
+   فهي روابط `https://` تُدرج في الورقة. والتحقّق يرفض ما ليس رابطاً (400).
+3. **🖨️ الطابعتان تُحفظان ولا تُستخدمان** — `Printing()` يُرسل العمل إلى `CasherPrinter`
+   ونسخةً إلى `kitchenprinter`؛ والخادم لا يرى طابعات المحل، فالاسمان يُعرضان في شريط
+   الطباعة (`.no-print`) ويبقى اختيارُ الطابعة في نافذة المتصفّح — وهو مقامُ «طابعة
+   الكاشير» عند من يقف أمام الصندوق.
+4. **`PrinterSettings` («📑 ربط الطابعات بالتقارير») لم يُنقل** — شبكة
+   (`Inv_Id, PrintName, Printer, RptUrl, RptName`) يقرأها `Print.cs` لتوجيه كل تقرير إلى
+   طابعة؛ ولا سبيل إلى ذلك من المتصفّح، فالجدول مؤجَّل (§12).
+5. **`PrinterItemType` و`PrintComponentsItemsIndividually` حقولٌ لا أثر** — تُحفظ وتُقرأ
+   ولا تغيّر الورقة بعد: ترتيبُ بنود الفاتورة والمكوّنات لم يُنقل إلى هذه الورقة بعد
+   (§12).
+6. **مسار التقرير حقلٌ تذكاري** — `RptURl` مجلدٌ على قرص الديسكتوب؛ ويُحفظ نصّاً كما هو
+   لأنّ من ينقل ملفاته بين جهازٍ وخادمٍ يبحث عنه، ولا أثر له في الطباعة هنا.
+7. **الإعداد الافتراضي A4 لا «ورق صغير»** — `Print.cs` L56 يبدأ بـ`PrintType=2`؛
+   وأوراقُنا تُطبع PDF، و`frmInvRptType` يفتح على «📄 ورقة A4»، فالافتراضي 1.
+
+### 10.6 الاختبارات والتحقّق الحيّ
+
+- `apps/api/test/print-settings.spec.ts` — 15 اختباراً: النطاقات السبعة بإعدادات
+  `Print.cs` قبل أي حفظ، الحفظ حقلٌ بحقل والقراءة بعده، حفظٌ ثانٍ يبقي ما لم يُرسل،
+  `report:<key>` لتقريرٍ مسجّل ورفضُ تقريرٍ غير مسجّل، نطاقٌ مجهول 404، التحقّق
+  (نسخ · ورق · روابط)، الحذف يعيد الافتراضي، **العزل بين المستأجرين**، الورقة
+  (النسخ · 80mm · الترويسة · التذييل · الختم · الملاحظة · الطابعتان)، ورقةٌ بلا ترويسة
+  ولا ختم، تجاوزٌ من سطر الاستعلام، سلسلة الرجوع (تقرير → تقارير → إفتراضي)،
+  «طباعة / PDF» يطبع الورقة نفسها، و403 لعارضٍ بلا `reporting.layout.manage` ولمستخدمٍ
+  بلا `reporting.view`.
+- `scripts/verify-print-settings.mjs` — **50** فحصاً على المستأجر `demo` الحيّ: خطّ أساس
+  لما كان محفوظاً، والسبعة نطاقات، والحفظ والقراءة، والمرفوضات الستّ، والورقة بكل
+  أجزائها، والتجاوز لمرة واحدة، وسلسلة الرجوع، وصلاحيات الأدوار، **والوثائق** (فاتورة
+  مبيعات بنطاق «مبيعات»، وسندٌ وقيدٌ بنطاق «الإفتراضي»)، ثم تنظيفٌ يعيد كل نطاقٍ إلى ما
+  كان (حذفاً إن لم يكن محفوظاً، وإعادةً لقيمه إن كان). أُجري ثلاث مراتٍ متتالية بصفر
+  فشل وبلا أثرٍ بعد التشغيل.
+
+## 11. معايير القبول لكل جزء
 
 1. كل تقريرٍ منقول يُسمّي ملفه من `Desktop_ERP` (`Form_WPF/frmRpt*.xaml` و
    `Reports/*.repx`) نصّاً في الوثيقة وفي تعليق تعريفه.
@@ -804,11 +937,13 @@
 5. الشاشة تصل من طريقٍ حقيقي في الشجرة (`apps/staff/lib/navigation.ts`).
 6. تحديث هذه الوثيقة و`docs/STATUS.md` و`docs/desktop-parity/README.md`.
 
-## 11. مؤجَّل عن قصد
+## 12. مؤجَّل عن قصد
 
-- 🖨️ `SettingPrint` (رأس · تذييل · ختم · عدد النسخ · الطابعة الافتراضية) — جزءٌ سابع،
-  ومعه `frmInvRptType.xaml` «🖨️ افتراضي طباعة الفواتير» (§9.1): نافذةُ إعدادٍ براديوَين
-  («📄 ورقة A4» · «🧾 ورق صغير») تكتب `UPDATE sett SET val = 1|2 WHERE id = 1`.
+- 📑 `PrinterSettings` — شبكة «ربط الطابعات بالتقارير» في `frmSettings` (الجدول
+  `Inv_Id, PrintName, Printer, RptUrl, RptName`، L2163-L2180، §10.5/4)؛ الخادم لا يرى
+  طابعات المحل، ولا سبيل إلى توجيه ورقةٍ إلى طابعةٍ بعينها من المتصفّح.
+- 🔢 `PrintItemType` و`PrintComponentsItemsIndividually` أثراً على الورقة (§10.5/5) —
+  يُحفظان ويُقرآن، وترتيبُ بنود الفاتورة ومكوّناتها لم يُنقل بعد.
 - 📊 «إجمالي الفترة:» في `frmRptRentInvoices` (L500) — تسميةٌ بلا صندوق قيمة (§9.5/8).
 - 📱 مربّع «الجوال» فلتراً في `frmRptRentInvoices` (§9.5/9).
 - ⚓ `Marine.IS_InPlan` علماً ثابتاً على المركب بدل خطة اليوم (§9.5/6).
@@ -838,7 +973,6 @@
   — الديسكتوب يحسب المناقلة بعمودين اثنين لا أربعة.
 - «الأصناف الخاضعة للضريبة الإضافية» وعمود `DgvItemAdditionalTax` (§5.5/5).
 - زرّا «تفاصيل» و«📄 الفاتورة» اللذان ينقلان من تقريرٍ إلى نافذةٍ أخرى (§5.5/4).
-- صور الرأس والتذييل والختم (`HeaderImage` · `FooterImage` · `StampImage`).
 - التقارير التي ترسم بيانياً (`FrmRptSalesChart`) حتى يُبتَ في مكتبة الرسوم.
 - تصدير PDF من الخادم (الطباعة تمرّ بطابعة المتصفّح اليوم).
 - تقارير أُعيد بناؤها في مراحل سابقة بعناوين من اختيار السحابة (`sales-invoices` ·

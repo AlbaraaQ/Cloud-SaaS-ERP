@@ -8,6 +8,25 @@ import { withTenantTx, type DatabaseHandle } from '@erp/database';
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 
 import { amountInArabicWords } from './tafqeet.js';
+import { PrintSettingsService, type PrintSettings } from './print-settings.service.js';
+
+/**
+ * 🖨️ كيف تُطبع هذه الورقة — the part of `SettingPrint` the browser can honour.
+ *
+ * `Class/Print.cs` `Printing()` reads `printNo` and loops the print that many times
+ * (L201-L206), picks the paper by `printType`, and injects `header.repx` / `footer.repx`
+ * into the `headerRpt` / `footerRpt` subreports when `PrintHeader` / `PrintFooter` are on.
+ * A service cannot reach a shop's printer, so the names are shown on the sheet instead of
+ * used: «طابعة الكاشير» and «طابعة المطبخ» appear in the page's own toolbar (which
+ * `.no-print` keeps off the paper), and the browser's print dialog is the operator's.
+ */
+export type ReportPrintOptions = {
+  settings: PrintSettings;
+  /** 🔢 عدد النسخ — `printNo`, overridable by `?copies=` for one print. */
+  copies: number;
+  /** 📄 نوع الورقة — 1 «📄 ورقة A4» · 2 «🧾 ورق صغير», overridable by `?paper=`. */
+  paper: 'a4' | 'small';
+};
 
 /**
  * Printable documents.
@@ -23,11 +42,16 @@ import { amountInArabicWords } from './tafqeet.js';
  */
 @Injectable()
 export class PrintTemplatesService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly printSettings: PrintSettingsService,
+  ) {}
 
   // ------------------------------------------------------------------ documents
 
   async salesInvoice(tenantId: string, id: string) {
+    // 🖨️ `frmSalesInvoice` prints with `new Print(InvType)` — 2, «مبيعات».
+    const print = await this.settingsFor(tenantId, 'sales');
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const company = await this.company(tx, tenantId);
       const invoice = first(
@@ -63,7 +87,7 @@ export class PrintTemplatesService {
 
       const kindTitle = SALES_KIND_TITLES[str(invoice.kind)] ?? 'فاتورة مبيعات';
       const title = `${kindTitle}${str(invoice.tax_total) !== '0.0000' || company.taxNo ? ' ضريبية' : ''}`;
-      return this.page({
+      return this.documentPage(print, company, {
         title: `${kindTitle} ${str(invoice.number) || ''}`.trim(),
         body: `
           ${this.header(company, {
@@ -77,7 +101,7 @@ export class PrintTemplatesService {
               ['المستودع', str(invoice.warehouse_name)],
               ['المندوب', str(invoice.salesman_name)],
             ],
-          })}
+          }, print.printHeader)}
           ${this.partyBlock('بيانات العميل', {
             name: str(invoice.party_name) || str(invoice.cash_customer_name) || 'عميل نقدي',
             code: str(invoice.party_code),
@@ -106,6 +130,8 @@ export class PrintTemplatesService {
   }
 
   async purchaseInvoice(tenantId: string, id: string) {
+    // 🖨️ `frmPurchInv` prints with `new Print(1)` — «مشتريات».
+    const print = await this.settingsFor(tenantId, 'purchases');
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const company = await this.company(tx, tenantId);
       const invoice = first(
@@ -133,7 +159,7 @@ export class PrintTemplatesService {
       );
 
       const kindTitle = str(invoice.kind) === 'return' ? 'مردود مشتريات' : 'فاتورة مشتريات';
-      return this.page({
+      return this.documentPage(print, company, {
         title: `${kindTitle} ${str(invoice.number) || ''}`.trim(),
         body: `
           ${this.header(company, {
@@ -147,7 +173,7 @@ export class PrintTemplatesService {
               ['المستودع', str(invoice.warehouse_name)],
               ['مرجع المورد', str(invoice.supplier_reference_no)],
             ],
-          })}
+          }, print.printHeader)}
           ${this.partyBlock('بيانات المورد', {
             name: str(invoice.party_name) || '—',
             code: str(invoice.party_code),
@@ -175,6 +201,9 @@ export class PrintTemplatesService {
   }
 
   async voucher(tenantId: string, id: string) {
+    // 🖨️ `frmSandQD` prints with `new Print(11)` — a number no radio of `frmSettings`
+    // writes, so the voucher falls through to «الإفتراضي».
+    const print = await this.settingsFor(tenantId, 'default');
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const company = await this.company(tx, tenantId);
       const voucher = first(
@@ -199,7 +228,7 @@ export class PrintTemplatesService {
       const label = isReceipt ? 'سند قبض' : 'سند صرف';
       const counterparty = str(voucher.party_name) || str(voucher.recipient) || '—';
 
-      return this.page({
+      return this.documentPage(print, company, {
         title: `${label} ${str(voucher.number) || ''}`.trim(),
         body: `
           ${this.header(company, {
@@ -213,7 +242,7 @@ export class PrintTemplatesService {
               ['الصندوق / البنك', str(voucher.cash_location_name)],
               ['طريقة الدفع', PAYMENT_METHODS[str(voucher.method)] ?? str(voucher.method)],
             ],
-          })}
+          }, print.printHeader)}
           <section class="panel">
             <div class="kv"><span>${isReceipt ? 'استلمنا من السيد' : 'صرفنا إلى السيد'}</span><b>${escapeHtml(counterparty)}</b></div>
             <div class="kv"><span>مبلغاً وقدره</span><b>${escapeHtml(money(voucherAmount))} ${escapeHtml(currency)}</b></div>
@@ -231,6 +260,9 @@ export class PrintTemplatesService {
   }
 
   async journalEntry(tenantId: string, id: string) {
+    // 🖨️ `FrmNewEntry` reads `SettingPrint WHERE Inv_Id=9` — likewise unwritable, so
+    // the entry falls through to «الإفتراضي».
+    const print = await this.settingsFor(tenantId, 'default');
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const company = await this.company(tx, tenantId);
       const entry = first(
@@ -257,7 +289,7 @@ export class PrintTemplatesService {
       const debit = lines.reduce((sum, row) => sum.plus(str(row.debit) || '0'), new Decimal(0));
       const credit = lines.reduce((sum, row) => sum.plus(str(row.credit) || '0'), new Decimal(0));
 
-      return this.page({
+      return this.documentPage(print, company, {
         title: `سند قيد ${str(entry.number) || ''}`.trim(),
         body: `
           ${this.header(company, {
@@ -270,7 +302,7 @@ export class PrintTemplatesService {
               ['الفرع', str(entry.branch_name)],
               ['البيان', str(entry.description)],
             ],
-          })}
+          }, print.printHeader)}
           <table class="lines">
             <thead>
               <tr><th>#</th><th>الحساب</th><th>البيان</th><th>مركز التكلفة</th><th>الجهة</th><th>مدين</th><th>دائن</th></tr>
@@ -302,6 +334,8 @@ export class PrintTemplatesService {
   }
 
   async shiftClose(tenantId: string, id: string) {
+    // 🖨️ `frmCloseShift` reads `SettingPrint WHERE Inv_Id = 6` — «تقارير».
+    const print = await this.settingsFor(tenantId, 'reports');
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const company = await this.company(tx, tenantId);
       const shift = first(
@@ -317,7 +351,7 @@ export class PrintTemplatesService {
       const totals = rows(await tx.execute(sql`SELECT kind, method, amount FROM shift_close_lines WHERE tenant_id = ${tenantId} AND shift_close_id = ${id} ORDER BY line_no`));
       const diff = new Decimal(str(shift.diff) || '0');
 
-      return this.page({
+      return this.documentPage(print, company, {
         title: 'إغلاق اليومية',
         body: `
           ${this.header(company, {
@@ -331,7 +365,7 @@ export class PrintTemplatesService {
               ['الفتح', dateTimeText(shift.opened_at)],
               ['الإغلاق', dateTimeText(shift.closed_at)],
             ],
-          })}
+          }, print.printHeader)}
           <section class="panel">
             <div class="kv"><span>النقد المتوقع</span><b>${escapeHtml(money(str(shift.expected_cash)))}</b></div>
             <div class="kv"><span>النقد المعدود</span><b>${escapeHtml(money(str(shift.counted_cash)))}</b></div>
@@ -394,6 +428,8 @@ export class PrintTemplatesService {
       emptyAr?: string;
       /** «أعده · راجعه · المدير» — the signature strip of the desktop's report footer. */
       signature?: boolean;
+      /** 🖨️ إعدادات الطباعة — `SettingPrint`; defaults to one A4 copy with the header on. */
+      print?: ReportPrintOptions;
     },
     /** 👤 المستخدم — `Common.GetEmpName(MainClass.EmpNo)` at the desktop. */
     userId?: string,
@@ -419,17 +455,29 @@ export class PrintTemplatesService {
           .join('')}</tr></tfoot>`
       : '';
 
-    return this.page({
-      title: report.titleAr,
-      landscape: true,
-      body: `
+    // 🖨️ إعدادات الطباعة — `SettingPrint` of the desktop (`Class/Print.cs` `Printing()`).
+    const settings = report.print?.settings;
+    const copies = Math.min(50, Math.max(1, report.print?.copies ?? 1));
+    const paper = report.print?.paper ?? 'a4';
+    /** 🏛️ طباعة ترويسة الفاتورة — the `header.repx` subreport, on unless switched off. */
+    const showHeader = settings?.printHeader !== false;
+    /** 📞 طباعة تذييل الفاتورة — the `footer.repx` subreport: الهاتف · الجوال · العنوان. */
+    const showFooter = settings?.printFooter === true;
+    /** 🔖 طباعة الختم — the stamp image under the signatures. */
+    const stamp = settings?.printStamp === false ? '' : (settings?.stampImageUrl ?? '');
+    /** 📝 ملاحظات التقرير — `txtNote`, printed under the grid. */
+    const note = (settings?.note ?? '').trim();
+    const image = (src: string, alt: string) => (src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />` : '');
+
+    const sheet = `
         <header class="doc-head">
-          <div class="company">
+          ${showHeader ? `<div class="company">
+            ${image(settings?.headerImageUrl ?? '', 'الترويـسة')}
             <h1>${escapeHtml(company.nameAr)}</h1>
             ${company.nameEn ? `<div class="en">${escapeHtml(company.nameEn)}</div>` : ''}
             <div class="meta">${company.taxNo ? `<span>الرقم الضريبي: <b dir="ltr">${escapeHtml(company.taxNo)}</b></span>` : ''}${company.crNo ? `<span>السجل التجاري: <b dir="ltr">${escapeHtml(company.crNo)}</b></span>` : ''}</div>
             ${contact ? `<div class="meta">${escapeHtml(contact)}</div>` : ''}
-          </div>
+          </div>` : ''}
           <div class="doc">
             <div class="doc-title">${escapeHtml(report.titleAr)}</div>
             <table class="doc-meta">
@@ -437,6 +485,7 @@ export class PrintTemplatesService {
               <tr><td>عدد السجلات: ${report.rows.length}</td></tr>
               ${userName ? `<tr><td>المستخدم: ${escapeHtml(userName)}</td></tr>` : ''}
               <tr><td>طُبع في: ${escapeHtml(dateTimeText(report.generatedAt))}</td></tr>
+              ${copies > 1 ? `<tr><td>عدد النسخ: ${copies}</td></tr>` : ''}
             </table>
           </div>
         </header>
@@ -452,12 +501,32 @@ export class PrintTemplatesService {
                 .join('')}</div>`
             : ''
         }
+        ${note ? `<div class="doc-note"><b>ملاحظات التقرير:</b> ${escapeHtml(note).replace(/\n/g, '<br />')}</div>` : ''}
         ${
           report.signature
             ? `<table class="signatures"><tr><td>أعده</td><td>راجعه</td><td>المدير</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></table>`
             : ''
         }
-      `,
+        ${stamp ? `<div class="doc-stamp">${image(stamp, 'الختم')}</div>` : ''}
+        ${showFooter ? `<div class="doc-foot">${contact ? escapeHtml(contact) : ''}${image(settings?.footerImageUrl ?? '', 'التـذيـيـل')}</div>` : ''}
+      `;
+
+    // 🔢 عدد النسخ — `Printing()` loops `Print()` `printNo` times (Print.cs L201-L206).
+    const sheets = copies === 1 ? sheet : Array.from({ length: copies }, () => `<div class="copy">${sheet}</div>`).join('');
+    // 🖨️ الطابعات — names the operator saved; the browser's print dialog is the real picker.
+    const printers = [settings?.casherPrinter, settings?.kitchenPrinter].filter(Boolean).map((name) => escapeHtml(name!));
+    const toolbar = [
+      printers.length ? `🖨️ ${printers.join(' · ')}` : '',
+      copies > 1 ? `🔢 عدد النسخ: ${copies}` : '',
+      paper === 'small' ? '🧾 ورق صغير' : '📄 ورقة A4',
+    ].filter(Boolean).join(' — ');
+
+    return this.page({
+      title: report.titleAr,
+      landscape: true,
+      paper,
+      toolbar,
+      body: sheets,
     });
   }
 
@@ -494,11 +563,17 @@ export class PrintTemplatesService {
   private header(
     company: Awaited<ReturnType<PrintTemplatesService['company']>>,
     doc: { docTitle: string; docTitleEn: string; number: string; date: string; status: string; extra: Array<[string, string]> },
+    /**
+     * 🏛️ طباعة ترويسة الفاتورة — `PrintHeader`. The desktop injects `header.repx` into the
+     * `headerRpt` subreport when it is on and leaves the subreport empty when it is
+     * off; the document keeps its own title and number either way.
+     */
+    showCompany = true,
   ) {
     const contact = [company.phones.join(' / '), company.email, addressText(company.address)].filter(Boolean).join(' — ');
     return `
       <header class="doc-head">
-        <div class="company">
+        ${showCompany ? `<div class="company">
           <h1>${escapeHtml(company.nameAr)}</h1>
           ${company.nameEn ? `<div class="en">${escapeHtml(company.nameEn)}</div>` : ''}
           <div class="meta">
@@ -506,7 +581,7 @@ export class PrintTemplatesService {
             ${company.crNo ? `<span>السجل التجاري: <b dir="ltr">${escapeHtml(company.crNo)}</b></span>` : ''}
           </div>
           ${contact ? `<div class="meta">${escapeHtml(contact)}</div>` : ''}
-        </div>
+        </div>` : ''}
         <div class="doc">
           <div class="doc-title">${escapeHtml(doc.docTitle)}</div>
           <div class="doc-title-en">${escapeHtml(doc.docTitleEn)}</div>
@@ -631,8 +706,70 @@ export class PrintTemplatesService {
     return `<section class="signs">${labels.map((label) => `<div><span>${escapeHtml(label)}</span><i></i></div>`).join('')}</section>`;
   }
 
-  /** One A4 stylesheet for every document, plus a print button that hides itself. */
-  private page({ title, body, landscape }: { title: string; body: string; landscape?: boolean }) {
+  /**
+   * 🖨️ وثيقة — `Print.cs` for the five documents.
+   *
+   * `frmPurchInv` prints with `new Print(1)` («مشتريات»), `frmSalesInvoice` with
+   * `new Print(InvType)` (2, «مبيعات»), `frmCloseShift` reads `SettingPrint WHERE
+   * Inv_Id = 6` («تقارير»), and the voucher and the journal entry read 11 and 9 —
+   * numbers no radio of `frmSettings` can write, so they fall through to «الإفتراضي».
+   * What the sheet does with the row is the same as `Printing()`: `printNo` copies,
+   * the paper of `printType`, `header.repx`, `footer.repx` and the stamp.
+   */
+  private documentPage(
+    print: PrintSettings,
+    company: Awaited<ReturnType<PrintTemplatesService['company']>>,
+    page: { title: string; body: string; landscape?: boolean },
+  ) {
+    const copies = Math.min(50, Math.max(1, print.printNo));
+    const paper = print.printType === 2 ? 'small' : 'a4';
+    const contact = [company.phones.join(' / '), company.email, addressText(company.address)].filter(Boolean).join(' — ');
+    const image = (src: string, alt: string) => (src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />` : '');
+    const footer =
+      print.printFooter === true
+        ? `<div class="doc-foot">${contact ? escapeHtml(contact) : ''}${image(print.footerImageUrl, 'التـذيـيـل')}</div>`
+        : '';
+    const stamp = print.printStamp === false ? '' : `<div class="doc-stamp">${image(print.stampImageUrl, 'الختم')}</div>`;
+    const body = `<div class="copy">${page.body}${stamp}${footer}</div>`;
+    const printers = [print.casherPrinter, print.kitchenPrinter].filter(Boolean).map((name) => escapeHtml(name!));
+    const toolbar = [
+      printers.length ? `🖨️ ${printers.join(' · ')}` : '',
+      copies > 1 ? `🔢 عدد النسخ: ${copies}` : '',
+      paper === 'small' ? '🧾 ورق صغير' : '📄 ورقة A4',
+    ].filter(Boolean).join(' — ');
+    return this.page({
+      title: page.title,
+      landscape: page.landscape,
+      paper,
+      toolbar,
+      body: copies === 1 ? body : Array.from({ length: copies }, () => body).join(''),
+    });
+  }
+
+  /** 🖨️ إعدادات وثيقة — the scope of the document, then «الإفتراضي». */
+  private settingsFor(tenantId: string, scope: string) {
+    return this.printSettings.effective(tenantId, [scope, 'default']);
+  }
+
+  /** One stylesheet for every document, plus a print button that hides itself. */
+  private page({
+    title,
+    body,
+    landscape,
+    paper = 'a4',
+    toolbar,
+  }: {
+    title: string;
+    body: string;
+    landscape?: boolean;
+    /** 🖨️ A note beside the print button — the saved printer names, hidden when printing. */
+    toolbar?: string;
+    /**
+     * 📄 نوع الورقة — `printType` of `SettingPrint`: 1 «📄 ورقة A4» · 2 «🧾 ورق صغير»,
+     * the two radios of `frmInvRptType.xaml` «🖨️ افتراضي طباعة الفواتير».
+     */
+    paper?: 'a4' | 'small';
+  }) {
     return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
@@ -640,10 +777,25 @@ export class PrintTemplatesService {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
 <style>
-  @page { size: A4${landscape ? ' landscape' : ''}; margin: 12mm; }
+  @page { size: ${paper === 'small' ? '80mm auto' : `A4${landscape ? ' landscape' : ''}`}; margin: ${paper === 'small' ? '3mm' : '12mm'}; }
   * { box-sizing: border-box; }
   body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; color: #111; margin: 0; padding: 16px; background: #f4f5f7; font-size: 12px; }
-  .sheet { background: #fff; max-width: ${landscape ? '297mm' : '210mm'}; margin: 0 auto; padding: 16mm 14mm; box-shadow: 0 1px 8px rgba(0,0,0,.12); }
+  .sheet { background: #fff; max-width: ${paper === 'small' ? '80mm' : landscape ? '297mm' : '210mm'}; margin: 0 auto; padding: ${paper === 'small' ? '3mm 4mm' : '16mm 14mm'}; box-shadow: 0 1px 8px rgba(0,0,0,.12); }
+  /* 🧾 ورق صغير — 80mm thermal: one column, no shadows, smaller type. */
+  .sheet.small { font-size: 10px; }
+  .sheet.small table.report { font-size: 9px; }
+  .sheet.small .doc-head { display: block; }
+  .sheet.small .doc { text-align: right; }
+  .sheet.small .totals-strip { flex-direction: column; gap: 4px; font-size: 11px; }
+  /* 🔢 عدد النسخ — every copy starts on its own sheet, the way Printing() loops. */
+  .copy + .copy { page-break-before: always; }
+  .doc-images { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .doc-images img { max-height: 90px; max-width: 100%; }
+  .doc-stamp { position: relative; display: inline-block; }
+  .doc-stamp img { max-height: 110px; max-width: 100%; }
+  .doc-note { margin-top: 10px; border: 1px dashed #bbb; padding: 6px 8px; color: #333; }
+  .doc-foot { margin-top: 10px; border-top: 1px solid #999; padding-top: 6px; color: #444; font-size: 11px; text-align: center; }
+  .doc-foot img { max-height: 70px; max-width: 100%; display: block; margin: 4px auto 0; }
   h1 { font-size: 18px; margin: 0 0 2px; }
   h2 { font-size: 13px; margin: 0 0 6px; }
   .doc-head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 12px; }
@@ -695,6 +847,7 @@ export class PrintTemplatesService {
   .signs i { display: block; border-top: 1px solid #999; margin-top: 34px; }
   .toolbar { max-width: 210mm; margin: 0 auto 10px; display: flex; gap: 8px; }
   .toolbar button { font: inherit; padding: 6px 14px; border: 1px solid #111; background: #111; color: #fff; border-radius: 6px; cursor: pointer; }
+  .toolbar-note { align-self: center; color: #555; }
   table.report { font-size: 11px; }
   table.report thead { display: table-header-group; }
   table.report tbody tr { page-break-inside: avoid; }
@@ -704,8 +857,8 @@ export class PrintTemplatesService {
 </style>
 </head>
 <body>
-  <div class="toolbar"><button type="button" onclick="window.print()">طباعة</button></div>
-  <div class="sheet">${body}</div>
+  <div class="toolbar"><button type="button" onclick="window.print()">طباعة</button>${toolbar ? `<span class="toolbar-note">${toolbar}</span>` : ''}</div>
+  <div class="sheet${paper === 'small' ? ' small' : ''}">${body}</div>
 </body>
 </html>`;
   }

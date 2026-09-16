@@ -5,7 +5,7 @@
  * so the admin ships one screen that can render all of them instead of forty near-identical
  * pages. This module holds the wire types, the fetchers and the cell formatting.
  */
-import { apiData, apiFetch, apiPatch, apiPost } from './api';
+import { apiData, apiDelete, apiFetch, apiPatch, apiPost, apiPut } from './api';
 import { money, quantity, shortDate } from './lookups';
 
 /** 🔢 الرقم التسلسلي — the free text box of the two serial windows; everything else is a lookup. */
@@ -99,6 +99,57 @@ export const saveReportLayout = (input: Partial<ReportLayout> & { reportKey: str
 export const updateReportLayout = (id: string, input: Partial<ReportLayout>) => apiPatch<ReportLayout>(`/reports/layouts/${id}`, input);
 
 export const deleteReportLayout = (id: string) => apiData<unknown>(`/reports/layouts/${id}`, { method: 'DELETE' });
+
+/**
+ * 🖨️ إعدادات الطباعة — `SettingPrint` of `Desktop_ERP`.
+ *
+ * `frmSettings.xaml` «خيارات الطباعة» writes one row per scope, and its radios
+ * «🧩 تفعيل إعدادات الطباعة» («الإفتراضي» · «مشتريات» · «مبيعات» · «نقطة بيع» · «تأجير» ·
+ * «عقود» · «تقارير») are `Inv_Id` 0 · 1 · 2 · 3 · 4 · 5 · 6 (`frmSettings.xaml.cs`
+ * L2095-L2116). The cloud names them, and gives each report its own scope under
+ * `report:<key>` on top of «تقارير» and «الإفتراضي».
+ */
+export const PRINT_SCOPES: Array<{ scope: string; labelAr: string }> = [
+  { scope: 'default', labelAr: 'الإفتراضي' },
+  { scope: 'purchases', labelAr: 'مشتريات' },
+  { scope: 'sales', labelAr: 'مبيعات' },
+  { scope: 'pos', labelAr: 'نقطة بيع' },
+  { scope: 'rental', labelAr: 'تأجير' },
+  { scope: 'contracts', labelAr: 'عقود' },
+  { scope: 'reports', labelAr: 'تقارير' },
+];
+
+export type PrintSettings = {
+  scope: string;
+  /** 📄 1 «📄 ورقة A4» · 2 «🧾 ورق صغير» — the radios of `frmInvRptType.xaml`. */
+  printType: 1 | 2;
+  printHeader: boolean;
+  printFooter: boolean;
+  printStamp: boolean;
+  printItemDetails: boolean;
+  printItemGroups: boolean;
+  printComponentsIndividually: boolean;
+  printMakePay: boolean;
+  printNo: number;
+  printItemType: number;
+  casherPrinter: string;
+  kitchenPrinter: string;
+  rptName: string;
+  rptUrl: string;
+  note: string;
+  headerImageUrl: string;
+  footerImageUrl: string;
+  stampImageUrl: string;
+  /** False when the row is still the desktop's default rather than a saved one. */
+  saved: boolean;
+};
+
+export const fetchPrintSettings = () => apiData<PrintSettings[]>('/reports/print-settings');
+
+export const savePrintSettings = (scope: string, input: Partial<PrintSettings>) =>
+  apiPut<PrintSettings>(`/reports/print-settings/${encodeURIComponent(scope)}`, input);
+
+export const resetPrintSettings = (scope: string) => apiDelete<PrintSettings>(`/reports/print-settings/${encodeURIComponent(scope)}`);
 
 export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
 
