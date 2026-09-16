@@ -1,4 +1,4 @@
-import { bigint, boolean, date, index, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { baseAuditColumns } from '../columns.js';
 
@@ -38,6 +38,20 @@ export const einvoiceSubmissions = pgTable('einvoice_submissions', {
   uuid: uuid('uuid'),
   hash: text('hash'),
   previousHash: text('previous_hash'),
+  /**
+   * 🧾 The invoice counter value (ICV) — 1 for the tenant's first invoice, +1 each time.
+   * A separate column (migration 0063) so the chain can be sorted, filtered and audited
+   * without parsing the stored document.
+   */
+  chainIndex: integer('chain_index'),
+  /**
+   * 🧾 The authority's own status word — the desktop's `ZatcaResponse.Status`, which is
+   * `ReportingStatus` for a reported invoice and `ClearanceStatus` for a cleared one
+   * (`InvoiceOper.cs` L538-L540).
+   */
+  authorityStatus: text('authority_status'),
+  /** 🧾 The re-signed document a standard (0100000) invoice is answered with; base64 UBL. */
+  clearedInvoice: text('cleared_invoice'),
   qrPayload: text('qr_payload'),
   requestPayload: jsonb('request_payload').$type<Record<string, unknown>>().notNull().default({}),
   response: jsonb('response').$type<Record<string, unknown>>(),

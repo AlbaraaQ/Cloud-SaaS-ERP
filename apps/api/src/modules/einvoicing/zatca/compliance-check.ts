@@ -117,7 +117,6 @@ export function buildComplianceDocument(expectation: ComplianceExpectation, sell
     subtotal: '4',
     taxTotal: '0.6',
     total: '4.6',
-    paidTotal: '4.6',
     paymentMeansCode: '10',
     counter,
     previousHash: GENESIS_PIH,

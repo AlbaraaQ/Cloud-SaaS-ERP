@@ -43,6 +43,26 @@ import { resolveGateway, type ZatcaGateway } from './zatca/gateway.js';
 
 export type CsrPropertiesInput = Partial<CsrProperties>;
 
+/**
+ * What one filing is filed with — the answer to «which gateway, and as which taxpayer?».
+ *
+ * `csid`/`secret` are decrypted here and handed over in memory only; they are never written
+ * to a submission row, a log line or a response.
+ */
+export type FilingContext = {
+  settings: typeof einvoiceSettings.$inferSelect;
+  credential: typeof einvoiceCredentials.$inferSelect | null;
+  /** The credential row's environment: 🧪 `simulation` or 🔴 `production`. */
+  environment: string;
+  gateway: ZatcaGateway;
+  /** The private key that pairs with the CSR — `null` when the tenant has not generated one. */
+  privateKey: string | null;
+  csid: string | null;
+  secret: string | null;
+  /** `production` when the production CSID was used, `compliance` while it does not exist yet. */
+  credentialKind: 'production' | 'compliance';
+};
+
 export type SettingsInput = {
   /** 🔵 Compliance تجريبي · 🔴 Production ربط فعلي */
   environment?: 'compliance' | 'production';
@@ -102,6 +122,15 @@ function mask(value: string | null | undefined): string | null {
     return `****${plain.slice(-4)}`;
   } catch {
     return '****';
+  }
+}
+
+/** A secret that cannot be decrypted is treated as absent, not as a reason to fail. */
+function safeDecrypt(value: string): string | null {
+  try {
+    return decryptSecret(value);
+  } catch {
+    return null;
   }
 }
 
@@ -505,6 +534,55 @@ export class ZatcaOnboardingService {
         .set({ active, updatedAt: new Date() })
         .where(and(eq(einvoiceSettings.tenantId, tenantId), eq(einvoiceSettings.authority, authority)));
       return { active, message: active ? 'تم التشغيل بنجاح' : 'تم الإيقاف بنجاح' };
+    });
+  }
+
+  // ── 🧾 what a filing needs ───────────────────────────────────────────────────────────
+
+  /**
+   * Everything `EinvoicingService` needs in order to file one document, resolved from the
+   * link the tenant saved in this window.
+   *
+   * The desktop asks the same question on every sale, from three static switches
+   * (`MainSetting.IsProductionZatca` / `IsSimulationZatca` · `ZatcaIntegerationActive`,
+   * `InvoiceOper.cs` L1478, L1855) and one row read with no `WHERE` clause
+   * (`ZatcaService.LoadZatcaCredential`: `select * from ZatcaCredential`). Here the link is
+   * per tenant, so it is read from `einvoice_settings` — and the caller may still override
+   * the environment for a single filing, which is how a tenant tests the 🧪 simulator
+   * without changing the link it files with.
+   *
+   * Which of the two CSID pairs is used follows the desktop: it authenticates with the
+   * **production** pair (`P_CSID` / `P_Secret`, L476-L479) and only falls back to the
+   * compliance pair while a production certificate does not exist yet — which is exactly
+   * the state a tenant is in during onboarding.
+   */
+  async filingContext(tenantId: string, authority = 'zatca', override: { environment?: 'simulation' | 'production' } = {}): Promise<FilingContext> {
+    return withTenantTx(this.database.db, tenantId, async (tx) => {
+      const settings = await this.settingsFor(tx, tenantId, authority);
+      const simulation = override.environment ? override.environment === 'simulation' : settings.simulation;
+      const production = override.environment ? override.environment === 'production' : settings.environment === 'production';
+      const environment = simulation ? 'simulation' : 'production';
+      const credential =
+        (await this.credentialFor(tx, tenantId, authority, environment)) ??
+        // `select * from ZatcaCredential` — the desktop's row has no environment column, and
+        // a tenant whose only row pre-dates the link must still be able to file with it.
+        (await this.credentialFor(tx, tenantId, authority, environment === 'simulation' ? 'production' : 'simulation'));
+
+      const productionCsid = credential?.productionCsidEnc ? safeDecrypt(credential.productionCsidEnc) : null;
+      const productionSecret = credential?.productionSecretEnc ? safeDecrypt(credential.productionSecretEnc) : null;
+      const complianceCsid = credential?.csidEnc ? safeDecrypt(credential.csidEnc) : null;
+      const complianceSecret = credential?.secretEnc ? safeDecrypt(credential.secretEnc) : null;
+
+      return {
+        settings,
+        credential,
+        environment,
+        gateway: resolveGateway({ simulation, production, baseUrl: process.env.ZATCA_API_BASE_URL }),
+        privateKey: credential?.privateKeyEnc ? safeDecrypt(credential.privateKeyEnc) : null,
+        csid: productionCsid ?? complianceCsid,
+        secret: productionSecret ?? complianceSecret,
+        credentialKind: productionCsid && productionSecret ? 'production' : 'compliance',
+      };
     });
   }
 

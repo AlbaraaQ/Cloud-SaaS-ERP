@@ -1562,6 +1562,14 @@ const settings: ModuleNode = {
           'ready',
           { permission: 'einvoice.view', endpoint: '/einvoice/settings' },
         ),
+        screen(
+          'zatca-sent',
+          'الفواتير المرفوعة على موقع الضرائب',
+          'Sent e-invoices',
+          '/settings/zatca/sent',
+          'ready',
+          { permission: 'einvoice.view', endpoint: '/einvoice/filings' },
+        ),
       ],
     },
     {

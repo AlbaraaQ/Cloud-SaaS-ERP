@@ -49,9 +49,42 @@ export class EinvoicingController {
   /** ⏸ إيقاف الربط / ▶ تشغيل. */
   @Post('einvoice/link/toggle') @RequiresPermission('einvoice.manage')
   toggleLink() { return this.onboarding.toggleLink(getTenantContext().tenantId); }
+
+  // ── 🧾 الإرسال والتوقيع والسلسلة (`ZatcaService.IntegrateInvoice`) ────────────────────
+
+  /**
+   * 🧾 الفواتير المرفوعة على موقع الضرائب — the grid of `frmSentEinvoice.xaml`, with its
+   * own two paging fields (حجم الصفحة · رقم الصفحة) and 🔍 عرض.
+   */
+  @Get('einvoice/filings') @RequiresPermission('einvoice.view')
+  filings(
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('pageNo') pageNo?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.einvoicing.filings(getTenantContext().tenantId, {
+      status,
+      from,
+      to,
+      pageNo: pageNo ? Number(pageNo) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
+  }
+
+  /** 📄 بيانات الفاتورة — one filing with its document, its QR decoded and its chain slot. */
+  @Get('einvoice/filings/:id') @RequiresPermission('einvoice.view')
+  filing(@Param('id') id: string) { return this.einvoicing.filing(getTenantContext().tenantId, id); }
+
+  /** The tenant's place in the chain: the last hash filed and the counter that follows it. */
+  @Get('einvoice/chain') @RequiresPermission('einvoice.view')
+  chain() { return this.einvoicing.chain(getTenantContext().tenantId); }
+
   @Put('einvoice/credentials') @RequiresPermission('einvoice.credentials.manage') putCredentials(@Body() body: CredentialInput) { return this.einvoicing.upsertCredentials(getTenantContext().tenantId, body); }
   @Get('einvoice/credentials') @RequiresPermission('einvoice.view') credentials() { return this.einvoicing.listCredentials(getTenantContext().tenantId); }
   @Get('einvoice/submissions') @RequiresPermission('einvoice.view') submissions(@Query('status') status?: string) { return this.einvoicing.submissions(getTenantContext().tenantId, status); }
+  /** 🔁 إعادة الإرسال — re-files a document that failed, without rebuilding it. */
   @Post('einvoice/submissions/:id/retry') @RequiresPermission('einvoice.submit') retry(@Param('id') id: string) { return this.einvoicing.retry(getTenantContext().tenantId, id); }
   @Post('sales-invoices/:id/einvoice/submit') @RequiresPermission('einvoice.submit') submitInvoice(@Param('id') id: string, @Body() body: { authority?: 'zatca' | 'eta'; environment?: 'simulation' | 'production' }) { return this.einvoicing.submitSalesInvoice(getTenantContext().tenantId, id, body.authority, body.environment); }
   @Get('einvoice/health') @RequiresPermission('einvoice.view') health() { return this.einvoicing.health(getTenantContext().tenantId); }

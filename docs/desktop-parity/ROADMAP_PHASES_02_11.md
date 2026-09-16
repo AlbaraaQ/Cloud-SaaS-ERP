@@ -172,7 +172,7 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [ ] Accept (each part): every ported report matches desktop columns/filters; print-ready
   Arabic RTL; new tests + a re-runnable live script; a real route in the staff tree.
 
-## Phase 11 — Zatca / ETA / integrations 🟡 part one done (2026-09, `PHASE_11_EINVOICING.md`)
+## Phase 11 — Zatca / ETA / integrations 🟡 parts one–two done (2026-09, `PHASE_11_EINVOICING.md`)
 
 - [x] Desktop (part one): `frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160),
   `Class/ZatcaService.cs` (546), `Class/ZatcaCredential.cs`,
@@ -186,8 +186,18 @@ then flip this file's checkbox and `README.md`. Every phase keeps API compatibil
 - [x] Part one — ⚙️ إعدادات الربط الضريبي: 🔄 تعبئة تلقائي · ⚡ توليد · 🔵 Compliance
   CSID · 🔐 Get PCSID · 🧪 اختبار الربط · 🔄 Renews CSID · ⏸ إيقاف الربط (18 tests +
   64 live checks).
-- [ ] Part two — 🧾 send, sign and chain: `frmSentEinvoice` +
-  `ZatcaService.IntegrateInvoice` (reporting/clearance, the eight-tag QR, retry).
+- [x] Part two — 🧾 send, sign and chain: `frmSentEinvoice.xaml` (358) + `.xaml.cs` (304)
+  and the grid of `frmInvsSyncStatusZatca.xaml` (559), behind
+  `ZatcaService.IntegrateInvoice` (L78-L410) and `InvoiceOper.SendZatca` (L2209).
+  Migration `0063` adds `chain_index` · `authority_status` · `cleared_invoice` to
+  `einvoice_submissions` (`ZatcaResponse` in the desktop); `zatca/filing.ts` reports a
+  `0200000` to `/invoices/reporting/single` and clears a `0100000` through
+  `/invoices/clearance/single`, then reads the QR out of the **returned** document with the
+  desktop's own XPath (L474-L477). Three endpoints: `GET /einvoice/filings` (paged, joined
+  to the invoice), `GET /einvoice/filings/:id` (both documents, the eight tags decoded,
+  the chain slot) and `GET /einvoice/chain`; `POST /einvoice/submissions/:id/retry`
+  re-files a stored document without moving its hash. Staff `/settings/zatca/sent`.
+  (16 tests + 53 live checks.)
 - [ ] Part three — 📊 `frmInvsSyncStatusZatca`: the sync-status grid, its filters and its
   statuses.
 - [ ] Part four — 🇪🇬 `frmEtaSetting` + `EtaService` + `EtaReciptService`.

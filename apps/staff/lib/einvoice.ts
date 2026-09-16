@@ -126,3 +126,84 @@ export const runComplianceCheck = () => apiFetch<ComplianceRun>('/einvoice/onboa
 
 export const toggleZatcaLink = () =>
   apiFetch<{ active: boolean; message: string }>('/einvoice/link/toggle', { method: 'POST', body: '{}' });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🧾 الإرسال والتوقيع والسلسلة — `Class/ZatcaService.cs` `IntegrateInvoice` and
+// `Class/InvoiceOper.cs` `SendZatca`, behind the window
+// `Form_WPF/frmSentEinvoice.xaml` («🧾 الفواتير المرفوعة على موقع الضرائب»).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type QrTag = { tag: number; labelAr: string; value: string; bytes: number };
+
+export type FilingRow = {
+  id: string;
+  /** The invoice behind the filing — the grid's own columns (رقم الفاتورة · العميل · …). */
+  invoice?: {
+    number: string | null;
+    kind: string | null;
+    total: string | null;
+    issuedAt: string | null;
+    partyName: string | null;
+    branchName: string | null;
+    createdByName: string | null;
+  };
+  invoiceId: string;
+  authority: string;
+  environment: string;
+  status: string;
+  authorityStatus: string | null;
+  uuid: string | null;
+  hash: string | null;
+  previousHash: string | null;
+  chainIndex: number | null;
+  attempts: string;
+  error: string | null;
+  submittedAt: string | null;
+  createdAt: string;
+  response: {
+    submitted?: boolean;
+    reason?: string;
+    message?: string;
+    clearance?: boolean;
+    profile?: string;
+    gateway?: string;
+    endpoint?: string | null;
+    errorMessages?: string[];
+    warningMessages?: string[];
+  } | null;
+};
+
+export type FilingPage = { items: FilingRow[]; total: number; pageNo: number; pageSize: number; pages: number };
+
+export type FilingDetail = {
+  submission: FilingRow & { requestPayload: { xml?: string; clearedXml?: string; counter?: number; profile?: string } };
+  invoice: { id: string; number: string | null; kind: string; total: string; taxTotal: string; currency: string; issuedAt: string | null } | null;
+  document: { xml: string | null; clearedXml: string | null; counter: number | null; profile: string | null; clearance: boolean | null };
+  chain: { previousHash: string | null; hash: string | null };
+  qr: { payload: string | null; tags: QrTag[] };
+  authority: { status: string | null; errors: string[]; warnings: string[]; error: string | null; response: Record<string, unknown> };
+};
+
+export type ChainState = { authority: string; environment: string; counter: number; lastHash: string; nextCounter: number; updatedAt: string | null };
+
+/** 🔍 عرض — the paged grid, with the window's own «رقم الصفحة» and «حجم الصفحة». */
+export const filingsPage = (query: { status?: string; from?: string; to?: string; pageNo: number; pageSize: number }) => {
+  const search = new URLSearchParams({ pageNo: String(query.pageNo), pageSize: String(query.pageSize) });
+  if (query.status) search.set('status', query.status);
+  if (query.from) search.set('from', query.from);
+  if (query.to) search.set('to', query.to);
+  return apiFetch<FilingPage>(`/einvoice/filings?${search.toString()}`);
+};
+
+/** 📄 بيانات الفاتورة — one filing, its document, its cleared document and its QR tags. */
+export const filingDetail = (id: string) => apiFetch<FilingDetail>(`/einvoice/filings/${id}`);
+
+/** The tenant's place in the hash chain. */
+export const zatcaChain = () => apiFetch<ChainState>('/einvoice/chain');
+
+/** 🔁 إعادة الإرسال — re-files the stored document; the hash never moves. */
+export const retryFiling = (id: string) => apiFetch<{ status: string; message?: string }>(`/einvoice/submissions/${id}/retry`, { method: 'POST', body: '{}' });
+
+/** 🧾 إرسال — files one posted sales invoice. */
+export const submitInvoiceEinvoice = (invoiceId: string, body: { authority?: 'zatca' | 'eta'; environment?: 'simulation' | 'production' } = {}) =>
+  apiFetch<FilingRow>(`/sales-invoices/${invoiceId}/einvoice/submit`, { method: 'POST', body: JSON.stringify(body) });
