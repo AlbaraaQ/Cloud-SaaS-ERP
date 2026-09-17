@@ -24,14 +24,15 @@ console work from any host without touching CORS.
   المنصة), each item carrying the `console.*` code that opens it. **This file is the single
   source of truth**: `tests/navigation.spec.ts` fails the build when an item claims `ready`
   without a page file, or names a code the registry does not declare.
-- `app/` — 13 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
-  `subscriptions`, `plans`, `activation-requests`, `users`, `roles`, `audit`, `health`, `jobs`,
-  `settings`.
+- `app/` — 14 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
+  `subscriptions`, `plans`, `activation-requests`, `users`, `users/[id]` (operator card),
+  `roles`, `audit`, `health`, `jobs`, `settings`.
 - `components/` — session auth gate, platform-only login screen (no signup path), the shell
   (`PlatformGuard`), and the shared screen kit.
 - `lib/` — API client (same origin, refresh-on-401), session provider (`can()` for tenant
   codes, `canConsole()` for `console.*`), `useQuery`, the navigation tree.
-- `tests/` — navigation + route/kit coverage checks (16 tests).
+- `tests/` — navigation + route/kit coverage checks (20 tests). `tests/routes.spec.ts` owns the
+  console's own route list, so a page that exists but is unreachable (or the reverse) fails.
 
 ## Screens added by P-C1 (2026-09-17)
 
@@ -58,6 +59,34 @@ The settings screen renders entirely from the catalogue the API validates with
 come from `GET /platform/settings`, so a key can never exist on one side only. An operator
 without `console.settings.manage` sees the form read-only.
 
+## Screens deepened/added by P-C3 (2026-09-17)
+
+| Screen | Route | Console code | Endpoints |
+|---|---|---|---|
+| المستخدمون (directory across every tenant) | `/users` | read `console.users.view` · invite/write `console.users.manage` | `GET /platform/users` (search) · `POST /platform/operators/invite` |
+| بطاقة المشغّل (identification · platform roles · memberships · sessions · 2FA) | `/users/[id]` | read `console.users.view` · the three acts `console.users.manage` | `GET /platform/users/:id` · `POST/DELETE …/roles[/:roleCode]` · `GET /platform/sessions/:id` · `DELETE /platform/sessions/:id?reason=` · `POST …/mfa/reset` |
+| مصفوفة الأدوار (the five roles × the 13 `console.*` codes) | `/roles` | read `console.users.view` · write `console.users.manage` | `GET /platform/roles` · `GET /platform/permissions` · `PUT /platform/roles/:code/permissions` |
+
+Three properties of this part are worth knowing before touching it:
+
+1. **The matrix is not decoration.** `PlatformAdminGuard` reads `console.role_permissions`
+   overrides (stored in `platform_settings`) on every guarded request, so a *narrowed* role
+   stops working immediately — even on a token that was issued seconds earlier — and `/me`
+   agrees with the API. A role *grant* still needs a fresh login (the role list itself travels
+   in the token).
+2. **Every act on a person carries a written reason.** Revoking a session (single or all) and
+   resetting 2FA answer `400` without one and write it into `audit_log`
+   (`session.revoke`, `operator.mfa_reset`, `operator.invite`, `platform_role.grant|revoke|permissions_update`).
+   The revoke reason travels in the **query string**: `apiDelete` sends no body.
+3. **Inviting an operator produces a person who can sign in.** The invite grants the platform
+   role *and* a role-less membership of the operations tenant (`PLATFORM_TENANT_CODE`,
+   default `platform`), because `POST /auth/login` always signs into a tenant; with a temporary
+   password the account is `active` and owes a password change, without one it is `invited`
+   and waits for the activation e-mail (P-C6).
+
+The user card is reached from the directory (and from the holders table on `/roles`), never
+from the sidebar: an operator reading it is already inside the identity area.
+
 ## Security
 
 - No self-service signup: operators are provisioned by hand and granted Family-A
@@ -70,4 +99,8 @@ without `console.settings.manage` sees the form read-only.
   the sidebar is a convenience, never a control.
 - `console.settings.manage` is held by `platform_owner` alone: the maintenance switch and
   the default limits affect every customer.
+- `console.users.view` is likewise `platform_owner`-only **in the catalogue**: none of the
+  other four roles can read the directory out of the box, and delegating it is a written,
+  audited act on `/roles` (the API suite builds a read-only operator that way and proves the
+  read-only operator still cannot revoke a session).
 - CSP headers are configured in `next.config.mjs`.

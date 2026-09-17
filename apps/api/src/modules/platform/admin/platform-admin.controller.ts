@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { OrgProvisioningService } from '../../organization/provisioning/org-provisioning.service.js';
@@ -155,42 +155,11 @@ export class PlatformAdminController {
     return { data: await this.admin.reviewActivation(id, body.approve, body.notes) };
   }
 
-  // ------------------------------------------------------------------ users
-
-  @Get('users')
-  @RequiresPlatformRole('console.users.view')
-  @ApiOperation({ summary: 'Search platform users across all tenants' })
-  async listUsers(@Query('search') search?: string) {
-    return { data: await this.admin.listUsers(search) };
-  }
-
-  // ------------------------------------------------------------------ platform roles (2026-09)
-
-  @Get('roles')
-  @RequiresPlatformRole('console.users.view')
-  @ApiOperation({ summary: 'Family-A platform role catalogue with holder counts' })
-  async listPlatformRoles() {
-    return { data: await this.admin.listPlatformRoles() };
-  }
-
-  @Get('permissions')
-  @RequiresPlatformRole('console.users.view')
-  @ApiOperation({ summary: 'Platform-console (console.*) permission registry' })
-  async listPlatformPermissions() {
-    return { data: this.admin.listPlatformPermissions() };
-  }
-
-  @Post('users/:id/roles')
-  @RequiresPlatformRole('console.users.manage')
-  @ApiOperation({ summary: 'Grant a platform role to a user' })
-  async grantPlatformRole(@Param('id') id: string, @Body() body: { roleCode: string }) {
-    return { data: await this.admin.grantPlatformRole(id, body.roleCode) };
-  }
-
-  @Delete('users/:id/roles/:roleCode')
-  @RequiresPlatformRole('console.users.manage')
-  @ApiOperation({ summary: 'Revoke a platform role from a user' })
-  async revokePlatformRole(@Param('id') id: string, @Param('roleCode') roleCode: string) {
-    return { data: await this.admin.revokePlatformRole(id, roleCode) };
-  }
+  // ------------------------------------------------- identity
+  //
+  // `GET users` · `GET users/:id` · `GET roles` · `GET permissions` · `POST users/:id/roles` ·
+  // `DELETE users/:id/roles/:roleCode` used to live here. P-C3 moved them — unchanged paths —
+  // to `PlatformIdentityController`, because «who exists and what may they do» is one subject
+  // and this controller's subject is customers, plans, licences and activation review. One
+  // path, one owner: the same rule that retired the duplicate `PATCH …/status` route in P-C2.
 }

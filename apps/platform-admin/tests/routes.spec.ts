@@ -23,6 +23,8 @@ const CONSOLE_ROUTES = [
   '/settings',
   // P-C2 — بطاقة العميل: one dynamic route, reached from the customers list.
   '/tenants/[id]',
+  // P-C3 — بطاقة المستخدم: reached from the directory, never from the sidebar.
+  '/users/[id]',
 ];
 
 function pageFileFor(href: string): string {
@@ -118,6 +120,41 @@ describe('platform console routes', () => {
     // The card is the platform plane only: it must never call a `/api/v1/tenants/…` route,
     // which is the customer's own surface and carries the tenant session's permissions.
     expect(card).not.toContain('/api/v1/tenant');
+  });
+
+  /**
+   * P-C3 — the identity screens are real: the directory links to the card, the card calls the
+   * five endpoints that back it, and the roles page writes the matrix through the one route
+   * the plan names. Same rule as P-C2: a screen that calls nothing is a picture.
+   */
+  it('links every directory row to its user card', () => {
+    const list = readFileSync(join(appDir, 'users', 'page.tsx'), 'utf8');
+    expect(list).toContain('href={`/users/${row.id}`}');
+    expect(list).toContain('/platform/operators/invite');
+  });
+
+  it('calls the P-C3 endpoints from the user card', () => {
+    const card = readFileSync(join(appDir, 'users', '[id]', 'page.tsx'), 'utf8');
+    for (const call of [
+      '`/platform/users/${id}`',
+      '`/platform/users/${id}/roles`',
+      '`/platform/users/${id}/roles/${code}`',
+      '`/platform/users/${id}/mfa/reset`',
+      '`/platform/sessions/${entry.id}?reason=',
+    ]) {
+      expect(card, call).toContain(call);
+    }
+    // Like the customer card, the platform plane only.
+    expect(card).not.toContain('/api/v1/tenant');
+  });
+
+  it('renders the roles matrix and writes it with a reason', () => {
+    const roles = readFileSync(join(appDir, 'roles', 'page.tsx'), 'utf8');
+    expect(roles).toContain('/platform/roles/${role.code}/permissions');
+    expect(roles).toContain('/platform/permissions');
+    for (const label of ['الحائزون', 'إرجاع إلى الفهرس', 'تجاوز مسجَّل']) {
+      expect(roles, label).toContain(label);
+    }
   });
 
   /** P-C1: the sidebar is a real tree, and the four groups are the plan's. */

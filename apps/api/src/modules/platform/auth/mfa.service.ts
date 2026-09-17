@@ -147,6 +147,39 @@ export class MfaService {
     this.logger.log({ userId, action: 'mfa.disable' }, 'TOTP disabled');
   }
 
+  /**
+   * P-C3 — admin reset: the platform console clears 2FA on an account that lost its
+   * authenticator. It is the **only** way to switch 2FA off without the account password,
+   * so it is deliberately not part of this service's public auth surface: the caller is
+   * `PlatformIdentityService`, which demands `console.users.manage` and a written reason
+   * and records `operator.mfa_reset` in the audit trail.
+   *
+   * Returns whether the account actually had 2FA on, so the caller can report «لا شيء
+   * لإبطاله» instead of pretending it reset something.
+   */
+  async resetForAdmin(userId: string): Promise<{ hadMfa: boolean }> {
+    const [user] = await withTx(this.database.db, async (tx) =>
+      tx
+        .select({ mfaEnabled: users.mfaEnabled, mfaSecretEnc: users.mfaSecretEnc })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
+    );
+    if (!user) throw new DomainError(errorCodes.NOT_FOUND, 'User not found', 404);
+    const hadMfa = user.mfaEnabled || user.mfaSecretEnc !== null;
+
+    await withTx(this.database.db, async (tx) => {
+      await tx
+        .update(users)
+        .set({ mfaEnabled: false, mfaSecretEnc: null, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+      await tx.delete(mfaRecoveryCodes).where(eq(mfaRecoveryCodes.userId, userId));
+    });
+
+    this.logger.log({ userId, action: 'mfa.reset' }, 'TOTP reset by platform console');
+    return { hadMfa };
+  }
+
   /** Called by `AuthService.login` *after* the password already checked out. */
   async verifyLogin(userId: string, suppliedCode: string): Promise<boolean> {
     const trimmed = suppliedCode.trim();

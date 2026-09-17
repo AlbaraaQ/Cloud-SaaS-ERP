@@ -585,11 +585,23 @@ export function isPlatformRoleCode(code: string): boolean {
 /**
  * Effective platform permissions of a set of platform roles (UNION semantics,
  * mirroring tenant roles in DATABASE_DESIGN §2).
+ *
+ * P-C3 added the second argument: `overrides` maps a role code to the exact set of
+ * `console.*` codes it carries **instead of** the catalogue. A role absent from the map
+ * follows the catalogue, so an empty map reproduces the pre-P-C3 behaviour exactly —
+ * which is what every existing caller gets when it omits the argument. The platform guard
+ * and `/me` both pass the stored overrides, so the console and the API answer with one
+ * voice (see `platformRolePermissionOverridesSchema`).
  */
-export function platformPermissionsForRoles(codes: readonly string[]): string[] {
+export function platformPermissionsForRoles(
+  codes: readonly string[],
+  overrides?: Readonly<Record<string, readonly string[]>>,
+): string[] {
   const out = new Set<string>();
   for (const code of codes) {
-    for (const permission of platformByCode.get(code)?.permissions ?? []) out.add(permission);
+    const override = overrides && Object.prototype.hasOwnProperty.call(overrides, code) ? overrides[code] : undefined;
+    const granted = override ?? platformByCode.get(code)?.permissions ?? [];
+    for (const permission of granted) out.add(permission);
   }
   return [...out];
 }

@@ -10,6 +10,7 @@ import { PasswordService } from './auth/password.service.js';
 import { TokenService } from './auth/token.service.js';
 import { IdentityController } from './identity/identity.controller.js';
 import { IdentityService } from './identity/identity.service.js';
+import { PlatformRolePermissionsService } from './identity/platform-role-permissions.service.js';
 import { RateLimiterService } from './rate-limit/rate-limiter.service.js';
 import { MembershipsController } from './tenancy/memberships.controller.js';
 import { MembershipsService } from './tenancy/memberships.service.js';
@@ -39,6 +40,7 @@ import { TenantService } from './tenancy/tenant.service.js';
     AuthService,
     BillingService,
     IdentityService,
+    PlatformRolePermissionsService,
     MembershipsService,
     RolesService,
     SettingsService,
@@ -48,6 +50,15 @@ import { TenantService } from './tenancy/tenant.service.js';
     TokenService,
     RateLimiterService,
   ],
-  exports: [AuthService, IdentityService, MfaService, PasswordService, TokenService, RateLimiterService, BillingService],
+  exports: [
+    AuthService,
+    IdentityService,
+    PlatformRolePermissionsService,
+    MfaService,
+    PasswordService,
+    TokenService,
+    RateLimiterService,
+    BillingService,
+  ],
 })
 export class PlatformModule {}

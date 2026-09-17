@@ -70,13 +70,22 @@
 > (`GET/PUT /platform/settings`). الجدول أدناه هو **قياس ما قبل P-C1** ويُحفظ للتاريخ.
 > الوثيقة: [`../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md).
 >
+> ✅ **وتحديثٌ بعد P-C3 (2026-09-17):** «المستخدمون والصلاحيات» على مستوى المنصة صار لهما
+> مسارٌ كامل: `GET /platform/users` (دليل عبر المنشآت) · `GET /platform/users/:id` (بطاقة:
+> عضويات وأدوار وجلسات) · `GET/DELETE /platform/sessions/:id` · `POST /platform/users/:id/mfa/reset`
+> · `POST /platform/operators/invite` · `PUT /platform/roles/:code/permissions` (مصفوفة مكتوبة).
+> ونُقّح بندٌ من قائمة «الغائب تماماً» أدناه: **SSO** يبقى غائباً (امتدادٌ لاحق مُعلَن في الخطة)،
+> و**الفوترة والتحصيل** كذلك (P-C4). التفصيل في
+> [`../PLATFORM_CONSOLE_P_C3_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C3_IMPLEMENTATION_REPORT.md) §7.
+>
 > ✅ **وتحديثٌ بعد P-C2 (2026-09-17):** «رايات الميزات وإعدادات المستأجر من المنصة» و«استخدام
 > وحصص» و«تدقيق عابر للمستأجرين» — البطاقة `/tenants/[id]` تغطيها بثمانية تبويبات، وملاحظات
 > المشغّلين صار لها جدول `tenant_notes`. الباقي من قائمة «الغائب تماماً» أدناه كما هو، و**زاد
 > عليها** بندٌ كُشف وأُغلق: سياسات RLS بـ`''::uuid` (155 سياسة) — التفصيل في
 > [`../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md) §1.1.
 
-**قياس اليوم** (تسجيل دخول `admin@platform.test` على المستأجر `platform`):
+**قياس اليوم** — هذا القياس **قبل P-C1**، ويُحفظ للتاريخ:
+(تسجيل دخول `admin@platform.test` على المستأجر `platform`):
 
 | الملاحظة | الدليل |
 |---|---|

@@ -21,7 +21,8 @@
  *  13. 🚩 الرايات والهوية — حزمة تُفتح، ولون يُكتب، وشعار خبيث يُرفض
  *  14. 🗒️ الملاحظات — تُضاف، ولا تُحذف من بطاقة عميل آخر
  *  15. 🔐 أبواب بطاقة العميل — جلسة المستأجر لا تدخل
- *  16. 🧹 التنظيف — الحالة تعود كما كانت
+ *  16. 🪪 الهوية والوصول — الدليل والبطاقة والجلسات والمصفوفة ودعوة مشغّل (P-C3)
+ *  17. 🧹 التنظيف — الحالة تعود كما كانت
  *
  * Re-runnable and non-destructive: the settings are snapshotted before anything is written
  * and restored at the end, and the temporary platform role granted in §8 is revoked in §10.
@@ -32,7 +33,12 @@
  * rather than hiding it: `pnpm db:seed` writes the four feature flags as rows holding the
  * catalogue default (`false`). The card's write path treats "value equals the registry
  * default" as "no row" (that is what keeps `isDefault` truthful), so returning a flag to
- * `false` removes a row that merely repeated the default. The **effective** value the
+ * `false` removes a row that merely repeated the default.
+ *
+ * P-C3 adds §16 and one more honest note: it invites a real operator
+ * (`VERIFY_INVITE_EMAIL`, default `verify-pc3@erpverify.test`) because «دعوة مشغّل» is only
+ * proven by a person who can actually sign in. The roles that invitation grants are revoked
+ * in §17; the account row stays, and a second run re-uses it rather than creating another. The **effective** value the
  * customer sees is identical (the feature stays off), and a second run changes nothing —
  * which is what "no residue" means here, and what the before/after snapshot in the report
  * asserts.
@@ -519,12 +525,190 @@ for (const path of [
 const anonCard = await refused('get', `/platform/tenants/${demoId}`, undefined, '');
 check('وترفض بلا جلسة 401', anonCard.status === 401, String(anonCard.status));
 
-// ═════════════════════════════════════════════════════════════ 16. 🧹 التنظيف
-console.log('\n■ 16. 🧹 التنظيف');
+// ══════════════════════════════════ 16. 🪪 الهوية والوصول — مَن يدير المنصة نفسها (P-C3)
+console.log('\n■ 16. 🪪 الهوية والوصول — الدليل والبطاقة والجلسات والمصفوفة والدعوة');
+
+// --- الدليل: صفٌّ لكل إنسان، ومنشآته، ودوره، وحالة 2FA
+const directory = await get('/platform/users');
+check('دليل المستخدمين يقرأ عبر المنشآت', Array.isArray(directory) && directory.length > 0, `${directory.length} حساباً`);
+const selfRow = (await get(`/platform/users?search=${encodeURIComponent(operator.email)}`)).find(
+  (row) => row.email === operator.email,
+);
+check('والبحث يجد مشغّل المنصة نفسه', Boolean(selfRow), selfRow?.id ?? '—');
+const demoRow2 = directory.find((row) => row.email === demo.email);
+check(
+  'والصف يحمل المنشأة والدور وحالة 2FA وآخر دخول',
+  Boolean(demoRow2) &&
+    Array.isArray(demoRow2.tenants) &&
+    demoRow2.tenants.some((tenant) => tenant.code === demo.tenantCode) &&
+    typeof demoRow2.mfaEnabled === 'boolean' &&
+    typeof demoRow2.activeSessionCount === 'number' &&
+    'lastLoginAt' in demoRow2,
+  demoRow2 ? `${demoRow2.tenants.map((tenant) => tenant.code).join(',')} · ${demoRow2.activeSessionCount} جلسة` : '—',
+);
+const unknownUser = await refused('get', `/platform/users/${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}`, undefined, ownerToken);
+check('ومعرّف لا وجود له 404', unknownUser.status === 404, String(unknownUser.status));
+const malformedId = await refused('get', '/platform/users/not-a-uuid', undefined, ownerToken);
+check('ومعرّف مشوّه 400', malformedId.status === 400, String(malformedId.status));
+
+// --- البطاقة: هو + أدواره + عضوياته + جلساته
+const selfCard = await get(`/platform/users/${selfRow.id}`);
+check(
+  'بطاقة المستخدم تجمع العضويات والأدوار والجلسات',
+  Array.isArray(selfCard.memberships) &&
+    Array.isArray(selfCard.sessions) &&
+    Array.isArray(selfCard.platformRoles) &&
+    selfCard.platformRoles.includes('platform_owner'),
+  `${selfCard.memberships.length} عضوية · ${selfCard.sessions.length} جلسة`,
+);
+const ownerLiveSession = selfCard.sessions.find((session) => !session.revoked);
+check('وجلسته الحالية معروفة بمعرّف عائلة', Boolean(ownerLiveSession?.id), ownerLiveSession?.ip ?? '—');
+check(
+  'ولا كلمة مرور ولا بصمة تشفير في البطاقة',
+  !JSON.stringify(selfCard).includes('argon2') && !JSON.stringify(selfCard).includes('password_hash'),
+);
+
+// --- الجلسات: القراءة، والسبب الإلزامي، وما لا وجود له
+const missingReason = await refused('delete', `/platform/sessions/${ownerLiveSession.id}`, undefined, ownerToken);
+check('إبطال جلسة بلا سبب يُرفض (400)', missingReason.status === 400, `${missingReason.status} ${missingReason.code}`);
+const ghostSession = await refused(
+  'delete',
+  `/platform/sessions/${'1'.repeat(8)}-1111-4111-8111-${'1'.repeat(12)}?reason=${encodeURIComponent('جلسة وهمية')}`,
+  undefined,
+  ownerToken,
+);
+check('وجلسة لا وجود لها 404', ghostSession.status === 404, String(ghostSession.status));
+const sessionRead = await refused('get', `/platform/sessions/${ownerLiveSession.id}`, undefined, ownerToken);
+check('والبطاقة تقرأ الجلسة بمفردها', sessionRead.status === 200, String(sessionRead.status));
+
+// --- إعادة تعيين 2FA: الباب قائم، والسبب شرط، ولا نمسّ 2FA حقيقيًّا في تشغيل التحقّق
+const mfaNoReason = await refused('post', `/platform/users/${selfRow.id}/mfa/reset`, { reason: '' }, ownerToken);
+check('إعادة تعيين 2FA بلا سبب تُرفض (400)', mfaNoReason.status === 400, `${mfaNoReason.status} ${mfaNoReason.code}`);
+const mfaGhost = await refused(
+  'post',
+  `/platform/users/${'2'.repeat(8)}-2222-4222-8222-${'2'.repeat(12)}/mfa/reset`,
+  { reason: 'حساب وهمي' },
+  ownerToken,
+);
+check('وحساب لا وجود له 404', mfaGhost.status === 404, String(mfaGhost.status));
+
+// --- المصفوفة: الفهرس، والفعل، والتجاوز، والإرجاع
+const matrix = await get('/platform/roles');
+check('المصفوفة تعرض الأدوار الخمسة بأسمائها العربية', matrix.length === 5 && matrix.every((role) => role.nameAr), matrix.map((role) => role.nameAr).join(' · '));
+check(
+  'وكل دور يفرّق بين الفهرس والفعل ويعدّ حامليه',
+  matrix.every((role) => Array.isArray(role.catalogPermissions) && Array.isArray(role.permissions) && typeof role.holderCount === 'number'),
+);
+const supportCatalog = [...(matrix.find((role) => role.code === 'platform_support')?.catalogPermissions ?? [])];
+const auditorCatalog = [...(matrix.find((role) => role.code === 'platform_auditor')?.catalogPermissions ?? [])];
+check(
+  'والمدقّق يحمل رموز القراءة وحدها',
+  auditorCatalog.length === 4 && auditorCatalog.every((code) => code.endsWith('.view')),
+  auditorCatalog.join(' · '),
+);
+const ownerRoleRow = matrix.find((role) => role.code === 'platform_owner');
+check(
+  'ومالك المنصة على الفهرس بلا تجاوز',
+  ownerRoleRow.overridden === false && ownerRoleRow.permissions.length === ownerRoleRow.catalogPermissions.length,
+  `${ownerRoleRow.permissions.length} رمزاً`,
+);
+const overridden = await put('/platform/roles/platform_support/permissions', {
+  permissions: [...supportCatalog, 'console.users.view'],
+  reason: 'تحقّق حيّ: توسيع مؤقّت لدعم المنصة',
+});
+check('كتابة تجاوز بسبب تُقبل وتُعلَن', overridden.overridden === true && overridden.permissions.includes('console.users.view'), `${overridden.permissions.length} رمزاً`);
+const matrixAfterWrite = await get('/platform/roles');
+const supportAfter = matrixAfterWrite.find((role) => role.code === 'platform_support');
+check('والمصفوفة تعرض التجاوز موسوماً', supportAfter.overridden === true && supportAfter.permissions.includes('console.users.view'));
+const restoredSupport = await put('/platform/roles/platform_support/permissions', {
+  permissions: supportCatalog,
+  reason: 'إرجاع الفهرس بعد التحقّق',
+});
+check('وإرجاع الفهرس يمحو صفّ التجاوز', restoredSupport.overridden === false && restoredSupport.permissions.length === supportCatalog.length);
+const unknownPermission = await refused(
+  'put',
+  '/platform/roles/platform_support/permissions',
+  { permissions: ['console.not.a.code'], reason: 'رمز مجهول' },
+  ownerToken,
+);
+check('ورموز خارج السجل تُرفض 400', unknownPermission.status === 400, `${unknownPermission.status} ${unknownPermission.code}`);
+const unknownRoleCode = await refused(
+  'put',
+  '/platform/roles/platform_nope/permissions',
+  { permissions: ['console.audit.view'], reason: 'دور مجهول' },
+  ownerToken,
+);
+check('ودور مجهول 404', unknownRoleCode.status === 404, String(unknownRoleCode.status));
+
+// --- الدعوة: ينشأ الحساب ويحمل الدور ويدخل فعلاً
+const inviteEmail = process.env.VERIFY_INVITE_EMAIL ?? 'verify-pc3@erpverify.test';
+const invited = await request(
+  'post',
+  '/platform/operators/invite',
+  {
+    email: inviteEmail,
+    fullName: 'مشغّل التحقّق',
+    roleCode: 'platform_support',
+    temporaryPassword: 'Kx#9Tq2Mv7Lp4Ze',
+    reason: 'تحقّق حيّ من دعوة مشغّل',
+  },
+  ownerToken,
+);
+check('الدعوة تُنشئ حساباً نشطاً يحمل الدور', invited.status === 'active' && invited.platformRoles.includes('platform_support'), invited.id);
+check('ويُطالَب بتغيير كلمة المرور المؤقّتة', invited.mustChangePassword === true);
+const invitedSession = await signIn(platformTenant, { email: inviteEmail, password: 'Kx#9Tq2Mv7Lp4Ze' });
+const invitedMe = await get('/me', invitedSession.token);
+check(
+  'والمدعوّ يدخل ويحمل رموز الدعم',
+  (invitedMe.platformPermissions ?? []).includes('console.tenants.view') &&
+    !(invitedMe.platformPermissions ?? []).includes('console.users.manage'),
+  (invitedMe.platformPermissions ?? []).length + ' رمزاً',
+);
+const reInvited = await request(
+  'post',
+  '/platform/operators/invite',
+  { email: inviteEmail, fullName: 'مشغّل التحقّق', roleCode: 'platform_auditor' },
+  ownerToken,
+);
+check('والدعوة الثانية تعيد استخدام الحساب نفسه وتضيف الدور', reInvited.id === invited.id && reInvited.platformRoles.includes('platform_auditor'), reInvited.id);
+const invitedCard = await get(`/platform/users/${invited.id}`);
+check(
+  'وبطاقة الحساب تسرد الدورين وحالته',
+  invitedCard.platformRoles.includes('platform_support') && invitedCard.platformRoles.includes('platform_auditor'),
+  invitedCard.platformRoles.join(' · '),
+);
+check('والمدعوّ عضو في منشأة المشغّلين (منشأ الرمز)', invitedCard.memberships.some((membership) => membership.tenantCode === platformTenant), invitedCard.memberships.map((membership) => membership.tenantCode).join(',') || '—');
+
+// --- الأبواب: جلسة المستأجر لا تلمس الهوية، ولا جلسة مجهولة
+for (const [method, path, body] of [
+  ['get', '/platform/users', undefined],
+  ['get', `/platform/users/${selfRow.id}`, undefined],
+  ['get', '/platform/roles', undefined],
+  ['get', '/platform/permissions', undefined],
+  ['post', '/platform/operators/invite', { email: 'nope@erpverify.test', fullName: 'مرفوض', roleCode: 'platform_support' }],
+  ['put', '/platform/roles/platform_support/permissions', { permissions: ['console.audit.view'], reason: 'محاولة' }],
+  ['post', `/platform/users/${selfRow.id}/mfa/reset`, { reason: 'محاولة' }],
+  ['delete', `/platform/sessions/${ownerLiveSession.id}?reason=${encodeURIComponent('محاولة')}`, undefined],
+]) {
+  const result = await refused(method, path, body, demoToken);
+  check(`${method.toUpperCase()} ${path.replace(selfRow.id, ':id').replace(ownerLiveSession.id, ':session')} يرفض المستأجر`, result.status === 403, `${result.status} ${result.code}`);
+}
+const anonymousIdentity = await refused('get', '/platform/users', undefined, '');
+check('وترفض بلا جلسة 401', anonymousIdentity.status === 401, String(anonymousIdentity.status));
+
+// ═════════════════════════════════════════════════════════════ 17. 🧹 التنظيف
+console.log('\n■ 17. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);
 check('سُحب الدور المحدود', (revokedMe.platformPermissions ?? []).length === 0);
+// §16 granted two roles to the verification account: both come back here, so a re-run starts
+// from the same place. The account itself stays — it is the one deliberate residue, and
+// re-inviting it reuses the row instead of adding another.
+await request('delete', `/platform/users/${invited.id}/roles/platform_support`, undefined, ownerToken);
+await request('delete', `/platform/users/${invited.id}/roles/platform_auditor`, undefined, ownerToken);
+const cleanedInvite = await get(`/platform/users/${invited.id}`);
+check('وسُحبت أدوار حساب التحقّق', cleanedInvite.platformRoles.length === 0, `${cleanedInvite.revokedPlatformRoles.length} دوراً مسحوباً`);
 const afterDenied = await refused('get', '/platform/tenants', undefined, afterRevoke.token);
 check('وعاد المستأجر ممنوعاً من اللوحة', afterDenied.status === 403, String(afterDenied.status));
 

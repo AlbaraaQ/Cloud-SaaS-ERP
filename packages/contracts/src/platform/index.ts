@@ -3,6 +3,7 @@ export * from './tenancy.js';
 export * from './audit.js';
 export * from './console.js';
 export * from './tenants.js';
+export * from './identity.js';
 export * from './files.js';
 export * from './jobs.js';
 export * from './notifications.js';

@@ -6,6 +6,8 @@ import { PlatformModule } from '../platform.module.js';
 import { PlatformAdminController } from './platform-admin.controller.js';
 import { PlatformAdminService } from './platform-admin.service.js';
 import { PlatformConsoleController } from './platform-console.controller.js';
+import { PlatformIdentityController } from './platform-identity.controller.js';
+import { PlatformIdentityService } from './platform-identity.service.js';
 import { PlatformConsoleService } from './platform-console.service.js';
 import { PlatformTenantsController } from './platform-tenants.controller.js';
 import { PlatformTenantsService } from './platform-tenants.service.js';
@@ -22,10 +24,16 @@ import { SignupController } from './signup.controller.js';
   controllers: [
     PlatformAdminController,
     PlatformConsoleController,
+    PlatformIdentityController,
     PlatformTenantsController,
     SignupController,
   ],
-  providers: [PlatformAdminService, PlatformConsoleService, PlatformTenantsService],
-  exports: [PlatformAdminService, PlatformConsoleService, PlatformTenantsService],
+  providers: [
+    PlatformAdminService,
+    PlatformConsoleService,
+    PlatformIdentityService,
+    PlatformTenantsService,
+  ],
+  exports: [PlatformAdminService, PlatformConsoleService, PlatformIdentityService, PlatformTenantsService],
 })
 export class PlatformAdminModule {}

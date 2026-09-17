@@ -4,7 +4,6 @@ import {
   DomainError,
   errorCodes,
   permissionRegistry,
-  platformPermissionsForRoles,
   type MeResponse,
   type PermissionDto,
 } from '@erp/contracts';
@@ -26,10 +25,15 @@ import { DATABASE_HANDLE } from '../../../database/database.module.js';
 import { resolvePlatformAccess } from '../auth/platform-access.js';
 import { toMembershipDto, toUserDto } from '../mappers.js';
 
+import { PlatformRolePermissionsService } from './platform-role-permissions.service.js';
+
 /** `GET /me` and `GET /permissions` — API_CONTRACT §1. */
 @Injectable()
 export class IdentityService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly rolePermissions: PlatformRolePermissionsService,
+  ) {}
 
   async me(auth: AuthContextValue): Promise<MeResponse> {
     const user = await withTx(this.database.db, async (tx) => {
@@ -64,7 +68,10 @@ export class IdentityService {
     // console sidebar renders from this list, so it never offers a link the API will
     // refuse — and it is a *separate* list from `permissions` because `pam`/`*` must never
     // satisfy a `console.*` code (SECURITY_ARCHITECTURE §3).
-    const platformPermissions = platformPermissionsForRoles(platform.platformRoles);
+    //
+    // P-C3: the same overrides the guard reads, so the sidebar and the API cannot disagree
+    // after the roles matrix is edited (`platform-role-permissions.service.ts`).
+    const platformPermissions = await this.rolePermissions.effectiveFor(platform.platformRoles);
 
     return withTenantTx(this.database.db, auth.claimedTenantId, async (tx) => {
       const rows = await tx

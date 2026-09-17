@@ -90,6 +90,13 @@ describe('platform console navigation', () => {
     expect(consoleItems.map((entry) => entry.href)).not.toContain('/tenants/[id]');
   });
 
+  it('keeps the user card reachable from the directory, not from the sidebar', () => {
+    // Same shape as the customer card: a detail screen entered from the row that names it.
+    const list = readFileSync(join(appDir, 'users', 'page.tsx'), 'utf8');
+    expect(list).toContain('/users/${row.id}');
+    expect(consoleItems.map((entry) => entry.href)).not.toContain('/users/[id]');
+  });
+
   it('ships every console page as a real page file', () => {
     // The eleven pre-P-C1 pages plus إعدادات المنصة.
     const pages = readdirSync(appDir, { withFileTypes: true })
