@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { Empty, ErrorBox, Forbidden, Loading, Screen } from '../../components/screen';
 import { apiData } from '../../lib/api';
@@ -14,10 +14,18 @@ import { useQuery } from '../../lib/use-query';
  * "nothing ever happened" (INCOMPLETE_INVENTORY §4.2 measured it). The page now reads
  * `GET /platform/audit`, which returns every customer's rows with the customer's code and
  * name beside them, and filters by customer, action, entity and date.
+ *
+ * P-C9 added the **diff viewer** the plan asked for: `before`/`after` were on every row since
+ * P-C1 but nothing displayed them, so an operator could see *that* settings changed and never
+ * *what* changed. The table now expands a row into a field-by-field comparison — added,
+ * removed and changed — and falls back to the raw JSON for rows that are not objects.
  */
 
 type AuditRow = {
   id: string;
+  /** The row as it was, and as it became — both present on every audit row (P-C1 contract). */
+  before: unknown;
+  after: unknown;
   tenantId: string | null;
   tenantCode: string | null;
   tenantName: string | null;
@@ -37,6 +45,7 @@ const PAGE_SIZE = 100;
 export default function AuditPage() {
   const [filters, setFilters] = useState({ tenant: '', action: '', entity: '', from: '', to: '' });
   const [applied, setApplied] = useState(filters);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const audit = useQuery<AuditPageResult>(() => {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
@@ -154,34 +163,54 @@ export default function AuditPage() {
                     <th>الكيان</th>
                     <th>المعرّف</th>
                     <th>المستخدم</th>
+                    <th>الفرق</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id}>
-                      <td dir="ltr">{new Date(row.createdAt).toLocaleString('ar-SA')}</td>
-                      <td>
-                        {row.tenantName ? (
-                          <>
-                            {row.tenantName}
-                            <br />
-                            <span className="muted small" dir="ltr">
-                              {row.tenantCode}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="muted">المنصة</span>
-                        )}
-                      </td>
-                      <td dir="ltr">{row.action}</td>
-                      <td dir="ltr">{row.entity}</td>
-                      <td dir="ltr" className="small">
-                        {row.entityId ? row.entityId.slice(0, 12) : '—'}
-                      </td>
-                      <td dir="ltr" className="small">
-                        {row.actorLabel ?? (row.actorUserId ? row.actorUserId.slice(0, 8) : '—')}
-                      </td>
-                    </tr>
+                    <Fragment key={row.id}>
+                      <tr>
+                        <td dir="ltr">{new Date(row.createdAt).toLocaleString('ar-SA')}</td>
+                        <td>
+                          {row.tenantName ? (
+                            <>
+                              {row.tenantName}
+                              <br />
+                              <span className="muted small" dir="ltr">
+                                {row.tenantCode}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="muted">المنصة</span>
+                          )}
+                        </td>
+                        <td dir="ltr">{row.action}</td>
+                        <td dir="ltr">{row.entity}</td>
+                        <td dir="ltr" className="small">
+                          {row.entityId ? row.entityId.slice(0, 12) : '—'}
+                        </td>
+                        <td dir="ltr" className="small">
+                          {row.actorLabel ?? (row.actorUserId ? row.actorUserId.slice(0, 8) : '—')}
+                        </td>
+                        <td>
+                          <button
+                            className="btn small"
+                            type="button"
+                            aria-expanded={expanded === row.id}
+                            onClick={() => setExpanded(expanded === row.id ? null : row.id)}
+                          >
+                            {expanded === row.id ? 'إخفاء' : describeChange(row)}
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded === row.id && (
+                        <tr>
+                          <td colSpan={7} style={{ background: 'rgba(0,0,0,0.02)' }}>
+                            <DiffPanel row={row} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -189,5 +218,104 @@ export default function AuditPage() {
           </>
         ))}
     </Screen>
+  );
+}
+
+/** «قبل/بعد» مُسطَّحان إلى أزواج مفتاحٍ/قيمة — صفٌّ واحد لكل حقلٍ تغيّر. */
+type DiffRow = { field: string; before: unknown; after: unknown; kind: 'added' | 'removed' | 'changed' };
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function diffRows(before: unknown, after: unknown): DiffRow[] {
+  const left = asRecord(before);
+  const right = asRecord(after);
+  if (!left && !right) return [];
+  const fields = Array.from(new Set([...Object.keys(left ?? {}), ...Object.keys(right ?? {})])).sort();
+  const rows: DiffRow[] = [];
+  for (const field of fields) {
+    const hadBefore = left ? field in left : false;
+    const hasAfter = right ? field in right : false;
+    const beforeValue = hadBefore ? left?.[field] : undefined;
+    const afterValue = hasAfter ? right?.[field] : undefined;
+    if (hadBefore && hasAfter && JSON.stringify(beforeValue) === JSON.stringify(afterValue)) continue;
+    rows.push({
+      field,
+      before: beforeValue,
+      after: afterValue,
+      kind: !hadBefore ? 'added' : !hasAfter ? 'removed' : 'changed',
+    });
+  }
+  return rows;
+}
+
+const KIND_LABEL: Record<DiffRow['kind'], string> = {
+  added: 'أُضيف',
+  removed: 'حُذف',
+  changed: 'تغيّر',
+};
+
+/** زرّ الصفّ يقول ما سيراه المشغّل إن ضغط: عدد الحقول التي تغيّرت. */
+function describeChange(row: AuditRow): string {
+  const changes = diffRows(row.before, row.after);
+  if (changes.length === 0) return row.before === null && row.after === null ? 'بلا تفاصيل' : 'تفاصيل';
+  return `الفرق (${changes.length})`;
+}
+
+function showValue(value: unknown): string {
+  if (value === undefined) return '—';
+  if (value === null) return 'null';
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
+
+/**
+ * عارض الفرق — لا يفسّر ولا يخفي: يعرض كل حقلٍ تغيّر، ومن أضاف ومن حذف. والصفوف التي
+ * ليست كائنات (`before`/`after` نصّان أو مصفوفتان) تُعرض خاماً كما هي في التدقيق.
+ */
+function DiffPanel({ row }: { row: AuditRow }) {
+  const changes = diffRows(row.before, row.after);
+  if (changes.length === 0) {
+    const raw = [row.before, row.after].filter((value) => value !== null && value !== undefined);
+    if (raw.length === 0) {
+      return <p className="muted small">لا `before` ولا `after` في هذا السطر — بعض الأفعال لا تغيّر صفاً.</p>;
+    }
+    return (
+      <pre className="code small" dir="ltr">
+        {raw.map((value) => showValue(value)).join('\n→\n')}
+      </pre>
+    );
+  }
+  return (
+    <div className="table-wrap">
+      <table className="small">
+        <thead>
+          <tr>
+            <th>الحقل</th>
+            <th>قبل</th>
+            <th>بعد</th>
+            <th>نوع التغيير</th>
+          </tr>
+        </thead>
+        <tbody>
+          {changes.map((change) => (
+            <tr key={change.field}>
+              <td dir="ltr">{change.field}</td>
+              <td dir="ltr">{showValue(change.before)}</td>
+              <td dir="ltr">{showValue(change.after)}</td>
+              <td>
+                <span
+                  className={`badge ${change.kind === 'changed' ? 'pending' : change.kind === 'added' ? 'active' : 'failed'}`}
+                >
+                  {KIND_LABEL[change.kind]}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -40,6 +40,8 @@ const CONSOLE_ROUTES = [
   '/tickets',
   '/tickets/[id]',
   '/impersonation',
+  // P-C9 — العمليات: المهام صار لها فعلان، والصحة تقرأ مجسّاتٍ مفصَّلة، والملفات شاشةٌ جديدة.
+  '/files',
 ];
 
 function pageFileFor(href: string): string {

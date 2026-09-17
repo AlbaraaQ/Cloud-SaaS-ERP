@@ -333,10 +333,20 @@ async function main() {
     'وكلها على طابور الإشعارات',
     emailJobs.every((job) => job.queue === 'notifications'),
   );
+  // كان الفحص يشترط أن تكون كل مهمّة `pending` أو `published` — وهذا كان صحيحاً قبل P-C9:
+  // لم يكن لأحدٍ أن يُلغي مهمّة. وبعد P-C9 صار المشغّل يملك `cancel` (وسمٌ `dead` بسببه)، فصار
+  // وجود صفٍّ `dead` **حالةً مشروعة** لا خللاً. فالقياس صار: الحالات كلها معلومة، والملغاة
+  // تحمل سبب من ألغاها — لا أن تُقرأ الحالات المعلومة كأنها الوحيدة الممكنة.
   check(
-    'وبحالة `pending` (لا Redis في هذه البيئة)',
-    emailJobs.every((job) => job.status === 'pending' || job.status === 'published'),
+    'وبحالةٍ معلومة: معلَّقة أو نُفِّذت أو ملغاة من اللوحة',
+    emailJobs.every((job) => ['pending', 'published', 'dead'].includes(job.status)),
     [...new Set(emailJobs.map((job) => job.status))].join(' · '),
+  );
+  const cancelledJobs = emailJobs.filter((job) => job.status === 'dead');
+  check(
+    'والملغاة تحمل سبب من ألغاها في اللوحة',
+    cancelledJobs.every((job) => typeof job.lastError === 'string' && job.lastError.includes('لوحة المنصة')),
+    cancelledJobs.length === 0 ? 'لا ملغاة' : `${cancelledJobs.length} ملغاة`,
   );
   check('وللرسائل الاختبارية معرّف مهمّة', Boolean(created?.id));
   const counts = probeLog.body?.counts ?? {};

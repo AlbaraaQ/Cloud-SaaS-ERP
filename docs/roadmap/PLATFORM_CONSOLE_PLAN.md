@@ -250,7 +250,7 @@
 | **ترحيل** | `0072_support_desk.sql` — `support_tickets` · `ticket_messages` · `support_sessions` (رقم الخطة `0071` كان قد أُخذ في P-C7) |
 | **اختبار** | `platform-support.spec.ts` (≥ 10): الدخول المؤقّت ينتهي بوقته، ويُسجَّل، ولا يسمح بالحذف |
 
-### P-C9 — العمليات 🟠
+### P-C9 — العمليات ✅
 
 | | |
 |---|---|
@@ -310,18 +310,18 @@
 | P-C6 البريد ✅ | 🔴 | P-C1 | 21 منفَّذ | 467 منفَّذ (تراكمي) |
 | P-C7 الإعلانات والإشعارات ✅ | 🟡 | P-C6 | 11 منفَّذ | 521 منفَّذ (تراكمي) |
 | P-C8 الدعم والدخول المؤقّت ✅ | 🟡 | P-C1 | 14 منفَّذ | 591 منفَّذ (تراكمي) |
-| P-C9 العمليات | 🟠 | P-C1 | 10 | +25 |
+| P-C9 العمليات ✅ | 🟠 | P-C1 | 12 منفَّذ | 678 منفَّذ (تراكمي) |
 | P-C10 البيانات والاسترجاع | 🟠 | P-C1 | 8 | 30 |
 | P-C11 بوابة المطوّر | 🟢 | P-C1 | 10 | +25 |
 | P-C12 التحليلات | 🟢 | P-C4 · P-C5 | 8 | +20 |
 
-**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد ثمانية
-أجزاء: رقم `verify` التراكمي صار **591** نقطة في **66** قسماً (176/19 من
-`verify-platform-console.mjs` · 147/12 من `verify-platform-billing.mjs` · 85/11 من
-`verify-platform-usage.mjs` · 73/9 من `verify-platform-email.mjs` · 47/7 من
-`verify-platform-announcements.mjs` · 63/9 من `verify-platform-support.mjs`) والمجموع المنفَّذ من
-الاختبارات المخصّصة للأجزاء 146 اختباراً (20+23+21+23+13+21+11+**14**). الأجزاء 9–12 (تبدأ من P-C9)
-تُقاس من هنا.
+**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد تسعة
+أجزاء: رقم `verify` التراكمي صار **679** نقطة في **76** قسماً (187/20 من
+`verify-platform-console.mjs` · 76/9 من `verify-platform-operations.mjs` · 147/12 من
+`verify-platform-billing.mjs` · 85/11 من `verify-platform-usage.mjs` · 74/9 من
+`verify-platform-email.mjs` · 47/7 من `verify-platform-announcements.mjs` · 63/9 من
+`verify-platform-support.mjs`) والمجموع المنفَّذ من الاختبارات المخصّصة للأجزاء 158 اختباراً
+(20+23+21+23+13+21+11+14+**12**). ويتبقّى من الأجزاء P-C10 حتى P-C12، وتُقاس من هنا.
 
 ---
 
@@ -329,7 +329,10 @@
 
 > **تنبيه ترقيم (2026-09-17):** الأرقام أدناه كانت مُدَّخرة في الخطة، وقد أخذ P-C2 الرقم
 > **`0067`** لترحيل البطاقة (السبب في §P-C2 أعلاه) — فانتقلت أرقام الأجزاء الباقية واحداً
-> واحداً. المتاح الآن للمنصة يبدأ من `0068`، والرقم التالي الحر في المستودع كله `0068`.
+> واحداً. وقد أخذ P-C8 الرقم `0072` (رقم الخطة `0071` كان قد أُخذ في P-C7)، وأخذ **P-C9**
+> الرقم `0073` — وهو **ترحيلُ صلاحيةٍ لا جدول** لأن رمز `console.jobs.manage` جديد والقاعدة
+> الملزمة أن كل رمز `console.*` يُدرَج في ترحيل. **الرقم التالي الحر الآن `0074`** (وهو رقم
+> ترحيل P-C10 في الجدول أدناه).
 
 | الترحيل | الجداول | الجزء |
 |---|---|---|
@@ -339,9 +342,10 @@
 | `0069_usage_metering.sql` ✅ | `usage_counters` | P-C5 |
 | `0070_email_service.sql` ✅ | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
 | `0071_announcements.sql` ✅ | `announcements` · `announcement_reads` | P-C7 |
-| `0072_support_desk.sql` | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
-| `0073_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |
-| `0074_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |
+| `0072_support_desk.sql` ✅ | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
+| `0073_jobs_manage_permission.sql` ✅ | **لا جدول** — صفُّ `console.jobs.manage` في `permissions` + `NOBYPASSRLS` | P-C9 |
+| `0074_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |
+| `0075_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |
 
 كل جدول: `tenant_id` حيث يلزم + `RLS` بـ`ENABLE` و`FORCE` وسياسة `tenant_id` + فهارس
 `(tenant_id, created_at DESC)` + ملف `down/` مقابل (اتّباعاً لمنهج المراحل 1–23).
@@ -451,5 +455,6 @@ P-C1 ──┬─ P-C2 ── P-C4 ── P-C5 ──┐
 
 الجلسة الأولى: **P-C1 كاملاً** (لا شيء بعده آمن بدونه). الثانية: **P-C6** (البريد) لأن
 التسويق والمتابعة والتنبيهات كلها تتفرّع عنه. الثالثة: **P-C2 + P-C4** (العملاء
-والمال). ثم الباقي بالأولوية — ومنه **P-C8** الذي اكتمل بعد P-C7 (يظهر في الشجرة أعلاه
-مستقلّاً عن P-C7 لأن الخطّة جعلته يعتمد P-C1 وحده، ولذلك لم يُسلسل بعده).
+والمال). ثم الباقي بالأولوية — ومنه **P-C8** و**P-C9** اللذان اكتملا بعد P-C7 (يظهران في
+الشجرة أعلاه مستقلّين عن P-C7 لأن الخطّة جعلتهما يعتمدان P-C1 وحده، ولذلك لم يُسلسلا بعده).
+**والتالي الآن `P-C10` «البيانات والاسترجاع»** (يعتمد P-C1 أيضاً)، ثم `P-C11` و`P-C12`.

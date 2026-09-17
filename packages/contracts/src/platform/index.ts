@@ -10,6 +10,7 @@ export * from './email.js';
 export * from './announcements.js';
 export * from './support.js';
 export * from './files.js';
+export * from './operations.js';
 export * from './jobs.js';
 export * from './notifications.js';
 export * from './sequences.js';

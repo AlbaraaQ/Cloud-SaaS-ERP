@@ -211,6 +211,30 @@ four. And the limits the screen implies are enforced by the API, not here: the t
 carries `imp`, every `DELETE` and every non-`GET` `/auth/*` is refused while it is in use, and
 ending the session in this screen drops the token **on the next request**.
 
+## Screens added by P-C9 (2026-09-17)
+
+| Screen | Route | Permission | Endpoints |
+|---|---|---|---|
+| المهام والطوابير (أُعيدت كتابتها) | `/jobs` | `console.jobs.view` (+ `console.jobs.manage` للأفعال) | `GET /platform/jobs` · `GET …/heartbeat` · `POST …/:id/retry` · `POST …/:id/cancel` |
+| الملفات | `/files` | `console.jobs.manage` | `GET /platform/files` · `POST …/:id/scan` · `DELETE …/:id` |
+| الصحة (أُعيدت كتابتها) | `/health` | `console.health.view` | `GET /platform/health/detailed` |
+| التدقيق (عارض فرق) | `/audit` | `console.audit.view` | `GET /platform/audit` (يحمل `before`/`after`) |
+
+Three decisions the screens make visible. **The scan verdict is read, not invented**: the console
+shows what the upload path wrote into the audit trail (`meta.scan`), so «لم يُفحص» (no audit line
+at all) and «لم يُفحص فعلياً» (`skipped` — the wired scanner does not scan) stay two different
+things. **Quarantine is a mark, not a delete**: `status='deleted'` plus `deleted_at`, metadata
+kept, and the customer's own `GET /files/:id` answers 404 afterwards. **Retry and cancel are
+separate from reading**: `/jobs` is visible with `console.jobs.view`, the two buttons need
+`console.jobs.manage` (owner and operations only), a reason of at least five characters, and a
+confirmation — the auditor keeps reading the queue without being able to run it.
+
+`/health` no longer probes the API from the browser: the six probes are measured **on the
+server** (database · Redis · storage · e-mail · queue · worker), a probe that is not configured
+says «غير مهيّأ» instead of pretending to be down, and the incident banner comes from
+`platform.maintenance*` in the settings. The old browser-side check survives only as a footer
+line that says what it is: proof that *this browser* reaches the API.
+
 ## Security
 
 - No self-service signup: operators are provisioned by hand and granted Family-A

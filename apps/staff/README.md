@@ -90,6 +90,16 @@ screen saying who is inside the tenant, why, and for how long. The banner is dri
 `me.impersonation` alone, so it cannot be dismissed while the token still carries `imp`; its
 button leaves the view locally, and the session itself is ended from the console.
 
+## What P-C9 (2026-09-17) changed here
+
+Nothing. The part is a console part: it turned the operator's daily service questions into
+screens (`/jobs` with retry and cancel, `/health` with six server-measured probes, `/files`
+with a real quarantine, `/audit` with a `before`/`after` diff viewer) and it added the
+`console.jobs.manage` code that separates *reading* the queue from *running* it. The customer
+surface — and this app's screens, navigation and session handling — did not change, which is
+itself a result: the quarantine the console writes is enforced by the API, so the customer's
+`GET /files/:id` answers 404 without a single line changing in the workspace.
+
 ## Coverage
 
 All core sections are navigable: organization, catalog, accounting,

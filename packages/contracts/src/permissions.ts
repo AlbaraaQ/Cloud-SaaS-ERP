@@ -320,6 +320,13 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
   ),
   perm('console.health.view', 'Read system health and readiness.'),
   perm('console.jobs.view', 'Read background-queue and outbox health.'),
+  //
+  // P-C9: القراءة والكتابة مفصولتان — «إعادة محاولة مهمّة» أو «إلغاء مهمّة» فعلٌ يغيّر
+  // ما سيراه العميل، ومدقّق المنصة يقرأ الطابور ولا يعيد تشغيله.
+  perm(
+    'console.jobs.manage',
+    'Retry or cancel background jobs in the platform outbox, and act on the file manager (scan, quarantine).',
+  ),
   perm('console.billing.manage', 'Manage billing operations and dunning.'),
   perm('console.support.manage', 'Handle platform support tickets and break-glass access.'),
   // P-C6 — خدمة البريد: قراءة السجلّ بلا قدرة إرسال، وإدارة القوالب والإعدادات وإعادة الإرسال.

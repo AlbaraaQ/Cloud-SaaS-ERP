@@ -216,15 +216,15 @@ check(
 const ownerRole = roles.find((role) => role.code === 'platform_owner');
 const operationsRole = roles.find((role) => role.code === 'platform_operations');
 check(
-  'مالك المنصة يحمل الرموز الستة عشر',
-  ownerRole.permissions.length === 16,
+  'مالك المنصة يحمل الرموز السبعة عشر',
+  ownerRole.permissions.length === 17,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 16, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 17, `${registry.length} رمزاً`);
 check(
   'والمفتاح الجديد فيه',
   registry.some((entry) => entry.code === 'console.settings.manage'),
@@ -1192,7 +1192,90 @@ check(
     ),
 );
 
-console.log('\n■ 19. 🧹 التنظيف');
+// ════════════════════════════════════════════════ 19. 🛠️ العمليات
+console.log('\n■ 19. 🛠️ العمليات — الطابور والصحة والملفات (P-C9)');
+// القسم العميق لهذا الجزء في `scripts/verify-platform-operations.mjs` — بما فيه دورة حياة
+// مهمّةٍ حقيقية (إلغاء ثم إعادة) وفحص ملفٍ رفعه العميل وحجره. وهنا ما يخصّ اللوحة وحدها:
+// أن المسارات الثلاثة تعمل، وأن رمز `console.jobs.manage` هو ما يفصل الفعل عن القراءة،
+// وأن المدقّق يقرأ الطابور ولا يستطيع أن يشغّله.
+const jobRows = await get('/platform/jobs?limit=50');
+check('الطابور يُقرأ عبر كل العملاء', Array.isArray(jobRows), `${jobRows.length} مهمّة`);
+check(
+  'وكل صفٍّ بحالته ومحاولاته واستحقاقه — وبلا حمولة',
+  jobRows.every(
+    (row) =>
+      ['pending', 'published', 'dead'].includes(row.status) &&
+      Number.isInteger(row.attempts) &&
+      'runAt' in row &&
+      Array.isArray(row.payloadKeys) &&
+      !('payload' in row),
+  ),
+);
+const pendingJobs = await get('/platform/jobs?filter[status]=pending&limit=50');
+check(
+  'ومرشّح الحالة يحصر النتائج',
+  pendingJobs.every((row) => row.status === 'pending'),
+  `${pendingJobs.length} معلَّقة`,
+);
+const jobBadFilter = await refused('get', '/platform/jobs?filter[state]=pending', undefined, ownerToken);
+check('ومرشّحٌ غير مسموح يُرفض 400', jobBadFilter.status === 400, `HTTP ${jobBadFilter.status}`);
+
+const heartbeat = await get('/platform/jobs/heartbeat');
+check(
+  'ونبض العامل يُقرأ',
+  typeof heartbeat.running === 'boolean' && typeof heartbeat.enabled === 'boolean',
+  `running=${heartbeat.running} · enabled=${heartbeat.enabled}`,
+);
+
+const detailedHealth = await get('/platform/health/detailed');
+const probeNames = (detailedHealth.probes ?? [])
+  .map((probe) => probe.name)
+  .sort()
+  .join(' ');
+check(
+  'وصحة الخدمة ستّة مجسّات لا جملة',
+  probeNames === 'database email queue redis storage worker',
+  probeNames,
+);
+check(
+  'ومعها عدّادات الطلبات ودلاء الاستجابة',
+  typeof detailedHealth.requests?.p95Ms === 'number' &&
+    typeof detailedHealth.requests?.errorRate === 'number',
+  `p95 ${detailedHealth.requests?.p95Ms}ms`,
+);
+const detailedAsClient = await refused('get', '/platform/health/detailed', undefined, demoToken);
+check(
+  'ورمز العميل لا يقرأ المجسّات (403)',
+  detailedAsClient.status === 403,
+  `HTTP ${detailedAsClient.status}`,
+);
+
+const fileRows = await get('/platform/files?limit=50');
+check('ومدير الملفات يُقرأ عبر المستأجرين', Array.isArray(fileRows), `${fileRows.length} ملفاً`);
+check(
+  'وكل صفٍّ يحمل عميله وحالته وحكم فحصه',
+  fileRows.every(
+    (row) =>
+      typeof row.tenantId === 'string' &&
+      ['pending', 'ready', 'deleted'].includes(row.status) &&
+      (row.scan === null || typeof row.scan.verdict === 'string'),
+  ),
+);
+check(
+  'ورموز العمليات عند المالك وحده: الفعل مميّز عن القراءة',
+  (roles.find((role) => role.code === 'platform_owner')?.permissions ?? []).includes('console.jobs.manage') &&
+    !(roles.find((role) => role.code === 'platform_auditor')?.permissions ?? []).includes(
+      'console.jobs.manage',
+    ) &&
+    !(roles.find((role) => role.code === 'platform_support')?.permissions ?? []).includes(
+      'console.jobs.manage',
+    ) &&
+    !(roles.find((role) => role.code === 'platform_billing')?.permissions ?? []).includes(
+      'console.jobs.manage',
+    ),
+);
+
+console.log('\n■ 20. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);

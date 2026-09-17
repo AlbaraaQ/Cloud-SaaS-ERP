@@ -157,8 +157,12 @@ export const consoleGroups: readonly ConsoleGroup[] = [
         'console.support.manage',
         'GET /platform/impersonate/sessions',
       ),
-      item('jobs', 'المهام والطوابير', 'Jobs', '/jobs', 'console.jobs.view', 'GET /platform/jobs/outbox'),
-      item('health', 'الصحة', 'Health', '/health', 'console.health.view', 'GET /api/health/ready'),
+      // P-C9 — «العمليات»: الطابور صار له فعلان (إعادة/إلغاء) ومجسّاتٌ مفصَّلة ومدير ملفات.
+      // والرمز `console.jobs.manage` (جديد في هذا الجزء) هو ما يفصل من يقرأ الطابور عمّن
+      // يشغّله — والمدقّق يحمل `console.jobs.view` وحده فيبقى على الحياد.
+      item('jobs', 'المهام والطوابير', 'Jobs', '/jobs', 'console.jobs.view', 'GET /platform/jobs'),
+      item('health', 'الصحة', 'Health', '/health', 'console.health.view', 'GET /platform/health/detailed'),
+      item('files', 'الملفات', 'Files', '/files', 'console.jobs.view', 'GET /platform/files'),
     ],
   },
   {

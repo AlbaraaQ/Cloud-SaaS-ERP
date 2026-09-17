@@ -75,6 +75,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C9: مالك المنصة يعيد ويُلغي كمثل ما يقرأ.
+      'console.jobs.manage',
       'console.billing.manage',
       'console.support.manage',
       // P-C1: the platform's own configuration belongs to the owner of the platform.
@@ -97,6 +99,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C9: تشغيل الطابور عملُ التشغيل اليومي — يعيد المحاولة ويُلغي بسببه.
+      'console.jobs.manage',
       // P-C6: queued mail is production queue health, so operations can act on it.
       'console.email.view',
       'console.email.manage',
