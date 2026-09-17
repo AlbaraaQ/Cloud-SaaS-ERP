@@ -9,6 +9,7 @@ import {
   platformEntitlementValueFits,
   platformMonthlyAmount,
   platformPlanEntitlementInputSchema,
+  publicPlanSchema,
   platformProration,
 } from './billing.js';
 import { billingDunningLadder, isSellerTaxNumber } from './console.js';
@@ -139,6 +140,45 @@ describe('P-C4 entitlement keys', () => {
     expect(byKey.get('limits.max_invoices_per_month')?.max).toBe(10_000_000);
     // ولا شيء خارج السجلّين: مفتاحٌ غير معروف لا يمكن أن يصير حقًّا.
     expect(byKey.has('feature.nope')).toBe(false);
+  });
+
+  it('gives every entitlement an English label too — the public pricing page reads both (P-M3)', () => {
+    const keys = buildPlatformEntitlementKeys([
+      // وصف السجلّ إنجليزيّ (كما في `@erp/config`)، والاسم المكتوب في `tenantFlagLabels` عربيٌّ
+      // وإنجليزي — فيُقدَّم المكتوب، ويبقى الوصف احتياطاً.
+      { key: 'feature.pos', description: 'Restaurant/retail POS pack.', defaultValue: false },
+      { key: 'feature.unknown-pack', description: 'A pack with no label yet.', defaultValue: false },
+    ]);
+    const byKey = new Map(keys.map((entry) => [entry.key, entry]));
+
+    expect(byKey.get('feature.pos')).toMatchObject({ labelAr: 'نقطة البيع', labelEn: 'Point of sale' });
+    // ومفتاحٌ جديد لم تُكتب تسميته بعد لا يُسقط الصفحة: يحمل وصفه في اللغتين بدل الفراغ.
+    expect(byKey.get('feature.unknown-pack')).toMatchObject({
+      labelAr: 'A pack with no label yet.',
+      labelEn: 'A pack with no label yet.',
+    });
+    // وكل مفتاح من سجلّ إعدادات المنصة له اسمان — الشرط معلَّقٌ على السجلّين معاً.
+    expect(keys.every((entry) => entry.labelAr.length > 0 && entry.labelEn.length > 0)).toBe(true);
+  });
+
+  it('validates the public plan shape the pricing page consumes, and hides what it must', () => {
+    const plan = publicPlanSchema.parse({
+      id: '01a0b19f-d890-7398-b02d-d03bed0c9f65',
+      code: 'pro-yearly',
+      name: 'الباقة الاحترافية (سنوي)',
+      interval: 'year',
+      amount: '4990.00',
+      currency: 'SAR',
+      monthlyAmount: '415.83',
+      annualAmount: '4990.00',
+      entitlements: [
+        { kind: 'module', key: 'feature.pos', value: true, labelAr: 'نقطة البيع', labelEn: 'Point of sale' },
+      ],
+    });
+    expect(plan.entitlements[0]!.labelEn).toBe('Point of sale');
+    // لا حقلَ مزوّد الدفع في العقد العام: لو أُضيف لَمرّ من هنا فوراً.
+    expect(Object.keys(publicPlanSchema.shape)).not.toContain('stripePriceId');
+    expect(() => publicPlanSchema.parse({ ...plan, monthlyAmount: 415.83 })).toThrow();
   });
 
   it('refuses a value that does not fit its key', () => {

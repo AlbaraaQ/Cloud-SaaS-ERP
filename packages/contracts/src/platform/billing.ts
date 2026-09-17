@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { uuidSchema } from '../ids.js';
 
 import { platformSettingDefinitions, platformSettingScopesOf } from './console.js';
+import { tenantFlagLabels } from './tenants.js';
 
 /**
  * P-C4 — «الباقات والتراخيص والفوترة»: عقود اشتراكات المنصة على عملائها.
@@ -159,6 +160,8 @@ export type PlatformPlanEntitlementInput = z.infer<typeof platformPlanEntitlemen
 /** حقٌّ كما يُعرض: مع اسمه العربي وبأي سجلٍّ عُرف. */
 export const platformPlanEntitlementSchema = platformPlanEntitlementInputSchema.extend({
   labelAr: z.string(),
+  /** الاسم الإنجليزي من السجلّ نفسه — تقرؤه صفحة `/pricing` العامة (P-M3). */
+  labelEn: z.string(),
   /** من أين جاء المفتاح: `tenant_settings` أم إعدادات المنصة ذات نطاق العميل. */
   registry: z.enum(['tenant', 'platform']),
 });
@@ -175,6 +178,13 @@ export type PlatformEntitlementKey = {
   key: string;
   kind: PlatformEntitlementKind;
   labelAr: string;
+  /**
+   * الاسم الإنجليزي — ليس ترفاً: الأمم المتحدة للسوق السعودي **تسعّر بالإنجليزية أيضاً**
+   * (P-M3 في `docs/roadmap/MARKETING_SITE_PLAN.md` يطلب `GET /public/plans` «الحقوق بلغتين»).
+   * والمصدر هو السجلّ نفسه: `labelEn` في `platformSettingDefinitions`، وتسمية الحزمة في
+   * `tenantFlagLabels`، ولا يُترجَم اسمٌ هنا ترجمةً حرّة.
+   */
+  labelEn: string;
   valueKind: 'boolean' | 'number' | 'string';
   registry: 'tenant' | 'platform';
   /** السقف إن كان حدًّا عددياً — يُعرض في الشاشة كتلميح. */
@@ -205,10 +215,15 @@ export function buildPlatformEntitlementKeys(
     // them or does not. The rest of the tenant registry is configuration (locale, fiscal
     // year, numbering) — a plan never sells that.
     if (!definition.key.startsWith('feature.')) continue;
+    // اسم الحزمة من `tenantFlagLabels` (تسمياتٌ مكتوبة مرّةً واحدة هناك، ومصدرها الملفّ الأصلي
+    // في `Desktop_ERP`)، وسجلّ `@erp/config` يحمل وصفاً إنجليزياً لا اسمَ عرض — فيُقدَّم الاسم
+    // المكتوب على الوصف، ويبقى الوصف احتياطاً لمفتاحٍ جديد لم تُكتب تسميته بعد.
+    const flag = tenantFlagLabels[definition.key];
     keys.push({
       key: definition.key,
       kind: platformEntitlementKindOf(definition.key),
-      labelAr: definition.description,
+      labelAr: flag?.labelAr ?? definition.description,
+      labelEn: flag?.labelEn ?? definition.description,
       valueKind: 'boolean',
       registry: 'tenant',
     });
@@ -223,6 +238,7 @@ export function buildPlatformEntitlementKeys(
       key: definition.key,
       kind: platformEntitlementKindOf(definition.key),
       labelAr: definition.labelAr,
+      labelEn: definition.labelEn,
       valueKind,
       registry: 'platform',
       ...('max' in definition && typeof definition.max === 'number' ? { max: definition.max } : {}),
@@ -311,6 +327,50 @@ export const platformPlanEntitlementsUpdateSchema = z.object({
   reason: z.string().trim().min(3, 'السبب ثلاثة أحرف على الأقل').max(500),
 });
 export type PlatformPlanEntitlementsUpdate = z.infer<typeof platformPlanEntitlementsUpdateSchema>;
+
+// ------------------------------------------------------------------ public pricing (P-M3)
+
+/**
+ * P-M3 — «الباقات والأسعار» في الموقع التسويقي (`docs/roadmap/MARKETING_SITE_PLAN.md` §5).
+ *
+ * `GET /public/plans` يجيب سؤال الزائر الوحيد: **ماذا أحصل عليه بهذا السعر؟** ولذلك هو
+ * `billing_plans` **مع** `billing_plan_entitlements` — لا أسعارٌ بلا حقوق، وهو الخطأ الذي
+ * يجعل صفحة أسعارٍ تُقرأ ولا تُقنع.
+ *
+ * وثلاثة قرارات في هذا العقد:
+ *
+ *   1. **بلا معرّفات داخلية**: لا `stripePriceId` ولا `active` ولا عدّاد التراخيص — العام لا
+ *      يرى أسرار المنصة، وما يُعرض على `/pricing` هو السعر والحقوق.
+ *   2. **الباقات النشطة وحدها**: باقةٌ أوقفها المشغّل لا تظهر لعميل (الفلترة في الخدمة، وهذا
+ *      العقد لا يحمل حقل «نشطة» أصلاً — فلا يظهر في الردّ ما لا يُعرض).
+ *   3. **الحقوق بلغتين**: `labelAr` و`labelEn` من سجلّ المنتج (`tenantFlagLabels` ·
+ *      `platformSettingDefinitions`) لا من ترجمةٍ في الواجهة، فتبقى صفحة الأسعار تقول ما
+ *      تقوله لوحة المنصة عن الباقة نفسها.
+ */
+export const publicPlanEntitlementSchema = z.object({
+  kind: platformEntitlementKindSchema,
+  key: z.string(),
+  value: platformEntitlementValueSchema,
+  labelAr: z.string(),
+  labelEn: z.string(),
+});
+export type PublicPlanEntitlement = z.infer<typeof publicPlanEntitlementSchema>;
+
+export const publicPlanSchema = z.object({
+  id: uuidSchema,
+  code: z.string(),
+  name: z.string(),
+  interval: platformPlanIntervalSchema,
+  /** السعر كما هو مكتوب في المنصة (نصٌّ لا `number` — المال في هذا المستودع نصّ). */
+  amount: z.string(),
+  currency: z.string(),
+  /** المكافئ الشهري: أساس مقارنة الشهري بالسنوي وترتيب البطاقات. */
+  monthlyAmount: z.string(),
+  /** ما يُدفع فعلاً في السنة: مبلغ السنوية، أو الشهرية × 12 — تُقاس عليه نسبة التوفير. */
+  annualAmount: z.string(),
+  entitlements: z.array(publicPlanEntitlementSchema),
+});
+export type PublicPlan = z.infer<typeof publicPlanSchema>;
 
 // ------------------------------------------------------------------ subscriptions
 

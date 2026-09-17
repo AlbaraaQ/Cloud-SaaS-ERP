@@ -152,16 +152,86 @@ const DEMO_COST_CENTERS = [
   { code: 'STORE', nameAr: 'المستودع', nameEn: 'Warehouse' },
 ];
 
-/** Catalogue shown on the pricing page and in the console. Amounts are strings on purpose. */
-export const DEMO_PLANS = [
-  { code: 'starter-monthly', name: 'الباقة الأساسية', interval: 'month', amount: '199.00', currency: 'SAR' },
-  { code: 'pro-monthly', name: 'الباقة الاحترافية', interval: 'month', amount: '499.00', currency: 'SAR' },
+/**
+ * Catalogue shown on the pricing page and in the console. Amounts are strings on purpose.
+ *
+ * **والحقوق معه** (`billing_plan_entitlements`، ترحيل `0068`): باقةٌ بلا حقوقها سعرٌ بلا
+ * مقابل — وصفحة `/pricing` (P-M3) تُبنى على السؤال «ماذا أحصل عليه؟». والقيم بذرةُ عرضٍ
+ * (demo) لا سياسةُ تسعير: المشغّل يعدّلها من اللوحة (`PUT /platform/plans/:id/entitlements`)
+ * وتظهر في الموقع فوراً، لأن الموقع يقرأ القاعدة لا الكود.
+ *
+ * والقيم داخل سقوف السجلّ (`packages/contracts/src/platform/console.ts`): كل مفتاح `limits.*`
+ * له `max` يُتحقَّق منه عند الكتابة من اللوحة، والبذرة تُحترمه حتى لا تُنتج بياناتٍ ترفضها
+ * نقطة النهاية نفسها.
+ */
+export const DEMO_PLANS: Array<{
+  code: string;
+  name: string;
+  interval: 'month' | 'year';
+  amount: string;
+  currency: string;
+  entitlements: Array<{ kind: 'module' | 'limit' | 'flag'; key: string; value: boolean | number }>;
+}> = [
   {
+    code: 'starter-monthly',
+    name: 'الباقة الأساسية',
+    interval: 'month',
+    amount: '199.00',
+    currency: 'SAR',
+    entitlements: [
+      { kind: 'limit', key: 'limits.max_users', value: 5 },
+      { kind: 'limit', key: 'limits.max_branches', value: 1 },
+      { kind: 'limit', key: 'limits.max_invoices_per_month', value: 500 },
+      { kind: 'limit', key: 'limits.max_items', value: 1_000 },
+      { kind: 'limit', key: 'limits.max_whatsapp_per_month', value: 200 },
+      { kind: 'limit', key: 'limits.max_emails_per_month', value: 1_000 },
+      { kind: 'limit', key: 'limits.max_storage_mb', value: 2_048 },
+      { kind: 'limit', key: 'limits.max_api_calls_per_day', value: 5_000 },
+    ],
+  },
+  {
+    code: 'pro-monthly',
+    name: 'الباقة الاحترافية',
+    interval: 'month',
+    amount: '499.00',
+    currency: 'SAR',
+    entitlements: [
+      { kind: 'limit', key: 'limits.max_users', value: 25 },
+      { kind: 'limit', key: 'limits.max_branches', value: 5 },
+      { kind: 'limit', key: 'limits.max_invoices_per_month', value: 5_000 },
+      { kind: 'limit', key: 'limits.max_items', value: 20_000 },
+      { kind: 'limit', key: 'limits.max_whatsapp_per_month', value: 2_000 },
+      { kind: 'limit', key: 'limits.max_emails_per_month', value: 10_000 },
+      { kind: 'limit', key: 'limits.max_storage_mb', value: 20_480 },
+      { kind: 'limit', key: 'limits.max_api_calls_per_day', value: 50_000 },
+      { kind: 'module', key: 'feature.pos', value: true },
+      { kind: 'module', key: 'feature.projects', value: true },
+      { kind: 'module', key: 'feature.hrm', value: true },
+      { kind: 'module', key: 'feature.niche', value: false },
+    ],
+  },
+  {
+    // السنة نفسها بسعرٍ أقل: الحقوق مطابقة للشهرية تماماً — وهذا ما يُقاس في `public-plans.spec.ts`
+    // (باقةٌ سنوية بحقوق أخرى هي باقةٌ أخرى، لا خصمٌ على الدفع مقدّماً).
     code: 'pro-yearly',
     name: 'الباقة الاحترافية (سنوي)',
     interval: 'year',
     amount: '4990.00',
     currency: 'SAR',
+    entitlements: [
+      { kind: 'limit', key: 'limits.max_users', value: 25 },
+      { kind: 'limit', key: 'limits.max_branches', value: 5 },
+      { kind: 'limit', key: 'limits.max_invoices_per_month', value: 5_000 },
+      { kind: 'limit', key: 'limits.max_items', value: 20_000 },
+      { kind: 'limit', key: 'limits.max_whatsapp_per_month', value: 2_000 },
+      { kind: 'limit', key: 'limits.max_emails_per_month', value: 10_000 },
+      { kind: 'limit', key: 'limits.max_storage_mb', value: 20_480 },
+      { kind: 'limit', key: 'limits.max_api_calls_per_day', value: 50_000 },
+      { kind: 'module', key: 'feature.pos', value: true },
+      { kind: 'module', key: 'feature.projects', value: true },
+      { kind: 'module', key: 'feature.hrm', value: true },
+      { kind: 'module', key: 'feature.niche', value: false },
+    ],
   },
 ];
 
@@ -274,19 +344,52 @@ export async function seedDemoData(
 // --------------------------------------------------------------------------- billing
 
 async function seedPlans(client: Client): Promise<number> {
-  for (const plan of DEMO_PLANS) {
-    await client.query(
-      `INSERT INTO billing_plans (id, code, name, interval, amount, currency, active)
-       VALUES ($1, $2, $3, $4, $5, $6, true)
-       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name,
-                                        interval = EXCLUDED.interval,
-                                        amount = EXCLUDED.amount,
-                                        currency = EXCLUDED.currency,
-                                        active = true`,
-      [newId(), plan.code, plan.name, plan.interval, plan.amount, plan.currency],
-    );
+  // `billing_plan_entitlements` بتفعيل RLS الإجباري (`FORCE ROW LEVEL SECURITY` في 0068)،
+  // وسياستها تسمح بالكتابة لمشغّل المنصة. والبذرة مشغّل: تُعلن نفسها كذلك للجلسة كلها
+  // (`set_config(..., false)` مثل `app.tenant_id` في `seed.ts`) — فلا تُخترع مستخدمٌ ولا
+  // جلسة، ولا يُخفَّف القيد من أجل سكربت.
+  await client.query(`SELECT set_config('app.is_platform_admin', 'on', false)`);
+
+  try {
+    for (const plan of DEMO_PLANS) {
+      const planId = newId();
+      const saved = await client.query<{ id: string }>(
+        `INSERT INTO billing_plans (id, code, name, interval, amount, currency, active)
+         VALUES ($1, $2, $3, $4, $5, $6, true)
+         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name,
+                                          interval = EXCLUDED.interval,
+                                          amount = EXCLUDED.amount,
+                                          currency = EXCLUDED.currency,
+                                          active = true
+         RETURNING id`,
+        [planId, plan.code, plan.name, plan.interval, plan.amount, plan.currency],
+      );
+      const id = saved.rows[0]!.id;
+
+      for (const entitlement of plan.entitlements) {
+        // كتابةٌ بالمفتاح نفسه تُحدّث القيمة: البذرة تُعاد في كل تشغيل، فلا تضاعف الحقوق ولا
+        // تتعارض مع تعديلٍ من اللوحة على نفس المفتاح (التعديل يفوز، لأن البذرة آخر كاتب).
+        await client.query(
+          `INSERT INTO billing_plan_entitlements (id, plan_id, kind, key, value)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (plan_id, key) DO UPDATE SET kind = EXCLUDED.kind,
+                                                    value = EXCLUDED.value,
+                                                    updated_at = now()`,
+          [newId(), id, entitlement.kind, entitlement.key, JSON.stringify(entitlement.value)],
+        );
+      }
+
+      // وحقٌّ شُطب من البذرة يُشطب من القاعدة: البذرة تصف المجموعة كاملةً لا إضافاتٍ متراكمة.
+      await client.query(
+        `DELETE FROM billing_plan_entitlements
+          WHERE plan_id = $1 AND key <> ALL($2::text[])`,
+        [id, plan.entitlements.map((entry) => entry.key)],
+      );
+    }
+    return DEMO_PLANS.length;
+  } finally {
+    await client.query(`SELECT set_config('app.is_platform_admin', 'off', false)`);
   }
-  return DEMO_PLANS.length;
 }
 
 async function ensureSubscription(

@@ -6,6 +6,8 @@ import { PlatformEmailController } from './admin/platform-email.controller.js';
 import { AuthController } from './auth/auth.controller.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
+import { PublicPlansController } from './billing/public-plans.controller.js';
+import { PublicPlansService } from './billing/public-plans.service.js';
 import { AuthService } from './auth/auth.service.js';
 import { MfaController } from './auth/mfa.controller.js';
 import { MfaService } from './auth/mfa.service.js';
@@ -34,6 +36,7 @@ import { TenantService } from './tenancy/tenant.service.js';
     AuthController,
     MfaController,
     BillingController,
+    PublicPlansController,
     PlatformEmailController,
     IdentityController,
     TenantController,
@@ -44,6 +47,7 @@ import { TenantService } from './tenancy/tenant.service.js';
   providers: [
     AuthService,
     BillingService,
+    PublicPlansService,
     IdentityService,
     PlatformRolePermissionsService,
     MembershipsService,

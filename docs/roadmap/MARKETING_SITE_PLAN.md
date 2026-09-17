@@ -108,7 +108,16 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **نقاط نهاية** | `GET /public/content/:slug` (صفحة بالاسم) · `GET /public/testimonials` · `GET /public/faq` |
 | **اختبار** | `public-content.spec.ts` (≥ 10) + اختبار عرض في marketing |
 
-### P-M3 — الباقات والأسعار 🟠 (يعتمد P-C4 في لوحة المنصة)
+### P-M3 — الباقات والأسعار 🟠 (يعتمد P-C4 في لوحة المنصة) — ✅ **مُنجَز** (2026-09-18)
+
+> مسارٌ عامٌّ ثالث لا إعادة استعمال مسارٍ قائم (`/billing/plans` أسعارٌ بلا حقوق، و
+> `/platform/plans` بجلسة مشغّل ومعه ما لا يُعرض) · والحقوق بلغتين من سجلّ المنتج نفسه
+> (`labelEn` أُضيف إلى `tenantFlagLabels` وإلى فهرس الحقوق) · وملاحظة الضريبة رقمُها من
+> `billing.tax_rate` لا من نصّ في الصفحة · ومبدّل الدورة **رابطان** (`/pricing?interval=year`)
+> لا حالةٌ في المتصفح · و«بوابات الدفع» صفُّ قدرةٍ موثَّق المصدر لا مفتاحُ حقٍّ مُخترع.
+> **وبذرة العرض تحمل حقوق الباقات الثلاث** (32 حقًّا) لأن «باقةً بلا حقوقها سعرٌ بلا مقابل».
+> الدليل: `public-plans.spec.ts` **9** · `apps/marketing/tests/pricing.spec.ts` **11** ·
+> `verify-pricing.mjs` **53/53** · [`../MARKETING_PRICING_P_M3_IMPLEMENTATION_REPORT.md`](../MARKETING_PRICING_P_M3_IMPLEMENTATION_REPORT.md).
 
 | | |
 |---|---|
@@ -260,12 +269,13 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | `public-leads.spec.ts` | 12 |
 | `platform-campaigns.spec.ts` | 12 |
 | `signup-flow.spec.ts` | 12 |
-| `public-plans.spec.ts` · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/site.spec.ts` | 30 |
+| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/site.spec.ts` | 30 |
 | **المجموع** | **≈ 82** |
 
-السكربتات: `verify-marketing-site.mjs` (20) · `verify-signup.mjs` (30) ·
-`verify-content.mjs` (35) · `verify-leads.mjs` (30) · `verify-campaigns.mjs` (30)
-— **≈ 145 نقطة تحقّق حيّة**.
+السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (30) ·
+`verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (30) · `verify-campaigns.mjs` (30) ·
+`verify-pricing.mjs` (**53** أُنجزت في P-M3)
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **152** نقطة في ثلاثة سكربتات.
 
 ---
 
@@ -308,8 +318,9 @@ P-M1 ── P-M2 ── P-M3 ── P-M4 ── P-M6
                  P-M8 ── P-M9
 ```
 
-الجلسة الأولى: **P-M1 + P-M2** (موقع يبدو احترافياً بسرعة). الثانية: **P-M5** (نظام
-المحتوى — بدونه كل نصّ تعديلُ كود). الثالثة: **P-M4 + P-M3** (الاشتراك والباقات).
+الجلسة الأولى: **P-M1 + P-M2** (موقع يبدو احترافياً بسرعة) — ✅. الثانية: **P-M5** (نظام
+المحتوى — بدونه كل نصّ تعديلُ كود) — ✅. والثالثة: **P-M3 + P-M4** (الباقات والاشتراك) —
+**P-M3 ✅ · P-M4 التالي**.
 الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية). وما بعدها تحسين.
 
 ---

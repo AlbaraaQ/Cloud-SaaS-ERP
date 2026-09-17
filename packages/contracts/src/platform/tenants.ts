@@ -312,13 +312,31 @@ export type TenantFlagsUpdate = z.infer<typeof tenantFlagsUpdateSchema>;
  * and «الرواتب» from `Form_WPF/frmEmployees.xaml`; «الأنشطة المتخصصة» is invented and
  * justified in the part document — the niche pack covers optics/marine/vehicles, which the
  * desktop names one by one, and the console needs one line for all three.
+ *
+ * و«الاسم الإنجليزي» (`labelEn`) أُضيف في P-M3: صفحة الأسعار العامة تعرض الحقوق بلغتين
+ * (`docs/roadmap/MARKETING_SITE_PLAN.md` §5 P-M3)، وهو **ترجمة الاسم المكتوب أعلاه** لا اسمٌ
+ * ثانٍ للحزمة — «نقطة البيع» ⇒ `Point of sale`، و«الرواتب والموظفون» ⇒ `Payroll & HR`،
+ * و«الأنشطة المتخصصة» ⇒ `Specialised activities` (نفس التسمية المُخترَعة أعلاه، مترجمةً).
  */
-export const tenantFlagLabels: Record<string, { labelAr: string; descriptionAr: string }> = {
-  'feature.pos': { labelAr: 'نقطة البيع', descriptionAr: 'حزمة المطاعم والتجزئة: شاشة بيع، ورديات، وطاولات.' },
-  'feature.projects': { labelAr: 'المشاريع', descriptionAr: 'حزمة المشاريع والمقاولات: عقود، دورات، ومستخلصات.' },
-  'feature.hrm': { labelAr: 'الرواتب والموظفون', descriptionAr: 'حزمة الموارد البشرية: موظفون، رواتب، ومستحقات.' },
+export const tenantFlagLabels: Record<string, { labelAr: string; labelEn: string; descriptionAr: string }> = {
+  'feature.pos': {
+    labelAr: 'نقطة البيع',
+    labelEn: 'Point of sale',
+    descriptionAr: 'حزمة المطاعم والتجزئة: شاشة بيع، ورديات، وطاولات.',
+  },
+  'feature.projects': {
+    labelAr: 'المشاريع',
+    labelEn: 'Projects',
+    descriptionAr: 'حزمة المشاريع والمقاولات: عقود، دورات، ومستخلصات.',
+  },
+  'feature.hrm': {
+    labelAr: 'الرواتب والموظفون',
+    labelEn: 'Payroll & HR',
+    descriptionAr: 'حزمة الموارد البشرية: موظفون، رواتب، ومستحقات.',
+  },
   'feature.niche': {
     labelAr: 'الأنشطة المتخصصة',
+    labelEn: 'Specialised activities',
     descriptionAr: 'الأنشطة المتخصصة: بصريات، بحرية، مركبات.',
   },
 };

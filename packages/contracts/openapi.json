@@ -1053,6 +1053,22 @@
         ]
       }
     },
+    "/api/v1/public/plans": {
+      "get": {
+        "description": "النشطة فقط، وبلا معرّف مزوّد الدفع، والحقوق بتسمياتها العربية والإنجليزية من سجلّ المنتج. و`meta.vatRatePercent` نسبة الضريبة من إعدادات المنصة — لأن صفحة الأسعار تُخبر الزائر بالضريبة، ولا يجوز أن تقولها من نصٍّ مكتوب في الكود.",
+        "operationId": "PublicPlansController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "الباقات النشطة بحقوقها بلغتين (مصدر صفحة `/pricing`)",
+        "tags": [
+          "public"
+        ]
+      }
+    },
     "/api/v1/platform/email/templates": {
       "get": {
         "operationId": "PlatformEmailController_listTemplates",

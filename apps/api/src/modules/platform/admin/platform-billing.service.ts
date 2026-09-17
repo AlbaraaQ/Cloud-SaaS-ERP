@@ -1655,6 +1655,8 @@ export class PlatformBillingService {
         // A key that left the product still reads back with its own name: a plan written
         // yesterday must not fail to render because the catalogue changed today.
         labelAr: definition?.labelAr ?? entry.key,
+        // والاسم الإنجليزي من الفهرس نفسه — تقرؤه صفحة الأسعار العامة (`GET /public/plans`).
+        labelEn: definition?.labelEn ?? entry.key,
         registry: definition?.registry ?? 'platform',
       };
     });
