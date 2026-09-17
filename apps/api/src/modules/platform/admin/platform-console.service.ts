@@ -108,6 +108,11 @@ export class PlatformConsoleService {
         labelAr: definition.labelAr,
         labelEn: definition.labelEn,
         kind: definition.kind,
+        // الخيارات والحدود من الكتالوج نفسه — لا تُخترع في الشاشة ولا تُترك للتخمين.
+        ...(definition.options ? { options: [...definition.options] } : {}),
+        ...(definition.optionLabels ? { optionLabels: [...definition.optionLabels] } : {}),
+        ...(definition.min !== undefined ? { min: definition.min } : {}),
+        ...(definition.max !== undefined ? { max: definition.max } : {}),
         helpAr: definition.helpAr,
         value: row ? (JSON.parse(row.raw) as PlatformSettingView['value']) : definition.defaultValue,
         isDefault: row === undefined,

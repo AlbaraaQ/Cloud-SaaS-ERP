@@ -3774,33 +3774,898 @@
         ]
       }
     },
-    "/api/v1/platform/jobs": {
+    "/api/v1/platform/reports/weekly": {
       "get": {
-        "operationId": "PlatformOperationsController_jobs",
+        "operationId": "PlatformReportsController_preview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Weekly report preview (window, recipients, schedule, variables)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "معاينة التقرير الأسبوعي: النافذة · المستلمون · الموعد · المتغيّرات",
+        "tags": [
+          "platform-reports"
+        ]
+      }
+    },
+    "/api/v1/platform/reports/weekly/run": {
+      "post": {
+        "operationId": "PlatformReportsController_run",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "إرسال التقرير الأسبوعي الآن (تجاوز الجدول — للحجر على سجلّ البريد)",
+        "tags": [
+          "platform-reports"
+        ]
+      }
+    },
+    "/api/v1/platform/overview": {
+      "get": {
+        "operationId": "PlatformAdminController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Control-plane KPIs: customers, licences, MRR, pending activations",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants": {
+      "get": {
+        "operationId": "PlatformAdminController_listTenants",
         "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List every customer with its current licence",
+        "tags": [
+          "platform-admin"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformAdminController_createTenant",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a customer, its owner account and its default branch",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/activation-requests": {
+      "get": {
+        "operationId": "PlatformAdminController_listActivationRequests",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Manual activation queue",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/activation-requests/{id}/review": {
+      "post": {
+        "operationId": "PlatformAdminController_reviewActivation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve or reject an activation request",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/platform/analytics/overview": {
+      "get": {
+        "operationId": "PlatformAnalyticsController_overview",
+        "parameters": [
+          {
+            "name": "months",
+            "required": false,
+            "in": "query",
+            "description": "نافذة المنحنى بالأشهر (3..24، والافتراضي 6)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics overview (MRR/ARR mirror the billing revenue board)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "نظرة المنصة: الإيراد · النمو · التسرّب · التجربة · الاستخدام · التنبيهات",
+        "tags": [
+          "platform-analytics"
+        ]
+      }
+    },
+    "/api/v1/platform/analytics/funnel": {
+      "get": {
+        "operationId": "PlatformAnalyticsController_funnel",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "نافذة التسجيل بالأيام (30..365، وبغيابها كل الفترات)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "قمع التفعيل: سجّل → فُعِّل → رحّل أوّل فاتورة → أوّل مستند زاتكا",
+        "tags": [
+          "platform-analytics"
+        ]
+      }
+    },
+    "/api/v1/platform/analytics/cohorts": {
+      "get": {
+        "operationId": "PlatformAnalyticsController_cohorts",
+        "parameters": [
+          {
+            "name": "months",
+            "required": false,
+            "in": "query",
+            "description": "عدد الأفواج (3..12، والافتراضي 6)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "basis",
+            "required": false,
+            "in": "query",
+            "description": "فوج التسجيل أم فوج التفعيل",
+            "schema": {
+              "enum": [
+                "signup",
+                "activation"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "أفواج الاحتفاظ: متعاقدٌ ومستخدِم في كل شهرٍ تالٍ",
+        "tags": [
+          "platform-analytics"
+        ]
+      }
+    },
+    "/api/v1/platform/analytics/export.csv": {
+      "get": {
+        "operationId": "PlatformAnalyticsController_exportCsv",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "نافذة القياس بالأيام (1..365، والافتراضي 30)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "بيان التحليلات لكل منشأة ملفَّ CSV (يُبنى في الذاكرة)",
+        "tags": [
+          "platform-analytics"
+        ]
+      }
+    },
+    "/api/v1/platform/plans/entitlement-keys": {
+      "get": {
+        "operationId": "PlatformBillingController_entitlementKeys",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every entitlement a plan may grant, with its Arabic label and kind",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/plans": {
+      "get": {
+        "operationId": "PlatformBillingController_listPlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plans with their entitlements, monthly equivalent and live licence count",
+        "tags": [
+          "platform-billing"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformBillingController_createPlan",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a plan, or update the one with the same code",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/plans/{id}": {
+      "patch": {
+        "operationId": "PlatformBillingController_updatePlan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a plan’s price or state (reason required; audited with the diff)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/plans/{id}/entitlements": {
+      "put": {
+        "operationId": "PlatformBillingController_setEntitlements",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The plan with its new entitlement set"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a plan’s entitlements (unknown or duplicated keys are refused)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions": {
+      "get": {
+        "operationId": "PlatformBillingController_listSubscriptions",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every licence across all customers, with its lifecycle state",
+        "tags": [
+          "platform-billing"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformBillingController_grantSubscription",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue a licence (optionally starting with a trial period)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions/{id}/change-plan": {
+      "post": {
+        "operationId": "PlatformBillingController_changePlan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upgrade or downgrade: prorate the period and draft the document",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions/{id}/pause": {
+      "post": {
+        "operationId": "PlatformBillingController_pauseSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pause a licence (reason required; the licence stays live)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions/{id}/resume": {
+      "post": {
+        "operationId": "PlatformBillingController_resumeSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resume a paused licence and give back the paused days",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/subscriptions/{id}/cancel": {
+      "post": {
+        "operationId": "PlatformBillingController_cancelSubscription",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a licence now or at the end of the paid period (reason required)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices": {
+      "get": {
+        "operationId": "PlatformBillingController_listInvoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subscription invoices and credit notes, newest first",
+        "tags": [
+          "platform-billing"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformBillingController_createInvoice",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Draft an invoice for a licence period (VAT computed line by line)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{id}": {
+      "get": {
+        "operationId": "PlatformBillingController_invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One invoice with its lines and payments",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{id}/print": {
+      "get": {
+        "operationId": "PlatformBillingController_printInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Printable A4 tax invoice (self-contained HTML, like the staff print pages)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{id}/issue": {
+      "post": {
+        "operationId": "PlatformBillingController_issueInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue the document: allocate the next number and the due date",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{id}/pay": {
+      "post": {
+        "operationId": "PlatformBillingController_payInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record a payment (partial allowed; more than the remainder is refused)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/invoices/{id}/void": {
+      "post": {
+        "operationId": "PlatformBillingController_voidInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Void a draft or issued invoice (reason required; a paid one is refused)",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/dunning": {
+      "get": {
+        "operationId": "PlatformBillingController_dunning",
+        "parameters": [
+          {
+            "name": "subscriptionId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Collection attempts, the ladder in force, and what runs next",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/dunning/{subscription}/run": {
+      "post": {
+        "operationId": "PlatformBillingController_runDunning",
+        "parameters": [
+          {
+            "name": "subscription",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Schedule the next reminder for every overdue invoice of a licence",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/revenue": {
+      "get": {
+        "operationId": "PlatformBillingController_revenue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "MRR, ARR, what is outstanding and what is overdue",
+        "tags": [
+          "platform-billing"
+        ]
+      }
+    },
+    "/api/v1/platform/audit": {
+      "get": {
+        "operationId": "PlatformConsoleController_audit",
+        "parameters": [
+          {
+            "name": "filter[to]",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 upper bound",
+            "schema": {}
+          },
+          {
+            "name": "filter[from]",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 lower bound",
+            "schema": {}
+          },
+          {
+            "name": "filter[entityId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[entity]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[action]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[actorUserId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
           {
             "name": "filter[tenantId]",
             "required": false,
             "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[type]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[queue]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[status]",
-            "required": false,
-            "in": "query",
-            "description": "pending | published | dead",
             "schema": {}
           },
           {
@@ -3818,7 +4683,10 @@
         ],
         "responses": {
           "200": {
-            "description": "Job page"
+            "description": "Audit page"
+          },
+          "403": {
+            "description": "console.audit.view is required"
           }
         },
         "security": [
@@ -3826,19 +4694,19 @@
             "bearer": []
           }
         ],
-        "summary": "The outbox across every customer, with each job’s payload keys",
+        "summary": "Cross-tenant audit trail with each row’s customer (newest first)",
         "tags": [
-          "platform-operations"
+          "platform-console"
         ]
       }
     },
-    "/api/v1/platform/jobs/heartbeat": {
+    "/api/v1/platform/settings": {
       "get": {
-        "operationId": "PlatformOperationsController_heartbeat",
+        "operationId": "PlatformConsoleController_settings",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Heartbeat"
+            "description": "Eight settings and the deployment name"
           }
         },
         "security": [
@@ -3846,49 +4714,66 @@
             "bearer": []
           }
         ],
-        "summary": "Worker heartbeat and the age of the oldest pending job",
+        "summary": "Platform settings: the catalogue joined with the stored values",
         "tags": [
-          "platform-operations"
+          "platform-console"
+        ]
+      },
+      "put": {
+        "operationId": "PlatformConsoleController_updateSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The settings after the write"
+          },
+          "422": {
+            "description": "Unknown key or invalid value for its kind"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write platform settings (validated against the shared catalogue)",
+        "tags": [
+          "platform-console"
         ]
       }
     },
-    "/api/v1/platform/jobs/{id}/retry": {
-      "post": {
-        "operationId": "PlatformOperationsController_retryJob",
+    "/api/v1/platform/jobs/outbox": {
+      "get": {
+        "operationId": "PlatformConsoleController_outbox",
         "parameters": [
           {
-            "name": "id",
-            "required": true,
-            "in": "path",
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "pending | published | dead",
             "schema": {
               "type": "string"
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "reason"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "The job after the retry"
-          },
-          "422": {
-            "description": "Already pending, or already published"
+            "description": "Outbox page with each job’s customer"
           }
         },
         "security": [
@@ -3896,123 +4781,27 @@
             "bearer": []
           }
         ],
-        "summary": "Return a pending or dead job to the queue (attempts cleared, run-at now)",
+        "summary": "Transactional outbox across every customer (read-only)",
         "tags": [
-          "platform-operations"
+          "platform-console"
         ]
       }
     },
-    "/api/v1/platform/jobs/{id}/cancel": {
-      "post": {
-        "operationId": "PlatformOperationsController_cancelJob",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "reason"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The job after the cancellation"
-          },
-          "422": {
-            "description": "Already published"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Mark a job dead so the publisher stops consuming it",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/health/detailed": {
+    "/api/v1/platform/tenants/search": {
       "get": {
-        "operationId": "PlatformOperationsController_health",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Health with six probes"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Probes, request rates, queue backlog and the incident banner",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/files": {
-      "get": {
-        "operationId": "PlatformOperationsController_files",
+        "operationId": "PlatformConsoleController_searchTenants",
         "parameters": [
-          {
-            "name": "filter[scan]",
-            "required": false,
-            "in": "query",
-            "description": "clean | infected | skipped | none",
-            "schema": {}
-          },
-          {
-            "name": "filter[entity]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[tenantId]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[status]",
-            "required": false,
-            "in": "query",
-            "description": "pending | ready | deleted",
-            "schema": {}
-          },
           {
             "name": "q",
-            "required": false,
+            "required": true,
             "in": "query",
-            "description": "File-name fragment",
+            "description": "Tenant code or name fragment",
             "schema": {}
           }
         ],
         "responses": {
           "200": {
-            "description": "File page"
+            "description": "Matching customers"
           }
         },
         "security": [
@@ -4020,15 +4809,44 @@
             "bearer": []
           }
         ],
-        "summary": "Cross-tenant file manager with each file’s last scan verdict",
+        "summary": "Ctrl+K lookup: up to ten customers by code or name",
         "tags": [
-          "platform-operations"
+          "platform-console"
         ]
       }
     },
-    "/api/v1/platform/files/{id}/scan": {
-      "post": {
-        "operationId": "PlatformOperationsController_scan",
+    "/api/v1/platform/users": {
+      "get": {
+        "operationId": "PlatformIdentityController_list",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Directory of users across every tenant, with tenants, roles and 2FA state",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/users/{id}": {
+      "get": {
+        "operationId": "PlatformIdentityController_detail",
         "parameters": [
           {
             "name": "id",
@@ -4041,10 +4859,280 @@
         ],
         "responses": {
           "200": {
-            "description": "The verdict as it came out of the scanner"
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One user: platform roles, memberships across tenants, sessions",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/operators/invite": {
+      "post": {
+        "operationId": "PlatformIdentityController_invite",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invite a platform operator with a role",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/users/{id}/roles": {
+      "post": {
+        "operationId": "PlatformIdentityController_grant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant a platform role",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/users/{id}/roles/{roleCode}": {
+      "delete": {
+        "operationId": "PlatformIdentityController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a platform role",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/users/{id}/mfa/reset": {
+      "post": {
+        "operationId": "PlatformIdentityController_resetMfa",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clear 2FA on an account (reason required, written to the audit trail)",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/sessions/{id}": {
+      "get": {
+        "operationId": "PlatformIdentityController_session",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One login session (a refresh-token rotation family)",
+        "tags": [
+          "platform-identity"
+        ]
+      },
+      "delete": {
+        "operationId": "PlatformIdentityController_revokeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a session (whole rotation family) with a written reason",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/roles": {
+      "get": {
+        "operationId": "PlatformIdentityController_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Platform roles with catalogue vs effective console codes and holder counts",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/permissions": {
+      "get": {
+        "operationId": "PlatformIdentityController_permissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Platform-console (console.*) permission registry",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/roles/{code}/permissions": {
+      "put": {
+        "operationId": "PlatformIdentityController_setPermissions",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The role’s new effective console codes"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace one role’s console codes (reason required; audited with the diff)",
+        "tags": [
+          "platform-identity"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}": {
+      "get": {
+        "operationId": "PlatformTenantsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Tenant id (uuid)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant card"
           },
           "404": {
-            "description": "No such file"
+            "description": "Unknown tenant"
           }
         },
         "security": [
@@ -4052,15 +5140,13 @@
             "bearer": []
           }
         ],
-        "summary": "Run the configured scanner now and record its verdict",
+        "summary": "One customer in depth: overview, members, licences",
         "tags": [
-          "platform-operations"
+          "platform-tenants"
         ]
-      }
-    },
-    "/api/v1/platform/files/{id}": {
-      "delete": {
-        "operationId": "PlatformOperationsController_purge",
+      },
+      "patch": {
+        "operationId": "PlatformTenantsController_patch",
         "parameters": [
           {
             "name": "id",
@@ -4071,30 +5157,9 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "reason"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
-          "200": {
-            "description": "The file after quarantine"
-          },
-          "422": {
-            "description": "Already quarantined"
+          "409": {
+            "description": "The code is already taken"
           }
         },
         "security": [
@@ -4102,21 +5167,450 @@
             "bearer": []
           }
         ],
-        "summary": "Quarantine a file (metadata is kept; rows are never deleted)",
+        "summary": "Rename a customer or change its code, timezone, currency",
         "tags": [
-          "platform-operations"
+          "platform-tenants"
         ]
       }
     },
-    "/api/v1/usage": {
+    "/api/v1/platform/tenants/{id}/usage": {
       "get": {
-        "operationId": "UsageController_snapshot",
+        "operationId": "PlatformTenantsController_usage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consumption against the effective limits, plus 30 days of invoices",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/health": {
+      "get": {
+        "operationId": "PlatformTenantsController_health",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subscription state, outbox depth and actionable findings",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/status": {
+      "post": {
+        "operationId": "PlatformTenantsController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Missing or too short reason (body schema)"
+          },
+          "409": {
+            "description": "The customer already has this status"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspend, reactivate or archive a customer — the reason is required",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/owner/transfer": {
+      "post": {
+        "operationId": "PlatformTenantsController_transferOwner",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "The member does not belong to this customer"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hand the account to another member of the same customer",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/notes": {
+      "get": {
+        "operationId": "PlatformTenantsController_notes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operator notes about this customer (newest first)",
+        "tags": [
+          "platform-tenants"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformTenantsController_addNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an operator note",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/notes/{noteId}": {
+      "delete": {
+        "operationId": "PlatformTenantsController_deleteNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "noteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Unknown note for this customer"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a note (the audit row keeps its text)",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/settings": {
+      "get": {
+        "operationId": "PlatformTenantsController_settings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tenant-scoped settings with their source: tenant, platform or default",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/settings/{key}": {
+      "put": {
+        "operationId": "PlatformTenantsController_updateSetting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "The key is not tenant-scoped, or the value is invalid"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write one override for one customer (null removes it)",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/flags": {
+      "get": {
+        "operationId": "PlatformTenantsController_flags",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Feature packs of this customer",
+        "tags": [
+          "platform-tenants"
+        ]
+      },
+      "put": {
+        "operationId": "PlatformTenantsController_updateFlags",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enable or disable feature packs for this customer",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{id}/branding": {
+      "get": {
+        "operationId": "PlatformTenantsController_branding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customer’s logo, colour and sender name",
+        "tags": [
+          "platform-tenants"
+        ]
+      },
+      "put": {
+        "operationId": "PlatformTenantsController_updateBranding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write the customer’s branding (any subset of the three fields)",
+        "tags": [
+          "platform-tenants"
+        ]
+      }
+    },
+    "/api/v1/platform/usage": {
+      "get": {
+        "operationId": "PlatformUsageController_grid",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": false,
+            "in": "query",
+            "description": "عميلٌ واحد؛ وبغيابه الشبكة كلها",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "الشهر بصيغة YYYY-MM",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage grid (or a single tenant snapshot when tenantId is given)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "شبكة الاستخدام عبر العملاء، أو لقطة عميلٍ واحد",
+        "tags": [
+          "platform-usage"
+        ]
+      }
+    },
+    "/api/v1/platform/usage/export.csv": {
+      "get": {
+        "operationId": "PlatformUsageController_exportCsv",
         "parameters": [
           {
             "name": "period",
             "required": false,
             "in": "query",
-            "description": "الشهر بصيغة YYYY-MM (افتراضاً: هذا الشهر)",
+            "description": "الشهر بصيغة YYYY-MM",
             "schema": {
               "type": "string"
             }
@@ -4124,7 +5618,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Usage snapshot for the calling tenant"
+            "description": ""
           }
         },
         "security": [
@@ -4132,9 +5626,45 @@
             "bearer": []
           }
         ],
-        "summary": "استهلاك منشأتي مقابل حدودها",
+        "summary": "بيان الاستخدام الشهري (كل عميل × كل مقياس) ملفَّ CSV",
         "tags": [
-          "usage"
+          "platform-usage"
+        ]
+      }
+    },
+    "/api/v1/signup/plans": {
+      "get": {
+        "operationId": "SignupController_plans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Plans a prospect can pick while signing up",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup": {
+      "post": {
+        "operationId": "SignupController_signup",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Tenant created; owner can log in immediately"
+          },
+          "409": {
+            "description": "Tenant code already taken (VERSION_CONFLICT)"
+          },
+          "422": {
+            "description": "Invalid payload or weak password (VALIDATION_FAILED)"
+          }
+        },
+        "summary": "Create a new tenant, its owner account and a pending activation request",
+        "tags": [
+          "signup"
         ]
       }
     },
@@ -6189,1860 +7719,6 @@
         ]
       }
     },
-    "/api/v1/platform/overview": {
-      "get": {
-        "operationId": "PlatformAdminController_overview",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Control-plane KPIs: customers, licences, MRR, pending activations",
-        "tags": [
-          "platform-admin"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants": {
-      "get": {
-        "operationId": "PlatformAdminController_listTenants",
-        "parameters": [
-          {
-            "name": "search",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List every customer with its current licence",
-        "tags": [
-          "platform-admin"
-        ]
-      },
-      "post": {
-        "operationId": "PlatformAdminController_createTenant",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a customer, its owner account and its default branch",
-        "tags": [
-          "platform-admin"
-        ]
-      }
-    },
-    "/api/v1/platform/activation-requests": {
-      "get": {
-        "operationId": "PlatformAdminController_listActivationRequests",
-        "parameters": [
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Manual activation queue",
-        "tags": [
-          "platform-admin"
-        ]
-      }
-    },
-    "/api/v1/platform/activation-requests/{id}/review": {
-      "post": {
-        "operationId": "PlatformAdminController_reviewActivation",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Approve or reject an activation request",
-        "tags": [
-          "platform-admin"
-        ]
-      }
-    },
-    "/api/v1/platform/analytics/overview": {
-      "get": {
-        "operationId": "PlatformAnalyticsController_overview",
-        "parameters": [
-          {
-            "name": "months",
-            "required": false,
-            "in": "query",
-            "description": "نافذة المنحنى بالأشهر (3..24، والافتراضي 6)",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Analytics overview (MRR/ARR mirror the billing revenue board)"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "نظرة المنصة: الإيراد · النمو · التسرّب · التجربة · الاستخدام · التنبيهات",
-        "tags": [
-          "platform-analytics"
-        ]
-      }
-    },
-    "/api/v1/platform/analytics/funnel": {
-      "get": {
-        "operationId": "PlatformAnalyticsController_funnel",
-        "parameters": [
-          {
-            "name": "days",
-            "required": false,
-            "in": "query",
-            "description": "نافذة التسجيل بالأيام (30..365، وبغيابها كل الفترات)",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "قمع التفعيل: سجّل → فُعِّل → رحّل أوّل فاتورة → أوّل مستند زاتكا",
-        "tags": [
-          "platform-analytics"
-        ]
-      }
-    },
-    "/api/v1/platform/analytics/cohorts": {
-      "get": {
-        "operationId": "PlatformAnalyticsController_cohorts",
-        "parameters": [
-          {
-            "name": "months",
-            "required": false,
-            "in": "query",
-            "description": "عدد الأفواج (3..12، والافتراضي 6)",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "basis",
-            "required": false,
-            "in": "query",
-            "description": "فوج التسجيل أم فوج التفعيل",
-            "schema": {
-              "enum": [
-                "signup",
-                "activation"
-              ],
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "أفواج الاحتفاظ: متعاقدٌ ومستخدِم في كل شهرٍ تالٍ",
-        "tags": [
-          "platform-analytics"
-        ]
-      }
-    },
-    "/api/v1/platform/analytics/export.csv": {
-      "get": {
-        "operationId": "PlatformAnalyticsController_exportCsv",
-        "parameters": [
-          {
-            "name": "days",
-            "required": false,
-            "in": "query",
-            "description": "نافذة القياس بالأيام (1..365، والافتراضي 30)",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "بيان التحليلات لكل منشأة ملفَّ CSV (يُبنى في الذاكرة)",
-        "tags": [
-          "platform-analytics"
-        ]
-      }
-    },
-    "/api/v1/platform/plans/entitlement-keys": {
-      "get": {
-        "operationId": "PlatformBillingController_entitlementKeys",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Every entitlement a plan may grant, with its Arabic label and kind",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/plans": {
-      "get": {
-        "operationId": "PlatformBillingController_listPlans",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Plans with their entitlements, monthly equivalent and live licence count",
-        "tags": [
-          "platform-billing"
-        ]
-      },
-      "post": {
-        "operationId": "PlatformBillingController_createPlan",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a plan, or update the one with the same code",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/plans/{id}": {
-      "patch": {
-        "operationId": "PlatformBillingController_updatePlan",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Change a plan’s price or state (reason required; audited with the diff)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/plans/{id}/entitlements": {
-      "put": {
-        "operationId": "PlatformBillingController_setEntitlements",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The plan with its new entitlement set"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Replace a plan’s entitlements (unknown or duplicated keys are refused)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/subscriptions": {
-      "get": {
-        "operationId": "PlatformBillingController_listSubscriptions",
-        "parameters": [
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Every licence across all customers, with its lifecycle state",
-        "tags": [
-          "platform-billing"
-        ]
-      },
-      "post": {
-        "operationId": "PlatformBillingController_grantSubscription",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Issue a licence (optionally starting with a trial period)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/subscriptions/{id}/change-plan": {
-      "post": {
-        "operationId": "PlatformBillingController_changePlan",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Upgrade or downgrade: prorate the period and draft the document",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/subscriptions/{id}/pause": {
-      "post": {
-        "operationId": "PlatformBillingController_pauseSubscription",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Pause a licence (reason required; the licence stays live)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/subscriptions/{id}/resume": {
-      "post": {
-        "operationId": "PlatformBillingController_resumeSubscription",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Resume a paused licence and give back the paused days",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/subscriptions/{id}/cancel": {
-      "post": {
-        "operationId": "PlatformBillingController_cancelSubscription",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cancel a licence now or at the end of the paid period (reason required)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/invoices": {
-      "get": {
-        "operationId": "PlatformBillingController_listInvoices",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Subscription invoices and credit notes, newest first",
-        "tags": [
-          "platform-billing"
-        ]
-      },
-      "post": {
-        "operationId": "PlatformBillingController_createInvoice",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Draft an invoice for a licence period (VAT computed line by line)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/invoices/{id}": {
-      "get": {
-        "operationId": "PlatformBillingController_invoice",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "One invoice with its lines and payments",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/invoices/{id}/print": {
-      "get": {
-        "operationId": "PlatformBillingController_printInvoice",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Printable A4 tax invoice (self-contained HTML, like the staff print pages)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/invoices/{id}/issue": {
-      "post": {
-        "operationId": "PlatformBillingController_issueInvoice",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Issue the document: allocate the next number and the due date",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/invoices/{id}/pay": {
-      "post": {
-        "operationId": "PlatformBillingController_payInvoice",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Record a payment (partial allowed; more than the remainder is refused)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/invoices/{id}/void": {
-      "post": {
-        "operationId": "PlatformBillingController_voidInvoice",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Void a draft or issued invoice (reason required; a paid one is refused)",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/dunning": {
-      "get": {
-        "operationId": "PlatformBillingController_dunning",
-        "parameters": [
-          {
-            "name": "subscriptionId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Collection attempts, the ladder in force, and what runs next",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/dunning/{subscription}/run": {
-      "post": {
-        "operationId": "PlatformBillingController_runDunning",
-        "parameters": [
-          {
-            "name": "subscription",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Schedule the next reminder for every overdue invoice of a licence",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/revenue": {
-      "get": {
-        "operationId": "PlatformBillingController_revenue",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "MRR, ARR, what is outstanding and what is overdue",
-        "tags": [
-          "platform-billing"
-        ]
-      }
-    },
-    "/api/v1/platform/audit": {
-      "get": {
-        "operationId": "PlatformConsoleController_audit",
-        "parameters": [
-          {
-            "name": "filter[to]",
-            "required": false,
-            "in": "query",
-            "description": "ISO-8601 upper bound",
-            "schema": {}
-          },
-          {
-            "name": "filter[from]",
-            "required": false,
-            "in": "query",
-            "description": "ISO-8601 lower bound",
-            "schema": {}
-          },
-          {
-            "name": "filter[entityId]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[entity]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[action]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[actorUserId]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[tenantId]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Audit page"
-          },
-          "403": {
-            "description": "console.audit.view is required"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cross-tenant audit trail with each row’s customer (newest first)",
-        "tags": [
-          "platform-console"
-        ]
-      }
-    },
-    "/api/v1/platform/settings": {
-      "get": {
-        "operationId": "PlatformConsoleController_settings",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Eight settings and the deployment name"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Platform settings: the catalogue joined with the stored values",
-        "tags": [
-          "platform-console"
-        ]
-      },
-      "put": {
-        "operationId": "PlatformConsoleController_updateSettings",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "The settings after the write"
-          },
-          "422": {
-            "description": "Unknown key or invalid value for its kind"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Write platform settings (validated against the shared catalogue)",
-        "tags": [
-          "platform-console"
-        ]
-      }
-    },
-    "/api/v1/platform/jobs/outbox": {
-      "get": {
-        "operationId": "PlatformConsoleController_outbox",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "description": "pending | published | dead",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Outbox page with each job’s customer"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Transactional outbox across every customer (read-only)",
-        "tags": [
-          "platform-console"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/search": {
-      "get": {
-        "operationId": "PlatformConsoleController_searchTenants",
-        "parameters": [
-          {
-            "name": "q",
-            "required": true,
-            "in": "query",
-            "description": "Tenant code or name fragment",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Matching customers"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Ctrl+K lookup: up to ten customers by code or name",
-        "tags": [
-          "platform-console"
-        ]
-      }
-    },
-    "/api/v1/platform/users": {
-      "get": {
-        "operationId": "PlatformIdentityController_list",
-        "parameters": [
-          {
-            "name": "search",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Directory of users across every tenant, with tenants, roles and 2FA state",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/users/{id}": {
-      "get": {
-        "operationId": "PlatformIdentityController_detail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "One user: platform roles, memberships across tenants, sessions",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/operators/invite": {
-      "post": {
-        "operationId": "PlatformIdentityController_invite",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Invite a platform operator with a role",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/users/{id}/roles": {
-      "post": {
-        "operationId": "PlatformIdentityController_grant",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Grant a platform role",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/users/{id}/roles/{roleCode}": {
-      "delete": {
-        "operationId": "PlatformIdentityController_revoke",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "roleCode",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Revoke a platform role",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/users/{id}/mfa/reset": {
-      "post": {
-        "operationId": "PlatformIdentityController_resetMfa",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Clear 2FA on an account (reason required, written to the audit trail)",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/sessions/{id}": {
-      "get": {
-        "operationId": "PlatformIdentityController_session",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "One login session (a refresh-token rotation family)",
-        "tags": [
-          "platform-identity"
-        ]
-      },
-      "delete": {
-        "operationId": "PlatformIdentityController_revokeSession",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Revoke a session (whole rotation family) with a written reason",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/roles": {
-      "get": {
-        "operationId": "PlatformIdentityController_roles",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Platform roles with catalogue vs effective console codes and holder counts",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/permissions": {
-      "get": {
-        "operationId": "PlatformIdentityController_permissions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Platform-console (console.*) permission registry",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/roles/{code}/permissions": {
-      "put": {
-        "operationId": "PlatformIdentityController_setPermissions",
-        "parameters": [
-          {
-            "name": "code",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The role’s new effective console codes"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Replace one role’s console codes (reason required; audited with the diff)",
-        "tags": [
-          "platform-identity"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}": {
-      "get": {
-        "operationId": "PlatformTenantsController_detail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Tenant id (uuid)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Tenant card"
-          },
-          "404": {
-            "description": "Unknown tenant"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "One customer in depth: overview, members, licences",
-        "tags": [
-          "platform-tenants"
-        ]
-      },
-      "patch": {
-        "operationId": "PlatformTenantsController_patch",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "409": {
-            "description": "The code is already taken"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Rename a customer or change its code, timezone, currency",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/usage": {
-      "get": {
-        "operationId": "PlatformTenantsController_usage",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Consumption against the effective limits, plus 30 days of invoices",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/health": {
-      "get": {
-        "operationId": "PlatformTenantsController_health",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Subscription state, outbox depth and actionable findings",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/status": {
-      "post": {
-        "operationId": "PlatformTenantsController_status",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "400": {
-            "description": "Missing or too short reason (body schema)"
-          },
-          "409": {
-            "description": "The customer already has this status"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Suspend, reactivate or archive a customer — the reason is required",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/owner/transfer": {
-      "post": {
-        "operationId": "PlatformTenantsController_transferOwner",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "404": {
-            "description": "The member does not belong to this customer"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Hand the account to another member of the same customer",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/notes": {
-      "get": {
-        "operationId": "PlatformTenantsController_notes",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Operator notes about this customer (newest first)",
-        "tags": [
-          "platform-tenants"
-        ]
-      },
-      "post": {
-        "operationId": "PlatformTenantsController_addNote",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Add an operator note",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/notes/{noteId}": {
-      "delete": {
-        "operationId": "PlatformTenantsController_deleteNote",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "noteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "404": {
-            "description": "Unknown note for this customer"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Delete a note (the audit row keeps its text)",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/settings": {
-      "get": {
-        "operationId": "PlatformTenantsController_settings",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Tenant-scoped settings with their source: tenant, platform or default",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/settings/{key}": {
-      "put": {
-        "operationId": "PlatformTenantsController_updateSetting",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "422": {
-            "description": "The key is not tenant-scoped, or the value is invalid"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Write one override for one customer (null removes it)",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/flags": {
-      "get": {
-        "operationId": "PlatformTenantsController_flags",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Feature packs of this customer",
-        "tags": [
-          "platform-tenants"
-        ]
-      },
-      "put": {
-        "operationId": "PlatformTenantsController_updateFlags",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Enable or disable feature packs for this customer",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/tenants/{id}/branding": {
-      "get": {
-        "operationId": "PlatformTenantsController_branding",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "The customer’s logo, colour and sender name",
-        "tags": [
-          "platform-tenants"
-        ]
-      },
-      "put": {
-        "operationId": "PlatformTenantsController_updateBranding",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Write the customer’s branding (any subset of the three fields)",
-        "tags": [
-          "platform-tenants"
-        ]
-      }
-    },
-    "/api/v1/platform/usage": {
-      "get": {
-        "operationId": "PlatformUsageController_grid",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": false,
-            "in": "query",
-            "description": "عميلٌ واحد؛ وبغيابه الشبكة كلها",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "period",
-            "required": false,
-            "in": "query",
-            "description": "الشهر بصيغة YYYY-MM",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Usage grid (or a single tenant snapshot when tenantId is given)"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "شبكة الاستخدام عبر العملاء، أو لقطة عميلٍ واحد",
-        "tags": [
-          "platform-usage"
-        ]
-      }
-    },
-    "/api/v1/platform/usage/export.csv": {
-      "get": {
-        "operationId": "PlatformUsageController_exportCsv",
-        "parameters": [
-          {
-            "name": "period",
-            "required": false,
-            "in": "query",
-            "description": "الشهر بصيغة YYYY-MM",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "بيان الاستخدام الشهري (كل عميل × كل مقياس) ملفَّ CSV",
-        "tags": [
-          "platform-usage"
-        ]
-      }
-    },
-    "/api/v1/signup/plans": {
-      "get": {
-        "operationId": "SignupController_plans",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Plans a prospect can pick while signing up",
-        "tags": [
-          "signup"
-        ]
-      }
-    },
-    "/api/v1/signup": {
-      "post": {
-        "operationId": "SignupController_signup",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": "Tenant created; owner can log in immediately"
-          },
-          "409": {
-            "description": "Tenant code already taken (VERSION_CONFLICT)"
-          },
-          "422": {
-            "description": "Invalid payload or weak password (VALIDATION_FAILED)"
-          }
-        },
-        "summary": "Create a new tenant, its owner account and a pending activation request",
-        "tags": [
-          "signup"
-        ]
-      }
-    },
     "/api/v1/platform/announcements": {
       "get": {
         "operationId": "AnnouncementsController_list",
@@ -8479,6 +8155,370 @@
         "summary": "End a support session — its token stops working on the next request (the row is closed, never deleted)",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs": {
+      "get": {
+        "operationId": "PlatformOperationsController_jobs",
+        "parameters": [
+          {
+            "name": "filter[tenantId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[type]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[queue]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[status]",
+            "required": false,
+            "in": "query",
+            "description": "pending | published | dead",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The outbox across every customer, with each job’s payload keys",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs/heartbeat": {
+      "get": {
+        "operationId": "PlatformOperationsController_heartbeat",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Heartbeat"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Worker heartbeat and the age of the oldest pending job",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs/{id}/retry": {
+      "post": {
+        "operationId": "PlatformOperationsController_retryJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job after the retry"
+          },
+          "422": {
+            "description": "Already pending, or already published"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a pending or dead job to the queue (attempts cleared, run-at now)",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "PlatformOperationsController_cancelJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job after the cancellation"
+          },
+          "422": {
+            "description": "Already published"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark a job dead so the publisher stops consuming it",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/health/detailed": {
+      "get": {
+        "operationId": "PlatformOperationsController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Health with six probes"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Probes, request rates, queue backlog and the incident banner",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/files": {
+      "get": {
+        "operationId": "PlatformOperationsController_files",
+        "parameters": [
+          {
+            "name": "filter[scan]",
+            "required": false,
+            "in": "query",
+            "description": "clean | infected | skipped | none",
+            "schema": {}
+          },
+          {
+            "name": "filter[entity]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[tenantId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[status]",
+            "required": false,
+            "in": "query",
+            "description": "pending | ready | deleted",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "File-name fragment",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cross-tenant file manager with each file’s last scan verdict",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/files/{id}/scan": {
+      "post": {
+        "operationId": "PlatformOperationsController_scan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The verdict as it came out of the scanner"
+          },
+          "404": {
+            "description": "No such file"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run the configured scanner now and record its verdict",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/files/{id}": {
+      "delete": {
+        "operationId": "PlatformOperationsController_purge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The file after quarantine"
+          },
+          "422": {
+            "description": "Already quarantined"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quarantine a file (metadata is kept; rows are never deleted)",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/usage": {
+      "get": {
+        "operationId": "UsageController_snapshot",
+        "parameters": [
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "الشهر بصيغة YYYY-MM (افتراضاً: هذا الشهر)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage snapshot for the calling tenant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "استهلاك منشأتي مقابل حدودها",
+        "tags": [
+          "usage"
         ]
       }
     },

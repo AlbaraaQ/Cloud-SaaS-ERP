@@ -64,11 +64,26 @@ export type TenantContextValue = {
   scopes: RoleScopeValue[];
 };
 
+/**
+ * سياق «النظام» — عملٌ خلفيّ لا إنسان خلفه (نبضة مجدول، ومعالج طابور).
+ *
+ * بعض الخدمات تشترط سياق مصادقة لأنها تُنادى من شاشة (قراءة الإيراد مثلاً)، والمهمّة
+ * الخلفية لا طلبَ لها. ولا يُرتجل لها مستخدمٌ ولا جلسة: `system` وسمٌ صريح يقول «هذا ليس
+ * طلباً»، وما يُبنى عليه قرارٌ أمنيّ واحد مُعلَن — `mustBePlatformAdmin` تقبله، لأن الذي
+ * يقود المهمّة هو المنصّة نفسها. ولا مسار HTTP يضعه: `runAsSystem` وحدها تكتبه.
+ */
+export type SystemContextValue = {
+  /** اسم المهمّة — يُكتب في `traceId` فيُقرأ في السجلّات من أين جاء النداء. */
+  job: string;
+};
+
 export type RequestContextValue = {
   traceId: string;
   startTime: number;
   auth?: AuthContextValue;
   tenant?: TenantContextValue;
+  /** مضبوطٌ في المهامّ الخلفية وحدها — انظر `SystemContextValue`. */
+  system?: SystemContextValue;
   /** Validated `X-Branch-Id` request scope. */
   branchId?: string;
   /** Client address, captured for `audit_log.meta` (SECURITY_ARCHITECTURE §10). */
@@ -92,6 +107,19 @@ const FALLBACK: RequestContextValue = {
 
 export function getRequestContext(): RequestContextValue {
   return requestContextStorage.getStore() ?? FALLBACK;
+}
+
+/**
+ * يشغّل عملاً خلفياً داخل سياق نظام — بلا جلسةٍ مصطنعة وبلا مستخدمٍ مُخترع.
+ * والتدقيق يسمّي الفاعل `null` ← «النظام» (كما تفعل `content.publish` المجدولة).
+ */
+export function runAsSystem<T>(job: string, work: () => Promise<T>): Promise<T> {
+  return requestContextStorage.run({ traceId: `job:${job}`, startTime: Date.now(), system: { job } }, work);
+}
+
+/** سياق النظام إن كنّا في مهمّةٍ خلفية — `undefined` في أيّ طلبٍ حقيقيّ. */
+export function systemContext(): SystemContextValue | undefined {
+  return getRequestContext().system;
 }
 
 export function getTraceId(): string {

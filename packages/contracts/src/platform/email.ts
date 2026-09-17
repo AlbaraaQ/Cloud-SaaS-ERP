@@ -35,6 +35,9 @@ export const emailEvents = [
   'activation.approved',
   'activation.rejected',
   'announcement',
+  // P-C6 المؤجَّل — التقرير الأسبوعي: الحدث الوحيد الذي **لا يخصّ عميلاً**، ووجهته مشغّلو
+  // المنصة. ولذلك نطاقه `platform` فلا يُحتسب على حصّة أي منشأة.
+  'report.weekly',
 ] as const;
 
 export type EmailEvent = (typeof emailEvents)[number];
@@ -210,7 +213,28 @@ export const emailEventRegistry: readonly EmailEventDefinition[] = [
     variables: ['name', 'title', 'body', 'link'],
     descriptionAr: 'رسالة إعلانية عامة — مصدرها P-C7.',
   },
-] as const;
+
+  {
+    event: 'report.weekly',
+    labelAr: 'التقرير الأسبوعي للمنصة',
+    labelEn: 'Weekly platform report',
+    scope: 'platform',
+    variables: [
+      'week',
+      'tenants',
+      'active',
+      'trialing',
+      'new_this_week',
+      'churned_this_week',
+      'mrr',
+      'outstanding',
+      'overdue',
+      'trials_ending',
+      'alerts',
+      'link',
+    ],
+    descriptionAr: 'تقريرٌ أسبوعي بأرقام المنصة يُرسل إلى عناوين المشغّلين من شاشة الإعدادات.',
+  },] as const;
 
 const eventByKey = new Map(emailEventRegistry.map((entry) => [entry.event, entry]));
 
@@ -499,7 +523,19 @@ export const emailTemplateSeeds: readonly EmailTemplateSeed[] = [
     subject: '{{title}}',
     body: 'Hello {{name}},\n\n{{body}}\n\n{{link}}',
   },
-] as const;
+
+  {
+    event: 'report.weekly',
+    locale: 'ar',
+    subject: 'تقرير المنصة — أسبوع {{week}}',
+    body: 'مرحباً،\n\nحصيلة الأسبوع {{week}}:\n• المنشآت: {{tenants}} (نشطة {{active}} · تجريبية {{trialing}})\n• انضمّ {{new_this_week}} وغادر {{churned_this_week}}\n• الإيراد الشهري المتكرّر: {{mrr}}\n• مستحقّ: {{outstanding}} — منه متأخّر: {{overdue}}\n• تجارب تنتهي خلال أسبوع: {{trials_ending}}\n\nتنبيهات تحتاج قراراً:\n{{alerts}}\n\nالتفاصيل: {{link}}',
+  },
+  {
+    event: 'report.weekly',
+    locale: 'en',
+    subject: 'Platform report — week of {{week}}',
+    body: 'Hello,\n\nThe week of {{week}}:\n• Tenants: {{tenants}} (active {{active}} · trialing {{trialing}})\n• Joined {{new_this_week}}, churned {{churned_this_week}}\n• MRR: {{mrr}}\n• Outstanding: {{outstanding}} — overdue: {{overdue}}\n• Trials ending within a week: {{trials_ending}}\n\nAlerts needing a decision:\n{{alerts}}\n\nDetails: {{link}}',
+  },] as const;
 
 export function emailTemplateSeed(event: EmailEvent, locale: EmailLocale): EmailTemplateSeed | undefined {
   return emailTemplateSeeds.find((seed) => seed.event === event && seed.locale === locale);

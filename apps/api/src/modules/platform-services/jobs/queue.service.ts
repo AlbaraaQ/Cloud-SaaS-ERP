@@ -31,6 +31,12 @@ export type QueueJob = {
 export interface QueuePort {
   readonly driver: 'bullmq' | 'inert';
   isEnabled(): boolean;
+  /**
+   * هل الطابور **حيّ** فعلاً؟ `isEnabled()` تقول «مُعلَن» (JOBS_ENABLED + REDIS_URL)،
+   * وهذا يقول «يُسمع على منفذه». الفرق يهمّ المجدولات: بيئةٌ فيها REDIS_URL بلا خادم
+   * تظنّ أن عاملاً سيستهلك مهامّها فلا تعمل شيئاً — وهي وحدها الحاضرة.
+   */
+  ping(): Promise<boolean>;
   publish(job: QueueJob): Promise<void>;
   close(): Promise<void>;
 }
@@ -63,6 +69,28 @@ export class QueueService implements QueuePort, OnApplicationShutdown {
 
   isEnabled(): boolean {
     return env.JOBS_ENABLED && Boolean(env.REDIS_URL);
+  }
+
+  /**
+   * فحص «يسمع أم لا» بفتح مقبسٍ واحد وإغلاقه — لا أمر Redis ولا تحميل مُشغّل: أرخص من
+   * `PING` وأصدق من `isEnabled()`، ولا يعلق أبداً (مهلةٌ صريحة).
+   */
+  async ping(timeoutMs = 1_000): Promise<boolean> {
+    if (!this.isEnabled()) return false;
+    const { host, port } = this.redisConnection();
+    const net = await import('node:net');
+    return new Promise<boolean>((resolve) => {
+      const socket = net.connect({ host, port });
+      const done = (answer: boolean) => {
+        socket.removeAllListeners();
+        socket.destroy();
+        resolve(answer);
+      };
+      socket.setTimeout(timeoutMs);
+      socket.once('connect', () => done(true));
+      socket.once('timeout', () => done(false));
+      socket.once('error', () => done(false));
+    });
   }
 
   recentInertJobs(): readonly QueueJob[] {

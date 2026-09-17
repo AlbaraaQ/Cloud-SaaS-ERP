@@ -6,10 +6,13 @@ import {
   type AnalyticsCohorts,
   type AnalyticsFunnel,
   type AnalyticsOverview,
+  type WeeklyReportPreview,
+  type WeeklyReportRunResult,
 } from '@erp/contracts';
 
 import { Empty, ErrorBox, Loading, Screen } from '../../components/screen';
-import { ApiError, apiData, downloadFile } from '../../lib/api';
+import { ApiError, apiData, apiPost, downloadFile } from '../../lib/api';
+import { useSession } from '../../lib/session';
 import { useQuery } from '../../lib/use-query';
 
 /**
@@ -83,6 +86,19 @@ export default function AnalyticsPage() {
   const [basis, setBasis] = useState<'signup' | 'activation'>('signup');
   const [exporting, setExporting] = useState(false);
   const [exportNote, setExportNote] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
+  const [sendingReport, setSendingReport] = useState(false);
+  const [reportNote, setReportNote] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
+  const { canConsole } = useSession();
+  const canSendReport = canConsole('console.email.manage');
+
+  /**
+   * التقرير الأسبوعي — قراءةٌ واحدة تعرض ما سيُرسل ولمن ومتى. والرمز `console.analytics.view`
+   * نفسه الذي يفتح الشاشة يفتحها؛ ومن لا يملك إرسال البريد يرى التقرير ولا يرسله.
+   */
+  const report = useQuery<WeeklyReportPreview>(
+    () => apiData<WeeklyReportPreview>('/platform/reports/weekly'),
+    [],
+  );
 
   const overview = useQuery<AnalyticsOverview>(
     () => apiData<AnalyticsOverview>(`/platform/analytics/overview?months=${months}`),
@@ -126,6 +142,36 @@ export default function AnalyticsPage() {
     }
   }
 
+  async function sendReportNow() {
+    setSendingReport(true);
+    setReportNote(undefined);
+    try {
+      const result = await apiPost<WeeklyReportRunResult>('/platform/reports/weekly/run', {
+        force: true,
+      });
+      setReportNote({
+        kind: result.failedCount > 0 ? 'danger' : 'ok',
+        text:
+          `نافذة ${result.window.label}: أُرسل ${result.sentCount}` +
+          (result.skippedCount > 0 ? ` · تُخطّي ${result.skippedCount}` : '') +
+          (result.failedCount > 0 ? ` · فشل ${result.failedCount}` : ''),
+      });
+      report.reload();
+    } catch (error) {
+      setReportNote({
+        kind: 'danger',
+        text:
+          error instanceof ApiError && error.isForbidden
+            ? 'الإرسال يحتاج صلاحية «إدارة البريد» (console.email.manage).'
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      });
+    } finally {
+      setSendingReport(false);
+    }
+  }
+
   return (
     <Screen
       title="التحليلات"
@@ -158,6 +204,68 @@ export default function AnalyticsPage() {
 
       {overview.status === 'success' && data && (
         <>
+          <section className="card">
+            <h2>التقرير الأسبوعي بالبريد</h2>
+            {report.status === 'loading' && <Loading rows={2} />}
+            {report.status === 'forbidden' && (
+              <Empty title="لا تملك صلاحية القراءة" detail="هذه البطاقة تحتاج console.analytics.view." />
+            )}
+            {report.status === 'error' && <ErrorBox message={report.error} onRetry={report.reload} />}
+            {report.status === 'success' && report.data && (
+              <>
+                <p className="muted small" style={{ marginTop: 0 }}>
+                  الحصيلة أسبوعٌ منقضٍ لا الجاري: من {report.data.window.label} (بتوقيت الخادم). والأرقام
+                  هي أرقام هذه الشاشة نفسها — لا حسابَ ثانياً للتقرير.
+                </p>
+                <dl className="kv">
+                  <dt>الحالة</dt>
+                  <dd>
+                    {report.data.enabled ? 'مُشغَّل' : 'متوقّف'}
+                    {report.data.enabled ? '' : ' — يُشغَّل من الإعدادات (`report.weekly_enabled`)'}
+                  </dd>
+                  <dt>الموعد</dt>
+                  <dd>
+                    {report.data.schedule.dayLabelAr} الساعة {report.data.schedule.hour}:00 · القادم{' '}
+                    <span dir="ltr">
+                      {new Date(report.data.schedule.nextRunAt).toLocaleString('ar-SA', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })}
+                    </span>
+                  </dd>
+                  <dt>المستلمون</dt>
+                  <dd dir="ltr">
+                    {report.data.recipients.length > 0 ? report.data.recipients.join(', ') : 'لا أحد — لا تقرير'}
+                  </dd>
+                  <dt>أُرسل لهذه النافذة</dt>
+                  <dd dir="ltr">
+                    {report.data.sentTo.length > 0 ? report.data.sentTo.join(', ') : '—'}
+                    {report.data.pending.length > 0 ? ` · معلَّق: ${report.data.pending.join(', ')}` : ''}
+                  </dd>
+                  <dt>رابط التقرير</dt>
+                  <dd dir="ltr">{report.data.link}</dd>
+                  <dt>ما سيقوله</dt>
+                  <dd>
+                    {report.data.variables.tenants} منشأة ({report.data.variables.active} نشطة ·{' '}
+                    {report.data.variables.trialing} تجريبية) · انضمّ {report.data.variables.new_this_week} وغادر{' '}
+                    {report.data.variables.churned_this_week} · MRR {money(report.data.variables.mrr)} · تجارب تنتهي{' '}
+                    {report.data.variables.trials_ending}
+                  </dd>
+                </dl>
+                {reportNote && <p className={`alert ${reportNote.kind}`}>{reportNote.text}</p>}
+                {canSendReport ? (
+                  <button className="btn" type="button" disabled={sendingReport} onClick={() => void sendReportNow()}>
+                    {sendingReport ? 'جارٍ الإرسال…' : 'أرسل التقرير الآن'}
+                  </button>
+                ) : (
+                  <p className="muted small" style={{ marginBottom: 0 }}>
+                    الإرسال يحتاج صلاحية «إدارة البريد» (console.email.manage).
+                  </p>
+                )}
+              </>
+            )}
+          </section>
+
           <div className="grid cols-2">
             <section className="card">
               <h2>الإيراد</h2>

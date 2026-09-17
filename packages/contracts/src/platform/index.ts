@@ -15,6 +15,7 @@ export * from './analytics.js';
 export * from './content.js';
 export * from './files.js';
 export * from './operations.js';
+export * from './reports.js';
 export * from './jobs.js';
 export * from './notifications.js';
 export * from './sequences.js';

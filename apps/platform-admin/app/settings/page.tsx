@@ -25,7 +25,7 @@ import { useQuery } from '../../lib/use-query';
  * so a key added on the contract side is a field on the screen the moment the API serves it.
  */
 
-type SettingKind = 'string' | 'email' | 'string-list' | 'integer' | 'boolean';
+type SettingKind = 'string' | 'email' | 'string-list' | 'integer' | 'boolean' | 'select';
 
 type SettingView = {
   key: string;
@@ -34,6 +34,12 @@ type SettingView = {
   kind: SettingKind;
   helpAr: string;
   value: string | string[] | number | boolean;
+  /** خيارات المفتاح إن كان قائمة — تصل من الكتالوج، فلا تُخترع هنا. */
+  options?: string[];
+  /** تسميات الخيارات بالعربية (موازية لـ`options`) — `0` تصير «الأحد». */
+  optionLabels?: string[];
+  min?: number;
+  max?: number;
   isDefault: boolean;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -175,6 +181,21 @@ export default function PlatformSettingsPage() {
                     >
                       <option value="off">مُطفأ</option>
                       <option value="on">مُفعَّل</option>
+                    </select>
+                  ) : setting.kind === 'select' && (setting.options ?? []).length > 0 ? (
+                    <select
+                      className="input"
+                      disabled={!canWrite}
+                      value={drafts[setting.key] ?? ''}
+                      onChange={(event) =>
+                        setDrafts((current) => ({ ...current, [setting.key]: event.target.value }))
+                      }
+                    >
+                      {(setting.options ?? []).map((option, index) => (
+                        <option key={option} value={option}>
+                          {setting.optionLabels?.[index] ?? option}
+                        </option>
+                      ))}
                     </select>
                   ) : setting.kind === 'string-list' ? (
                     <textarea

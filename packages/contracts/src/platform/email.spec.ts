@@ -20,12 +20,14 @@ import {
  * أما السلوك (حجرٌ يمنع، حصةٌ ترفض، إعادة إرسال) ففي `apps/api/test/platform-email.spec.ts`.
  */
 describe('email event registry (P-C6)', () => {
-  it('freezes the seventeen events the plan lists', () => {
-    expect(emailEvents).toHaveLength(17);
-    expect(new Set(emailEvents).size).toBe(17);
+  it('freezes the eighteen events the plan lists', () => {
+    expect(emailEvents).toHaveLength(18);
+    expect(new Set(emailEvents).size).toBe(18);
     expect(emailEvents).toContain('portal.access.grant');
     expect(emailEvents).toContain('subscription.payment_failed');
     expect(emailEvents).toContain('announcement');
+    // التقرير الأسبوعي حدثُ منصّة: لا يُحتسب على حصّة أي منشأة (وإلا لظهر في فاتورتها).
+    expect(emailEventRegistry.find((entry) => entry.event === 'report.weekly')?.scope).toBe('platform');
   });
 
   it('gives every event a unique key, an Arabic label and variables', () => {
@@ -34,7 +36,9 @@ describe('email event registry (P-C6)', () => {
     for (const entry of emailEventRegistry) {
       expect(entry.labelAr.length).toBeGreaterThan(1);
       expect(entry.variables.length).toBeGreaterThan(0);
-      expect(entry.variables).toContain('name');
+      // كل حدثٍ يخاطب إنساناً باسمه — إلا التقرير الأسبوعي: وجهتُه عناوين مشغّلين بلا أسماء
+      // معروفة، فلا يُطلب `name` ولا يُصيَّر به.
+      if (entry.event !== 'report.weekly') expect(entry.variables).toContain('name');
       // المتغيّرات لاتينية صغيرة: `{{invoiceNo}}` يُقرأ بشكلين ويُكتب بشكلين.
       for (const variable of entry.variables) expect(variable).toMatch(/^[a-z0-9_]+$/);
     }

@@ -282,11 +282,21 @@ check(
   `${settingsSnapshot.environment.name} / ${settingsSnapshot.environment.labelAr}`,
 );
 check(
-  // P-M5: صار 27 — أُضيفت ثمانية مفاتيح بهوية الموقع التسويقي (`site.*`)، تُدار من هذه
-  // الشاشة نفسها فلا شاشةَ ثانية لعنوانٍ ورابطٍ وبريد.
-  'سبعة وعشرون إعداداً معرَّفاً (ستة للفوترة P-C4 · خمسة حدود للحصص P-C5 · ثمانية للموقع P-M5)',
-  settingsSnapshot.settings.length === 27,
+  // P-M5: صار 27 — أُضيفت ثمانية مفاتيح بهوية الموقع التسويقي (`site.*`)؛ وP-C12 (التقرير
+  // الأسبوعي): أربعة (`report.weekly_*`) — كلها تُدار من هذه الشاشة نفسها، فلا شاشةَ ثانية.
+  'واحدٌ وثلاثون إعداداً معرَّفاً (+ أربعة للتقرير الأسبوعي)',
+  settingsSnapshot.settings.length === 31,
   `${settingsSnapshot.settings.length}`,
+);
+check(
+  'ومفاتيح التقرير الأسبوعي الأربعة بينها',
+  [
+    'report.weekly_enabled',
+    'report.weekly_recipients',
+    'report.weekly_day',
+    'report.weekly_hour',
+  ].every((key) => settingsSnapshot.settings.some((setting) => setting.key === key)),
+  settingsSnapshot.settings.filter((setting) => setting.key.startsWith('report.')).length + ' مفتاحاً',
 );
 check(
   'ومفاتيح الموقع الثمانية بينها',

@@ -74,6 +74,9 @@ export const jobTypes = {
   // P-M5 — نشر صفحةٍ مجدولة في وقتها. وُضع في طابور «الصيانة» لا «الإشعارات»: أسماء
   // الطوابير الخمسة مجمّدة في TARGET_ARCHITECTURE §6، ونشر صفحةٍ ليس تسليم رسالة.
   CONTENT_PUBLISH: 'content.publish',
+  // P-C12 المؤجَّل — التقرير الأسبوعي (بقالب P-C6): تقريرُ المنصة إلى بريد المشغّلين،
+  // فلا يخصّ عميلاً واحداً. وطابور «الصيانة» لأن تسليمه ليس رسالة عميلٍ عاجلة.
+  REPORT_WEEKLY: 'report.weekly',
   FILES_ORPHAN_GC: 'files.orphan-gc',
   IDEMPOTENCY_GC: 'idempotency.gc',
 } as const;

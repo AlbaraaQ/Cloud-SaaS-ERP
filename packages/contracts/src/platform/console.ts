@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { uuidSchema } from '../ids.js';
 import { paginationQuerySchema } from '../pagination.js';
 
+// أسماء الأيام تُقرأ من عقد التقرير نفسه — لا نسخةٌ ثانية تُترجم في `console.ts` وتنحرف عنها.
+import { weeklyReportDayLabels } from './reports.js';
+
 /**
  * Platform-console contracts (P-C1 — الأساس والقشرة).
  *
@@ -75,6 +78,12 @@ export type PlatformSettingDefinition = {
   max?: number;
   /** القيم المسموحة لنوع `select` — بلاها يُرفض النوع عند التحقّق. */
   options?: readonly string[];
+  /**
+   * تسميات الخيارات بالعربية، موازيةً لـ`options` (الفهرس بالفهرس). تُفصل عن القيم لأن
+   * القيمة هي ما يُخزَّن (`0`) والتسمية هي ما يُقرأ («الأحد») — وخلطهما يجعل قيمةً عربية
+   * تُكتب في القاعدة ثم تُترجم في كل قارئ.
+   */
+  optionLabels?: readonly string[];
   /**
    * Writers allowed for this key. Omitted means `['platform']` — P-C1's eight keys keep
    * their original meaning without a line of churn.
@@ -397,7 +406,76 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
     helpAr: 'حين تُشغَّل يرى الزائر صفحة صيانة، ويبقى في الاستطاعة الوصول إلى الدخول والاشتراك.',
     defaultValue: false,
   },
+  // --- التقرير الأسبوعي (P-C6 المؤجَّل) ------------------------------------------------
+  // أربعة مفاتيح لا شاشةٌ خاصة: المشغّل يضبطها من شاشة الإعدادات القائمة، والمرسل يعمل بلا
+  // تدخّل. والقائمة نصٌّ بفواصل — لا نوع «قائمة» جديد في الكتالوج من أجل حقلٍ واحد.
+  {
+    key: 'report.weekly_enabled',
+    labelAr: 'التقرير الأسبوعي',
+    labelEn: 'Weekly report',
+    kind: 'boolean',
+    helpAr: 'حين يُشغَّل يُرسل تقرير المنصة الأسبوعي إلى العناوين أدناه — أرقامه من تحليلات المنصة نفسها.',
+    defaultValue: false,
+  },
+  {
+    key: 'report.weekly_recipients',
+    labelAr: 'عناوين التقرير الأسبوعي',
+    labelEn: 'Weekly report recipients',
+    kind: 'string',
+    helpAr: 'عناوين بريدٍ مفصولة بفواصل. لا عناوين ⇒ لا إرسال (ولا مهمّة تُجدول أصلاً).',
+    defaultValue: '',
+    max: 500,
+  },
+  {
+    key: 'report.weekly_day',
+    labelAr: 'يوم التقرير الأسبوعي',
+    labelEn: 'Weekly report day',
+    kind: 'select',
+    options: ['0', '1', '2', '3', '4', '5', '6'],
+    optionLabels: weeklyReportDayLabels,
+    helpAr: '0 = الأحد … 6 = السبت (أسبوع العمل يبدأ بالأحد). ويُرسل في الساعة أدناه.',
+    defaultValue: '0',
+  },
+  {
+    key: 'report.weekly_hour',
+    labelAr: 'ساعة التقرير الأسبوعي',
+    labelEn: 'Weekly report hour',
+    kind: 'integer',
+    helpAr: 'الساعة بتوقيت الخادم (0..23) التي يُرسل فيها التقرير في اليوم المختار.',
+    defaultValue: 7,
+    min: 0,
+    max: 23,
+  },
 ] as const;
+
+/**
+ * نافذة الأسبوع الماضي: من الأحد 00:00 إلى السبت 23:59:59 بتوقيت الخادم — الأسبوع المنقضي
+ * لا الجاري، لأن التقرير يحكي عمّا وقع.
+ */
+export function weeklyWindow(now: Date, weekStartsOn = 0): { start: Date; end: Date } {
+  const end = new Date(now.getTime());
+  const day = end.getDay();
+  const back = (day - weekStartsOn + 7) % 7;
+  end.setDate(end.getDate() - back);
+  end.setHours(0, 0, 0, 0);
+  const start = new Date(end.getTime());
+  start.setDate(start.getDate() - 7);
+  return { start, end };
+}
+
+/**
+ * عناوين التقرير من نصّ الإعداد — تُقبل فقط عناوين صحيحة، والمكرّر يُسقط مرّةً واحدة.
+ * والقيمة الفارغة تعني «لا تقرير» لا «أرسل إلى أحد».
+ */
+export function weeklyRecipients(value: string): string[] {
+  const seen = new Set<string>();
+  for (const entry of value.split(',')) {
+    const address = entry.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) continue;
+    seen.add(address);
+  }
+  return [...seen];
+}
 
 /**
  * يُقرأ الرقم الضريبي للبائع من الإعدادات — ويُتحقّق منه هنا لا في الشاشة: 15 رقماً كما
@@ -552,6 +630,15 @@ export const platformSettingViewSchema = z.object({
   kind: z.enum(platformSettingKinds),
   helpAr: z.string(),
   value: z.union([z.string(), z.array(z.string()), z.number(), z.boolean()]),
+  /**
+   * خيارات المفتاح إن كان قائمةً (`select`) وحدوده إن كان عدداً — تُنشر لأن الشاشة **لا
+   * تعرف الكتالوج**: بلاها يُعرض اليوم والساعة حقلَ نصٍّ حرٍّ يكتب فيه المشغّل ما يقبله
+   * الخادم أو يرفضه، وهو عكس ما تفعله القائمة.
+   */
+  options: z.array(z.string()).optional(),
+  optionLabels: z.array(z.string()).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
   /** True when the row comes from the catalogue, not from a `platform_settings` row. */
   isDefault: z.boolean(),
   /**

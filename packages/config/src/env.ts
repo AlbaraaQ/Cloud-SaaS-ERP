@@ -150,6 +150,12 @@ const envSchema = z.object({
    * Empty means the link stays a relative path rather than a dead absolute one.
    */
   STAFF_PUBLIC_URL: z.string().default(''),
+  /**
+   * P-C12 (التقرير الأسبوعي) — Public URL of the platform console, used as the link inside
+   * the weekly report. Empty means the e-mail carries the relative path (`/analytics`) rather
+   * than a dead absolute URL — the same rule as `STAFF_PUBLIC_URL`.
+   */
+  CONSOLE_PUBLIC_URL: z.string().default(''),
 
   /** AES-256-GCM data-encryption key, base64 (SECURITY_ARCHITECTURE §9). */
   DATA_ENC_KEY: z.string().optional(),

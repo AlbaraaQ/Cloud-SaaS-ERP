@@ -61,7 +61,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.tokens.js';
-import { getAuthContext } from '../../../request-context/request-context.js';
+import { getAuthContext, systemContext } from '../../../request-context/request-context.js';
 import { buildQrPayload } from '../../einvoicing/zatca/qr.js';
 import { WebhookPublisher } from '../../developer/webhook-publisher.service.js';
 import { AuditService } from '../../platform-services/audit/audit.service.js';
@@ -1796,6 +1796,9 @@ export class PlatformBillingService {
 // -------------------------------------------------------------------- helpers
 
 function mustBePlatformAdmin(): void {
+  // مهمّةٌ خلفية (سياق النظام) تقرأ الإيراد للتقرير الأسبوعي: لا جلسةَ مشغّل تُصنع لها،
+  // والوسم `system` لا يضعه مسار HTTP أصلاً (`runAsSystem` وحدها). وما عدا ذلك الحاجز كما هو.
+  if (systemContext()) return;
   if (!getAuthContext().isPlatformAdmin) {
     throw new DomainError(errorCodes.FORBIDDEN, 'platform-admin plane requires is_platform_admin', 403);
   }
