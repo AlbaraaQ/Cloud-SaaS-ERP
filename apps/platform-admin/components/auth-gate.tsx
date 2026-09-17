@@ -9,9 +9,12 @@ import { PlatformGuard } from './platform-guard';
  * Everything behind this component requires a platform session. There is no
  * self-service signup on the console: platform operators are created by hand and
  * granted roles from `/roles`.
+ *
+ * P-C1 moved the page chrome (sidebar, top bar, breadcrumb) into `PlatformGuard`, so this
+ * gate is now only the session boundary: loading, sign-in, or the console itself.
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const { status, error, signOut, me } = useSession();
+  const { status, error } = useSession();
 
   if (status === 'loading') {
     return (
@@ -26,23 +29,5 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (status === 'anonymous') return <LoginScreen initialError={error} />;
 
-  return (
-    <div className="wrap">
-      <header className="top">
-        <span className="brand">
-          <span className="logo">ERP</span>
-          <span>لوحة تحكم المنصة</span>
-        </span>
-        <span className="muted">
-          {me?.user.fullName} · {me?.user.email}
-          <button className="btn" type="button" onClick={() => void signOut()} style={{ marginInlineStart: 12 }}>
-            خروج
-          </button>
-        </span>
-      </header>
-      <main style={{ marginTop: 18 }}>
-        <PlatformGuard>{children}</PlatformGuard>
-      </main>
-    </div>
-  );
+  return <PlatformGuard>{children}</PlatformGuard>;
 }

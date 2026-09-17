@@ -12,6 +12,12 @@ export type SessionState = {
 
 type SessionContextValue = SessionState & {
   can: (permission?: string) => boolean;
+  /**
+   * P-C1 — the console permission check. Separate from `can()` on purpose: the tenant
+   * aliases above must never be consulted for a `console.*` code (the planes are disjoint
+   * in `@erp/contracts`), and `*` — which a tenant owner holds — grants nothing here.
+   */
+  canConsole: (permission?: string) => boolean;
   isPlatformAdmin: boolean;
   signIn: (email: string, password: string, tenantCode: string, mfaCode?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -95,6 +101,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SessionContextValue>(() => {
     const permissions = state.me?.permissions ?? [];
+    const consolePermissions = state.me?.platformPermissions ?? [];
     return {
       ...state,
       isPlatformAdmin: state.me?.user.isPlatformAdmin === true,
@@ -103,6 +110,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (permissions.includes('*') || permissions.includes(permission)) return true;
         const alias = resolveAlias(permission);
         return alias !== undefined && permissions.includes(alias);
+      },
+      canConsole: (permission?: string) => {
+        if (!permission) return true;
+        return consolePermissions.includes(permission);
       },
       signIn,
       signOut,

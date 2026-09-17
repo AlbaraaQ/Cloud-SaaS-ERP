@@ -64,6 +64,12 @@
 
 ### 4.2 لوحة تحكم المنصة (`apps/platform-admin`) — 11 شاشة
 
+> ✅ **حُدِّث بعد P-C1 (2026-09-17):** أُغلق هذا القسم — كل مسار `/platform/*` صار برمز
+> `console.*`، وسجل التدقيق العابر للمستأجرين أُضيف (`GET /platform/audit`)، وصندوق
+> الأحداث عبر العملاء (`GET /platform/jobs/outbox`)، وإعدادات المنصة صارت مكتوبة
+> (`GET/PUT /platform/settings`). الجدول أدناه هو **قياس ما قبل P-C1** ويُحفظ للتاريخ.
+> الوثيقة: [`../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md).
+
 **قياس اليوم** (تسجيل دخول `admin@platform.test` على المستأجر `platform`):
 
 | الملاحظة | الدليل |

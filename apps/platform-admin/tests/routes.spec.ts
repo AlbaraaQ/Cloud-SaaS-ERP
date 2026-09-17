@@ -18,6 +18,9 @@ const CONSOLE_ROUTES = [
   '/roles',
   '/audit',
   '/health',
+  '/jobs',
+  // P-C1 — the settings screen the console writes through `PUT /platform/settings`.
+  '/settings',
 ];
 
 function pageFileFor(href: string): string {
@@ -32,11 +35,22 @@ describe('platform console routes', () => {
     }
   });
 
-  /** The old `/platform/*` prefix must not leak into links after the flattening. */
-  it('links no route under the legacy /platform prefix', () => {
-    const guard = readFileSync(join(testDir, '..', 'components', 'platform-guard.tsx'), 'utf8');
-    expect(guard).not.toContain("'/platform");
-    expect(guard).not.toContain('"/platform');
+  /**
+   * The old `/platform/*` **page** prefix must not come back after the surface separation.
+   *
+   * P-C1 made this check precise: the shell legitimately quotes API paths (`/platform/audit`)
+   * and they all start with the same word. What must never exist again is a *link* to a page
+   * under that prefix, so the scan now looks at `href` values only.
+   */
+  it('links no page under the legacy /platform prefix', () => {
+    const shell = readFileSync(join(testDir, '..', 'components', 'platform-guard.tsx'), 'utf8');
+    const hrefs = [...shell.matchAll(/href=(?:"([^"]+)"|\{`([^`]+)`\}|\{'([^']+)'\})/g)]
+      .map((match) => match[1] ?? match[2] ?? match[3] ?? '')
+      .filter((href) => !href.startsWith('${'));
+    expect(hrefs.length).toBeGreaterThan(0);
+    for (const href of hrefs) {
+      expect(href.startsWith('/platform'), href).toBe(false);
+    }
   });
 
   /** Console login is operator-only: no signup path may exist on this surface. */
@@ -48,5 +62,13 @@ describe('platform console routes', () => {
     expect(code).not.toContain('/onboarding');
     expect(login).not.toContain('إنشاء حساب');
     expect(login).not.toContain('اشترك');
+  });
+
+  /** P-C1: the sidebar is a real tree, and the four groups are the plan's. */
+  it('renders the shell from the navigation tree', () => {
+    const shell = readFileSync(join(testDir, '..', 'components', 'platform-guard.tsx'), 'utf8');
+    expect(shell).toContain('visibleConsoleGroups');
+    expect(shell).toContain('canConsole');
+    expect(shell).toContain('Ctrl+K');
   });
 });

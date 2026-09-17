@@ -4,6 +4,7 @@ import {
   DomainError,
   errorCodes,
   permissionRegistry,
+  platformPermissionsForRoles,
   type MeResponse,
   type PermissionDto,
 } from '@erp/contracts';
@@ -59,6 +60,11 @@ export class IdentityService {
       isPlatformAdmin: platform.isPlatformAdmin,
       platformRoles: platform.platformRoles,
     };
+    // P-C1: the union of the console codes the operator's platform roles carry. The
+    // console sidebar renders from this list, so it never offers a link the API will
+    // refuse — and it is a *separate* list from `permissions` because `pam`/`*` must never
+    // satisfy a `console.*` code (SECURITY_ARCHITECTURE §3).
+    const platformPermissions = platformPermissionsForRoles(platform.platformRoles);
 
     return withTenantTx(this.database.db, auth.claimedTenantId, async (tx) => {
       const rows = await tx
@@ -94,6 +100,7 @@ export class IdentityService {
         user: toUserDto(userRow),
         membership: await toMembershipDto(tx, membership),
         permissions: permissionRows.map((row) => row.code).sort(),
+        platformPermissions: [...platformPermissions].sort(),
         branchScope: (membership.branchScope as string[] | null) ?? null,
       };
     });

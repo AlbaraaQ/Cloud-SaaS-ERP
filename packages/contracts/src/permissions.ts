@@ -282,6 +282,10 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
   perm('console.users.view', 'List platform users.'),
   perm('console.users.manage', 'Grant and revoke platform roles.'),
   perm('console.audit.view', 'Read the cross-tenant audit trail.'),
+  perm(
+    'console.settings.manage',
+    'Read and write the platform settings (support contacts, service domains, default limits, maintenance switch).',
+  ),
   perm('console.health.view', 'Read system health and readiness.'),
   perm('console.jobs.view', 'Read background-queue and outbox health.'),
   perm('console.billing.manage', 'Manage billing operations and dunning.'),

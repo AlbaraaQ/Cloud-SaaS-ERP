@@ -288,6 +288,8 @@ export type MePayload = {
   };
   membership: { id: string; tenantId: string; tenantCode: string; tenantName: string; displayName: string; isOwner: boolean };
   permissions: string[];
+  /** P-C1 — the `console.*` codes of the operator's platform roles (never tenant codes). */
+  platformPermissions: string[];
   branchScope: string[] | null;
 };
 

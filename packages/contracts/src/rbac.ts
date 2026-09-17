@@ -86,6 +86,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.jobs.view',
       'console.billing.manage',
       'console.support.manage',
+      // P-C1: the platform's own configuration belongs to the owner of the platform.
+      // Operations reads it under `console.tenants.view`; nobody else writes it.
+      'console.settings.manage',
     ],
   },
   {

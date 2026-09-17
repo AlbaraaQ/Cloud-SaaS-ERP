@@ -14,8 +14,40 @@ import {
 
 /**
  * `/api/v1/platform/*` — the SaaS control plane consumed by the admin console at
- * `/platform`. Every route sits behind `PlatformAdminGuard`, which requires the `pam`
- * claim; a tenant permission can never reach it (SECURITY_ARCHITECTURE §3).
+ * `/platform`. Every route sits behind `PlatformAdminGuard`.
+ *
+ * **P-C1 (2026-09-17) — the permission repair.** Until this part, two routes carried a
+ * `console.*` code and the other eleven were reachable by *any* effective platform
+ * administrator: the `pam` claim alone was enough to suspend a customer, retire a plan or
+ * cancel a licence (INCOMPLETE_INVENTORY §4.2 measured it: 10 of 12 codes declared but
+ * unused). Every route below now names the code it needs, so the five Family-A roles in
+ * `@erp/contracts`' `platformRoleCatalog` mean what their descriptions say:
+ *
+ * | Route | Code | Owner | Operations | Billing | Support | Auditor |
+ * |---|---|---|---|---|---|---|
+ * | `GET overview` | `console.tenants.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
+ * | `GET tenants` | `console.tenants.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
+ * | `POST tenants` | `console.tenants.manage` | ✓ | | | | |
+ * | `PATCH tenants/:id/status` | `console.tenants.manage` | ✓ | | | | |
+ * | `GET plans` | `console.plans.manage` | ✓ | | ✓ | | |
+ * | `POST plans` | `console.plans.manage` | ✓ | | ✓ | | |
+ * | `PATCH plans/:id/active` | `console.plans.manage` | ✓ | | ✓ | | |
+ * | `GET subscriptions` | `console.subscriptions.manage` | ✓ | | ✓ | | |
+ * | `POST subscriptions` | `console.subscriptions.manage` | ✓ | | ✓ | | |
+ * | `POST subscriptions/:id/cancel` | `console.subscriptions.manage` | ✓ | | ✓ | | |
+ * | `GET activation-requests` | `console.activation.review` | ✓ | | ✓ | | |
+ * | `POST activation-requests/:id/review` | `console.activation.review` | ✓ | | ✓ | | |
+ * | `GET users` | `console.users.view` | ✓ | | | | |
+ * | `GET roles` | `console.users.view` | ✓ | | | | |
+ * | `GET permissions` | `console.users.view` | ✓ | | | | |
+ * | `POST users/:id/roles` | `console.users.manage` | ✓ | | | | |
+ * | `DELETE users/:id/roles/:roleCode` | `console.users.manage` | ✓ | | | | |
+ *
+ * Read routes are mapped to the code that owns the *area* (plans/subscriptions/activation
+ * queue/identity) rather than to a read-only twin, because no `console.*.view` twin exists
+ * for them in the registry and inventing four codes to read four lists is not a smaller
+ * surface — it is a bigger one. The console sidebar hides exactly what these codes deny
+ * (`apps/platform-admin/lib/navigation.ts`), so the operator sees no dead links.
  */
 @ApiTags('platform-admin')
 @ApiBearerAuth()
@@ -28,6 +60,7 @@ export class PlatformAdminController {
   ) {}
 
   @Get('overview')
+  @RequiresPlatformRole('console.tenants.view')
   @ApiOperation({ summary: 'Control-plane KPIs: customers, licences, MRR, pending activations' })
   async overview() {
     return { data: await this.admin.overview() };
@@ -36,12 +69,14 @@ export class PlatformAdminController {
   // ------------------------------------------------------------------ tenants
 
   @Get('tenants')
+  @RequiresPlatformRole('console.tenants.view')
   @ApiOperation({ summary: 'List every customer with its current licence' })
   async listTenants(@Query('search') search?: string, @Query('status') status?: string) {
     return { data: await this.admin.listTenants(search, status) };
   }
 
   @Post('tenants')
+  @RequiresPlatformRole('console.tenants.manage')
   @ApiOperation({ summary: 'Create a customer, its owner account and its default branch' })
   async createTenant(@Body() body: CreateTenantInput) {
     const created = await this.admin.createTenant(body);
@@ -54,6 +89,7 @@ export class PlatformAdminController {
   }
 
   @Patch('tenants/:id/status')
+  @RequiresPlatformRole('console.tenants.manage')
   @ApiOperation({ summary: 'Suspend, reactivate or archive a customer' })
   async setTenantStatus(@Param('id') id: string, @Body() body: { status: 'active' | 'suspended' | 'archived' }) {
     return { data: await this.admin.setTenantStatus(id, body.status) };
@@ -62,18 +98,21 @@ export class PlatformAdminController {
   // ------------------------------------------------------------------ plans
 
   @Get('plans')
+  @RequiresPlatformRole('console.plans.manage')
   @ApiOperation({ summary: 'List subscription plans including retired ones' })
   async listPlans() {
     return { data: await this.admin.listPlans() };
   }
 
   @Post('plans')
+  @RequiresPlatformRole('console.plans.manage')
   @ApiOperation({ summary: 'Create or update a subscription plan (upsert by code)' })
   async createPlan(@Body() body: PlanInput) {
     return { data: await this.admin.createPlan(body) };
   }
 
   @Patch('plans/:id/active')
+  @RequiresPlatformRole('console.plans.manage')
   @ApiOperation({ summary: 'Activate or retire a plan' })
   async setPlanActive(@Param('id') id: string, @Body() body: { active: boolean }) {
     return { data: await this.admin.setPlanActive(id, body.active) };
@@ -82,18 +121,21 @@ export class PlatformAdminController {
   // ------------------------------------------------------------------ licences
 
   @Get('subscriptions')
+  @RequiresPlatformRole('console.subscriptions.manage')
   @ApiOperation({ summary: 'List every licence across all customers' })
   async listSubscriptions(@Query('status') status?: string) {
     return { data: await this.admin.listSubscriptions(status) };
   }
 
   @Post('subscriptions')
+  @RequiresPlatformRole('console.subscriptions.manage')
   @ApiOperation({ summary: 'Issue or extend a licence manually' })
   async grantSubscription(@Body() body: GrantSubscriptionInput) {
     return { data: await this.admin.grantSubscription(body) };
   }
 
   @Post('subscriptions/:id/cancel')
+  @RequiresPlatformRole('console.subscriptions.manage')
   @ApiOperation({ summary: 'Cancel a licence' })
   async cancelSubscription(@Param('id') id: string) {
     return { data: await this.admin.cancelSubscription(id) };
@@ -102,12 +144,14 @@ export class PlatformAdminController {
   // ------------------------------------------------------------------ activation queue
 
   @Get('activation-requests')
+  @RequiresPlatformRole('console.activation.review')
   @ApiOperation({ summary: 'Manual activation queue' })
   async listActivationRequests(@Query('status') status?: string) {
     return { data: await this.admin.listActivationRequests(status ?? 'pending') };
   }
 
   @Post('activation-requests/:id/review')
+  @RequiresPlatformRole('console.activation.review')
   @ApiOperation({ summary: 'Approve or reject an activation request' })
   async reviewActivation(@Param('id') id: string, @Body() body: { approve: boolean; notes?: string }) {
     return { data: await this.admin.reviewActivation(id, body.approve, body.notes) };
@@ -116,6 +160,7 @@ export class PlatformAdminController {
   // ------------------------------------------------------------------ users
 
   @Get('users')
+  @RequiresPlatformRole('console.users.view')
   @ApiOperation({ summary: 'Search platform users across all tenants' })
   async listUsers(@Query('search') search?: string) {
     return { data: await this.admin.listUsers(search) };
@@ -124,12 +169,14 @@ export class PlatformAdminController {
   // ------------------------------------------------------------------ platform roles (2026-09)
 
   @Get('roles')
+  @RequiresPlatformRole('console.users.view')
   @ApiOperation({ summary: 'Family-A platform role catalogue with holder counts' })
   async listPlatformRoles() {
     return { data: await this.admin.listPlatformRoles() };
   }
 
   @Get('permissions')
+  @RequiresPlatformRole('console.users.view')
   @ApiOperation({ summary: 'Platform-console (console.*) permission registry' })
   async listPlatformPermissions() {
     return { data: this.admin.listPlatformPermissions() };
