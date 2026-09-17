@@ -1683,6 +1683,15 @@ const settings: ModuleNode = {
           permission: 'tenant.settings.manage',
           endpoint: '/settings',
         }),
+        // 📊 الاستخدام والحصص — P-C5 (`PLATFORM_CONSOLE_PLAN.md` §4: «شاشة للمستأجر في
+        // staff (`/settings/usage`)»). لا مقابل لها في `Desktop_ERP`: النسخة المكتبية تخدم
+        // منشأةً واحدة على جهاز العميل، فلا حصص ولا حدود منصّة. القراءة `tenant.view` لأن
+        // الرقم يخصّ المنشأة نفسها؛ ولا كتابة هنا — الحدود يضعها المشغّل في لوحة المنصّة.
+        screen('usage', 'الاستخدام والحصص', 'Usage & quotas', '/settings/usage', 'ready', {
+          permission: 'tenant.view',
+          endpoint: 'GET /usage',
+          description: 'PLATFORM_CONSOLE_PLAN.md §4 (P-C5) — ثمانية مقاييس: المستخدمون · الفروع · الأصناف · فواتير الشهر · التخزين · استدعاءات الـAPI · واتساب · البريد، مع ٨٠٪ ناعم و١٠٠٪ صلب.',
+        }),
         // 🖨️ إعدادات الطباعة — `SettingPrint` of the desktop (`frmSettings.xaml`
         // «خيارات الطباعة» + `frmInvRptType.xaml`). Reading them is part of viewing a
         // report; changing them is part of owning the report designer's surface, so the

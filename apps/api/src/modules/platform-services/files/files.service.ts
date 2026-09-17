@@ -20,6 +20,7 @@ import { env } from '@erp/config';
 import { files, newId, withTenantTx, type DatabaseHandle, type DrizzleTx } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { UsageService } from '../../usage/index.js';
 import { AuditService } from '../audit/audit.service.js';
 
 import { isExpired, signDownloadToken, verifyDownloadToken } from './download-token.js';
@@ -66,6 +67,7 @@ export class FilesService {
     @Inject(VIRUS_SCANNER) private readonly scanner: VirusScannerPort,
     private readonly attachments: FileAttachmentRegistry,
     private readonly audit: AuditService,
+    private readonly usage: UsageService,
   ) {}
 
   /** `POST /files/presign` — `platform.file.upload`. */
@@ -76,6 +78,8 @@ export class FilesService {
   ): Promise<FilePresignResponse> {
     this.assertMimeAllowed(input.mime);
     this.assertSizeAllowed(input.sizeBytes);
+    // P-C5: التخزين مقياسٌ محدود — يُحتسب بالطلب المرفوع (م.ب صاعدةً)، فالرفض يقع قبل التوقيع.
+    await this.usage.assertWithinLimit(tenantId, 'storage_mb', Math.max(1, Math.ceil(input.sizeBytes / 1048576)));
     if (input.entity) this.assertEntityRegistered(input.entity, input.entityId);
 
     const fileId = newId();

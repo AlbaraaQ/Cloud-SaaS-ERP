@@ -30,6 +30,8 @@ export const errorCodes = {
   ACCOUNT_PROFILE_MISSING: 'ACCOUNT_PROFILE_MISSING',
   // Round 11 — credentials were valid but the user has TOTP enabled and sent no code.
   MFA_REQUIRED: 'MFA_REQUIRED',
+  // P-C5 — a tenant wrote past a limit that an operator had set (metric in the details).
+  USAGE_LIMIT_REACHED: 'USAGE_LIMIT_REACHED',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -64,6 +66,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   INTERNAL: 500,
   ACCOUNT_PROFILE_MISSING: 422,
   MFA_REQUIRED: 401,
+  USAGE_LIMIT_REACHED: 409,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -92,6 +95,7 @@ export const errorTitle: Record<ErrorCode, string> = {
   INTERNAL: 'Internal error',
   ACCOUNT_PROFILE_MISSING: 'Posting profile missing',
   MFA_REQUIRED: 'Verification code required',
+  USAGE_LIMIT_REACHED: 'Usage limit reached',
 };
 
 export function statusForCode(code: string): number {

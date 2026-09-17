@@ -24,14 +24,15 @@ console work from any host without touching CORS.
   المنصة), each item carrying the `console.*` code that opens it. **This file is the single
   source of truth**: `tests/navigation.spec.ts` fails the build when an item claims `ready`
   without a page file, or names a code the registry does not declare.
-- `app/` — 14 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
+- `app/` — 19 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
   `subscriptions`, `plans`, `activation-requests`, `users`, `users/[id]` (operator card),
-  `roles`, `audit`, `health`, `jobs`, `settings`.
+  `roles`, `audit`, `health`, `jobs`, `settings`, `invoices`, `invoices/[id]/print`, `dunning`,
+  `revenue`, `usage`.
 - `components/` — session auth gate, platform-only login screen (no signup path), the shell
   (`PlatformGuard`), and the shared screen kit.
 - `lib/` — API client (same origin, refresh-on-401), session provider (`can()` for tenant
   codes, `canConsole()` for `console.*`), `useQuery`, the navigation tree.
-- `tests/` — navigation + route/kit coverage checks (20 tests). `tests/routes.spec.ts` owns the
+- `tests/` — navigation + route/kit coverage checks (24 tests). `tests/routes.spec.ts` owns the
   console's own route list, so a page that exists but is unreachable (or the reverse) fails.
 
 ## Screens added by P-C1 (2026-09-17)
@@ -116,6 +117,28 @@ What to know before touching the money screens:
 5. **Settings are the invoice.** The seller identity, the VAT rate, the payment terms and the
    dunning ladder live in ستة `billing.*` keys on `/settings` (P-C1's catalogue) and are copied
    onto every document as it is created.
+
+## Screens added by P-C5 (2026-09-17)
+
+| Screen | Route | Console code | Endpoints |
+|---|---|---|---|
+| الاستخدام والحصص (**new**: totals · worst-first grid · per-tenant daily chart · CSV export) | `/usage` | read `console.tenants.view` · export `console.billing.manage` | `GET /platform/usage?tenantId=&period=` · `GET /platform/usage/export.csv` · `GET /platform/tenants/:id/usage` |
+
+What to know before touching the usage screens:
+
+1. **One engine, three surfaces.** The console grid, the CSV export, the customer card tab and
+   the write-time guards all read `UsageService` — no screen counts anything itself. The card's
+   own `invoicesPerDay` chart is the single deliberate exception (it is not one of the eight).
+2. **Default limits are reported, not enforced.** A `limits.*` catalogue value describes the
+   envelope a new tenant inherits; enforcement starts only at a limit whose source is `tenant`
+   or `platform`. Every metric carries `enforced`, and the card tab says «يُبلَّغ عنه فقط» for
+   the rest. This is why the sidebar's `/settings` shows the limits without promising a gate.
+3. **Two ways to be refused.** Soft (80 %) writes a notice + a `usage.soft_limit` audit row and
+   lets the write through; hard (100 %) refuses with `409 USAGE_LIMIT_REACHED` and puts the
+   metric in `errors[0].metric` (problem+json extras) plus a `usage.limit_reached` audit row.
+4. **`null` is not a reset.** `PUT /platform/settings` rejects `null`/blank for numeric keys
+   (422) — it used to store `0`, which now means «block the customer».
+
 
 ## Security
 

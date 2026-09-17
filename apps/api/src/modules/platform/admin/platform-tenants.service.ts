@@ -41,6 +41,7 @@ import {
 
 import { DATABASE_HANDLE } from '../../../database/database.tokens.js';
 import { getAuthContext } from '../../../request-context/request-context.js';
+import { UsageService } from '../../usage/usage.service.js';
 import { AuditService } from '../../platform-services/audit/audit.service.js';
 
 /**
@@ -81,6 +82,11 @@ export class PlatformTenantsService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly audit: AuditService,
+    /**
+     * عدّادٌ واحد لكل الأسطح (P-C5). تُحقن الخدمة مباشرةً — لا عبر الوحدة — لأن الوحدة
+     * عالمية أصلاً (`@Global`) ولأن هذا الملف لا يعرف غيرها من `UsageModule`.
+     */
+    private readonly usageEngine: UsageService,
   ) {}
 
   // --------------------------------------------------------------------- detail
@@ -113,29 +119,22 @@ export class PlatformTenantsService {
     });
   }
 
-  /** `GET /platform/tenants/:id/usage` — what the customer consumes, and the limit. */
+  /**
+   * `GET /platform/tenants/:id/usage` — what the customer consumes, and the limit.
+   *
+   * **P-C5 moved the counting to one engine.** This route used to count three metrics and
+   * read three limits by itself; the console's `/usage` grid, the tenant surface and the
+   * six enforcement hooks all read `UsageService` — so a second counter here would be a
+   * second truth, and the numbers would drift. The route is now a **projection** of the
+   * engine's snapshot into the card's shape (all eight metrics, with the state fields the
+   * tab shows), plus `invoicesPerDay`: this tab's own chart, which is not one of the eight.
+   */
   async usage(tenantId: string): Promise<PlatformTenantUsageResponse> {
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      await this.assertTenant(tx, tenantId);
+    // 404s for an unknown customer inside the engine, exactly as it did before.
+    const snapshot = await this.usageEngine.snapshotForPlatform(tenantId);
 
-      const counters = await tx.execute(sql`
-        SELECT
-          (SELECT count(*) FROM memberships m WHERE m.tenant_id = ${tenantId} AND m.deleted_at IS NULL)::int AS users,
-          (SELECT count(*) FROM branches b WHERE b.tenant_id = ${tenantId} AND b.deleted_at IS NULL)::int AS branches,
-          (SELECT count(*) FROM sales_invoices i
-            WHERE i.tenant_id = ${tenantId}
-              AND i.created_at >= date_trunc('month', now()))::int AS invoices_per_month
-      `);
-      const row = counters.rows[0] ?? {};
-      const used: Record<keyof typeof LIMIT_KEYS, number> = {
-        users: Number(row.users ?? 0),
-        branches: Number(row.branches ?? 0),
-        invoices_per_month: Number(row.invoices_per_month ?? 0),
-      };
-
-      const limits = await this.effectiveLimitsInTx(tx, tenantId);
-
-      const series = await tx.execute(sql`
+    const series = await withPlatformAdminTx(this.database.db, async (tx) =>
+      tx.execute(sql`
         SELECT d::date AS day, COALESCE(c.n, 0)::int AS count
           FROM generate_series(date_trunc('day', now()) - interval '29 days',
                                date_trunc('day', now()), interval '1 day') d
@@ -147,29 +146,33 @@ export class PlatformTenantsService {
              GROUP BY 1
           ) c ON c.day = d
          ORDER BY d ASC
-      `);
+      `),
+    );
 
-      return {
-        tenantId,
-        metrics: (Object.keys(LIMIT_KEYS) as Array<keyof typeof LIMIT_KEYS>).map((key) => {
-          const limit = limits[key];
-          return {
-            key,
-            labelAr: METRIC_LABELS[key] ?? key,
-            used: used[key],
-            limit: limit.value,
-            limitSource: limit.source,
-            percentUsed: limit.value === null ? null : Math.round((used[key] / Math.max(limit.value, 1)) * 100),
-            periodStart: key === 'invoices_per_month' ? startOfMonthIso() : null,
-          };
-        }),
-        invoicesPerDay: series.rows.map((entry) => ({
-          day: String(entry.day).slice(0, 10),
-          count: Number(entry.count ?? 0),
-        })),
-        generatedAt: new Date().toISOString(),
-      };
-    });
+    return {
+      tenantId,
+      metrics: snapshot.metrics.map((metric) => ({
+        key: metric.key,
+        labelAr: metric.labelAr,
+        used: metric.used,
+        limit: metric.limit,
+        limitSource: metric.limitSource,
+        percentUsed: metric.percentUsed,
+        // المقاييس الشهرية وحدها لها بداية فترة تُعرض؛ التراكمية واليومية بلا بداية.
+        periodStart: metric.period === 'month' ? snapshot.periodStart : null,
+        unitAr: metric.unitAr,
+        period: metric.period,
+        state: metric.state,
+        enforced: metric.enforced,
+        noticeAr: metric.noticeAr,
+        enforcedAtAr: metric.enforcedAtAr,
+      })),
+      invoicesPerDay: series.rows.map((entry) => ({
+        day: String(entry.day).slice(0, 10),
+        count: Number(entry.count ?? 0),
+      })),
+      generatedAt: snapshot.generatedAt,
+    };
   }
 
   /** `GET /platform/tenants/:id/health` — the «الصحة» tab, from real tables only. */
@@ -1024,10 +1027,4 @@ function iso(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-/** First day of the current month at 00:00 UTC — the window `invoices_per_month` counts. */
-function startOfMonthIso(): string {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }

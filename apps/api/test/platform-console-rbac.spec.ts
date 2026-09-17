@@ -273,8 +273,9 @@ describe('platform console RBAC and cross-tenant audit (P-C1)', () => {
     expect(body.settings.map((row) => row.key)).toEqual(
       platformSettingsForScope('platform').map((definition) => definition.key),
     );
-    // ستة مفاتيح فوترة أضافها P-C4 (`billing.*`) إلى نفس النطاق.
-    expect(body.settings.length).toBe(14);
+    // أربعة عشر مفتاحاً أضافها P-C3/P-C4 إلى النطاق: ستة `billing.*` للفوترة، وخمسة
+    // `limits.*` للحصص (P-C5) — وكلها بحاجةٍ إلى تسمية عربية وشرح، وهذا ما يفحصه السطر التالي.
+    expect(body.settings.length).toBe(19);
     for (const row of body.settings) {
       expect(row.labelAr.length).toBeGreaterThan(0);
     }
@@ -391,6 +392,19 @@ describe('platform console RBAC and cross-tenant audit (P-C1)', () => {
       body: { values: { 'limits.max_branches': -3 } },
     });
     expect(outOfRange.status).toBe(422);
+
+    // P-C5: `null` في مفتاح عددي ليس صفراً — كان `Number(null) === 0` يُخزَّن «حدّ صفر» على
+    // إعدادٍ صار يُطبَّق، فيُحجب العميل بدل أن تُرفض الكتابة.
+    const nullValue = await api(ctx.server, 'put', '/api/v1/platform/settings', {
+      token: owner.token,
+      body: { values: { 'limits.max_users': null } },
+    });
+    expect(nullValue.status).toBe(422);
+    const stored = await api(ctx.server, 'get', '/api/v1/platform/settings', { token: owner.token });
+    const users = (stored.body.data as { settings: Array<{ key: string; value: unknown }> }).settings.find(
+      (row) => row.key === 'limits.max_users',
+    );
+    expect(users?.value).not.toBe(0);
 
     // A batch with one bad key is rejected whole: the good half must not land.
     const mixed = await api(ctx.server, 'put', '/api/v1/platform/settings', {

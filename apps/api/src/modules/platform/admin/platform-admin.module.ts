@@ -12,6 +12,7 @@ import { PlatformIdentityController } from './platform-identity.controller.js';
 import { PlatformIdentityService } from './platform-identity.service.js';
 import { PlatformConsoleService } from './platform-console.service.js';
 import { PlatformTenantsController } from './platform-tenants.controller.js';
+import { PlatformUsageController } from './platform-usage.controller.js';
 import { PlatformTenantsService } from './platform-tenants.service.js';
 import { SignupController } from './signup.controller.js';
 
@@ -29,6 +30,7 @@ import { SignupController } from './signup.controller.js';
     PlatformConsoleController,
     PlatformIdentityController,
     PlatformTenantsController,
+    PlatformUsageController,
     SignupController,
   ],
   providers: [

@@ -185,6 +185,17 @@ describe('staff navigation tree', () => {
     }
   });
 
+  it('wires the tenant usage & quotas screen (P-C5) at /settings/usage', () => {
+    // الشاشة التي يطلبها P-C5 للمستأجر: مقاييس ثمانية يقرأها العميل، وحدودٌ يضعها المشغّل —
+    // فالصلاحية `tenant.view` (قراءة منشأته) لا صلاحية إدارة منصّة.
+    const item = allScreens.find((screen) => screen.key === 'usage');
+    expect(item).toBeDefined();
+    expect(item?.status).toBe('ready');
+    expect(item?.href).toBe('/settings/usage');
+    expect(item?.permission).toBe('tenant.view');
+    expect(item?.endpoint).toBe('GET /usage');
+  });
+
   it('resolves a screen from its href, ignoring the query string', () => {
     expect(findScreenByHref('/accounting/accounts')?.key).toBe('coa');
     expect(findScreenByHref('/accounting/journal-entries/new?kind=opening')?.key).toBe('opening-entry');

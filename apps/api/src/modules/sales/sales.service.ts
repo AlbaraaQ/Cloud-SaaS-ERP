@@ -25,6 +25,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { UsageService } from '../usage/index.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
 import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
@@ -160,6 +161,7 @@ export class SalesService {
     private readonly accounting: AccountingService,
     private readonly sequences: SequencesService,
     private readonly profiles: PostingProfilesService,
+    private readonly usage: UsageService,
   ) {}
 
   async list(tenantId: string) {
@@ -271,6 +273,8 @@ export class SalesService {
   }
 
   async create(tenantId: string, input: SalesInvoiceInput) {
+    // P-C5: فواتير الشهر مقياسٌ محدود — والعدّ في القاعدة لا في الذاكرة.
+    await this.usage.assertWithinLimit(tenantId, 'invoices_per_month');
     const id = await withTenantTx(this.database.db, tenantId, (tx) => this.createInTx(tx, tenantId, input));
     return this.get(tenantId, id);
   }

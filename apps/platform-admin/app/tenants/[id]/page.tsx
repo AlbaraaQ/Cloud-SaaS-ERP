@@ -3,17 +3,18 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import type {
-  PlatformSettingView,
-  PlatformTenantDetailResponse,
-  PlatformTenantHealthResponse,
-  PlatformTenantMember,
-  PlatformTenantSubscription,
-  PlatformTenantUsageResponse,
-  TenantBrandingResponse,
-  TenantFlagsResponse,
-  TenantNotesResponse,
-  TenantSettingsResponse,
+import {
+  usageMetricRegistry,
+  type PlatformSettingView,
+  type PlatformTenantDetailResponse,
+  type PlatformTenantHealthResponse,
+  type PlatformTenantMember,
+  type PlatformTenantSubscription,
+  type PlatformTenantUsageResponse,
+  type TenantBrandingResponse,
+  type TenantFlagsResponse,
+  type TenantNotesResponse,
+  type TenantSettingsResponse,
 } from '@erp/contracts';
 
 import { Empty, ErrorBox, Loading, Screen } from '../../../components/screen';
@@ -625,14 +626,13 @@ function UsageTab({
   );
   const [busy, setBusy] = useState(false);
   const metrics = usage.data?.metrics ?? [];
-  const limitKeys: Record<string, string> = {
-    users: 'limits.max_users',
-    branches: 'limits.max_branches',
-    invoices_per_month: 'limits.max_invoices_per_month',
-  };
+  // مفتاح الحدّ يأتي من فهرس المقاييس نفسه (P-C5) لا من خريطةٍ في الشاشة: إضافة مقياسٍ
+  // تاسعٍ للفهرس تجعل عموده قابلاً للتجاوز هنا بلا تحرير هذه الصفحة.
+  const limitKeyFor = (metricKey: string) =>
+    usageMetricRegistry.find((entry) => entry.key === metricKey)?.limitKey;
 
   async function setLimit(metricKey: string, raw: string) {
-    const key = limitKeys[metricKey];
+    const key = limitKeyFor(metricKey);
     if (!key) return;
     setBusy(true);
     onNotice(undefined);
@@ -674,7 +674,10 @@ function UsageTab({
               <tbody>
                 {metrics.map((metric) => (
                   <tr key={metric.key}>
-                    <td>{metric.labelAr}</td>
+                    <td>
+                      {metric.labelAr}
+                      <div className="muted small">{metric.unitAr ?? ''}</div>
+                    </td>
                     <td>{metric.used}</td>
                     <td>{metric.limit ?? 'بلا حدّ'}</td>
                     <td>
@@ -691,9 +694,18 @@ function UsageTab({
                         }
                       />
                       <span className="muted small">{metric.percentUsed === null ? '—' : `${metric.percentUsed}%`}</span>
+                      {metric.state && (
+                        <span className={`badge ${metric.state === 'ok' ? 'ready' : metric.state}`} style={{ marginInlineStart: 6 }}>
+                          {USAGE_STATE_LABEL[metric.state]}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <SourceTag source={metric.limitSource} />
+                      {/* المغلّف الافتراضي يُبلَّغ عنه ولا يمنع — والعمود يقول أيّهما هذا. */}
+                      {metric.enforced !== undefined && (
+                        <div className="muted small">{metric.enforced ? 'يُطبَّق' : 'يُبلَّغ عنه فقط'}</div>
+                      )}
                     </td>
                     <td>
                       <LimitEditor
@@ -708,6 +720,17 @@ function UsageTab({
               </tbody>
             </table>
           </div>
+          {metrics
+            .filter((metric) => metric.noticeAr && metric.state !== 'ok' && metric.state !== 'unlimited')
+            .map((metric) => (
+              <p
+                key={metric.key}
+                className={`alert ${metric.state === 'hard' ? 'danger' : 'warn'}`}
+                style={{ marginTop: 8 }}
+              >
+                {metric.noticeAr}
+              </p>
+            ))}
           {metricNote(metrics)}
         </div>
       )}
@@ -741,15 +764,40 @@ function UsageTab({
   );
 }
 
+const USAGE_STATE_LABEL: Record<string, string> = {
+  ok: 'طبيعي',
+  soft: 'قريب من الحدّ',
+  hard: 'بلغ الحدّ',
+  unlimited: 'بلا حدّ',
+};
+
 function metricNote(metrics: PlatformTenantUsageResponse['metrics']) {
-  const atCeiling = metrics.filter((metric) => metric.limit !== null && metric.used >= metric.limit);
-  if (atCeiling.length === 0) {
-    return <p className="muted small">لا بند عند حدّه الآن. الأرقام مجمّعة من جداول المنشأة نفسها.</p>;
-  }
+  const atCeiling = metrics.filter((metric) => metric.state === 'hard' && metric.enforced !== false);
+  const approaching = metrics.filter((metric) => metric.state === 'soft');
+  const reportedOnly = metrics.filter((metric) => metric.state === 'hard' && metric.enforced === false);
   return (
-    <p className="alert warn" style={{ marginTop: 8 }}>
-      بلغ الحدّ: {atCeiling.map((metric) => metric.labelAr).join(' · ')} — راجع التجاوزات في العمود الأخير.
-    </p>
+    <>
+      {atCeiling.length > 0 && (
+        <p className="alert danger" style={{ marginTop: 8 }}>
+          بلغ الحدّ ويُرفض التجاوز: {atCeiling.map((metric) => metric.labelAr).join(' · ')} — ارفع الحدّ من العمود
+          الأخير أو اتّفق مع العميل على باقةٍ أوسع.
+        </p>
+      )}
+      {approaching.length > 0 && (
+        <p className="alert warn" style={{ marginTop: 8 }}>
+          يقترب من الحدّ (٨٠٪ فأكثر): {approaching.map((metric) => metric.labelAr).join(' · ')}.
+        </p>
+      )}
+      {reportedOnly.length > 0 && (
+        <p className="muted small" style={{ marginTop: 8 }}>
+          عند مغلّف الفهرس بلا تجاوز مكتوب: {reportedOnly.map((metric) => metric.labelAr).join(' · ')} — يُبلَّغ عنه ولا
+          يمنع، لأن الفهرس يصف منشأةً جديدة لا عميلاً قائماً.
+        </p>
+      )}
+      {atCeiling.length === 0 && approaching.length === 0 && reportedOnly.length === 0 && (
+        <p className="muted small">لا بند عند حدّه الآن. الأرقام مجمّعة من جداول المنشأة نفسها.</p>
+      )}
+    </>
   );
 }
 

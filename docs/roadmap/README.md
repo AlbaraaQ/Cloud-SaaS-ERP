@@ -20,6 +20,15 @@
 > أولاً، والضريبة والمهلة وهوية البائع من `platform_settings`. الوثيقة
 > [`../PLATFORM_CONSOLE_P_C4_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C4_IMPLEMENTATION_REPORT.md).
 >
+>
+> **تحديث 2026-09-17 (جلسة P-C5):** والجزء الخامس «الاستخدام والحصص» مُنجَز على الفرع نفسه:
+> محرّك واحد يقيس ثمانية مقاييس ويرفض عند الحدّ (`409 USAGE_LIMIT_REACHED`) وينبّه عند 80٪،
+> وترحيل `0069_usage_metering.sql` (جدول `usage_counters`)، وثلاثة أسطح — تاب «الاستخدام» في
+> بطاقة العميل (إسقاط على المحرّك لا حساب ثانٍ) و`/usage` في اللوحة (شبكة + رسوم + تصدير CSV)
+> و`/settings/usage` في staff. **الحدود الافتراضية تُبلَّغ ولا تُطبَّق** — قرارٌ مصرَّح به في §3
+> من التقرير. الوثيقة
+> [`../PLATFORM_CONSOLE_P_C5_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C5_IMPLEMENTATION_REPORT.md).
+
 > **تحديث 2026-09-17 (جلسة P-C3):** والجزء الثالث «الهوية والوصول على المنصة» مُنجَز على
 > الفرع نفسه: دليل المستخدمين عبر كل المنشآت وبطاقة `/users/[id]` (عضويات · أدوار · جلسات ·
 > إبطال · إعادة تعيين 2FA) ومصفوفة `/roles` **حيّة** (`PUT /platform/roles/:code/permissions`

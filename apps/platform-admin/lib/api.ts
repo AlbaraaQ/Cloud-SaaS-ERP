@@ -231,6 +231,35 @@ export function apiDelete<T>(path: string, options: ApiOptions = {}): Promise<T>
   return apiData<T>(path, { ...options, method: 'DELETE' });
 }
 
+/**
+ * تنزيل ملفٍ نصّي من الـAPI (P-C5: `GET /platform/usage/export.csv`).
+ *
+ * لا يكفي `<a href>`: المسار محميّ برمز Bearer، والمتصفّح لا يحمل الرمز في تنقّلٍ عاديّ —
+ * فنجلب النصّ بالجلسة نفسها التي تستعملها بقية الطلبات، ثم نحوّله إلى ملفٍ في الذاكرة.
+ * رموز الرفض تمرّ بنفس `toError`، فيقرأ النداء `403` ويشرح سببه بدل أن يُنزّل صفحة خطأ.
+ */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const session = readSession();
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    headers: {
+      accept: 'text/csv, text/plain;q=0.9, */*;q=0.8',
+      ...(session ? { authorization: `Bearer ${session.accessToken}` } : {}),
+    },
+  });
+  if (!response.ok) throw await toError(response);
+
+  const text = await response.text();
+  if (!browser()) return;
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 // --------------------------------------------------------------------------- auth
 
 export type LoginPayload = {

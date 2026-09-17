@@ -18,6 +18,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { UsageService } from '../../usage/index.js';
 
 /** One line of a bill of materials. `ratio` is base units per one of `unitId`. */
 export type ItemComponentRow = {
@@ -148,7 +149,10 @@ const IMMUTABLE_AFTER_USE = 'CATALOG_ITEM_IN_USE';
 
 @Injectable()
 export class CatalogService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly usage: UsageService,
+  ) {}
 
   async listItems(tenantId: string, q?: string) {
     return withTenantTx(this.database.db, tenantId, (tx) =>
@@ -168,6 +172,8 @@ export class CatalogService {
   }
 
   async createItem(tenantId: string, input: CatalogItemInput) {
+    // P-C5: الأصناف مقياسٌ محدود.
+    await this.usage.assertWithinLimit(tenantId, 'items');
     const id = newId();
     await withTenantTx(this.database.db, tenantId, async (tx) => {
       await tx.insert(items).values({

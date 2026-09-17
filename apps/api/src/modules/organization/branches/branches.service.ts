@@ -26,6 +26,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { UsageService } from '../../usage/index.js';
 import {
   actorStamp,
   assertVersion,
@@ -54,7 +55,10 @@ import {
  */
 @Injectable()
 export class BranchesService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly usage: UsageService,
+  ) {}
 
   async list(tenantId: string, query: OrgListQuery): Promise<ListEnvelope<BranchDto>> {
     const filters = parseFilters(query.filter, BRANCH_FILTERS);
@@ -118,6 +122,8 @@ export class BranchesService {
 
   async create(tenantId: string, input: BranchCreate): Promise<BranchDto> {
     const { actorUserId, now } = actorStamp();
+    // P-C5: الفروع مقياسٌ محدود — والحدّ يُطبَّق قبل الكتابة لا بعدها.
+    await this.usage.assertWithinLimit(tenantId, 'branches');
 
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       await this.assertCodeAvailable(tx, tenantId, input.code);

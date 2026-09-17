@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { uuidSchema } from '../ids.js';
 
 import { platformSettingViewSchema } from './console.js';
+import { usageMetricKeys, usageMetricStateSchema } from './usage.js';
 
 /**
  * P-C2 — «العملاء في العمق» (`docs/roadmap/PLATFORM_CONSOLE_PLAN.md` §4).
@@ -120,9 +121,14 @@ export type PlatformTenantSubscription = z.infer<typeof platformTenantSubscripti
  *
  * `limit === null` means "no limit configured" (an operator may clear a limit; the plan
  * treats limits as defaults, not as hard walls until P-C5 enforces them).
+ *
+ * **P-C5 widened this row to the eight-metric registry** (`usageMetricKeys`) and added the
+ * state fields the enforcement surfaces need. The three keys P-C2 shipped stay in it — the
+ * card simply stops being the only place that knows about limits. The state fields are
+ * optional so a P-C2-era client keeps parsing; the engine fills them.
  */
 export const platformTenantUsageMetricSchema = z.object({
-  key: z.enum(['users', 'branches', 'invoices_per_month']),
+  key: z.enum(usageMetricKeys),
   labelAr: z.string(),
   used: z.number().int(),
   limit: z.number().int().nullable(),
@@ -135,11 +141,32 @@ export const platformTenantUsageMetricSchema = z.object({
   /** `used / limit` as a percentage, rounded — NULL when there is no limit. */
   percentUsed: z.number().int().nullable(),
   periodStart: z.string().nullable(),
+  // ---- P-C5: what the screen needs to *act* and not only to display ----------------
+  /** «مستخدم» · «م.ب» — the unit printed after the number (from the registry). */
+  unitAr: z.string().optional(),
+  /** `total` تراكمي · `day` · `month` — why the number resets when it resets. */
+  period: z.enum(['day', 'month', 'total']).optional(),
+  /** `ok` · `soft` (80٪) · `hard` (100٪) · `unlimited` — from `usageStateFor`. */
+  state: usageMetricStateSchema.optional(),
+  /**
+   * Whether the limit is *enforced* or merely reported. A limit whose source is `default`
+   * describes the envelope a new tenant inherits; enforcement starts when an operator
+   * writes a limit (`tenant` or `platform`) — see the P-C5 decision in `usage.ts`.
+   */
+  enforced: z.boolean().optional(),
+  /** Arabic sentence for `soft`/`hard` — written once in the contract, shown everywhere. */
+  noticeAr: z.string().nullable().optional(),
+  /** Where the refusal happens (registry text), so the tab never promises more than it does. */
+  enforcedAtAr: z.string().optional(),
 });
 
 export const platformTenantUsageResponseSchema = z.object({
   tenantId: uuidSchema,
   metrics: z.array(platformTenantUsageMetricSchema),
+  /**
+   * سلسلة فواتير الثلاثين يوماً — يبقى هذا الاستعلام هنا لأن سلسلة الاستدعاءات
+   * (`UsageSnapshot.apiCallsPerDay`) مقياسٌ آخر: البطاقة تعرض الاثنين ولا تخلطهما.
+   */
   invoicesPerDay: z.array(
     z.object({
       day: z.string(),

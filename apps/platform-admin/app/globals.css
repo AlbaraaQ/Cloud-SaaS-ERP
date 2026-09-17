@@ -173,5 +173,13 @@ td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; font-famil
 .chip.active { background: #dcfce7; color: #166534; }
 .chip.suspended { background: #fee2e2; color: #991b1b; }
 .chip.archived { background: #e2e8f0; color: #334155; }
+/* States of the eight metered metrics (P-C5). `.badge` already had a colour for every
+   licence and invoice state; a quota state is a different axis, so `ok`/`soft`/`hard`/
+   `unlimited` get their own — «بلا حدّ» included, because an unlimited metric is a fact an
+   operator must see, not an empty cell. */
+.badge.ok { background: #dcfce7; color: var(--ok); }
+.badge.soft { background: #fef3c7; color: var(--warn); }
+.badge.hard { background: #fee2e2; color: var(--danger); }
+.badge.unlimited { background: #e0f2fe; color: #075985; }
 .day-bars { display: flex; align-items: flex-end; gap: 2px; height: 64px; }
 .day-bar { flex: 1; background: var(--brand); border-radius: 2px 2px 0 0; min-height: 2px; }

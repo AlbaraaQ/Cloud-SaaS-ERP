@@ -30,6 +30,8 @@ const CONSOLE_ROUTES = [
   '/invoices/[id]/print',
   '/dunning',
   '/revenue',
+  // P-C5 — شبكة الاستخدام: من بلغ حدّه، ورسوم استدعاءات الـAPI، وتصدير البيان.
+  '/usage',
 ];
 
 function pageFileFor(href: string): string {

@@ -135,6 +135,10 @@ export const consoleGroups: readonly ConsoleGroup[] = [
     icon: '⚙️',
     items: [
       item('overview', 'نظرة عامة', 'Overview', '/', 'console.tenants.view', 'GET /platform/overview'),
+      // P-C5 — «الاستخدام والحصص»: شبكةٌ تقول من اقترب من حدّه ومن تجاوزه، وتصديرٌ لمن
+      // يمسك المال. الرؤية `console.tenants.view` (كل مشغّل يرى استهلاك عملائه)، والتصدير
+      // `console.billing.manage` (بيانٌ يذهب إلى الفوترة) — والاثنان من P-C1.
+      item('usage', 'الاستخدام', 'Usage', '/usage', 'console.tenants.view', 'GET /platform/usage'),
       item('users', 'المستخدمون', 'Users', '/users', 'console.users.view', 'GET /platform/users'),
       item('roles', 'أدوار المنصة', 'Platform roles', '/roles', 'console.users.view', 'GET /platform/roles'),
       item(

@@ -43,6 +43,10 @@
  * which is what "no residue" means here, and what the before/after snapshot in the report
  * asserts.
  *
+ *
+ * ملاحظة P-C5: هذا السكربت **لا يكتب `limits.*`** — منذ P-C5 صار كتابةُ حدٍّ عام في
+ * `platform_settings` تُشغِّل التطبيق على كل عميل، ولا مسار يحذف صفّ إعدادٍ عام؛ فالسكربت
+ * الذي يكتب حدّاً ويعيد «قيمته السابقة» يترك خلفه حدّاً مطبَّقاً. القسم ٥ يكتب `billing.tax_rate`.
  * Usage: node scripts/verify-platform-console.mjs
  */
 import { loadEnvFiles } from './dotenv.mjs';
@@ -209,9 +213,15 @@ const settingsSnapshot = await get('/platform/settings');
 const snapshotValues = Object.fromEntries(settingsSnapshot.settings.map((setting) => [setting.key, setting.value]));
 check('البيئة مُعلَنة بوسمٍ عربي', typeof settingsSnapshot.environment.name === 'string' && settingsSnapshot.environment.labelAr.length > 0, `${settingsSnapshot.environment.name} / ${settingsSnapshot.environment.labelAr}`);
 check(
-  'أربعة عشر إعداداً معرَّفاً (ستة منها للفوترة: P-C4)',
-  settingsSnapshot.settings.length === 14,
+  'تسعة عشر إعداداً معرَّفاً (ستة للفوترة P-C4 · خمسة حدود للحصص P-C5)',
+  settingsSnapshot.settings.length === 19,
   `${settingsSnapshot.settings.length}`,
+);
+check(
+  'ومفاتيح الحدود الخمسة الجديدة بينها',
+  ['limits.max_items', 'limits.max_storage_mb', 'limits.max_api_calls_per_day', 'limits.max_whatsapp_per_month', 'limits.max_emails_per_month'].every(
+    (key) => settingsSnapshot.settings.some((setting) => setting.key === key),
+  ),
 );
 check(
   'ومفاتيح الفاتورة الضريبية بينها',
@@ -233,14 +243,16 @@ try {
       'support.email': 'support.verify@demo.test',
       'support.phone': '920000000',
       'platform.domains': ['verify.example.test'],
-      'limits.max_users': 33,
+      // لا نكتب `limits.*` هنا منذ P-C5: كتابة حدٍّ عام تُشغِّل التطبيق على كل عميل،
+      // والسكربت لا يملك ما يمحو الصفّ (لا مسار حذف لإعداد منصّة). البديل عددٌ ليس حدّاً.
+      'billing.tax_rate': 16,
       'platform.maintenance': true,
       'platform.maintenance_message': 'نافذة صيانة تجريبية',
     },
   });
   const byKey = Object.fromEntries(written.settings.map((setting) => [setting.key, setting]));
   check('الكتابة تُقرأ فوراً', byKey['support.email'].value === 'support.verify@demo.test');
-  check('والأعداد تُخزَّن أعداداً', byKey['limits.max_users'].value === 33, typeof byKey['limits.max_users'].value);
+  check('والأعداد تُخزَّن أعداداً', byKey['billing.tax_rate'].value === 16, typeof byKey['billing.tax_rate'].value);
   check('والقوائم تُخزَّن قوائم', Array.isArray(byKey['platform.domains'].value) && byKey['platform.domains'].value[0] === 'verify.example.test');
   check('ومفتاح الصيانة صار مفتوحاً', byKey['platform.maintenance'].value === true);
   check('ولم يبقَ إعدادٌ على قيمته الافتراضية', byKey['support.email'].isDefault === false);
@@ -266,7 +278,18 @@ try {
   const badRange = await refused('put', '/platform/settings', { values: { 'limits.max_branches': -5 } }, ownerToken);
   check('ولعددٍ خارج المدى', badRange.status === 422, `${badRange.status}`);
 } finally {
-  await put('/platform/settings', { values: snapshotValues });
+  // إعادة القيم التي كتبها هذا القسم وحده. الكتابة الشاملة لكل اللقطة كانت تُنشئ صفوفاً
+  // لمفاتيح لم يكتبها السكربت (ومنها `limits.*`) — ومع P-C5 يصير صفُّ الحدّ تطبيقاً فعلياً.
+  await put('/platform/settings', {
+    values: {
+      'support.email': snapshotValues['support.email'],
+      'support.phone': snapshotValues['support.phone'],
+      'platform.domains': snapshotValues['platform.domains'],
+      'billing.tax_rate': snapshotValues['billing.tax_rate'],
+      'platform.maintenance': snapshotValues['platform.maintenance'],
+      'platform.maintenance_message': snapshotValues['platform.maintenance_message'],
+    },
+  });
 }
 
 // ═══════════════════════════════════ 6. 📜 التدقيق العابر للمستأجرين
@@ -387,9 +410,25 @@ console.log('\n■ 11. 📊 الاستخدام — مقابل الحدّ، وم�
 const usage = await get(`/platform/tenants/${demoId}/usage`);
 const metricKeys = usage.metrics.map((metric) => metric.key);
 check(
-  'البطاقة تقيس المستخدمين والفروع وفواتير الشهر',
-  JSON.stringify(metricKeys) === JSON.stringify(['users', 'branches', 'invoices_per_month']),
+  // P-C5: البطاقة لم تعد ثلاثة عدّادات — صارت فهرس المقاييس الثمانية نفسه، تقرؤه من المحرّك.
+  'البطاقة تقيس المقاييس الثمانية بترتيبها',
+  JSON.stringify(metricKeys) ===
+    JSON.stringify([
+      'users',
+      'branches',
+      'items',
+      'invoices_per_month',
+      'storage_mb',
+      'api_calls_per_day',
+      'whatsapp_per_month',
+      'email_sends_per_month',
+    ]),
   metricKeys.join(', '),
+);
+check(
+  'وكل مقياس يقول حالته وهل يُطبَّق',
+  usage.metrics.every((metric) => ['ok', 'soft', 'hard', 'unlimited'].includes(metric.state) && typeof metric.enforced === 'boolean'),
+  usage.metrics.map((metric) => `${metric.key}:${metric.state}${metric.enforced ? '' : '(report)'}`).join(' '),
 );
 check('وكل بند يقول مصدر حدّه', usage.metrics.every((metric) => ['tenant', 'platform', 'default'].includes(metric.limitSource)), usage.metrics.map((metric) => `${metric.key}:${metric.limitSource}`).join(' '));
 check('وسلسلة ثلاثين يوماً كاملة', usage.invoicesPerDay.length === 30, `${usage.invoicesPerDay.length} يوماً`);

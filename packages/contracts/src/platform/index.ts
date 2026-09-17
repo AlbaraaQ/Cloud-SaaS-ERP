@@ -5,6 +5,7 @@ export * from './console.js';
 export * from './tenants.js';
 export * from './identity.js';
 export * from './billing.js';
+export * from './usage.js';
 export * from './files.js';
 export * from './jobs.js';
 export * from './notifications.js';

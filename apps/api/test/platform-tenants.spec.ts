@@ -196,10 +196,16 @@ describe('platform tenant card (P-C2)', () => {
     expect(response.status).toBe(200);
     const usage = response.body.data as PlatformTenantUsageResponse;
 
+    // P-C5: the card's usage list is the eight-metric registry, not three hand-picked cups.
     expect(usage.metrics.map((metric) => metric.key)).toEqual([
       'users',
       'branches',
+      'items',
       'invoices_per_month',
+      'storage_mb',
+      'api_calls_per_day',
+      'whatsapp_per_month',
+      'email_sends_per_month',
     ]);
     const users = usage.metrics.find((metric) => metric.key === 'users');
     expect(users?.used).toBe(2);
@@ -207,12 +213,20 @@ describe('platform tenant card (P-C2)', () => {
     expect(users?.limitSource).toBe('platform');
     expect(users?.percentUsed).toBe(50);
     expect(users?.labelAr).toBe('المستخدمون');
+    // الحدّ الذي كتبه مشغّل يُطبَّق فعلاً — ولذلك `enforced` صحيحة ووسم الوحدة حاضر.
+    expect(users?.enforced).toBe(true);
+    expect(users?.state).toBe('ok');
+    expect(users?.unitAr).toBe('مستخدم');
+    expect(users?.enforcedAtAr).toContain('عضوية');
 
     const branches = usage.metrics.find((metric) => metric.key === 'branches');
     expect(branches?.used).toBe(1);
     // Nothing overrode the branches limit anywhere → the catalogue default answers.
     expect(branches?.limit).toBe(1);
     expect(branches?.limitSource).toBe('default');
+    // والمغلّف الافتراضي يُبلَّغ عنه ولا يمنع: الحالة صلبة والتنفيذ معطَّل.
+    expect(branches?.state).toBe('hard');
+    expect(branches?.enforced).toBe(false);
 
     const invoices = usage.metrics.find((metric) => metric.key === 'invoices_per_month');
     expect(invoices?.used).toBe(1);

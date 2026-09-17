@@ -140,6 +140,66 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
     min: 0,
     max: 10_000_000,
   },
+  // --- The five limits P-C5 meters (P-C1 declared the first three) ------------------
+  // Each of the eight usage metrics needs a key an operator can set, otherwise "hard at
+  // 100%" would only exist for users, branches and invoices. Defaults are the envelope a
+  // *new* tenant inherits; P-C5 enforces a limit once it has a source (a platform row or a
+  // customer override) — see `platform/usage.ts` decision 2.
+  {
+    key: 'limits.max_items',
+    scopes: ['platform', 'tenant'],
+    labelAr: 'حدّ الأصناف الافتراضي',
+    labelEn: 'Default item limit',
+    kind: 'integer',
+    helpAr: 'عدد الأصناف الذي ترثه منشأة جديدة قبل أن يُضبط لها حدّ خاص.',
+    defaultValue: 5000,
+    min: 0,
+    max: 10_000_000,
+  },
+  {
+    key: 'limits.max_storage_mb',
+    scopes: ['platform', 'tenant'],
+    labelAr: 'حدّ التخزين الافتراضي (م.ب)',
+    labelEn: 'Default storage limit (MB)',
+    kind: 'integer',
+    helpAr: 'حجم الملفات المرفوعة الذي ترثه منشأة جديدة، بالميغابايت.',
+    defaultValue: 2048,
+    min: 0,
+    max: 10_000_000,
+  },
+  {
+    key: 'limits.max_api_calls_per_day',
+    scopes: ['platform', 'tenant'],
+    labelAr: 'حدّ استدعاءات الـAPI اليومي',
+    labelEn: 'Default daily API-call limit',
+    kind: 'integer',
+    helpAr: 'عدد الطلبات في اليوم الذي ترثه منشأة جديدة؛ يُرفض ما بعده برمز USAGE_LIMIT_REACHED.',
+    defaultValue: 50_000,
+    min: 0,
+    max: 100_000_000,
+  },
+  {
+    key: 'limits.max_whatsapp_per_month',
+    scopes: ['platform', 'tenant'],
+    labelAr: 'حدّ رسائل واتساب الشهري',
+    labelEn: 'Default monthly WhatsApp limit',
+    kind: 'integer',
+    helpAr: 'عدد الرسائل في الشهر الذي ترثه منشأة جديدة.',
+    defaultValue: 1000,
+    min: 0,
+    max: 10_000_000,
+  },
+  {
+    key: 'limits.max_emails_per_month',
+    scopes: ['platform', 'tenant'],
+    labelAr: 'حدّ إرسالات البريد الشهري',
+    labelEn: 'Default monthly e-mail limit',
+    kind: 'integer',
+    helpAr: 'عدد رسائل البريد في الشهر؛ يُقاس من P-C6 حين يصير للمنصة مُرسِل.',
+    defaultValue: 5000,
+    min: 0,
+    max: 10_000_000,
+  },
   {
     key: 'platform.maintenance',
     labelAr: 'مفتاح الصيانة',
@@ -369,6 +429,11 @@ export function validatePlatformSettingValue(
       return { ok: true, value: [...new Set(entries)] };
     }
     case 'integer': {
+      // `null` ليست صفراً: `Number(null) === 0` كان يكتب «حدّ صفر» لمن يرسل قيمةً فارغة.
+      // ولمّا صار P-C5 يطبّق الحدود، صار ذلك يعني حجب العميل بدل تجاهل الكتابة — فيُرفض الفراغ.
+      if (value === null || value === undefined || value === '') {
+        return { ok: false, reason: 'القيمة يجب أن تكون عدداً صحيحاً (صفر يعني حدّاً صفرياً مقصوداً)' };
+      }
       const numeric = typeof value === 'number' ? value : Number(value);
       if (!Number.isInteger(numeric)) return { ok: false, reason: 'القيمة يجب أن تكون عدداً صحيحاً' };
       if (definition.min !== undefined && numeric < definition.min) {

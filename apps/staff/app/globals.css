@@ -436,6 +436,59 @@ th.num {
   color: #475569;
 }
 
+/* P-C5 — «الاستخدام والحصص»: أحوال المقاييس الثمانية ومتر النسبة والرسم اليومي.
+   النسخ الثلاث (`meter` · `day-bars` · حالات `badge`) مأخوذة حرفياً من
+   `apps/platform-admin/app/globals.css` (P-C5 نفسه) — القياس واحد على السطحين،
+   فيجب أن يُقرأ بالعين نفسها. */
+.badge.ok {
+  background: #dcfce7;
+  color: var(--ok);
+}
+.badge.soft {
+  background: #fef3c7;
+  color: var(--warn);
+}
+.badge.hard {
+  background: #fee2e2;
+  color: var(--danger);
+}
+.badge.unlimited {
+  background: #e0f2fe;
+  color: #075985;
+}
+.meter {
+  display: inline-block;
+  width: 90px;
+  height: 8px;
+  border-radius: 99px;
+  background: #e2e8f0;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+}
+.meter-fill.warn {
+  background: #d97706;
+}
+.meter-fill.danger {
+  background: #dc2626;
+}
+.day-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+}
+.day-bar {
+  flex: 1;
+  background: var(--brand);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+
 .alert {
   border-radius: 10px;
   padding: 9px 12px;
