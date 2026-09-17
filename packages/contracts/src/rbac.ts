@@ -87,6 +87,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.email.manage',
       // P-C7: announcements are the platform speaking to its customers — owner and operations.
       'console.notifications.manage',
+      // P-C10: the backups, the retention windows and a data-subject request are the
+      // platform's own obligations — the owner answers for them.
+      'console.backups.manage',
     ],
   },
   {
@@ -106,6 +109,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.email.manage',
       // P-C7: operations owns the maintenance window, so it owns the notice about it.
       'console.notifications.manage',
+      // P-C10: running tonight's backup and keeping the retention windows are ops work.
+      // The auditor and the billing/support desks do not get it: it erases bytes and identities.
+      'console.backups.manage',
     ],
   },
   {

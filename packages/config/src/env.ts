@@ -1,3 +1,6 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { z } from 'zod';
 
 import { describeEnvSources, loadEnvFiles } from './load-env.js';
@@ -97,6 +100,19 @@ const envSchema = z.object({
   FILES_DOWNLOAD_URL_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(300),
   /** A `pending` file older than this is an abandoned upload and is collected. */
   FILES_ORPHAN_GC_HOURS: z.coerce.number().int().positive().default(24),
+
+  /**
+   * P-C10 — أين تُكتب نسخة المنصّة حين لا اعتمادات تخزين كائنات. النسخة تُكتب دائماً إلى
+   * ملفٍّ يُقرأ من مكانه (التحقّق يعيد قراءته ويحسب بصمته)، و`ObjectStoragePort` هو الوجهة
+   * الأولى متى كان مُهيّأً؛ وهذا المسار هو البديل المُعلَن لا الصامت.
+   */
+  BACKUP_ARTIFACT_DIR: z.string().default(join(tmpdir(), 'erp-backups')),
+  /**
+   * وجهة النسخة: `auto` (التخزين إن كان مُهيّأً، وإلا نظام الملفات) · `s3` · `filesystem`.
+   * `auto` هي الصواب في النشر، والاختيار الصريح لمن يعرف أنّ تخزينه غير متاحٍ في بيئته —
+   * ولا يُحوَّل فشلُ الرفع إلى نجاحٍ على القرص بصمت في أي حال.
+   */
+  BACKUP_STORE: z.enum(['auto', 's3', 'filesystem']).default('auto'),
 
   /** PHASE_04 jobs — BullMQ is only wired up when a Redis URL is present. */
   WORKER: booleanish.default(false),

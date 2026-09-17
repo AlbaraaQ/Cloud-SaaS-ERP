@@ -24,7 +24,9 @@
  *  16. 🪪 الهوية والوصول — الدليل والبطاقة والجلسات والمصفوفة ودعوة مشغّل (P-C3)
  *  17. 📣 الإعلانات — شاشة المنصة تقرأ ما كتبته شاشة الإعلانات (P-C7)
  *  18. 🎧 مكتب الدعم — الصندوق وسجلّ الدخول المؤقّت (P-C8)
- *  19. 🧹 التنظيف — الحالة تعود كما كانت
+ *  19. 🛠️ العمليات — الطابور والصحة والملفات (P-C9)
+ *  20. 💾 البيانات والاسترجاع — النسخ والاحتفاظ وطلبات البيانات (P-C10)
+ *  21. 🧹 التنظيف — الحالة تعود كما كانت
  *
  * Re-runnable and non-destructive: the settings are snapshotted before anything is written
  * and restored at the end, and the temporary platform role granted in §8 is revoked in §10.
@@ -216,15 +218,15 @@ check(
 const ownerRole = roles.find((role) => role.code === 'platform_owner');
 const operationsRole = roles.find((role) => role.code === 'platform_operations');
 check(
-  'مالك المنصة يحمل الرموز السبعة عشر',
-  ownerRole.permissions.length === 17,
+  'مالك المنصة يحمل الرموز الثمانية عشر',
+  ownerRole.permissions.length === 18,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 17, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 18, `${registry.length} رمزاً`);
 check(
   'والمفتاح الجديد فيه',
   registry.some((entry) => entry.code === 'console.settings.manage'),
@@ -232,6 +234,10 @@ check(
 check(
   'ورمز الإعلانات (P-C7) في السجل أيضاً',
   registry.some((entry) => entry.code === 'console.notifications.manage'),
+);
+check(
+  'ورمز النسخ (P-C10) في السجل أيضاً',
+  registry.some((entry) => entry.code === 'console.backups.manage'),
 );
 
 // ════════════════════════════════════════════════ 5. ⚙️ إعدادات المنصة
@@ -1275,7 +1281,90 @@ check(
     ),
 );
 
-console.log('\n■ 20. 🧹 التنظيف');
+// ═════════════════════════════════════ 20. 💾 البيانات والاسترجاع (P-C10)
+console.log('\n■ 20. 💾 البيانات والاسترجاع — النسخ والاحتفاظ وطلبات البيانات (P-C10)');
+// القسم العميق لهذا الجزء في `scripts/verify-platform-backups.mjs` — نسخةٌ حقيقية تُكتب
+// وتُقاس من القرص وتُعبث ببايتٍ منها، وسياسةٌ تُنفَّذ، ومحوٌ يُقاس على مستخدمٍ حقيقي.
+// وهنا ما يخصّ اللوحة وحدها: أن المسارات تعمل، وأن **القراءة هنا لا تكتب شيئاً** — فسياسة
+// الاحتفاظ تُقرأ ولا تُعدَّل، لأن شاشة التنظيف في §21 تقارن إعدادات المنصّة بما كانت عليه.
+const backupRows = await get('/platform/backups?limit=20');
+check('النسخ تُقرأ عبر كل العملاء', Array.isArray(backupRows), `${backupRows.length} نسخة`);
+check(
+  'وكل صفٍّ يقول حجمه وبصمته ومخزنه وعدّاداته',
+  backupRows.every(
+    (row) =>
+      ['platform', 'tenant'].includes(row.scope) &&
+      ['running', 'succeeded', 'failed'].includes(row.status) &&
+      ['object-storage', 'filesystem'].includes(row.store) &&
+      Number.isInteger(row.tables) &&
+      Number.isInteger(row.rows) &&
+      (row.checksum === null || /^[0-9a-f]{64}$/.test(row.checksum)),
+  ),
+);
+const backupBadFilter = await refused(
+  'get',
+  '/platform/backups?filter[state]=succeeded',
+  undefined,
+  ownerToken,
+);
+check('ومرشّحٌ غير مسموح يُرفض 400', backupBadFilter.status === 400, `HTTP ${backupBadFilter.status}`);
+
+const retention = await get('/platform/retention');
+check(
+  'وسياسة الاحتفاظ تُقرأ بنوافذها الخمس وافتراضاتها',
+  [
+    'auditArchiveDays',
+    'artifactRetentionDays',
+    'idempotencyPurgeDays',
+    'outboxPurgeDays',
+    'fileOrphanPurgeDays',
+  ].every((key) => Number.isInteger(retention.policy?.[key]) && Number.isInteger(retention.defaults?.[key])),
+  Object.entries(retention.policy ?? {})
+    .map(([key, value]) => `${key}=${value}`)
+    .join(' '),
+);
+check(
+  'ومعها عدّادات ما سيطاله التنفيذ',
+  ['idempotencyExpired', 'outboxPurgeable', 'fileOrphans', 'artifactsExpired', 'auditArchivable'].every(
+    (key) => Number.isInteger(retention.purges?.[key]),
+  ),
+);
+check('والمحو النهائي للتدقيق ممنوعٌ ومُعلَن', retention.auditHardDeleteAllowed === false);
+
+const dataRequests = await get('/platform/data-requests?limit=20');
+check('وطلبات البيانات تُقرأ', Array.isArray(dataRequests), `${dataRequests.length} طلباً`);
+check(
+  'وكل طلبٍ بنوعه وحالته وصاحبه',
+  dataRequests.every(
+    (row) =>
+      ['export', 'erase'].includes(row.kind) &&
+      ['pending', 'approved', 'rejected', 'completed', 'cancelled'].includes(row.status) &&
+      typeof row.subjectEmail === 'string',
+  ),
+);
+
+// رمز العميل لا يفتح سطح النسخ، والمشغّل يمرّ — والفصل هنا على النهايات لا على الأزرار.
+const backupsAsClient = await refused('get', '/platform/backups', undefined, demoToken);
+check('ورمز العميل لا يرى النسخ (403)', backupsAsClient.status === 403, `HTTP ${backupsAsClient.status}`);
+const retentionAsClient = await refused('get', '/platform/retention', undefined, demoToken);
+check('ولا سياسة الاحتفاظ (403)', retentionAsClient.status === 403, `HTTP ${retentionAsClient.status}`);
+const requestsAsClient = await refused('get', '/platform/data-requests', undefined, demoToken);
+check('ولا طلبات البيانات (403)', requestsAsClient.status === 403, `HTTP ${requestsAsClient.status}`);
+check(
+  'ورموز النسخ عند المالك والعمليات وحدهما',
+  (roles.find((role) => role.code === 'platform_owner')?.permissions ?? []).includes(
+    'console.backups.manage',
+  ) &&
+    (roles.find((role) => role.code === 'platform_operations')?.permissions ?? []).includes(
+      'console.backups.manage',
+    ) &&
+    ['platform_auditor', 'platform_support', 'platform_billing'].every(
+      (code) =>
+        !(roles.find((role) => role.code === code)?.permissions ?? []).includes('console.backups.manage'),
+    ),
+);
+
+console.log('\n■ 21. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);

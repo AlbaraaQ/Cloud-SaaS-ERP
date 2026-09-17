@@ -42,6 +42,9 @@ const CONSOLE_ROUTES = [
   '/impersonation',
   // P-C9 — العمليات: المهام صار لها فعلان، والصحة تقرأ مجسّاتٍ مفصَّلة، والملفات شاشةٌ جديدة.
   '/files',
+  // P-C10 — البيانات والاسترجاع: النسخ والاحتفاظ في شاشة، وطلبات البيانات في أخرى.
+  '/backups',
+  '/data-requests',
 ];
 
 function pageFileFor(href: string): string {

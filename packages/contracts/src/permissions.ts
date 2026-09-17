@@ -337,6 +337,13 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
     'console.notifications.manage',
     'Write, target and publish platform announcements, and read their delivery.',
   ),
+  // P-C10 — البيانات والاسترجاع: تشغيل النسخ والتحقّق منها، وكتابة سياسة الاحتفاظ،
+  // وتنفيذ طلبات تصدير/محو البيانات الشخصية. رمزٌ واحد للثلاثة لأنها عملٌ واحد:
+  // «من يملك النسخة يملك ما فيها»، ولا معنى لفصل قراءة النسخة عن إعادة كتابة السياسة.
+  perm(
+    'console.backups.manage',
+    'Run and verify platform backups, set the retention policy, and execute data export or erasure requests.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

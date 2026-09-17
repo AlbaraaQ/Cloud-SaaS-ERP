@@ -9,6 +9,7 @@ export * from './usage.js';
 export * from './email.js';
 export * from './announcements.js';
 export * from './support.js';
+export * from './backups.js';
 export * from './files.js';
 export * from './operations.js';
 export * from './jobs.js';

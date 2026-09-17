@@ -16,6 +16,13 @@ import { describe, expect, it } from 'vitest';
  * scan below is the "صفر مسار `/platform/*` بلا رمز `console.*`" acceptance gate of
  * `docs/roadmap/PLATFORM_CONSOLE_PLAN.md` §4 — a route that drops the decorator fails the
  * suite, not a review.
+ *
+ * ولهذه القاعدة استثناءٌ واحد مكتوبٌ بالاسم لا بالنيّة (P-C10): **نهايتا المحتوى الموقّعتان**
+ * (`GET /platform/backups/:id/content` و`GET /platform/data-requests/exports/:artifactId`)
+ * تعملان بلا رمز حامل، لأن التصريح فيهما هو **التوقيع** لا الجلسة — وهذا هو نفسه قرار
+ * `/files/:id/content` في مسار الملفات: تطبيقٌ يفتح رابطاً في تبويبٍ جديد لا يستطيع أن يحمل
+ * رمزاً. ولذلك يُطالب هذا الاختبار بأن يكون لكل مسارٍ عامّ بهذا الشكل سطرٌ في القائمة أدناه
+ * **وأن يُتحقّق توقيعه فعلاً** (`verifyDownloadToken`) — فإضافة `@Public()` عارية تُسقط البوابة.
  */
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +37,23 @@ function sourceFiles(dir: string): string[] {
 }
 
 const controllers = sourceFiles(srcDir).filter((file) => file.endsWith('.controller.ts'));
+
+/**
+ * المسارات العامة المشروعة تحت `/platform`: تُفتح بـ**قدرةٍ موقّعة** لا بجلسة.
+ *
+ * القائمة صريحة عمداً (لا استثناءٌ أعمى لكل `@Public()`)، والمفتاح هو النصّ نفسه الذي
+ * يُبنى منه الفشل: `Get <path> (<file>)` — فمساراتٌ جديدة لا تُقبل صامتة.
+ */
+const SIGNED_CAPABILITY_ROUTES: ReadonlyArray<{ key: string; signatureCheck: string }> = [
+  {
+    key: 'Get backups/:id/content (modules/backups/platform-backups.controller.ts)',
+    signatureCheck: 'verifyDownloadToken',
+  },
+  {
+    key: 'Get data-requests/exports/:artifactId (modules/backups/platform-backups.controller.ts)',
+    signatureCheck: 'verifyDownloadToken',
+  },
+];
 
 /**
  * Comments out of the way first: the guard's own docstring contains the literal
@@ -121,20 +145,29 @@ describe('permission codes used by controllers', () => {
 
     const unprotected: string[] = [];
     let routes = 0;
+    let signedRoutes = 0;
 
     for (const file of platformControllers) {
       const source = stripComments(readFileSync(file, 'utf8'));
       for (const route of routesOf(source)) {
         routes += 1;
+        const key = `${route.method} ${route.path} (${file.slice(srcDir.length + 1)})`;
         const block = decoratorBlockAfter(source, route.index);
-        if (!/@RequiresPlatformRole\('console\.[^']+'\)/.test(block)) {
-          unprotected.push(`${route.method} ${route.path} (${file.slice(srcDir.length + 1)})`);
+        if (/@RequiresPlatformRole\('console\.[^']+'\)/.test(block)) continue;
+
+        // مسارٌ عامّ يُقبل **إن كان مُعلَناً هنا** ويُتحقّق من توقيعه بنفسه.
+        const declared = SIGNED_CAPABILITY_ROUTES.find((entry) => entry.key === key);
+        if (declared && /@Public\(\)/.test(block) && source.includes(declared.signatureCheck)) {
+          signedRoutes += 1;
+          continue;
         }
+        unprotected.push(key);
       }
     }
 
     // 17 legacy routes + 5 console routes; the guard is about coverage, not the count.
     expect(routes).toBeGreaterThanOrEqual(20);
+    expect(signedRoutes).toBe(SIGNED_CAPABILITY_ROUTES.length);
     expect(unprotected).toEqual([]);
   });
 });

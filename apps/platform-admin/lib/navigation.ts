@@ -163,6 +163,25 @@ export const consoleGroups: readonly ConsoleGroup[] = [
       item('jobs', 'المهام والطوابير', 'Jobs', '/jobs', 'console.jobs.view', 'GET /platform/jobs'),
       item('health', 'الصحة', 'Health', '/health', 'console.health.view', 'GET /platform/health/detailed'),
       item('files', 'الملفات', 'Files', '/files', 'console.jobs.view', 'GET /platform/files'),
+      // P-C10 — «البيانات والاسترجاع»: نسخةٌ لها حجمٌ وبصمة ومكان، وسياسةُ احتفاظٍ تُنفَّذ،
+      // وطلبات بياناتٍ لشخصٍ بعينه. ورُفعت شاشتان لا شاشة: للمحو فعلٌ لا رجعة فيه، ويستحق
+      // صفَّه وسببه وحقل تأكيده بدل أن يُخلط مع جدولة النسخ.
+      item(
+        'backups',
+        'البيانات والنسخ',
+        'Backups',
+        '/backups',
+        'console.backups.manage',
+        'GET /platform/backups',
+      ),
+      item(
+        'data-requests',
+        'طلبات البيانات',
+        'Data requests',
+        '/data-requests',
+        'console.backups.manage',
+        'GET /platform/data-requests',
+      ),
     ],
   },
   {
