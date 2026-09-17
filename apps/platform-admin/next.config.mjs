@@ -32,6 +32,9 @@ const nextConfig = {
     return [
       { source: '/api/v1/:path*', destination: `${apiTarget}/api/v1/:path*` },
       { source: '/api/health/:path*', destination: `${apiTarget}/health/:path*` },
+      // P-C11 — مستكشف الـAPI يقرأ وثيقة OpenAPI وواجهة Swagger من نفس الأصل، فلا حاجة
+      // لفتح منفذ الـAPI في المتصفّح ولا لضبط CORS على مسارٍ للتوثيق.
+      { source: '/api/docs/:path*', destination: `${apiTarget}/api/docs/:path*` },
     ];
   },
   async headers() {

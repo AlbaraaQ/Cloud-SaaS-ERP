@@ -32,6 +32,10 @@ export const errorCodes = {
   MFA_REQUIRED: 'MFA_REQUIRED',
   // P-C5 — a tenant wrote past a limit that an operator had set (metric in the details).
   USAGE_LIMIT_REACHED: 'USAGE_LIMIT_REACHED',
+  // P-C11 — a state transition the current state forbids: rotate a revoked API key,
+  // revoke one twice, or retry a delivery that already succeeded. 409, not 400: the
+  // request was well-formed and the resource exists — it is its state that refuses.
+  INVALID_STATE: 'INVALID_STATE',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -67,6 +71,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   ACCOUNT_PROFILE_MISSING: 422,
   MFA_REQUIRED: 401,
   USAGE_LIMIT_REACHED: 409,
+  INVALID_STATE: 409,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -96,6 +101,7 @@ export const errorTitle: Record<ErrorCode, string> = {
   ACCOUNT_PROFILE_MISSING: 'Posting profile missing',
   MFA_REQUIRED: 'Verification code required',
   USAGE_LIMIT_REACHED: 'Usage limit reached',
+  INVALID_STATE: 'Invalid state transition',
 };
 
 export function statusForCode(code: string): number {

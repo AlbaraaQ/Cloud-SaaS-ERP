@@ -45,6 +45,10 @@ const CONSOLE_ROUTES = [
   // P-C10 — البيانات والاسترجاع: النسخ والاحتفاظ في شاشة، وطلبات البيانات في أخرى.
   '/backups',
   '/data-requests',
+  // P-C11 — بوابة المطوّر: المفاتيح، والويب هوك، ومستكشف الـAPI.
+  '/api-keys',
+  '/webhooks',
+  '/api-explorer',
 ];
 
 function pageFileFor(href: string): string {

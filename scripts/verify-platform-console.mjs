@@ -9,7 +9,7 @@
  *   1. 🔐 الجلسة والصلاحيات — ما يقوله `/me` لمشغّل المنصة ولغيره
  *   2. 🗺️ المسارات — كل مسار `/platform/*` يعمل للمالك
  *   3. 🚫 الأبواب المغلقة — جلسة مستأجر لا تصل إلى اللوحة
- *   4. 👥 الأدوار والرموز — الأدوار الخمسة، والرموز الخمسة عشر (آخرها رمزا البريد P-C6)
+ *   4. 👥 الأدوار والرموز — الأدوار الخمسة، والرموز العشرون (آخرها رمزا المطوّر P-C11)
  *   5. ⚙️ إعدادات المنصة — قراءة، كتابة، تدقيق، رفض، واستعادة
  *   6. 📜 التدقيق العابر للمستأجرين — بلا حدود منشأةٍ واحدة
  *   7. 🔎 البحث الشامل — Ctrl+K على الرمز والاسم العربي
@@ -26,7 +26,8 @@
  *  18. 🎧 مكتب الدعم — الصندوق وسجلّ الدخول المؤقّت (P-C8)
  *  19. 🛠️ العمليات — الطابور والصحة والملفات (P-C9)
  *  20. 💾 البيانات والاسترجاع — النسخ والاحتفاظ وطلبات البيانات (P-C10)
- *  21. 🧹 التنظيف — الحالة تعود كما كانت
+ *  21. 🔑 بوّابة المطوّر — مفتاحٌ يعمل، وعنوانٌ يستقبل بتوقيعٍ يُتحقَّق منه (P-C11)
+ *  22. 🧹 التنظيف — الحالة تعود كما كانت
  *
  * Re-runnable and non-destructive: the settings are snapshotted before anything is written
  * and restored at the end, and the temporary platform role granted in §8 is revoked in §10.
@@ -53,6 +54,9 @@
  * الذي يكتب حدّاً ويعيد «قيمته السابقة» يترك خلفه حدّاً مطبَّقاً. القسم ٥ يكتب `billing.tax_rate`.
  * Usage: node scripts/verify-platform-console.mjs
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createServer } from 'node:http';
+
 import { loadEnvFiles } from './dotenv.mjs';
 
 loadEnvFiles();
@@ -218,15 +222,15 @@ check(
 const ownerRole = roles.find((role) => role.code === 'platform_owner');
 const operationsRole = roles.find((role) => role.code === 'platform_operations');
 check(
-  'مالك المنصة يحمل الرموز الثمانية عشر',
-  ownerRole.permissions.length === 18,
+  'مالك المنصة يحمل الرموز العشرين',
+  ownerRole.permissions.length === 20,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 18, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 20, `${registry.length} رمزاً`);
 check(
   'والمفتاح الجديد فيه',
   registry.some((entry) => entry.code === 'console.settings.manage'),
@@ -238,6 +242,17 @@ check(
 check(
   'ورمز النسخ (P-C10) في السجل أيضاً',
   registry.some((entry) => entry.code === 'console.backups.manage'),
+);
+check(
+  'ورمزا المطوّر (P-C11) في السجل، وعند المالك والتشغيل وحدهما',
+  registry.some((entry) => entry.code === 'console.apikeys.manage') &&
+    registry.some((entry) => entry.code === 'console.webhooks.manage') &&
+    ownerRole.permissions.includes('console.apikeys.manage') &&
+    operationsRole.permissions.includes('console.webhooks.manage') &&
+    !(roles.find((role) => role.code === 'platform_support')?.permissions ?? []).includes(
+      'console.apikeys.manage',
+    ),
+  'الاعتماد لا يُنشئه الدعم',
 );
 
 // ════════════════════════════════════════════════ 5. ⚙️ إعدادات المنصة
@@ -1364,7 +1379,168 @@ check(
     ),
 );
 
-console.log('\n■ 21. 🧹 التنظيف');
+// ═════════════════════════════════════ 21. 🔑 بوابة المطوّر (P-C11)
+console.log('\n■ 21. 🔑 بوّابة المطوّر — مفتاحٌ يعمل، وعنوانٌ يستقبل بتوقيعٍ يُتحقَّق منه (P-C11)');
+const catalogue = await get('/platform/developer/catalogue');
+check(
+  'الكتالوج يعلن النطاقات والأحداث من الخادم نفسه',
+  catalogue.scopes.length >= 8 && catalogue.events.length >= 9,
+  `${catalogue.scopes.length} نطاقاً · ${catalogue.events.length} حدثاً`,
+);
+check(
+  'وصيغة التوقيع ونافذة القبول',
+  catalogue.signature.header === 'x-erp-signature' && catalogue.signature.toleranceSeconds === 300,
+  `${catalogue.signature.header} · ${catalogue.signature.toleranceSeconds}s`,
+);
+
+const devStamp = Date.now().toString(36);
+const devKey = await request(
+  'post',
+  `/platform/tenants/${demoId}/api-keys`,
+  { name: `تكامل اللوحة ${devStamp}`, scopes: ['invoices:read'] },
+  ownerToken,
+);
+check(
+  'مفتاحٌ يُصدر لعميلٍ بعينه ونصّه يُعاد مرّة واحدة',
+  typeof devKey.secret === 'string' && devKey.secret.startsWith('erp_live_'),
+  `${devKey.prefix} · ${devKey.scopes.join(',')}`,
+);
+const keyList = await get(`/platform/tenants/${demoId}/api-keys`);
+const keyRow = keyList.find((row) => row.id === devKey.id);
+check('وصفُّه في القائمة يقول نطاقاته وحالته', keyRow?.status === 'active' && keyRow?.scopes.length === 1);
+check(
+  'والقائمة لا تحمل النصّ الصريح',
+  !JSON.stringify(keyList).includes(devKey.secret),
+  'المحفوظ بادئةٌ وبصمة',
+);
+const keyMe = await request('get', '/integration/v1/me', undefined, devKey.secret);
+check(
+  'والمفتاح يعرّف نفسه من سطح التكامل',
+  keyMe.tenantId === demoId && keyMe.permissions.includes('sales.view'),
+  `${keyMe.tenantCode} · ${keyMe.permissions.length} صلاحية`,
+);
+const narrowKey = await request(
+  'post',
+  `/platform/tenants/${demoId}/api-keys`,
+  { name: `تقارير اللوحة ${devStamp}`, scopes: ['reporting:read'] },
+  ownerToken,
+);
+const deniedByScope = await refused('get', '/integration/v1/invoices?limit=1', undefined, narrowKey.secret);
+check(
+  'والنطاق سقفٌ: 403 على ما خارجه',
+  deniedByScope.status === 403,
+  `${deniedByScope.status} ${deniedByScope.code}`,
+);
+const rotated = await request(
+  'post',
+  `/platform/tenants/${demoId}/api-keys/${narrowKey.id}/rotate`,
+  { reason: 'تدوير في التحقّق الحيّ' },
+  ownerToken,
+);
+check('والتدوير يرث الاسم والنطاقات', rotated.name === narrowKey.name && rotated.secret !== narrowKey.secret);
+check(
+  'والقديم يسقط فوراً',
+  (await refused('get', '/integration/v1/me', undefined, narrowKey.secret)).status === 401,
+);
+
+// مستقبِل الويب هوك: يتحقّق من التوقيع بنفسه ويردّ 200.
+const hookState = { secret: '', body: '', valid: false, event: '', tenant: '' };
+const hookServer = createServer((req, res) => {
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk;
+  });
+  req.on('end', () => {
+    const raw = String(req.headers['x-erp-signature'] ?? '');
+    const match = /^t=(\d+),v1=([0-9a-f]+)$/.exec(raw);
+    if (match) {
+      const expected = createHmac('sha256', hookState.secret).update(`${match[1]}.${body}`).digest('hex');
+      hookState.valid =
+        expected.length === match[2].length &&
+        timingSafeEqual(Buffer.from(expected), Buffer.from(match[2]));
+    }
+    hookState.body = body;
+    hookState.event = String(req.headers['x-erp-event'] ?? '');
+    hookState.tenant = String(req.headers['x-erp-tenant'] ?? '');
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"ok":true}');
+  });
+});
+await new Promise((resolve) => hookServer.listen(0, '127.0.0.1', resolve));
+const hookPort = hookServer.address().port;
+
+const badHook = await refused(
+  'post',
+  `/platform/tenants/${demoId}/webhooks`,
+  { url: 'http://example.com/hooks', events: ['invoice.posted'] },
+  ownerToken,
+);
+check('عنوان http عامّ يُرفض', badHook.status === 400, `${badHook.status} ${badHook.code}`);
+const hook = await request(
+  'post',
+  `/platform/tenants/${demoId}/webhooks`,
+  {
+    url: `http://127.0.0.1:${hookPort}/hooks/${devStamp}`,
+    events: ['invoice.posted', 'invoice.paid'],
+    description: 'مستقبِل اللوحة الحيّ',
+  },
+  ownerToken,
+);
+hookState.secret = hook.secret;
+check(
+  'وعنوانٌ محلّي يُضاف بسرّ توقيعٍ يُعرض مرّة واحدة',
+  hook.secret.startsWith('whsec_') && hook.secretPrefix.length > 5,
+  hook.secretPrefix,
+);
+const testAttempt = await request('post', `/platform/webhooks/${hook.id}/test`, {}, ownerToken);
+check(
+  'وحدث الاختبار يصل فعلاً وبتوقيعٍ صحيح عند المستقبِل',
+  testAttempt.status === 'delivered' && testAttempt.responseCode === 200 && hookState.valid,
+  `${testAttempt.responseCode} · ${testAttempt.durationMs} ms · ${hookState.event} · توقيع صحيح=${hookState.valid}`,
+);
+check('ويحمل منشأة العميل', hookState.tenant === demoId);
+const deliveries = await get(`/platform/webhooks/${hook.id}/deliveries`);
+const deliveryRow = deliveries.find((row) => row.id === testAttempt.deliveryId);
+check(
+  'وسجلّ التسليم يقول الرمز والمحاولات ومفاتيح الحمولة',
+  deliveryRow?.responseCode === 200 && deliveryRow?.attempts === 1 && deliveryRow?.payloadKeys.length > 0,
+  `${deliveryRow?.event} · ${deliveryRow?.payloadKeys.join(',')}`,
+);
+// §8 يمنح حساب التجربة دور «تشغيل المنصة» مؤقّتاً ويسحبه في §22، ودور التشغيل يحمل رمز
+// العناوين. وهنا يظهر فرقٌ حقيقي: **الأدوار تُقرأ من الرمز لا من القاعدة** — فجلسةُ عميلٍ
+// أُصدرت قبل المنح تُردّ 403 وإن كان `/me` اليوم يقول إنه يحمل الرمز، وجلسةٌ أُصدرت بعده تمرّ.
+const clientConsoleCodes = (await get('/me', demoToken)).platformPermissions ?? [];
+const hooksAsClient = await refused('get', `/platform/tenants/${demoId}/webhooks`, undefined, demoToken);
+check(
+  'وجلسة عميلٍ أُصدرت قبل منح الدور لا تفتح العناوين (403)',
+  hooksAsClient.status === 403,
+  `HTTP ${hooksAsClient.status} · /me يقول ${clientConsoleCodes.length} رمزاً للحساب`,
+);
+const hooksAsOperator = await refused('get', `/platform/tenants/${demoId}/webhooks`, undefined, limitedToken);
+check(
+  'وجلسةٌ أُصدرت بعد المنح تفتحها (200) لأن دورها يحمل رمزها',
+  hooksAsOperator.status === 200,
+  `HTTP ${hooksAsOperator.status}`,
+);
+
+// تنظيف القسم: العنوان يُحذف والمفاتيح تُبطَل — والتدقيق يبقى أثراً.
+await request('delete', `/platform/tenants/${demoId}/webhooks/${hook.id}`, { reason: 'تنظيف التحقّق الحيّ' }, ownerToken);
+await request('delete', `/platform/tenants/${demoId}/api-keys/${devKey.id}`, { reason: 'تنظيف التحقّق الحيّ' }, ownerToken);
+await request('delete', `/platform/tenants/${demoId}/api-keys/${rotated.id}`, { reason: 'تنظيف التحقّق الحيّ' }, ownerToken);
+await new Promise((resolve) => hookServer.close(resolve));
+const auditAfterDeveloper = await get('/platform/audit?limit=100');
+const developerActions = new Set(
+  auditAfterDeveloper.items.map((row) => row.action).filter((action) => String(action).startsWith('platform.api-key.')),
+);
+check(
+  'وأفعال المفاتيح في التدقيق بأسمائها',
+  developerActions.has('platform.api-key.create') &&
+    developerActions.has('platform.api-key.rotate') &&
+    developerActions.has('platform.api-key.revoke'),
+  [...developerActions].join(', '),
+);
+
+console.log('\n■ 22. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);

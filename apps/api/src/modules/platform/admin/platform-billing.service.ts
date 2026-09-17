@@ -63,6 +63,7 @@ import {
 import { DATABASE_HANDLE } from '../../../database/database.tokens.js';
 import { getAuthContext } from '../../../request-context/request-context.js';
 import { buildQrPayload } from '../../einvoicing/zatca/qr.js';
+import { WebhookPublisher } from '../../developer/webhook-publisher.service.js';
 import { AuditService } from '../../platform-services/audit/audit.service.js';
 
 /**
@@ -97,6 +98,8 @@ export class PlatformBillingService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly audit: AuditService,
+    // P-C11 — `subscription.*`: تغيّر الترخيص خبرُ العميل الأول، فيُعلَن.
+    private readonly webhooks: WebhookPublisher,
   ) {}
 
   // ================================================================== plans
@@ -382,7 +385,15 @@ export class PlatformBillingService {
     );
     const row = rows.rows[0];
     if (!row) throw new DomainError(errorCodes.INTERNAL, 'تعذّر قراءة الترخيص بعد الإصدار', 500);
-    return this.subscriptionView(row);
+    const granted = this.subscriptionView(row);
+    void this.webhooks.emit('subscription.activated', granted.tenantId, {
+      subscriptionId: granted.id,
+      planCode: granted.planCode,
+      status: granted.status,
+      currentPeriodEnd: granted.currentPeriodEnd,
+      trialEndsAt: granted.trialEndsAt,
+    });
+    return granted;
   }
 
   /**
@@ -580,6 +591,15 @@ export class PlatformBillingService {
       };
     });
 
+    void this.webhooks.emit('subscription.plan_changed', result.subscription.tenantId, {
+      subscriptionId: result.subscription.id,
+      planCode: result.subscription.planCode,
+      status: result.subscription.status,
+      currentPeriodEnd: result.subscription.currentPeriodEnd,
+      prorationNet: result.proration.net,
+      invoiceId: result.invoiceId,
+      invoiceKind: result.invoiceKind,
+    });
     return {
       subscription: result.subscription,
       proration: result.proration,
@@ -594,7 +614,7 @@ export class PlatformBillingService {
     subscriptionId: string,
     input: PlatformSubscriptionPause,
   ): Promise<PlatformSubscription> {
-    return this.transition(subscriptionId, {
+    const paused = await this.transition(subscriptionId, {
       action: billingAuditActions.SUBSCRIPTION_PAUSE,
       reason: input.reason,
       allowed: ['trialing', 'active', 'past_due'],
@@ -605,6 +625,14 @@ export class PlatformBillingService {
          WHERE id = ${subscriptionId}
       `),
     });
+    // P-C11 — الإيقاف قرارٌ يمسّ عمل العميل اليوم، فيُعلَن بسببه لا يُكتشف عند أول رفض.
+    void this.webhooks.emit('subscription.suspended', paused.tenantId, {
+      subscriptionId: paused.id,
+      status: paused.status,
+      reason: input.reason,
+      pausedAt: paused.pausedAt,
+    });
+    return paused;
   }
 
   /**
@@ -923,11 +951,13 @@ export class PlatformBillingService {
 
       const remaining =
         platformParseAmount(String(current.total)) - platformParseAmount(String(current.paid_amount));
-      const amount = input.amount ? platformParseAmount(input.amount) : remaining;
-      if (amount <= 0n) {
+      // الاسم `collected` لا `amount`: القيمة bigint بأصغر وحدة نقدية، والاسم `amount`
+      // محجوز في حرس المال على `number` (PROJECT_CONTRACT §3) فيُلبِس القارئ.
+      const collected = input.amount ? platformParseAmount(input.amount) : remaining;
+      if (collected <= 0n) {
         throw new DomainError(errorCodes.VALIDATION_FAILED, 'المبلغ يجب أن يكون أكبر من صفر', 422);
       }
-      if (amount > remaining) {
+      if (collected > remaining) {
         throw new DomainError(
           errorCodes.VALIDATION_FAILED,
           `المبلغ يتجاوز المتبقّي (${platformFormatAmount(remaining)})`,
@@ -941,7 +971,7 @@ export class PlatformBillingService {
           (id, invoice_id, tenant_id, method, amount, reference, receipt_file_id, status,
            received_at, recorded_by, note)
         VALUES (${newId()}, ${invoiceId}, ${String(current.tenant_id)}, ${input.method},
-                ${platformFormatAmount(amount)}, ${input.reference ?? null}, ${input.receiptFileId ?? null},
+                ${platformFormatAmount(collected)}, ${input.reference ?? null}, ${input.receiptFileId ?? null},
                 'recorded', COALESCE(${input.receivedAt ?? null}::timestamptz, now()), ${auth.userId},
                 ${input.note ?? null})
       `);
@@ -978,7 +1008,7 @@ export class PlatformBillingService {
         meta: {
           scope: 'platform_console',
           receiptFileId: input.receiptFileId ?? null,
-          partial: platformFormatAmount(amount) !== String(after.total),
+          partial: platformFormatAmount(collected) !== String(after.total),
         },
       });
     });

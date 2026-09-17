@@ -2,6 +2,7 @@ export * from './platform.js';
 export * from './tenancy.js';
 export * from './operations.js';
 export * from './backups.js';
+export * from './developer.js';
 export * from './platform-services.js';
 export * from './organization.js';
 export * from './catalog.js';

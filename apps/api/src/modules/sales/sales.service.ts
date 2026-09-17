@@ -25,6 +25,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
+import { WebhookPublisher } from '../developer/webhook-publisher.service.js';
 import { UsageService } from '../usage/index.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { InventoryService, type InventoryLine } from '../inventory/inventory.service.js';
@@ -162,6 +163,8 @@ export class SalesService {
     private readonly sequences: SequencesService,
     private readonly profiles: PostingProfilesService,
     private readonly usage: UsageService,
+    // P-C11 — الإعلان عن الأحداث يُحقن ولا يُستورَد: الوحدة تُصرّح بتبعيّتها في موديولها.
+    private readonly webhooks: WebhookPublisher,
   ) {}
 
   async list(tenantId: string) {
@@ -342,7 +345,21 @@ export class SalesService {
     const posted = await withTenantTx(this.database.db, tenantId, (tx) =>
       this.postInTx(tx, tenantId, id, posting),
     );
-    return posted ?? this.get(tenantId, id);
+    const invoice = posted ?? (await this.get(tenantId, id));
+    // P-C11 — `invoice.posted` يُعلَن **بعد** نجاح المعاملة: الحدث يقول ما جرى لا ما نُوي
+    // فعله. و`void` مقصود: الإعلان لا يوقف الصدور — عنوانٌ معطّل عند العميل ليس سبباً لرفض
+    // فاتورة. والفشل مسجَّل في سجلّ التسليم حيث يُقرأ.
+    void this.webhooks.emit('invoice.posted', tenantId, {
+      invoiceId: invoice.id,
+      number: invoice.number,
+      kind: invoice.kind,
+      status: invoice.status,
+      total: invoice.total,
+      currency: invoice.currency,
+      partyId: invoice.partyId,
+      branchId: invoice.branchId,
+    });
+    return invoice;
   }
 
   /**
@@ -930,7 +947,16 @@ export class SalesService {
           ),
         );
     });
-    return this.get(tenantId, id);
+    const voided = await this.get(tenantId, id);
+    void this.webhooks.emit('invoice.voided', tenantId, {
+      invoiceId: voided.id,
+      number: voided.number,
+      reason,
+      total: voided.total,
+      currency: voided.currency,
+      partyId: voided.partyId,
+    });
+    return voided;
   }
 
   async addPayment(tenantId: string, invoiceId: string, input: PaymentInput) {
@@ -947,6 +973,12 @@ export class SalesService {
       !input.cashLocationId
     )
       throw new DomainError('CASH_LOCATION_REQUIRED', 'Cash payments require a cash location', 422);
+    // يُقال صراحةً: هل كتب هذا النداء دفعةً جديدة أم أعاد صفاً موجوداً؟ فالإعلان عن
+    // `invoice.paid` عند إعادة الإرسال بنفس مفتاح الالتزام يُضاعف أثر الحدث عند المستلم.
+    let recorded = false;
+    let paymentId = '';
+    let paymentMethod: string = input.method;
+    let paymentAmount: string = input.amount;
     const result = await withTenantTx(this.database.db, tenantId, async (tx) => {
       const [existing] = await tx
         .select()
@@ -982,8 +1014,27 @@ export class SalesService {
           updatedAt: new Date(),
         })
         .where(and(eq(salesInvoices.tenantId, tenantId), eq(salesInvoices.id, invoiceId)));
+      recorded = true;
+      paymentId = payment?.id ?? '';
+      paymentMethod = payment?.method ?? input.method;
+      paymentAmount = payment?.amount ?? input.amount;
       return payment;
     });
+    // `invoice.paid` تعني «سُدِّدت» لا «وصلت دفعة»: تُعلَن عند تمام السداد وحده. والدفعات
+    // الجزئية مقروءةٌ من حالة الفاتورة (`partial`) — وحدثٌ يتكرّر مع كل دفعة يجعل المستلم
+    // يعيد بناء حالته مراراً على معلومة ناقصة.
+    if (recorded && money(invoice.paidTotal).plus(paymentValue).gte(money(invoice.total))) {
+      void this.webhooks.emit('invoice.paid', tenantId, {
+        invoiceId,
+        paymentId,
+        method: paymentMethod,
+        amount: paymentAmount,
+        paidTotal: money(invoice.paidTotal).plus(paymentValue).toFixed(4),
+        total: invoice.total,
+        currency: invoice.currency,
+        partyId: invoice.partyId,
+      });
+    }
     return result;
   }
 

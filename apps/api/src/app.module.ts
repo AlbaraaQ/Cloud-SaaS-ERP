@@ -19,6 +19,7 @@ import {
   TenantGuard,
 } from './modules/platform/index.js';
 import { PlatformBackupsModule } from './modules/backups/platform-backups.module.js';
+import { DeveloperModule } from './modules/developer/developer.module.js';
 import { PlatformOperationsModule } from './modules/operations/platform-operations.module.js';
 import { ImpersonationGuard } from './modules/support/impersonation.guard.js';
 import { PlatformAdminModule } from './modules/platform/admin/platform-admin.module.js';
@@ -84,6 +85,7 @@ import { OpsModule } from './ops/ops.module.js';
     DatabaseModule,
     OpsModule,
     PlatformBackupsModule,
+    DeveloperModule,
     PlatformOperationsModule,
     DomainEventsModule,
     PlatformModule,

@@ -90,6 +90,10 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-C10: the backups, the retention windows and a data-subject request are the
       // platform's own obligations — the owner answers for them.
       'console.backups.manage',
+      // P-C11: an integration credential and an outbound webhook are the platform's
+      // standing promises to a customer — the owner answers for both.
+      'console.apikeys.manage',
+      'console.webhooks.manage',
     ],
   },
   {
@@ -112,6 +116,10 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-C10: running tonight's backup and keeping the retention windows are ops work.
       // The auditor and the billing/support desks do not get it: it erases bytes and identities.
       'console.backups.manage',
+      // P-C11: تكاملُ العميل عملُ تشغيلٍ يوميّ (مفتاحٌ تعطّل، أو عنوانٌ توقّف عن الإجابة).
+      // ولا يُعطى للدعم: الدعم يتكلّم مع العميل في التذكرة، لا يُنشئ له اعتماداً.
+      'console.apikeys.manage',
+      'console.webhooks.manage',
     ],
   },
   {

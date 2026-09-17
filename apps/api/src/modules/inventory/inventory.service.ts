@@ -32,6 +32,7 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { AccountingService } from '../accounting/accounting.service.js';
+import { WebhookPublisher } from '../developer/webhook-publisher.service.js';
 import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
 import { getRequestContext } from '../../request-context/request-context.js';
 import { SequencesService } from '../platform-services/index.js';
@@ -112,6 +113,8 @@ export class InventoryService {
     private readonly sequences: SequencesService,
     private readonly accounting: AccountingService,
     private readonly profiles: PostingProfilesService,
+    // P-C11 — `stock.below_reorder`: نقصُ المخزون خبرٌ يُعلَن عند وقوعه لا عند الجرد.
+    private readonly webhooks: WebhookPublisher,
   ) {}
 
   /**
@@ -162,7 +165,60 @@ export class InventoryService {
   }
 
   async record(tenantId: string, lines: InventoryLine[]) {
-    return withTenantTx(this.database.db, tenantId, (tx) => this.recordInTx(tx, tenantId, lines));
+    const created = await withTenantTx(this.database.db, tenantId, (tx) => this.recordInTx(tx, tenantId, lines));
+    // P-C11 — الفحص **بعد** نجاح المعاملة: نقرأ رصيداً مثبَّتاً لا رصيداً داخل معاملةٍ بعد.
+    await this.announceBelowReorder(tenantId, lines);
+    return created;
+  }
+
+  /**
+   * `stock.below_reorder` — يُعلَن لصنفٍ هبط إلى حدّه الأدنى أو دونه.
+   *
+   * وثلاثة شروط تُقرأ من الكود نفسه: أن يكون للصنف حدٌّ أدنى (`min_qty > 0`) — فصنفٌ بلا حدّ
+   * لا «يخالف» حدّاً؛ وأن يكون الرصيد قد بلغه فعلاً (`quantity <= min_qty`)؛ وأن تُقرأ القيم
+   * من القاعدة بعد الالتزام لا من الطلب (فالطلب يقول ما طُلب، والقاعدة تقول ما استقرّ).
+   *
+   * ويُعلَن عن كل (صنف، مخزن) مرّةً في النداء — لا مرّةً لكل سطر: حركةٌ من خمسة أسطر على
+   * الصنف نفسه خبرٌ واحد.
+   */
+  private async announceBelowReorder(tenantId: string, lines: InventoryLine[]): Promise<void> {
+    const pairs = new Map<string, { itemId: string; warehouseId: string }>();
+    for (const line of lines) {
+      pairs.set(`${line.itemId}:${line.warehouseId}`, { itemId: line.itemId, warehouseId: line.warehouseId });
+    }
+    for (const pair of pairs.values()) {
+      const row = await withTenantTx(this.database.db, tenantId, async (tx) => {
+        const [found] = await tx
+          .select({
+            quantity: stockBalances.quantity,
+            minQty: items.minQty,
+            sku: items.sku,
+            nameAr: items.nameAr,
+          })
+          .from(stockBalances)
+          .innerJoin(items, eq(items.id, stockBalances.itemId))
+          .where(
+            and(
+              eq(stockBalances.tenantId, tenantId),
+              eq(stockBalances.itemId, pair.itemId),
+              eq(stockBalances.warehouseId, pair.warehouseId),
+            ),
+          )
+          .limit(1);
+        return found;
+      });
+      if (!row) continue;
+      if (new Decimal(row.minQty).lte(0)) continue;
+      if (new Decimal(row.quantity).gt(row.minQty)) continue;
+      void this.webhooks.emit('stock.below_reorder', tenantId, {
+        itemId: pair.itemId,
+        warehouseId: pair.warehouseId,
+        sku: row.sku,
+        nameAr: row.nameAr,
+        quantity: row.quantity,
+        minQty: row.minQty,
+      });
+    }
   }
 
   /**

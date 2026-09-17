@@ -611,8 +611,8 @@ describe('platform billing (P-C4)', () => {
     const draft = await asOwner('post', INVOICES, { subscriptionId: subscription.id, reason: 'فاتورة للتحصيل' });
     const document = draft.body.data as PlatformInvoice;
     const issued = await asOwner('post', `${INVOICES}/${document.id}/issue`, { dueInDays: 10 });
-    const total = Number((issued.body.data as PlatformInvoice).total);
-    expect(total).toBe(228.85);
+    const billed = Number((issued.body.data as PlatformInvoice).total);
+    expect(billed).toBe(228.85);
 
     const partial = await asOwner('post', `${INVOICES}/${document.id}/pay`, {
       method: 'bank_transfer',

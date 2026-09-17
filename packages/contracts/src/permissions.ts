@@ -344,6 +344,14 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
     'console.backups.manage',
     'Run and verify platform backups, set the retention policy, and execute data export or erasure requests.',
   ),
+  // P-C11 — بوابة المطوّر: مفتاح الـAPI هو **هويّة** تُنشأ لمستأجر، وويب هوك هو **وعدٌ
+  // بتسليم**. رمزان لا رمز، لأن الأول يمنح وصولاً والثاني يُرسل بياناتٍ خارج المنصة —
+  // ومن يملك الثاني لا يلزمه الأول (فريقٌ يضبط التكامل ثم يسلّم المفتاح لغيره).
+  perm('console.apikeys.manage', 'Issue, rotate and revoke tenant API keys, and read their last use.'),
+  perm(
+    'console.webhooks.manage',
+    'Create and edit tenant webhook endpoints, send a test event, and retry a failed delivery.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

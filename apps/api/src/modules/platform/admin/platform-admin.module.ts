@@ -4,6 +4,7 @@ import { AnnouncementsModule } from '../../announcements/announcements.module.js
 import { SupportModule } from '../../support/support.module.js';
 import { OrganizationModule } from '../../organization/organization.module.js';
 import { PlatformModule } from '../platform.module.js';
+import { DeveloperModule } from '../../developer/developer.module.js';
 
 import { PlatformAdminController } from './platform-admin.controller.js';
 import { PlatformAdminService } from './platform-admin.service.js';
@@ -25,7 +26,7 @@ import { SignupController } from './signup.controller.js';
  * one-directional here avoids a module cycle.
  */
 @Module({
-  imports: [PlatformModule, OrganizationModule, AnnouncementsModule, SupportModule],
+  imports: [PlatformModule, OrganizationModule, AnnouncementsModule, SupportModule, DeveloperModule],
   controllers: [
     PlatformAdminController,
     PlatformBillingController,

@@ -5,6 +5,7 @@ import { AccountingModule } from '../accounting/accounting.module.js';
 import { CatalogModule } from '../organization/catalog/catalog.module.js';
 import { OrganizationModule } from '../organization/organization.module.js';
 import { PlatformServicesModule } from '../platform-services/index.js';
+import { DeveloperModule } from '../developer/developer.module.js';
 
 import { InventoryController } from './inventory.controller.js';
 import { InventoryService } from './inventory.service.js';
@@ -14,7 +15,7 @@ import { WarehouseDocumentsController } from './warehouse-documents.controller.j
 import { WarehouseDocumentsService } from './warehouse-documents.service.js';
 
 @Module({
-  imports: [DatabaseModule, PlatformServicesModule, AccountingModule, OrganizationModule, CatalogModule],
+  imports: [DatabaseModule, PlatformServicesModule, AccountingModule, OrganizationModule, CatalogModule, DeveloperModule],
   controllers: [InventoryController, WarehouseDocumentsController, ProductionOrdersController],
   providers: [InventoryService, WarehouseDocumentsService, ProductionOrdersService],
   exports: [InventoryService, WarehouseDocumentsService, ProductionOrdersService],

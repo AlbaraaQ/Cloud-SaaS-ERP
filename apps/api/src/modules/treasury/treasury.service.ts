@@ -29,6 +29,7 @@ import {
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { AccountingService, type JournalLineInput } from '../accounting/accounting.service.js';
+import { WebhookPublisher } from '../developer/webhook-publisher.service.js';
 import { PostingProfilesService } from '../organization/posting-profiles/posting-profiles.service.js';
 import { SequencesService } from '../platform-services/index.js';
 
@@ -173,6 +174,8 @@ export class TreasuryService {
     private readonly accounting: AccountingService,
     private readonly sequences: SequencesService,
     private readonly profiles: PostingProfilesService,
+    // P-C11 — `shift.closed`: من ينتظر تقرير الوردية يعرف بغلاقها بلا أن يسأل.
+    private readonly webhooks: WebhookPublisher,
   ) {}
 
   /**
@@ -1369,7 +1372,7 @@ export class TreasuryService {
    * a cash refund shrinks the expected cash instead of inflating it.
    */
   async closeShift(tenantId: string, id: string, counts: ShiftCount[]) {
-    return withTenantTx(this.database.db, tenantId, async (tx) => {
+    const closed = await withTenantTx(this.database.db, tenantId, async (tx) => {
       const [shift] = await tx
         .select()
         .from(shiftCloses)
@@ -1493,6 +1496,16 @@ export class TreasuryService {
         );
       return { id, number: allocated.display, status: 'closed', summary };
     });
+    // P-C11 — بعد الإغلاق: الفرق بين المعدود والمتوقّع هو الخبر الذي يُعلَن.
+    const summary = closed.summary as Record<string, unknown>;
+    void this.webhooks.emit('shift.closed', tenantId, {
+      shiftId: closed.id,
+      number: closed.number,
+      countedCash: summary.countedCash ?? null,
+      diff: summary.diff ?? null,
+      closedAt: new Date().toISOString(),
+    });
+    return closed;
   }
   /**
    * 📒 قيد الإغلاق — `Class/EntryOper.cs` `BindCloseShiftToEntry`.

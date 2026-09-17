@@ -195,6 +195,34 @@ export const consoleGroups: readonly ConsoleGroup[] = [
       // يمسك المال. الرؤية `console.tenants.view` (كل مشغّل يرى استهلاك عملائه)، والتصدير
       // `console.billing.manage` (بيانٌ يذهب إلى الفوترة) — والاثنان من P-C1.
       item('usage', 'الاستخدام', 'Usage', '/usage', 'console.tenants.view', 'GET /platform/usage'),
+      // P-C11 — «بوابة المطوّر»: مفاتيحُ لكل منشأة، وعناوين ويب هوك بأحداثها وسجلّ تسليمها،
+      // ومستكشف OpenAPI. موضعها في مجموعة «المنصة» لا «التشغيل»: هذه عقودُ تكاملٍ تُمنح
+      // وتُسحب، لا حادثةٌ تشغيلية تُتابع. والرمز لكل شاشةٍ رمزُها: من يُصدر مفتاحاً ليس
+      // بالضرورة من يفتح عنواناً خارج المنصة.
+      item(
+        'api-keys',
+        'مفاتيح الـAPI',
+        'API keys',
+        '/api-keys',
+        'console.apikeys.manage',
+        'GET /platform/tenants/:id/api-keys',
+      ),
+      item(
+        'webhooks',
+        'الويب هوك',
+        'Webhooks',
+        '/webhooks',
+        'console.webhooks.manage',
+        'GET /platform/tenants/:id/webhooks',
+      ),
+      item(
+        'api-explorer',
+        'مستكشف الـAPI',
+        'API explorer',
+        '/api-explorer',
+        'console.apikeys.manage',
+        'GET /api/docs/openapi.json',
+      ),
       item('users', 'المستخدمون', 'Users', '/users', 'console.users.view', 'GET /platform/users'),
       item('roles', 'أدوار المنصة', 'Platform roles', '/roles', 'console.users.view', 'GET /platform/roles'),
       item(

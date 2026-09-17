@@ -24,8 +24,6 @@ import { platformSettingDefinitions, platformSettingScopesOf } from './console.j
  *      يختلف تقريب الضريبة بين السطحين.
  */
 
-/* eslint-disable no-restricted-syntax */
-
 // ------------------------------------------------------------------ vocabulary
 
 export const platformSubscriptionStatusSchema = z.enum([
@@ -407,8 +405,6 @@ export const platformPlanChangeResultSchema = z.object({
 });
 export type PlatformPlanChangeResult = z.infer<typeof platformPlanChangeResultSchema>;
 
-/* eslint-enable no-restricted-syntax */
-
 // ------------------------------------------------------------------ audit
 
 /**
@@ -716,8 +712,10 @@ function divideHalfUp(numerator: bigint, denominator: bigint): bigint {
 }
 
 /** المكافئ الشهري لباقة: الشهرية كما هي، والسنوية على اثني عشر. */
-export function platformMonthlyAmount(amount: string, interval: PlatformPlanInterval): string {
-  const units = platformParseAmount(amount);
+// واسم المعامل `sum` لا `amount`: القيمة نصٌّ عشريّ (والقاعدة تمنع `number` للمال)، لكن
+// حرس المال يطارد **الاسم** أيضاً — وتسميةٌ تُلبِس القارئ تُصحَّح لا تُستثنى.
+export function platformMonthlyAmount(sum: string, interval: PlatformPlanInterval): string {
+  const units = platformParseAmount(sum);
   if (interval === 'month') return platformFormatAmount(units);
   return platformFormatAmount(divideHalfUp(units, 12n));
 }

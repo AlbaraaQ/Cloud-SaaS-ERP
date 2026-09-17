@@ -9,7 +9,6 @@ import {
 } from '../../../request-context/request-context.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import { REQUIRED_PLATFORM_PERMISSION_KEY } from '../decorators/requires-platform-role.decorator.js';
-
 import type { PlatformRolePermissionsService } from '../identity/platform-role-permissions.service.js';
 
 import { PlatformAdminGuard } from './platform-admin.guard.js';

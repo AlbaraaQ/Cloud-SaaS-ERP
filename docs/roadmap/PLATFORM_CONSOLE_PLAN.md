@@ -63,7 +63,7 @@
 ├─ 9  مكتب الدعم + دخول مؤقّت   P-C8 ✅
 ├─ 10 العمليات (مهام · صحة · رايات · ملفات) P-C9
 ├─ 11 البيانات والاسترجاع       P-C10
-├─ 12 المطوّرون (مفاتيح · ويب هوكس) P-C11
+├─ 12 المطوّرون (مفاتيح · ويب هوكس) P-C11 ✅
 └─ 13 التحليلات                 P-C12
 ```
 
@@ -273,7 +273,7 @@
 | **ترحيل** | `0074_platform_backups.sql` — `backup_jobs` · `backup_artifacts` · `data_requests` (الرقم صُحِّح: 0072 لـP-C8 و0073 لـP-C9) |
 | **اختبار** | `platform-backups.spec.ts` (≥ 8)؛ والتحقّق الحيّ بـ`scripts/verify-platform-backups.mjs` |
 
-### P-C11 — بوابة المطوّر 🟢
+### P-C11 — بوابة المطوّر ✅
 
 | | |
 |---|---|
@@ -312,17 +312,18 @@
 | P-C8 الدعم والدخول المؤقّت ✅ | 🟡 | P-C1 | 14 منفَّذ | 591 منفَّذ (تراكمي) |
 | P-C9 العمليات ✅ | 🟠 | P-C1 | 12 منفَّذ | 678 منفَّذ (تراكمي) |
 | P-C10 البيانات والاسترجاع ✅ | 🟠 | P-C1 | 25 منفَّذ | 780 منفَّذ (تراكمي) |
-| P-C11 بوابة المطوّر | 🟢 | P-C1 | 10 | +25 |
+| P-C11 بوابة المطوّر ✅ | 🟢 | P-C1 | 16 منفَّذ | 861 منفَّذ (تراكمي) |
 | P-C12 التحليلات | 🟢 | P-C4 · P-C5 | 8 | +20 |
 
-**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد عشرة
-أجزاء: رقم `verify` التراكمي صار **780** نقطة في **87** قسماً (200/21 من
-`verify-platform-console.mjs` · **87/9 من `verify-platform-backups.mjs` (جديد)** · 76/9 من
+**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد أحد عشر
+جزءاً: رقم `verify` التراكمي صار **861** نقطة في **97** قسماً (218/22 من
+`verify-platform-console.mjs` · **63/9 من `verify-platform-developer.mjs` (جديد)** · 87/9 من
+`verify-platform-backups.mjs` · 76/9 من
 `verify-platform-operations.mjs` · 148/12 من
 `verify-platform-billing.mjs` · 85/11 من `verify-platform-usage.mjs` · 74/9 من
 `verify-platform-email.mjs` · 47/7 من `verify-platform-announcements.mjs` · 63/9 من
-`verify-platform-support.mjs`) والمجموع المنفَّذ من الاختبارات المخصّصة للأجزاء 183 اختباراً
-(20+23+21+23+13+21+11+14+12+**25**). ويتبقّى من الأجزاء P-C11 حتى P-C12، وتُقاس من هنا.
+`verify-platform-support.mjs`) والمجموع المنفَّذ من الاختبارات المخصّصة للأجزاء 199 اختباراً
+(20+23+21+23+13+21+11+14+12+25+**16**). ويتبقّى من الأجزاء P-C12 وحده، وتُقاس من هنا.
 
 ---
 
@@ -346,7 +347,7 @@
 | `0072_support_desk.sql` ✅ | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
 | `0073_jobs_manage_permission.sql` ✅ | **لا جدول** — صفُّ `console.jobs.manage` في `permissions` + `NOBYPASSRLS` | P-C9 |
 | `0074_platform_backups.sql` ✅ | `backup_jobs` · `backup_artifacts` · `data_requests` + RLS على `data_requests` + `REVOKE UPDATE, DELETE ON audit_log FROM erp_api` | P-C10 |
-| `0075_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |
+| `0075_developer_platform.sql` ✅ | `api_keys` (بلا نصٍّ صريح) · `webhook_endpoints` (سرٌّ مشفَّر) · `webhook_deliveries` · `api_key_uses` + RLS الأربعة + `GRANT … ON SEQUENCE api_key_uses_id_seq` + صفّا `console.apikeys.manage`/`console.webhooks.manage` + `NOBYPASSRLS` | P-C11 |
 
 كل جدول: `tenant_id` حيث يلزم + `RLS` بـ`ENABLE` و`FORCE` وسياسة `tenant_id` + فهارس
 `(tenant_id, created_at DESC)` + ملف `down/` مقابل (اتّباعاً لمنهج المراحل 1–23).
@@ -458,5 +459,6 @@ P-C1 ──┬─ P-C2 ── P-C4 ── P-C5 ──┐
 التسويق والمتابعة والتنبيهات كلها تتفرّع عنه. الثالثة: **P-C2 + P-C4** (العملاء
 والمال). ثم الباقي بالأولوية — ومنه **P-C8** و**P-C9** اللذان اكتملا بعد P-C7 (يظهران في
 الشجرة أعلاه مستقلّين عن P-C7 لأن الخطّة جعلتهما يعتمدان P-C1 وحده، ولذلك لم يُسلسلا بعده).
-**والمنفَّذ الآن `P-C10` «البيانات والاسترجاع»** (اعتمد P-C1)، **والتالي `P-C11` «بوابة المطوّر»**
-(يعتمد P-C1، وترحيله **0075**)، ثم `P-C12`.
+**والمنفَّذ الآن `P-C11` «بوابة المطوّر»** (اعتمد P-C1، وترحيله **0075**)، **والتالي `P-C12`
+«التحليلات»** (يعتمد P-C4 وP-C5، وبلا ترحيل)، ويبقى بعده مؤجَّلاً صراحةً **المستأجر التجريبي
+(sandbox)** الذي ذكرته الخطة في شاشات P-C11 بلا نقاط نهاية.
