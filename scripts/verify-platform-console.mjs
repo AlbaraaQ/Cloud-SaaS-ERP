@@ -221,16 +221,20 @@ check(
 );
 const ownerRole = roles.find((role) => role.code === 'platform_owner');
 const operationsRole = roles.find((role) => role.code === 'platform_operations');
+// P-C12: الرمز الواحد والعشرون (`console.analytics.view`) — قراءةٌ خالصة تُمنح لكل من يقرأ
+// أرقام المنصة: المالك والتشغيل والفوترة والمدقّق. والعدّ هنا مقصود: رمزٌ يُضاف إلى الفهرس
+// بلا أن يظهر على الدور يعني أن أحداً لن يستطيع استخدام الشاشة، وهو ما يجب أن يسقط هنا لا في
+// يد المشغّل.
 check(
-  'مالك المنصة يحمل الرموز العشرين',
-  ownerRole.permissions.length === 20,
+  'مالك المنصة يحمل الرموز الواحد والعشرين',
+  ownerRole.permissions.length === 21,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 20, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 21, `${registry.length} رمزاً`);
 check(
   'والمفتاح الجديد فيه',
   registry.some((entry) => entry.code === 'console.settings.manage'),
@@ -967,8 +971,9 @@ const auditorCatalog = [
   ...(matrix.find((role) => role.code === 'platform_auditor')?.catalogPermissions ?? []),
 ];
 check(
+  // P-C12: صار ستّةً — أُضيفت `console.analytics.view`، وهي `.view` كذلك: المدقّق يقرأ ولا يكتب.
   'والمدقّق يحمل رموز القراءة وحدها',
-  auditorCatalog.length === 5 && auditorCatalog.every((code) => code.endsWith('.view')),
+  auditorCatalog.length === 6 && auditorCatalog.every((code) => code.endsWith('.view')),
   auditorCatalog.join(' · '),
 );
 const ownerRoleRow = matrix.find((role) => role.code === 'platform_owner');

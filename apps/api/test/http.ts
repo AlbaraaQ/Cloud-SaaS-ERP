@@ -34,6 +34,8 @@ export type ApiCall = {
   status: number;
   body: Record<string, unknown>;
   headers: Record<string, string>;
+  /** الرد كما هو نصّاً — يُقرأ به ملف CSV (P-C12) بلا تحويلٍ في الاختبار. */
+  text: string;
 };
 
 /** Plain supertest helper for the non-isolation suites. */
@@ -55,5 +57,6 @@ export async function api(
     status: response.status,
     body: (response.body ?? {}) as Record<string, unknown>,
     headers: response.headers as Record<string, string>,
+    text: response.text ?? '',
   };
 }

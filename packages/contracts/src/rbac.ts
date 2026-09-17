@@ -94,6 +94,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // standing promises to a customer — the owner answers for both.
       'console.apikeys.manage',
       'console.webhooks.manage',
+      // P-C12: أرقام المنصة هي ما يُقرأ قبل أي قرار — والمالك أوّل من يقرؤها.
+      'console.analytics.view',
     ],
   },
   {
@@ -120,6 +122,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // ولا يُعطى للدعم: الدعم يتكلّم مع العميل في التذكرة، لا يُنشئ له اعتماداً.
       'console.apikeys.manage',
       'console.webhooks.manage',
+      // P-C12: التشغيل يرى القمع والتنبيهات و«من صمت» — وهي عملُه اليوميّ قبل أن تكون تقريراً.
+      'console.analytics.view',
     ],
   },
   {
@@ -135,6 +139,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.billing.manage',
       // P-C6: invoices are sent by mail — billing reads the log, never sends.
       'console.email.view',
+      // P-C12: التسرّب والتحصيل والقيمة الشهرية أرقامُ فوترةٍ قبل أن تكون رسوماً.
+      'console.analytics.view',
     ],
   },
   {
@@ -162,6 +168,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.jobs.view',
       // P-C6: reading what the platform sent is oversight.
       'console.email.view',
+      // P-C12: الأرقام المجمّعة تقرأها الرقابة بلا صلاحية تغييرٍ واحدة — قراءةٌ خالصة.
+      'console.analytics.view',
     ],
   },
 ] as const;

@@ -7,6 +7,8 @@ import { PlatformModule } from '../platform.module.js';
 import { DeveloperModule } from '../../developer/developer.module.js';
 
 import { PlatformAdminController } from './platform-admin.controller.js';
+import { PlatformAnalyticsController } from './platform-analytics.controller.js';
+import { PlatformAnalyticsService } from './platform-analytics.service.js';
 import { PlatformAdminService } from './platform-admin.service.js';
 import { PlatformBillingController } from './platform-billing.controller.js';
 import { PlatformBillingService } from './platform-billing.service.js';
@@ -29,6 +31,7 @@ import { SignupController } from './signup.controller.js';
   imports: [PlatformModule, OrganizationModule, AnnouncementsModule, SupportModule, DeveloperModule],
   controllers: [
     PlatformAdminController,
+    PlatformAnalyticsController,
     PlatformBillingController,
     PlatformConsoleController,
     PlatformIdentityController,
@@ -38,6 +41,7 @@ import { SignupController } from './signup.controller.js';
   ],
   providers: [
     PlatformAdminService,
+    PlatformAnalyticsService,
     PlatformBillingService,
     PlatformConsoleService,
     PlatformIdentityService,
@@ -45,6 +49,7 @@ import { SignupController } from './signup.controller.js';
   ],
   exports: [
     PlatformAdminService,
+    PlatformAnalyticsService,
     PlatformBillingService,
     PlatformConsoleService,
     PlatformIdentityService,

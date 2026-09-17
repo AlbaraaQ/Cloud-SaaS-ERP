@@ -352,6 +352,13 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
     'console.webhooks.manage',
     'Create and edit tenant webhook endpoints, send a test event, and retry a failed delivery.',
   ),
+  // P-C12 — التحليلات: **قراءةٌ لا فعل**، ولذلك رمزٌ واحد بصيغة `view` لا `manage` — ولا
+  // مسار في هذه الوحدة يكتب شيئاً. ويمنحه كل من يقرأ أرقام المنصة أصلاً (المالك · التشغيل ·
+  // الفوترة · المدقّق)، ولا يُمنح للدعم: مقاييس الإيراد ليست جزءاً من ردّ تذكرة.
+  perm(
+    'console.analytics.view',
+    'Read platform analytics: MRR, churn, activation funnel, cohorts, trial conversion and usage per plan.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));
