@@ -7,6 +7,11 @@
 > الصلاحيات» مُنجَز على الفرع `arena/01a0acbb-cloud-saas-erp`؛ الأرقام في §5 حُدِّثت
 > بعد التنفيذ، والوثيقة [`../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md).
 >
+> **تحديث 2026-09-17 (جلسة P-C2):** والجزء الثاني «العملاء في العمق» مُنجَز على الفرع
+> نفسه: بطاقة العميل `/tenants/[id]` بثمانية تبويبات و15 مسار `/platform/tenants/:id/*`،
+> وترحيل `0067_tenant_card.sql`. الوثيقة
+> [`../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md).
+>
 > هذه المجلدة مكتوبة **لمحادثة جديدة لا تعرف شيئاً عما سبق**: تقرأ هذا الملف، تختار
 > الجزء، وتنفّذه. كل بند فيها مشفوعٌ بمكانه في الكود وبرقمٍ مقيس اليوم.
 
@@ -92,13 +97,13 @@ pnpm dev                             # API :3000 · staff :3001 · portal :3002 
 
 | البند | القيمة |
 |---|---|
-| اختبارات API | **975** · 127 ملفاً |
-| اختبارات staff | **36** (منها 20 لشجرة الملاحة) · contracts **71** · platform-admin **12** |
-| الترحيلات | حتى **0066** (`0066_platform_settings.sql` — P-C1) |
+| اختبارات API | **998** · 128 ملفاً |
+| اختبارات staff | **36** (منها 20 لشجرة الملاحة) · contracts **71** · platform-admin **16** |
+| الترحيلات | حتى **0067** (`0067_tenant_card.sql` — P-C2؛ و0066 لـP-C1) |
 | الرموز الصلاحية | **143** رمز مستأجر + **13** رمز لوحة (منها `console.settings.manage` الجديد) في `packages/contracts/src/permissions.ts` |
 | التقارير | **102** مفتاح في `apps/api/src/modules/reporting/report-catalog.ts` |
 | الشاشات (staff) | **229**: 225 `ready` · 3 `api` · 1 `planned` |
-| لوحة المنصة | **12** صفحة، وتستدعي **21** نقطة نهاية (`/platform/*`)؛ كل مسار برمز `console.*` (P-C1 ✅) |
+| لوحة المنصة | **13** صفحة، وتستدعي **36** نقطة نهاية (`/platform/*`)؛ كل مسار برمز `console.*` (P-C1 ✅ · P-C2 ✅) |
 | الموقع التسويقي | 6 صفحات، **144 سطراً** إجمالاً |
 | بوابة العميل | 10 صفحات، و12 نقطة نهاية (`/portal/*`) |
 | سكربتات التحقّق الحيّ | **28** سكربتاً في `scripts/verify-*.mjs` |

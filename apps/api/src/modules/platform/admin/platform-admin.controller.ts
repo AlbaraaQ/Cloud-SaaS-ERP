@@ -28,7 +28,7 @@ import {
  * | `GET overview` | `console.tenants.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
  * | `GET tenants` | `console.tenants.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
  * | `POST tenants` | `console.tenants.manage` | ✓ | | | | |
- * | `PATCH tenants/:id/status` | `console.tenants.manage` | ✓ | | | | |
+ * | `POST tenants/:id/status` (P-C2, in `PlatformTenantsController`) | `console.tenants.manage` | ✓ | | | | |
  * | `GET plans` | `console.plans.manage` | ✓ | | ✓ | | |
  * | `POST plans` | `console.plans.manage` | ✓ | | ✓ | | |
  * | `PATCH plans/:id/active` | `console.plans.manage` | ✓ | | ✓ | | |
@@ -88,12 +88,10 @@ export class PlatformAdminController {
     return { data: { ...created, defaults } };
   }
 
-  @Patch('tenants/:id/status')
-  @RequiresPlatformRole('console.tenants.manage')
-  @ApiOperation({ summary: 'Suspend, reactivate or archive a customer' })
-  async setTenantStatus(@Param('id') id: string, @Body() body: { status: 'active' | 'suspended' | 'archived' }) {
-    return { data: await this.admin.setTenantStatus(id, body.status) };
-  }
+  // `PATCH tenants/:id/status` lived here and took a status with no reason. P-C2 replaced it
+  // with `POST /platform/tenants/:id/status` (`PlatformTenantsController`) which requires
+  // «السبب»: suspending a customer must be explainable a month later, and two routes for one
+  // decision — one of them reason-less — means the rule is only as strong as the caller.
 
   // ------------------------------------------------------------------ plans
 

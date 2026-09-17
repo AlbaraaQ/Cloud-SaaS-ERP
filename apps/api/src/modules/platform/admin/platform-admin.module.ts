@@ -7,6 +7,8 @@ import { PlatformAdminController } from './platform-admin.controller.js';
 import { PlatformAdminService } from './platform-admin.service.js';
 import { PlatformConsoleController } from './platform-console.controller.js';
 import { PlatformConsoleService } from './platform-console.service.js';
+import { PlatformTenantsController } from './platform-tenants.controller.js';
+import { PlatformTenantsService } from './platform-tenants.service.js';
 import { SignupController } from './signup.controller.js';
 
 /**
@@ -17,8 +19,13 @@ import { SignupController } from './signup.controller.js';
  */
 @Module({
   imports: [PlatformModule, OrganizationModule],
-  controllers: [PlatformAdminController, PlatformConsoleController, SignupController],
-  providers: [PlatformAdminService, PlatformConsoleService],
-  exports: [PlatformAdminService, PlatformConsoleService],
+  controllers: [
+    PlatformAdminController,
+    PlatformConsoleController,
+    PlatformTenantsController,
+    SignupController,
+  ],
+  providers: [PlatformAdminService, PlatformConsoleService, PlatformTenantsService],
+  exports: [PlatformAdminService, PlatformConsoleService, PlatformTenantsService],
 })
 export class PlatformAdminModule {}

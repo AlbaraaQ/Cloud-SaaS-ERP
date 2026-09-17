@@ -4,7 +4,8 @@ import {
   DomainError,
   errorCodes,
   findPlatformSettingDefinition,
-  platformSettingDefinitions,
+  platformSettingAllowsScope,
+  platformSettingsForScope,
   platformSettingDefaultMap,
   validatePlatformSettingValue,
   auditActions,
@@ -97,7 +98,10 @@ export class PlatformConsoleService {
     );
 
     const stored = new Map(rows.map((row) => [row.key, row]));
-    const settings: PlatformSettingView[] = platformSettingDefinitions.map((definition) => {
+    // Platform-scope keys only. The catalogue is shared with the tenant card
+    // (`GET /platform/tenants/:id/settings`), and keys declared `['tenant']` — the three
+    // `branding.*` keys P-C2 added — must not appear as writable platform-wide values.
+    const settings: PlatformSettingView[] = platformSettingsForScope('platform').map((definition) => {
       const row = stored.get(definition.key);
       return {
         key: definition.key,
@@ -107,6 +111,9 @@ export class PlatformConsoleService {
         helpAr: definition.helpAr,
         value: row ? (JSON.parse(row.raw) as PlatformSettingView['value']) : definition.defaultValue,
         isDefault: row === undefined,
+        // A platform-scoped read can only answer from the platform row or the catalogue:
+        // `tenant` appears on `GET /platform/tenants/:id/settings` (P-C2).
+        source: row === undefined ? 'default' : 'platform',
         updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : null,
         updatedBy: row?.updatedBy ?? null,
       };
@@ -134,6 +141,11 @@ export class PlatformConsoleService {
       const definition = findPlatformSettingDefinition(key);
       if (!definition) {
         throw new DomainError(errorCodes.VALIDATION_FAILED, `Unknown platform setting: ${key}`, 422, {
+          field: key,
+        });
+      }
+      if (!platformSettingAllowsScope(key, 'platform')) {
+        throw new DomainError(errorCodes.VALIDATION_FAILED, `المفتاح «${key}» ليس إعداداً للمنصّة`, 422, {
           field: key,
         });
       }

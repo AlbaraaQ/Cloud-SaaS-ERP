@@ -89,7 +89,18 @@
 | **تحقّق حيّ** | `scripts/verify-platform-console.mjs` (≈ 45 نقطة في 8 أقسام) |
 | **القبول** | صفر مسار `/platform/*` بلا رمز `console.*` (يُثبته اختبار يمسح الكود) |
 
-### P-C2 — العملاء في العمق 🔴
+### P-C2 — العملاء في العمق ✅
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **998** اختباراً (128 ملفاً) · platform-admin **16** · `platform-tenants.spec.ts` **23**
+> (الخطة طلبت ≥ 12) · `scripts/verify-platform-console.mjs` = **121** نقطة في **16** قسماً (كان 70/10) · الشاشة `/tenants/[id]` بثمانية تبويبات.
+> **مخالفة مقصودة واحدة:** الترحيب بـ`0067_tenant_card.sql` رغم قول هذا القسم «يُكتفى بـ0066» — السبب
+> ثلاثة أمور مقيسة: جدول `tenant_notes` غير موجود، وسياسات `platform_admin_plane` ناقصة على
+> `tenant_settings`/`sales_invoices`/`outbox_jobs` (وبلا `WITH CHECK` على `audit_log`)، و**155 سياسة**
+> تكتب `current_setting('app.tenant_id', true)::uuid` بلا `nullif` — فتُفشل أي قراءة من مستوى المنصة على
+> اتصالٍ سبقته معاملة مستأجر. التفصيل في §1 و§5.1 من تقرير الجزء.
+> ثلاث نقاط نهاية أُضيفت فوق ما في الجدول أدناه: `GET …/:id/health` (يحتاجه تبويب «الصحة») و`DELETE …/:id/notes/:noteId`
+> (ملاحظةٌ خاطئة يجب أن تُحذف) و`DELETE` غير موجود — أي أن العدد الفعلي **15** مساراً لا 12.
 
 | | |
 |---|---|
@@ -218,7 +229,7 @@
 | الجزء | الأولوية | يعتمد على | اختبارات | نقاط التحقّق |
 |---|:--:|---|---:|---:|
 | P-C1 الأساس والصلاحيات ✅ | 🔴 | — | 20 منفَّذ | 70 منفَّذ |
-| P-C2 العملاء في العمق | 🔴 | P-C1 | 12 | +25 |
+| P-C2 العملاء في العمق ✅ | 🔴 | P-C1 | 23 منفَّذ | 121 منفَّذ (تراكمي) |
 | P-C3 الهوية والوصول | 🟠 | P-C1 | 10 | +20 |
 | P-C4 الباقات والفوترة | 🟠 | P-C2 | 14 | 50 |
 | P-C5 الاستخدام والحصص | 🟠 | P-C4 | 8 | +20 |
@@ -230,22 +241,28 @@
 | P-C11 بوابة المطوّر | 🟢 | P-C1 | 10 | +25 |
 | P-C12 التحليلات | 🟢 | P-C4 · P-C5 | 8 | +20 |
 
-**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة.
+**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة (المتبقّي بعد P-C1+P-C2:
+≈ 96 اختباراً و≈ 240 نقطة، ورقم `verify` التراكمي صار **121** نقطة في 16 قسماً).
 
 ---
 
-## 6. الترحيلات المقترحة (من 0066)
+## 6. الترحيلات (من 0066)
+
+> **تنبيه ترقيم (2026-09-17):** الأرقام أدناه كانت مُدَّخرة في الخطة، وقد أخذ P-C2 الرقم
+> **`0067`** لترحيل البطاقة (السبب في §P-C2 أعلاه) — فانتقلت أرقام الأجزاء الباقية واحداً
+> واحداً. المتاح الآن للمنصة يبدأ من `0068`، والرقم التالي الحر في المستودع كله `0068`.
 
 | الترحيل | الجداول | الجزء |
 |---|---|---|
-| `0066_platform_settings.sql` | `platform_settings` | P-C1 |
-| `0067_platform_billing.sql` | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
-| `0068_usage_metering.sql` | `usage_counters` | P-C5 |
-| `0069_email_service.sql` | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
-| `0070_announcements.sql` | `announcements` · `announcement_reads` | P-C7 |
-| `0071_support_desk.sql` | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
-| `0072_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |
-| `0073_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |
+| `0066_platform_settings.sql` ✅ | `platform_settings` | P-C1 |
+| `0067_tenant_card.sql` ✅ | `tenant_notes` + سياسات المنصة الناقصة + ترميم `nullif` | P-C2 |
+| `0068_platform_billing.sql` | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
+| `0069_usage_metering.sql` | `usage_counters` | P-C5 |
+| `0070_email_service.sql` | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
+| `0071_announcements.sql` | `announcements` · `announcement_reads` | P-C7 |
+| `0072_support_desk.sql` | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
+| `0073_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |
+| `0074_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |
 
 كل جدول: `tenant_id` حيث يلزم + `RLS` بـ`ENABLE` و`FORCE` وسياسة `tenant_id` + فهارس
 `(tenant_id, created_at DESC)` + ملف `down/` مقابل (اتّباعاً لمنهج المراحل 1–23).

@@ -82,6 +82,14 @@ describe('platform console navigation', () => {
     expect(session).toContain('canConsole');
   });
 
+  it('keeps the customer card reachable from the customers list, not from the sidebar', () => {
+    // A sidebar entry needs a fixed href; the card needs an id. It is reached the way a
+    // detail screen should be — from the row that names the customer.
+    const list = readFileSync(join(appDir, 'tenants', 'page.tsx'), 'utf8');
+    expect(list).toContain('/tenants/${tenant.id}');
+    expect(consoleItems.map((entry) => entry.href)).not.toContain('/tenants/[id]');
+  });
+
   it('ships every console page as a real page file', () => {
     // The eleven pre-P-C1 pages plus إعدادات المنصة.
     const pages = readdirSync(appDir, { withFileTypes: true })

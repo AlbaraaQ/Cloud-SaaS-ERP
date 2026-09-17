@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
-  platformSettingDefinitions,
+  platformSettingsForScope,
   platformPermissionRegistry,
   platformPermissionsForRoles,
 } from '@erp/contracts';
@@ -148,9 +148,11 @@ describe('platform console RBAC and cross-tenant audit (P-C1)', () => {
     const tenants = await api(ctx.server, 'get', '/api/v1/platform/tenants', { token: operations.token });
     expect(tenants.status).toBe(200);
 
-    const suspend = await api(ctx.server, 'patch', `/api/v1/platform/tenants/${tenantA.tenantId}/status`, {
+    // P-C2 moved this decision to `POST …/status` and made «السبب» part of the body; the
+    // permission boundary is what this check is about, so the reason is present and valid.
+    const suspend = await api(ctx.server, 'post', `/api/v1/platform/tenants/${tenantA.tenantId}/status`, {
       token: operations.token,
-      body: { status: 'suspended' },
+      body: { status: 'suspended', reason: 'محاولة من دور العمليات' },
     });
     expect(suspend.status).toBe(403);
     expect(suspend.body.detail).toBe('platform permission console.tenants.manage required');
@@ -258,15 +260,18 @@ describe('platform console RBAC and cross-tenant audit (P-C1)', () => {
 
   // ------------------------------------------------------- 5. platform settings
 
-  it('serves every catalogue key with its default and the deployment name', async () => {
+  it('serves every platform-scoped catalogue key with its default and the deployment name', async () => {
     const response = await api(ctx.server, 'get', '/api/v1/platform/settings', { token: support.token });
     expect(response.status).toBe(200);
     const body = response.body.data as {
       settings: Array<{ key: string; value: unknown; isDefault: boolean; labelAr: string }>;
       environment: { name: string; labelAr: string };
     };
+    // Platform scope, not the whole catalogue: P-C2 added tenant-only keys
+    // (`branding.*`) to the same catalogue, and a platform-wide value for those is
+    // refused by `PUT /platform/settings` — so the page must not offer them.
     expect(body.settings.map((row) => row.key)).toEqual(
-      platformSettingDefinitions.map((definition) => definition.key),
+      platformSettingsForScope('platform').map((definition) => definition.key),
     );
     expect(body.settings.length).toBe(8);
     for (const row of body.settings) {

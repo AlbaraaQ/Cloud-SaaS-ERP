@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Live verification of P-C1 — «الأساس والقشرة، وترميم الصلاحيات»
+ * Live verification of P-C1 «الأساس والقشرة، وترميم الصلاحيات» and P-C2 «العملاء في العمق»
  * (`docs/roadmap/PLATFORM_CONSOLE_PLAN.md` §4) against a running stack
  * (`node scripts/local-db.mjs` + `pnpm db:migrate` + `pnpm db:seed` + `pnpm dev`).
  *
@@ -15,12 +15,27 @@
  *   7. 🔎 البحث الشامل — Ctrl+K على الرمز والاسم العربي
  *   8. 👤 دور محدود — العمليات تقرأ ولا توقف منشأة
  *   9. 📋 المهام — صندوق الأحداث عبر كل العملاء
- *  10. 🧹 التنظيف — الحالة تعود كما كانت
+ *  10. 🪪 بطاقة العميل — كل سؤال عن عميل واحد في مكان واحد (P-C2)
+ *  11. 📊 الاستخدام — مقابل الحدّ، ومصدر الحدّ، وتجاوز العميل
+ *  12. 🚦 الحالة والملكية — بلا سبب لا يقع الفعل، والسبب في التدقيق
+ *  13. 🚩 الرايات والهوية — حزمة تُفتح، ولون يُكتب، وشعار خبيث يُرفض
+ *  14. 🗒️ الملاحظات — تُضاف، ولا تُحذف من بطاقة عميل آخر
+ *  15. 🔐 أبواب بطاقة العميل — جلسة المستأجر لا تدخل
+ *  16. 🧹 التنظيف — الحالة تعود كما كانت
  *
  * Re-runnable and non-destructive: the settings are snapshotted before anything is written
  * and restored at the end, and the temporary platform role granted in §8 is revoked in §10.
  * Nothing is emailed and no message is sent — the console's writes are its own settings and
  * one role grant on a seeded demo user.
+ *
+ * One deliberate **normalisation** is possible on a freshly seeded database, and §16 says so
+ * rather than hiding it: `pnpm db:seed` writes the four feature flags as rows holding the
+ * catalogue default (`false`). The card's write path treats "value equals the registry
+ * default" as "no row" (that is what keeps `isDefault` truthful), so returning a flag to
+ * `false` removes a row that merely repeated the default. The **effective** value the
+ * customer sees is identical (the feature stays off), and a second run changes nothing —
+ * which is what "no residue" means here, and what the before/after snapshot in the report
+ * asserts.
  *
  * Usage: node scripts/verify-platform-console.mjs
  */
@@ -309,9 +324,9 @@ check(
   `${limitedWrite.status} ${limitedWrite.detail}`,
 );
 const limitedSuspend = await refused(
-  'patch',
+  'post',
   `/platform/tenants/${demoMe.membership.tenantId}/status`,
-  { status: 'suspended' },
+  { status: 'suspended', reason: 'محاولة من دور العمليات' },
   limitedToken,
 );
 check(
@@ -334,14 +349,199 @@ check('والمرشّح بالحالة يعمل', filteredOutbox.items.every((jo
 const outboxDenied = await refused('get', '/platform/jobs/outbox', undefined, demoToken);
 check('والمستأجر لا يراه', outboxDenied.status === 403, String(outboxDenied.status));
 
-// ═════════════════════════════════════════════════════════════ 10. 🧹 التنظيف
-console.log('\n■ 10. 🧹 التنظيف');
+// ═══════════════════════════════════════════ 10. 🪪 بطاقة العميل
+console.log('\n■ 10. 🪪 بطاقة العميل — كل سؤال عن عميل واحد');
+const demoId = demoMe.membership.tenantId;
+const cardSnapshot = await get(`/platform/tenants/${demoId}`);
+const cardTenant = cardSnapshot.tenant;
+check('البطاقة تعود باسم العميل ورمزه', cardTenant.code === demo.tenantCode && cardTenant.name.length > 0, `${cardTenant.code} / ${cardTenant.name}`);
+check('وبحالته وعملته', ['active', 'suspended', 'archived'].includes(cardTenant.status), `${cardTenant.status} · ${cardTenant.baseCurrency}`);
+check('وأعداد المستخدمين والفروع', typeof cardTenant.userCount === 'number' && cardTenant.branchCount >= 1, `${cardTenant.userCount} مستخدماً · ${cardTenant.branchCount} فرعاً`);
+check('وعدّاد فواتير آخر ثلاثين يوماً', typeof cardTenant.invoicesLast30Days === 'number', String(cardTenant.invoicesLast30Days));
+check('وآخر نشاط من التدقيق لا من سجل المتصفح', cardTenant.lastActivityAt === null || !Number.isNaN(Date.parse(cardTenant.lastActivityAt)), String(cardTenant.lastActivityAt));
+check('ومالك المنشأة مُسمّى', Boolean(cardTenant.owner?.email), cardTenant.owner?.email ?? '—');
+check('وسطور المستخدمين تحمل أدوارهم', cardSnapshot.members.every((member) => typeof member.roleCount === 'number' && typeof member.isOwner === 'boolean'), `${cardSnapshot.members.length} عضواً`);
+const missingCard = await refused('get', '/platform/tenants/00000000-0000-0000-0000-000000000001', undefined, ownerToken);
+check('وعميل غير موجود يردّ 404', missingCard.status === 404, `${missingCard.status} ${missingCard.code}`);
+const badCard = await refused('get', '/platform/tenants/not-a-uuid', undefined, ownerToken);
+check('ومعرّف تالف 400', badCard.status === 400, String(badCard.status));
+
+// ═══════════════════════════════════════════ 11. 📊 الاستخدام
+console.log('\n■ 11. 📊 الاستخدام — مقابل الحدّ، ومصدر الحدّ');
+const usage = await get(`/platform/tenants/${demoId}/usage`);
+const metricKeys = usage.metrics.map((metric) => metric.key);
+check(
+  'البطاقة تقيس المستخدمين والفروع وفواتير الشهر',
+  JSON.stringify(metricKeys) === JSON.stringify(['users', 'branches', 'invoices_per_month']),
+  metricKeys.join(', '),
+);
+check('وكل بند يقول مصدر حدّه', usage.metrics.every((metric) => ['tenant', 'platform', 'default'].includes(metric.limitSource)), usage.metrics.map((metric) => `${metric.key}:${metric.limitSource}`).join(' '));
+check('وسلسلة ثلاثين يوماً كاملة', usage.invoicesPerDay.length === 30, `${usage.invoicesPerDay.length} يوماً`);
+const usersMetric = usage.metrics.find((metric) => metric.key === 'users');
+check('وعدد المستخدمين يطابق البطاقة', usersMetric.used === cardTenant.userCount, `${usersMetric.used}`);
+
+const tenantSettingBefore = await get(`/platform/tenants/${demoId}/settings`);
+const limitsBefore = Object.fromEntries(tenantSettingBefore.settings.map((setting) => [setting.key, setting.value]));
+check(
+  'وإعدادات العميل تعرض القسم المسموح للمستأجر فقط',
+  tenantSettingBefore.settings.every((setting) => !setting.key.startsWith('platform.') && !setting.key.startsWith('support.')),
+  `${tenantSettingBefore.settings.length} مفتاحاً`,
+);
+try {
+  const override = await put(`/platform/tenants/${demoId}/settings/limits.max_users`, { value: 7 });
+  const afterOverride = override.settings.find((setting) => setting.key === 'limits.max_users');
+  check('كتابة تجاوزٍ خاص بالعميل', afterOverride.value === 7 && afterOverride.source === 'tenant', `${afterOverride.value} من ${afterOverride.source}`);
+  const usageAfter = await get(`/platform/tenants/${demoId}/usage`);
+  check(
+    'والاستخدام يقرأ التجاوز لا الافتراضي',
+    usageAfter.metrics.find((metric) => metric.key === 'users').limit === 7 &&
+      usageAfter.metrics.find((metric) => metric.key === 'users').limitSource === 'tenant',
+  );
+  const platformOnly = await refused('put', `/platform/tenants/${demoId}/settings/platform.maintenance`, { value: true }, ownerToken);
+  check('ومفتاح المنصة يُرفض هنا 422', platformOnly.status === 422, `${platformOnly.status} ${platformOnly.detail}`);
+  const badValue = await refused('put', `/platform/tenants/${demoId}/settings/branding.primary_color`, { value: 'teal' }, ownerToken);
+  check('ولون بصيغة خاطئة 422', badValue.status === 422, `${badValue.status}`);
+} finally {
+  await put(`/platform/tenants/${demoId}/settings/limits.max_users`, { value: null });
+  const cleared = await get(`/platform/tenants/${demoId}/settings`);
+  check(
+    'وإزالة التجاوز تُرجع العميل إلى قيمة المنصة',
+    cleared.settings.find((setting) => setting.key === 'limits.max_users').source !== 'tenant',
+  );
+}
+
+// ═══════════════════════════════════════ 12. 🚦 الحالة والملكية
+console.log('\n■ 12. 🚦 الحالة والملكية — بلا سبب لا يقع الفعل');
+const noReason = await refused('post', `/platform/tenants/${demoId}/status`, { status: 'suspended' }, ownerToken);
+check('الإيقاف بلا سبب يُرفض 400', noReason.status === 400, String(noReason.status));
+const suspended = await request('post', `/platform/tenants/${demoId}/status`, { status: 'suspended', reason: 'تحقّق حيّ P-C2' }, ownerToken);
+check('وبالسبب يقع الإيقاف', suspended.status === 'suspended', suspended.status);
+const alreadySuspended = await refused('post', `/platform/tenants/${demoId}/status`, { status: 'suspended', reason: 'تحقّق حيّ P-C2' }, ownerToken);
+check('وتكرار نفس الحالة يُرفض 409', alreadySuspended.status === 409 && alreadySuspended.code === 'TENANT_STATUS_UNCHANGED', `${alreadySuspended.status} ${alreadySuspended.code}`);
+const suspendedHealth = await get(`/platform/tenants/${demoId}/health`);
+check('والصحة تُعلن الإيقاف', suspendedHealth.findings.some((finding) => finding.text.includes('موقوف')), suspendedHealth.status);
+const reactivated = await request('post', `/platform/tenants/${demoId}/status`, { status: 'active', reason: 'انتهى التحقّق الحيّ' }, ownerToken);
+check('وإعادة التنشيط تعود بالحالة', reactivated.status === 'active');
+const statusAudit = await get(`/platform/audit?filter[tenantId]=${demoId}&filter[entity]=tenant&limit=50`);
+const statusRow = statusAudit.items.find((row) => row.action === 'tenant.status' && row.after?.status === 'suspended');
+check('وسبب الإيقاف محفوظ في تدقيق العميل نفسه', Boolean(statusRow) && statusRow.meta?.reason === 'تحقّق حيّ P-C2', statusRow?.meta?.reason ?? '—');
+
+const members = cardSnapshot.members;
+const otherMember = members.find((member) => !member.isOwner && member.status === 'active');
+if (otherMember) {
+  const badTransfer = await refused('post', `/platform/tenants/${demoId}/owner/transfer`, { membershipId: '00000000-0000-0000-0000-000000000002', reason: 'عضو غير موجود' }, ownerToken);
+  check('نقل الملكية لعضو غير موجود 404', badTransfer.status === 404, String(badTransfer.status));
+  const transferred = await request('post', `/platform/tenants/${demoId}/owner/transfer`, { membershipId: otherMember.membershipId, reason: 'تحقّق حيّ P-C2' }, ownerToken);
+  check('والنقل لعضو قائم يقع', transferred.owner.email === otherMember.email, transferred.owner.email);
+  const back = await request('post', `/platform/tenants/${demoId}/owner/transfer`, { membershipId: cardTenant.owner.membershipId, reason: 'إعادة المالك في التحقّق' }, ownerToken);
+  check('ويُعاد المالك الأصلي', back.owner.email === cardTenant.owner.email, back.owner.email);
+} else {
+  check('لا عضو ثانٍ نشط لنقل الملكية — تُخطّى', true, 'منشأة التجربة بمستخدم واحد');
+}
+
+// ═══════════════════════════ 13. 🚩 الرايات والهوية
+console.log('\n■ 13. 🚩 الرايات والهوية');
+const flagsBefore = await get(`/platform/tenants/${demoId}/flags`);
+check('الرايات أربع', flagsBefore.flags.length === 4, flagsBefore.flags.map((flag) => flag.key).join(', '));
+check('وكل راية تقول أهي افتراضية أم مضبوطة', flagsBefore.flags.every((flag) => typeof flag.isDefault === 'boolean' && typeof flag.enabled === 'boolean'));
+const previousFlags = Object.fromEntries(flagsBefore.flags.map((flag) => [flag.key, flag.enabled]));
+// `isDefault === false` means the customer had an explicit row; §16 reports when the write
+// path turned such a redundant row (one that merely repeated the catalogue default) into none.
+const previousFlagRows = Object.fromEntries(flagsBefore.flags.map((flag) => [flag.key, flag.isDefault]));
+const openedFlag = await put(`/platform/tenants/${demoId}/flags`, { values: { 'feature.pos': true } });
+check('فتح حزمة نقطة البيع', openedFlag.flags.find((flag) => flag.key === 'feature.pos').enabled === true);
+const demoFlagView = await get('/settings', demoToken);
+check('ويراها العميل في إعداداته (نفس المخزن)', demoFlagView.settings['feature.pos'] === true);
+const unknownFlag = await refused('put', `/platform/tenants/${demoId}/flags`, { values: { 'feature.nope': true } }, ownerToken);
+check('وراية مجهولة 422', unknownFlag.status === 422, `${unknownFlag.status} ${unknownFlag.detail}`);
+await put(`/platform/tenants/${demoId}/flags`, { values: previousFlags });
+
+const brandingBefore = await get(`/platform/tenants/${demoId}/branding`);
+try {
+  const branding = await put(`/platform/tenants/${demoId}/branding`, { primaryColor: '#123ABC', senderName: 'شركة تجريبية', logoUrl: 'https://example.test/logo.png' });
+  check('كتابة الهوية (لون · شعار · اسم المُرسِل)', branding.primaryColor === '#123abc' && branding.senderName === 'شركة تجريبية', branding.primaryColor);
+  const brandingAgain = await get(`/platform/tenants/${demoId}/branding`);
+  check('والقراءة تُرجعها كما كُتبت', brandingAgain.logoUrl === 'https://example.test/logo.png');
+  const badLogo = await refused('put', `/platform/tenants/${demoId}/branding`, { logoUrl: 'javascript:alert(1)' }, ownerToken);
+  check('ورشعار بخواص خطرة 422', badLogo.status === 422, `${badLogo.status} ${badLogo.detail}`);
+} finally {
+  // `updatedAt === null` means the customer had **no** branding override: writing the
+  // defaults back would leave three rows saying what the catalogue already says.
+  const hadOverride = brandingBefore.updatedAt !== null;
+  if (hadOverride) {
+    await put(`/platform/tenants/${demoId}/branding`, {
+      primaryColor: brandingBefore.primaryColor,
+      senderName: brandingBefore.senderName,
+      logoUrl: brandingBefore.logoUrl,
+    });
+  } else {
+    for (const key of ['branding.primary_color', 'branding.logo_url', 'branding.sender_name']) {
+      await put(`/platform/tenants/${demoId}/settings/${key}`, { value: null });
+    }
+  }
+  const brandingAfter = await get(`/platform/tenants/${demoId}/branding`);
+  const sameBranding =
+    brandingAfter.primaryColor === brandingBefore.primaryColor &&
+    brandingAfter.senderName === brandingBefore.senderName &&
+    brandingAfter.logoUrl === brandingBefore.logoUrl &&
+    (brandingAfter.updatedAt === null) === (brandingBefore.updatedAt === null);
+  check('واستُعيدت الهوية إلى ما كانت عليه', sameBranding, hadOverride ? 'كما كانت' : 'بلا تجاوز');
+}
+
+// ═══════════════════════════════════════════ 14. 🗒️ الملاحظات
+console.log('\n■ 14. 🗒️ الملاحظات — ما لا تحتمله الحقول');
+const beforeNotes = await get(`/platform/tenants/${demoId}/notes`);
+const note = await request('post', `/platform/tenants/${demoId}/notes`, { body: 'ملاحظة تحقّق حيّ P-C2' }, ownerToken);
+check('إضافة ملاحظة تُرجع كاتبها', note.authorLabel.length > 0, note.authorLabel);
+const listedNotes = await get(`/platform/tenants/${demoId}/notes`);
+check('وتبدو في القائمة', listedNotes.total === (beforeNotes.total ?? 0) + 1, `${listedNotes.total} ملاحظة`);
+const foreignNote = await refused('delete', `/platform/tenants/${withCustomer.tenantId}/notes/${note.id}`, undefined, ownerToken);
+check('ولا تُحذف من بطاقة عميل آخر (404)', foreignNote.status === 404, String(foreignNote.status));
+const deletedNote = await request('delete', `/platform/tenants/${demoId}/notes/${note.id}`, undefined, ownerToken);
+check('وتُحذف من بطاقة صاحبها', deletedNote.deleted === true);
+const noteAudit = await get(`/platform/audit?filter[tenantId]=${demoId}&filter[entity]=tenant_note&limit=20`);
+check('ونصّها باقٍ في التدقيق بعد الحذف', noteAudit.items.some((row) => row.before?.body === 'ملاحظة تحقّق حيّ P-C2'), `${noteAudit.items.length} سطراً`);
+
+// ═════════════════════════════ 15. 🔐 أبواب بطاقة العميل
+console.log('\n■ 15. 🔐 أبواب بطاقة العميل');
+for (const path of [
+  `/platform/tenants/${demoId}`,
+  `/platform/tenants/${demoId}/usage`,
+  `/platform/tenants/${demoId}/settings`,
+  `/platform/tenants/${demoId}/flags`,
+  `/platform/tenants/${demoId}/branding`,
+  `/platform/tenants/${demoId}/health`,
+  `/platform/tenants/${demoId}/notes`,
+]) {
+  const result = await refused('get', path, undefined, demoToken);
+  check(`GET ${path.replace(demoId, ':id')} ترفض جلسة المستأجر`, result.status === 403, `${result.status} ${result.code}`);
+}
+const anonCard = await refused('get', `/platform/tenants/${demoId}`, undefined, '');
+check('وترفض بلا جلسة 401', anonCard.status === 401, String(anonCard.status));
+
+// ═════════════════════════════════════════════════════════════ 16. 🧹 التنظيف
+console.log('\n■ 16. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);
 check('سُحب الدور المحدود', (revokedMe.platformPermissions ?? []).length === 0);
 const afterDenied = await refused('get', '/platform/tenants', undefined, afterRevoke.token);
 check('وعاد المستأجر ممنوعاً من اللوحة', afterDenied.status === 403, String(afterDenied.status));
+
+const restoredFlags = await get(`/platform/tenants/${demoId}/flags`);
+const restoredFlagValues = Object.fromEntries(restoredFlags.flags.map((flag) => [flag.key, flag.enabled]));
+check(
+  'ورايات العميل بقيمها الفعلية',
+  JSON.stringify(restoredFlagValues) === JSON.stringify(previousFlags),
+  Object.entries(restoredFlagValues).map(([key, value]) => `${key.replace('feature.', '')}=${value}`).join(' '),
+);
+const normalised = restoredFlags.flags.filter((flag) => previousFlagRows[flag.key] === false && flag.isDefault);
+if (normalised.length > 0) {
+  // Not a residue: the value is unchanged, the redundant row is gone by design.
+  console.log(
+    `  · ملاحظة: ${normalised.length} راية كانت صفاً يكرّر القيمة الافتراضية فصار صفّها محذوفاً (القيمة الفعلية كما هي)`,
+  );
+}
 
 const restored = await get('/platform/settings');
 const restoredValues = Object.fromEntries(restored.settings.map((setting) => [setting.key, setting.value]));

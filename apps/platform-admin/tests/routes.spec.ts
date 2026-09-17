@@ -21,6 +21,8 @@ const CONSOLE_ROUTES = [
   '/jobs',
   // P-C1 — the settings screen the console writes through `PUT /platform/settings`.
   '/settings',
+  // P-C2 — بطاقة العميل: one dynamic route, reached from the customers list.
+  '/tenants/[id]',
 ];
 
 function pageFileFor(href: string): string {
@@ -62,6 +64,60 @@ describe('platform console routes', () => {
     expect(code).not.toContain('/onboarding');
     expect(login).not.toContain('إنشاء حساب');
     expect(login).not.toContain('اشترك');
+  });
+
+  /**
+   * P-C2 — the card is reachable and complete.
+   *
+   * A dynamic route is only a *real* screen if something links to it, so this checks both
+   * halves: the list page links to `/tenants/:id`, and the card carries the plan's eight
+   * tabs and calls the endpoints that back them.
+   */
+  it('links every customer row to its card', () => {
+    const list = readFileSync(join(appDir, 'tenants', 'page.tsx'), 'utf8');
+    expect(list).toContain('href={`/tenants/${tenant.id}`}');
+  });
+
+  it('renders the card with the plan’s tab names, in order', () => {
+    const card = readFileSync(join(appDir, 'tenants', '[id]', 'page.tsx'), 'utf8');
+    for (const label of [
+      'نظرة عامة',
+      'الاشتراك',
+      'المستخدمون',
+      'الاستخدام',
+      'الرايات',
+      'الصحة',
+      'التدقيق',
+      'الملاحظات',
+    ]) {
+      expect(card, label).toContain(label);
+    }
+    // The order is part of the contract with the plan, not an accident of typing.
+    const positions = ['نظرة عامة', 'الاشتراك', 'المستخدمون', 'الاستخدام', 'الرايات', 'الصحة', 'التدقيق', 'الملاحظات'].map(
+      (label) => card.indexOf(`label: '${label}'`),
+    );
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
+  it('calls the P-C2 endpoints and no tenant-plane shortcut', () => {
+    const card = readFileSync(join(appDir, 'tenants', '[id]', 'page.tsx'), 'utf8');
+    for (const call of [
+      '`/platform/tenants/${tenantId}`',
+      '`/platform/tenants/${tenantId}/usage`',
+      '`/platform/tenants/${tenantId}/health`',
+      '`/platform/tenants/${tenantId}/notes`',
+      '`/platform/tenants/${tenantId}/settings',
+      '`/platform/tenants/${tenantId}/flags`',
+      '`/platform/tenants/${tenantId}/branding`',
+      '`/platform/tenants/${tenantId}/status`',
+      '`/platform/tenants/${tenantId}/owner/transfer`',
+    ]) {
+      expect(card, call).toContain(call);
+    }
+    // The card is the platform plane only: it must never call a `/api/v1/tenants/…` route,
+    // which is the customer's own surface and carries the tenant session's permissions.
+    expect(card).not.toContain('/api/v1/tenant');
   });
 
   /** P-C1: the sidebar is a real tree, and the four groups are the plan's. */

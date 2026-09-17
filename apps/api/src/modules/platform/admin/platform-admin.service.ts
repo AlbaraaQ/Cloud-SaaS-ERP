@@ -371,17 +371,9 @@ export class PlatformAdminService {
     });
   }
 
-  async setTenantStatus(tenantId: string, status: 'active' | 'suspended' | 'archived') {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        UPDATE tenants SET status = ${status}, updated_at = now() WHERE id = ${tenantId}
-        RETURNING id, code, name, status
-      `);
-      if (result.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'Tenant not found', 404);
-      return result.rows[0];
-    });
-  }
+  // `setTenantStatus` was removed with its route: P-C2's `POST /platform/tenants/:id/status`
+  // (`PlatformTenantsService.setStatus`) supersedes it — it demands a reason, refuses a
+  // no-op transition, and writes an audit row in the customer's own trail.
 
   // ----------------------------------------------------------------- plans
 

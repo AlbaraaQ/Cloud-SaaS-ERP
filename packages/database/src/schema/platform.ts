@@ -206,6 +206,35 @@ export const platformSettings = pgTable(
   }),
 );
 
+/**
+ * Platform operators' notes about one customer (migration 0067, P-C2).
+ *
+ * The console's «الملاحظات» tab is the only reader. It is deliberately *not* tenant data:
+ * a note like "called about the unpaid invoice, asked for a 30-day extension" is written
+ * by the platform about the customer, so the table carries a `tenant_id` (for the cascade
+ * and for the isolation policy) but is visible only on the platform plane.
+ */
+export const tenantNotes = pgTable(
+  'tenant_notes',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    authorUserId: uuid('author_user_id'),
+    /** The author's name as it must read in the console, even after the user is gone. */
+    authorLabel: text('author_label').notNull().default(''),
+    ...baseAuditColumns(),
+  },
+  (table) => ({
+    tenantNotesTenantIdx: index('tenant_notes_tenant_idx').on(table.tenantId, table.createdAt),
+  }),
+);
+
+export type TenantNote = typeof tenantNotes.$inferSelect;
+export type NewTenantNote = typeof tenantNotes.$inferInsert;
+
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type NewPlatformSetting = typeof platformSettings.$inferInsert;
 

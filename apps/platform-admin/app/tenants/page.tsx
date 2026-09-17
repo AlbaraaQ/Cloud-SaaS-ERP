@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { Empty, ErrorBox, Loading, Screen } from '../../components/screen';
-import { ApiError, apiData, apiPatch, apiPost } from '../../lib/api';
+import { ApiError, apiData, apiPost } from '../../lib/api';
 import { useQuery } from '../../lib/use-query';
 
 type Tenant = {
@@ -33,6 +33,10 @@ export default function TenantsPage() {
   const [applied, setApplied] = useState({ search: '', status: '' });
   const [message, setMessage] = useState<{ kind: 'ok' | 'danger'; text: string } | undefined>();
   const [granting, setGranting] = useState<Tenant | undefined>();
+  // P-C2 made «السبب» mandatory on `POST /platform/tenants/:id/status`: suspending a
+  // customer is a decision somebody must be able to explain a month later. The screen asks
+  // for it before the click instead of letting the API answer 400.
+  const [statusTarget, setStatusTarget] = useState<{ tenant: Tenant; next: 'active' | 'suspended' | 'archived' } | undefined>();
 
   const tenants = useQuery<Tenant[]>(() => {
     const params = new URLSearchParams();
@@ -43,12 +47,12 @@ export default function TenantsPage() {
 
   const plans = useQuery<Plan[]>(() => apiData<Plan[]>('/platform/plans'), []);
 
-  async function changeStatus(tenant: Tenant, next: 'active' | 'suspended' | 'archived') {
-    if (next !== 'active' && !window.confirm(`تأكيد ${next === 'suspended' ? 'إيقاف' : 'أرشفة'} «${tenant.name}»؟`)) return;
+  async function changeStatus(tenant: Tenant, next: 'active' | 'suspended' | 'archived', reason: string) {
     setMessage(undefined);
     try {
-      await apiPatch(`/platform/tenants/${tenant.id}/status`, { status: next });
-      setMessage({ kind: 'ok', text: 'تم تحديث حالة العميل.' });
+      await apiPost(`/platform/tenants/${tenant.id}/status`, { status: next, reason });
+      setMessage({ kind: 'ok', text: 'تم تحديث حالة العميل، والسبب محفوظ في تدقيقه.' });
+      setStatusTarget(undefined);
       tenants.reload();
     } catch (error) {
       setMessage({ kind: 'danger', text: error instanceof ApiError ? error.message : String(error) });
@@ -89,6 +93,15 @@ export default function TenantsPage() {
 
       {message && <p className={`alert ${message.kind}`}>{message.text}</p>}
 
+      {statusTarget && (
+        <StatusReasonForm
+          tenant={statusTarget.tenant}
+          next={statusTarget.next}
+          onClose={() => setStatusTarget(undefined)}
+          onSubmit={(reason) => void changeStatus(statusTarget.tenant, statusTarget.next, reason)}
+        />
+      )}
+
       {granting && (
         <GrantLicenceForm
           tenant={granting}
@@ -126,7 +139,10 @@ export default function TenantsPage() {
                 {(tenants.data ?? []).map((tenant) => (
                   <tr key={tenant.id}>
                     <td>
-                      <strong>{tenant.name}</strong>
+                      {/* P-C2 — the card: every question about one customer, on one page. */}
+                      <Link href={`/tenants/${tenant.id}`}>
+                        <strong>{tenant.name}</strong>
+                      </Link>
                       <div className="muted small">{new Date(tenant.createdAt).toLocaleDateString('ar-SA')}</div>
                     </td>
                     <td dir="ltr">{tenant.code}</td>
@@ -150,15 +166,26 @@ export default function TenantsPage() {
                     <td className="num">{tenant.branchCount}</td>
                     <td>
                       <div className="row">
+                        <Link className="btn sm" href={`/tenants/${tenant.id}`}>
+                          البطاقة
+                        </Link>
                         <button className="btn sm primary" type="button" onClick={() => setGranting(tenant)}>
                           ترخيص
                         </button>
                         {tenant.status === 'active' ? (
-                          <button className="btn sm danger" type="button" onClick={() => void changeStatus(tenant, 'suspended')}>
+                          <button
+                            className="btn sm danger"
+                            type="button"
+                            onClick={() => setStatusTarget({ tenant, next: 'suspended' })}
+                          >
                             إيقاف
                           </button>
                         ) : (
-                          <button className="btn sm" type="button" onClick={() => void changeStatus(tenant, 'active')}>
+                          <button
+                            className="btn sm"
+                            type="button"
+                            onClick={() => setStatusTarget({ tenant, next: 'active' })}
+                          >
                             تفعيل
                           </button>
                         )}
@@ -171,6 +198,49 @@ export default function TenantsPage() {
           </div>
         ))}
     </Screen>
+  );
+}
+
+/** «السبب» before the click — the same requirement the API enforces. */
+function StatusReasonForm({
+  tenant,
+  next,
+  onClose,
+  onSubmit,
+}: {
+  tenant: Tenant;
+  next: 'active' | 'suspended' | 'archived';
+  onClose: () => void;
+  onSubmit: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const action = next === 'suspended' ? 'إيقاف' : next === 'archived' ? 'أرشفة' : 'إعادة تنشيط';
+
+  return (
+    <form
+      className="card"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (reason.trim().length >= 3) onSubmit(reason.trim());
+      }}
+    >
+      <h2>
+        {action} — {tenant.name}
+      </h2>
+      <p className="muted small">يُحفظ السبب في تدقيق العميل نفسه، ويظهر في تبويب «التدقيق» من بطاقته.</p>
+      <label className="field">
+        <span>السبب (٣ أحرف على الأقل)</span>
+        <input className="input" value={reason} onChange={(event) => setReason(event.target.value)} autoFocus />
+      </label>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn primary" type="submit" disabled={reason.trim().length < 3}>
+          تأكيد
+        </button>
+        <button className="btn" type="button" onClick={onClose}>
+          إلغاء
+        </button>
+      </div>
+    </form>
   );
 }
 

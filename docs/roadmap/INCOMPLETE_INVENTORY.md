@@ -69,6 +69,12 @@
 > الأحداث عبر العملاء (`GET /platform/jobs/outbox`)، وإعدادات المنصة صارت مكتوبة
 > (`GET/PUT /platform/settings`). الجدول أدناه هو **قياس ما قبل P-C1** ويُحفظ للتاريخ.
 > الوثيقة: [`../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md).
+>
+> ✅ **وتحديثٌ بعد P-C2 (2026-09-17):** «رايات الميزات وإعدادات المستأجر من المنصة» و«استخدام
+> وحصص» و«تدقيق عابر للمستأجرين» — البطاقة `/tenants/[id]` تغطيها بثمانية تبويبات، وملاحظات
+> المشغّلين صار لها جدول `tenant_notes`. الباقي من قائمة «الغائب تماماً» أدناه كما هو، و**زاد
+> عليها** بندٌ كُشف وأُغلق: سياسات RLS بـ`''::uuid` (155 سياسة) — التفصيل في
+> [`../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md) §1.1.
 
 **قياس اليوم** (تسجيل دخول `admin@platform.test` على المستأجر `platform`):
 

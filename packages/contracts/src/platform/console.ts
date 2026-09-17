@@ -30,8 +30,30 @@ import { paginationQuerySchema } from '../pagination.js';
  * field and how the API validates the value. `string-list` is one entry per line in the
  * UI and a JSON array on the wire — the same shape `platform_settings.value` stores.
  */
-export const platformSettingKinds = ['string', 'email', 'string-list', 'integer', 'boolean'] as const;
+export const platformSettingKinds = [
+  'string',
+  'email',
+  'string-list',
+  'integer',
+  'boolean',
+  /** `#rrggbb` only (P-C2 branding). */
+  'color',
+  /** `https://…` or an internal `/…` path (P-C2 branding). */
+  'url',
+] as const;
 export type PlatformSettingKind = (typeof platformSettingKinds)[number];
+
+/**
+ * Where a setting may be written (P-C2 added the second scope).
+ *
+ * - `platform` — one row with `tenant_id IS NULL` decides for every customer. The
+ *   maintenance switch is the obvious member: it is not a per-customer idea.
+ * - `tenant` — one row per customer, used either as that customer's **override** of a
+ *   platform default (`limits.*`) or as data that only a customer can have
+ *   (`branding.*`: a logo and a sender name belong to one company).
+ */
+export const platformSettingScopes = ['platform', 'tenant'] as const;
+export type PlatformSettingScope = (typeof platformSettingScopes)[number];
 
 export type PlatformSettingDefinition = {
   key: string;
@@ -45,6 +67,11 @@ export type PlatformSettingDefinition = {
   /** Inclusive bounds for `integer` kinds. */
   min?: number;
   max?: number;
+  /**
+   * Writers allowed for this key. Omitted means `['platform']` — P-C1's eight keys keep
+   * their original meaning without a line of churn.
+   */
+  scopes?: readonly PlatformSettingScope[];
 };
 
 /**
@@ -80,6 +107,7 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
   },
   {
     key: 'limits.max_users',
+    scopes: ['platform', 'tenant'],
     labelAr: 'حدّ المستخدمين الافتراضي',
     labelEn: 'Default user limit',
     kind: 'integer',
@@ -90,6 +118,7 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
   },
   {
     key: 'limits.max_branches',
+    scopes: ['platform', 'tenant'],
     labelAr: 'حدّ الفروع الافتراضي',
     labelEn: 'Default branch limit',
     kind: 'integer',
@@ -100,6 +129,7 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
   },
   {
     key: 'limits.max_invoices_per_month',
+    scopes: ['platform', 'tenant'],
     labelAr: 'حدّ الفواتير الشهرية الافتراضي',
     labelEn: 'Default monthly invoice limit',
     kind: 'integer',
@@ -124,6 +154,41 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
     helpAr: 'النص المعروض للعملاء أثناء نافذة الصيانة.',
     defaultValue: '',
   },
+
+  // --- Per-customer branding (P-C2) --------------------------------------------
+  // Three keys, tenant scope only: a logo and a sender name are properties of one
+  // company, not defaults. `branding.primary_color` re-uses the key the tenant settings
+  // registry already declared (`packages/config/src/tenant-settings.ts`), so a colour
+  // written before P-C2 reads back unchanged — the platform console simply becomes the
+  // second writer of the same name, with the same `#rrggbb` contract.
+  {
+    key: 'branding.primary_color',
+    labelAr: 'اللون الأساسي',
+    labelEn: 'Primary colour',
+    kind: 'color',
+    helpAr: 'لون واجهة العميل بصيغة #rrggbb.',
+    defaultValue: '#0f172a',
+    scopes: ['tenant'],
+  },
+  {
+    key: 'branding.logo_url',
+    labelAr: 'رابط الشعار',
+    labelEn: 'Logo URL',
+    kind: 'url',
+    helpAr: 'رابط https مباشر لشعار العميل، أو مسار داخلي يبدأ بـ/.',
+    defaultValue: '',
+    scopes: ['tenant'],
+  },
+  {
+    key: 'branding.sender_name',
+    labelAr: 'اسم المُرسِل',
+    labelEn: 'Sender name',
+    kind: 'string',
+    helpAr: 'الاسم الذي تظهر به رسائل العميل وإشعاراته.',
+    defaultValue: '',
+    max: 60,
+    scopes: ['tenant'],
+  },
 ] as const;
 
 export const platformSettingKeySchema = z.string().refine(
@@ -135,6 +200,24 @@ export function findPlatformSettingDefinition(
   key: string,
 ): PlatformSettingDefinition | undefined {
   return platformSettingDefinitions.find((definition) => definition.key === key);
+}
+
+/** The writers a key allows. A definition without `scopes` is platform-only (P-C1 rule). */
+export function platformSettingScopesOf(key: string): readonly PlatformSettingScope[] {
+  return findPlatformSettingDefinition(key)?.scopes ?? ['platform'];
+}
+
+export function platformSettingAllowsScope(key: string, scope: PlatformSettingScope): boolean {
+  return platformSettingScopesOf(key).includes(scope);
+}
+
+/**
+ * The catalogue a screen shows for one scope. `GET /platform/settings` renders the
+ * platform-scoped half; `GET /platform/tenants/:id/settings` renders the tenant-scoped
+ * half — the same definitions, so a key can never be editable in the wrong plane.
+ */
+export function platformSettingsForScope(scope: PlatformSettingScope): PlatformSettingDefinition[] {
+  return platformSettingDefinitions.filter((definition) => platformSettingAllowsScope(definition.key, scope));
 }
 
 /** The value a setting takes when it has never been written. */
@@ -162,9 +245,31 @@ export function validatePlatformSettingValue(
   if (!definition) return { ok: false, reason: `مفتاح إعداد غير معروف: ${key}` };
 
   switch (definition.kind) {
-    case 'string':
+    case 'string': {
       if (typeof value !== 'string') return { ok: false, reason: 'القيمة يجب أن تكون نصاً' };
-      return { ok: true, value: value.trim() };
+      const text = value.trim();
+      if (definition.max !== undefined && text.length > definition.max) {
+        return { ok: false, reason: `أقصى طول مسموح ${definition.max} حرفاً` };
+      }
+      return { ok: true, value: text };
+    }
+    case 'color': {
+      if (typeof value !== 'string') return { ok: false, reason: 'القيمة يجب أن تكون نصاً' };
+      const color = value.trim().toLowerCase();
+      if (!/^#[0-9a-f]{6}$/.test(color)) {
+        return { ok: false, reason: 'اللون يجب أن يكون بصيغة #rrggbb' };
+      }
+      return { ok: true, value: color };
+    }
+    case 'url': {
+      if (typeof value !== 'string') return { ok: false, reason: 'القيمة يجب أن تكون نصاً' };
+      const url = value.trim();
+      // Empty is allowed: a customer with no logo yet keeps the platform's default.
+      if (url.length === 0) return { ok: true, value: '' };
+      if (url.startsWith('/') && !url.startsWith('//') && !/\s/.test(url)) return { ok: true, value: url };
+      if (/^https:\/\/[^\s]+$/i.test(url)) return { ok: true, value: url };
+      return { ok: false, reason: 'الرابط يجب أن يبدأ بـhttps:// أو بمسار داخلي /' };
+    }
     case 'email': {
       if (typeof value !== 'string') return { ok: false, reason: 'القيمة يجب أن تكون نصاً' };
       const email = value.trim();
@@ -211,6 +316,11 @@ export const platformSettingViewSchema = z.object({
   value: z.union([z.string(), z.array(z.string()), z.number(), z.boolean()]),
   /** True when the row comes from the catalogue, not from a `platform_settings` row. */
   isDefault: z.boolean(),
+  /**
+   * Which row answered (P-C2). `platform` is the inherited value an override replaces;
+   * for a platform-scoped read `source` is `default` or `platform` only.
+   */
+  source: z.enum(['default', 'platform', 'tenant']).default('default'),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
