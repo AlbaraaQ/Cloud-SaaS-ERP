@@ -8,6 +8,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  time,
   timestamp,
   uniqueIndex,
   uuid,
@@ -15,6 +16,7 @@ import {
 
 import { baseAuditColumns, baseLegacyColumns, baseSoftDeleteColumns } from '../columns.js';
 
+import { employees } from './hrm.js';
 import { branches } from './organization.js';
 import { tenants } from './platform.js';
 
@@ -38,6 +40,16 @@ export const accounts = pgTable(
     allowManual: boolean('allow_manual').notNull().default(true),
     branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
     currencyCode: text('currency_code'),
+    /**
+     * 📅 تاريخ فتح الحساب — `Form_WPF/frmAccountsTree.xaml` («بطاقة حساب»). Nullable: an
+     * account opened years ago has no recorded date, and a chart imported by
+     * `desktop-coa.ts` must not be forced to invent one (migration 0045).
+     */
+    openedAt: date('opened_at'),
+    /** 💰 الرصيد الافتتاحي — defaults to 0 so a NULL can never break a sum. */
+    openingBalance: numeric('opening_balance', money).notNull().default('0'),
+    /** 📊 مركز التكلفة — the card's default centre, inherited by a line that names none. */
+    costCenterId: uuid('cost_center_id').references(() => costCenters.id),
     ...baseAuditColumns(),
     ...baseSoftDeleteColumns(),
     ...baseLegacyColumns(),
@@ -77,11 +89,16 @@ export const fiscalPeriods = pgTable(
     status: text('status').notNull().default('open'),
     closedBy: uuid('closed_by'),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** ✔️ فترة نشطة حالياً — `FrmAccountingPeriods.xaml` `ChkIsActive` (migration 0048). */
+    isActive: boolean('is_active').notNull().default(false),
+    /** ملاحظات — `FrmAccountingPeriods.xaml` `TxtNotes` (migration 0048). */
+    notes: text('notes'),
     ...baseAuditColumns(),
   },
   (table) => ({
     periodsYearDatesIdx: index('fiscal_periods_year_dates_idx').on(table.fiscalYearId, table.startDate, table.endDate),
     periodsTenantStatusIdx: index('fiscal_periods_tenant_status_idx').on(table.tenantId, table.status),
+    periodsOneActiveIdx: uniqueIndex('fiscal_periods_one_active_idx').on(table.tenantId).where(sql`${table.isActive}`),
   }),
 );
 
@@ -109,6 +126,10 @@ export const journalEntries = pgTable(
     fiscalPeriodId: uuid('fiscal_period_id').notNull().references(() => fiscalPeriods.id, { onDelete: 'restrict' }),
     date: date('date').notNull(),
     number: text('number'),
+    /** ⏰ الوقت — `FrmNewEntry.xaml` `txtTime`; NULL for entries posted before it was recorded. */
+    entryTime: time('entry_time'),
+    /** ✅ قيد ضريبي — `FrmNewEntry.xaml` `chkIsVAT` (`Entry.IsVAT`). */
+    isVat: boolean('is_vat').notNull().default(false),
     kind: text('kind').notNull().default('manual'),
     status: text('status').notNull().default('draft'),
     description: text('description'),
@@ -143,6 +164,8 @@ export const journalEntryLines = pgTable(
     costCenterId: uuid('cost_center_id'),
     partyId: uuid('party_id'),
     branchId: uuid('branch_id'),
+    /** المندوب — `FrmNewEntry.xaml` `colSalesman` (`Entry_sub.salesman`); NULL when no one is credited. */
+    salesmanId: uuid('salesman_id').references(() => employees.id, { onDelete: 'set null' }),
     description: text('description'),
   },
   (table) => ({

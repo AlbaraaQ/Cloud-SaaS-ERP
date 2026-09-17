@@ -1,0 +1,334 @@
+﻿<Window x:Class="SmartAuditERP.Form_WPF.frmAddPeriod"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="⏰ فترات التأجير" 
+        Height="450" 
+        Width="650"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        ResizeMode="CanResize"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None">
+
+    <Window.Resources>
+        <!-- Gradient Brushes -->
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#8b5cf6" Offset="0"/>
+            <GradientStop Color="#6366f1" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BackgroundGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#f8fafc" Offset="0"/>
+            <GradientStop Color="#e2e8f0" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="PrimaryButtonGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#6366f1" Offset="0"/>
+            <GradientStop Color="#4f46e5" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Button Style -->
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" Opacity="0.3" BlurRadius="10" ShadowDepth="3"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ComboBox Style -->
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="#cbd5e1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" Opacity="0.1" BlurRadius="5" ShadowDepth="2"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="#6366f1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Label Style -->
+        <Style x:Key="ModernLabel" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+
+        <!-- DataGrid Style -->
+        <Style x:Key="ModernDataGrid" TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="True"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="Cell"/>
+            <Setter Property="AlternatingRowBackground" Value="#f8fafc"/>
+            <Setter Property="RowHeight" Value="45"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderGradient}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="TextBlock.TextAlignment" Value="Center"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#e0e7ff"/>
+                    <Setter Property="Foreground" Value="#1e293b"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Border CornerRadius="15" Background="{StaticResource BackgroundGradient}">
+        <Border.Effect>
+            <DropShadowEffect Color="#000000" Opacity="0.3" BlurRadius="20" ShadowDepth="5"/>
+        </Border.Effect>
+
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" 
+                    Background="{StaticResource HeaderGradient}" 
+                    CornerRadius="10" 
+                    Padding="20,15"
+                    Margin="0,0,0,20">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" Opacity="0.2" BlurRadius="10" ShadowDepth="3"/>
+                </Border.Effect>
+                <Grid>
+                    <TextBlock Text="⏰ إدارة فترات التأجير" 
+                               FontSize="24" 
+                               FontWeight="Bold" 
+                               Foreground="White"
+                               HorizontalAlignment="Right"/>
+                    <Button x:Name="btnClose"
+                            HorizontalAlignment="Left"
+                            Width="35" Height="35"
+                            Background="#dc2626"
+                            BorderThickness="0"
+                            ToolTip="إغلاق"
+                            Cursor="Hand"
+                            Click="btnClose_Click">
+                        <Button.Template>
+                            <ControlTemplate>
+                                <Border Background="{TemplateBinding Background}" 
+                                        CornerRadius="8">
+                                    <TextBlock Text="✖" 
+                                               FontSize="18" 
+                                               FontWeight="Bold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Group Selection -->
+            <Border Grid.Row="1" 
+                    Background="White" 
+                    CornerRadius="10" 
+                    Padding="20"
+                    Margin="0,0,0,15">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" Opacity="0.1" BlurRadius="10" ShadowDepth="3"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="250"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" 
+                               Text="🏷️ الفئة" 
+                               Style="{StaticResource ModernLabel}"/>
+                    <ComboBox x:Name="cmbGroup"
+                              Grid.Column="1"
+                              Style="{StaticResource ModernComboBox}"
+                              SelectionChanged="cmbGroup_SelectionChanged"
+                              DisplayMemberPath="code"
+                              SelectedValuePath="id"/>
+                </Grid>
+            </Border>
+
+            <!-- DataGrid -->
+            <Border Grid.Row="2" 
+                    Background="White" 
+                    CornerRadius="10" 
+                    Padding="10"
+                    Margin="0,0,0,15">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" Opacity="0.1" BlurRadius="10" ShadowDepth="3"/>
+                </Border.Effect>
+                <DataGrid x:Name="dgvData"
+                          Style="{StaticResource ModernDataGrid}"
+                          CurrentCellChanged="dgvData_CurrentCellChanged"
+                          CellEditEnding="dgvData_CellEditEnding">
+                    <DataGrid.Columns>
+                        <!-- Period ComboBox Column -->
+                        <DataGridComboBoxColumn Header="⏰ المدة" 
+                                                Width="*"
+                                                SelectedValueBinding="{Binding PeriodId, UpdateSourceTrigger=PropertyChanged}"
+                                                DisplayMemberPath="name"
+                                                SelectedValuePath="id">
+                            <DataGridComboBoxColumn.ElementStyle>
+                                <Style TargetType="ComboBox">
+                                    <Setter Property="ItemsSource" Value="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.Periods}"/>
+                                    <Setter Property="IsEditable" Value="False"/>
+                                </Style>
+                            </DataGridComboBoxColumn.ElementStyle>
+                            <DataGridComboBoxColumn.EditingElementStyle>
+                                <Style TargetType="ComboBox">
+                                    <Setter Property="ItemsSource" Value="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.Periods}"/>
+                                    <Setter Property="IsEditable" Value="False"/>
+                                </Style>
+                            </DataGridComboBoxColumn.EditingElementStyle>
+                        </DataGridComboBoxColumn>
+
+                        <!-- Rent Price Column -->
+                        <DataGridTextColumn Header="💵 السعر" 
+                                            Binding="{Binding Rent, UpdateSourceTrigger=PropertyChanged}" 
+                                            Width="120"/>
+
+                        <!-- Offer Column -->
+                        <DataGridTextColumn Header="🎁 العرض" 
+                                            Binding="{Binding Offer, UpdateSourceTrigger=PropertyChanged}" 
+                                            Width="120"/>
+
+                        <!-- Delete Button Column -->
+                        <DataGridTemplateColumn Header="🗑️" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="🗑️ حذف"
+                                            Background="#ef4444"
+                                            Foreground="White"
+                                            BorderThickness="0"
+                                            Padding="10,5"
+                                            Cursor="Hand"
+                                            FontWeight="SemiBold"
+                                            Click="btnDeleteRow_Click">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" 
+                                                        CornerRadius="6"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" 
+                                                                      VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Opacity" Value="0.85"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- Action Buttons -->
+            <StackPanel Grid.Row="3" 
+                        Orientation="Horizontal" 
+                        HorizontalAlignment="Right">
+
+                <Button x:Name="btnNew"
+                        Width="50" Height="50"
+                        Background="{StaticResource PrimaryButtonGradient}"
+                        Style="{StaticResource ModernButton}"
+                        ToolTip="➕ جديد"
+                        Click="btnNew_Click">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="{TemplateBinding Background}" 
+                                    CornerRadius="10">
+                                <TextBlock Text="➕" 
+                                           FontSize="24"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button x:Name="btnSave"
+                        Width="50" Height="50"
+                        Background="{StaticResource PrimaryButtonGradient}"
+                        Style="{StaticResource ModernButton}"
+                        ToolTip="💾 حفظ"
+                        Click="btnSave_Click">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="{TemplateBinding Background}" 
+                                    CornerRadius="10">
+                                <TextBlock Text="💾" 
+                                           FontSize="24"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+            </StackPanel>
+
+        </Grid>
+    </Border>
+</Window>

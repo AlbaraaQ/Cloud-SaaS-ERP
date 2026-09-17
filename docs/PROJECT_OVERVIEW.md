@@ -49,9 +49,9 @@ Full detail: `LEGACY_DATABASE_ANALYSIS.md`, `LEGACY_BUSINESS_LOGIC.md`.
 ## 4. Target System — Decisions in One Paragraph
 
 **Node.js 22 + TypeScript (strict) + NestJS modular monolith + PostgreSQL 16 +
-Drizzle ORM**, pnpm monorepo with `apps/api`, `apps/admin` (Next.js), `apps/customer`
-(Next.js), `apps/migrator` (ETL CLI), shared packages (`@erp/database`, `@erp/contracts`,
-`@erp/config`). Multi-tenancy = **shared database + shared schema + `tenant_id` on every
+Drizzle ORM**, pnpm monorepo with `apps/api`, four Next.js surfaces (`apps/staff`,
+`apps/marketing`, `apps/platform-admin`, `apps/customer-portal`), `apps/migrator`
+(ETL CLI), shared packages (`@erp/database`, `@erp/contracts`, `@erp/config`). Multi-tenancy = **shared database + shared schema + `tenant_id` on every
 business table + PostgreSQL Row-Level Security**. IDs = **UUID v7**; human document
 numbers from a transactional `document_sequences` service. Money = `NUMERIC(20,4)`
 handled via `decimal.js`, never IEEE floats. Posted journals are **immutable**;

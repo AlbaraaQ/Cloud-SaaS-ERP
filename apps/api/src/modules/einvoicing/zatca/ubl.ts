@@ -59,7 +59,6 @@ export type ZatcaInvoiceInput = {
   subtotal: string;
   taxTotal: string;
   total: string;
-  paidTotal: string;
   paymentMeansCode: string;
   /** Invoice counter value: 1 for the first invoice of the chain, +1 each time. */
   counter: number;
@@ -72,7 +71,33 @@ export type ZatcaInvoiceInput = {
 /** ZATCA's genesis PIH: base64 SHA-256 of the single character "0". */
 export const GENESIS_PIH = 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
 
-const INVOICE_TYPE_CODES: Record<string, string> = { sale: '388', contracting: '388', return: '381', debit: '383' };
+/**
+ * The invoice type code, and — above it — the desktop's own vocabulary.
+ *
+ * `ZatcaService.IntegrateInvoice` (L62-L95) decides between 388 (tax invoice), 381 (credit
+ * note) and 383 (debit note) from the invoice's type and `ProcType`, where a *return*
+ * (`ProcType == 2`) of a sale is a credit note and a debit note is its own kind (`21`).
+ * Our kinds are named rather than numbered, so both spellings of each are listed: the
+ * legacy `return`/`debit` and the kinds the sales module actually writes
+ * (`sale_return`, `credit_note`, `debit_note`). A kind that is not listed is a tax
+ * invoice, which is what the desktop defaults to (`value = "388"`).
+ */
+const INVOICE_TYPE_CODES: Record<string, string> = {
+  sale: '388',
+  contracting: '388',
+  return: '381',
+  sale_return: '381',
+  credit_note: '381',
+  debit: '383',
+  debit_note: '383',
+};
+
+/**
+ * `ZatcaService.cs` L113-L130: the payment instruction says *why* the money moved —
+ * ` Refund.` on a returned sale and ` EditPrice.` on a debit note. Purely descriptive, and
+ * part of the document the authority receives, so it is kept.
+ */
+const INSTRUCTION_NOTES: Record<string, string> = { '381': 'Refund.', '383': 'EditPrice.' };
 
 export function escapeXml(value: unknown): string {
   return String(value ?? '')
@@ -189,7 +214,16 @@ export function buildInvoiceXml(input: ZatcaInvoiceInput): string {
   const typeCode = INVOICE_TYPE_CODES[input.kind] ?? '388';
   // 01 = standard (B2B), 02 = simplified (B2C); the remaining five digits are transaction flags.
   const typeName = input.profile === 'standard' ? '0100000' : '0200000';
+  // `cbc:PrepaidAmount` is always zero, and deliberately so: ZatcaIntegrationSDK.Invoice —
+  // the desktop's own document model (`ZatcaService.cs` L60-L360) — has no prepayment field
+  // at all, so the desktop's documents declare none. Writing the cash the till took in here
+  // would be a second claim about the sale: BR-CO-16 requires PayableAmount to be
+  // TaxInclusiveAmount − PrepaidAmount, so a fully-paid sale would then have to declare a
+  // payable amount of zero. The settlement lives in the treasury and in the payment-means
+  // code; the tax document states what is owed.
   const discount = Number(input.invoiceDiscount ?? 0);
+  const instruction = INSTRUCTION_NOTES[typeCode];
+  const instructionNote = instruction ? `<cbc:InstructionNote>${escapeXml(instruction)}</cbc:InstructionNote>` : '';
   const billingReference =
     typeCode !== '388' && input.referenceNumber
       ? `<cac:BillingReference><cac:InvoiceDocumentReference><cbc:ID>${escapeXml(input.referenceNumber)}</cbc:ID></cac:InvoiceDocumentReference></cac:BillingReference>\n  `
@@ -220,7 +254,7 @@ export function buildInvoiceXml(input: ZatcaInvoiceInput): string {
     ${partyBlock(input.buyer ?? { nameAr: 'عميل نقدي', nameEn: 'Cash customer' })}
   </cac:AccountingCustomerParty>
   <cac:Delivery><cbc:ActualDeliveryDate>${issued.slice(0, 10)}</cbc:ActualDeliveryDate></cac:Delivery>
-  <cac:PaymentMeans><cbc:PaymentMeansCode>${escapeXml(input.paymentMeansCode || '10')}</cbc:PaymentMeansCode></cac:PaymentMeans>
+  <cac:PaymentMeans><cbc:PaymentMeansCode>${escapeXml(input.paymentMeansCode || '10')}</cbc:PaymentMeansCode>${instructionNote}</cac:PaymentMeans>
   ${
     discount > 0
       ? `<cac:AllowanceCharge>
@@ -238,7 +272,7 @@ export function buildInvoiceXml(input: ZatcaInvoiceInput): string {
     <cbc:TaxExclusiveAmount currencyID="${escapeXml(currency)}">${amountOf(Number(input.subtotal) - discount)}</cbc:TaxExclusiveAmount>
     <cbc:TaxInclusiveAmount currencyID="${escapeXml(currency)}">${amountOf(input.total)}</cbc:TaxInclusiveAmount>
     <cbc:AllowanceTotalAmount currencyID="${escapeXml(currency)}">${amountOf(discount)}</cbc:AllowanceTotalAmount>
-    <cbc:PrepaidAmount currencyID="${escapeXml(currency)}">${amountOf(input.paidTotal)}</cbc:PrepaidAmount>
+    <cbc:PrepaidAmount currencyID="${escapeXml(currency)}">0.00</cbc:PrepaidAmount>
     <cbc:PayableAmount currencyID="${escapeXml(currency)}">${amountOf(input.total)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
   ${input.lines.map((line) => invoiceLine(line, currency)).join('\n  ')}

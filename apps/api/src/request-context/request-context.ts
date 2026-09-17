@@ -22,7 +22,21 @@ export type AuthContextValue = {
   scope: string[];
   /** `jti` — token id, used for logout. */
   tokenId: string;
+  /**
+   * Effective platform access: the legacy `users.is_platform_admin` flag OR any
+   * `platform_memberships` row (2026-09: the flag is deprecated, kept for compat).
+   */
   isPlatformAdmin: boolean;
+  /** Platform role codes carried by the token (`proles` claim, may be stale ≤ TTL). */
+  platformRoles: string[];
+};
+
+export type MembershipKind = 'staff' | 'portal';
+
+export type RoleScopeValue = {
+  roleId: string;
+  scopeType: 'branch' | 'warehouse' | 'cash_location' | 'pos_terminal';
+  scopeId: string;
 };
 
 export type TenantContextValue = {
@@ -36,6 +50,13 @@ export type TenantContextValue = {
   /** NULL = all branches (MULTI_TENANCY §2). */
   branchScope: string[] | null;
   isOwner: boolean;
+  /**
+   * Audience of the membership (2026-09). `portal` memberships belong to external
+   * customers and are denied on every `@RequiresPermission` route.
+   */
+  kind: MembershipKind;
+  /** Per-role scope restrictions from `membership_role_scopes` (empty = tenant-wide). */
+  scopes: RoleScopeValue[];
 };
 
 export type RequestContextValue = {

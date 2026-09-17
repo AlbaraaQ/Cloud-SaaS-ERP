@@ -46,6 +46,33 @@ describe('parties phase 08 integration', () => {
     expect(betaList.body.data ?? betaList.body).toEqual([]);
   });
 
+  /**
+   * 🗑️ حذف عميل — `frmCustomers`. `partyBalance` returns money as four-decimal strings,
+   * and `softDelete` used to compare them to `'0'`, which refused **every** delete: a
+   * customer with no movement at all could never be removed. Found by
+   * `scripts/verify-tailoring.mjs` while cleaning up the عميل it had created.
+   */
+  it('deletes a party that has no balance — and refuses one that does', async () => {
+    const created = await api(ctx.server, 'post', '/api/v1/parties', {
+      token: alpha.token,
+      body: { kind: 'customer', name: 'Customer With No Movement' },
+    });
+    expect(created.status).toBe(201);
+    const partyId = ((created.body.data ?? created.body) as { id: string }).id;
+
+    const ledger = await api(ctx.server, 'get', `/api/v1/parties/${partyId}/balance`, { token: alpha.token });
+    expect(ledger.status).toBe(200);
+    // `0.0000` is zero, however many decimals it carries — comparing the *string* to
+    // `'0'` is what made every delete fail (`PARTY_HAS_OPEN_BALANCE`).
+    expect(Number((ledger.body.data ?? ledger.body).receivable)).toBe(0);
+
+    const removed = await api(ctx.server, 'delete', `/api/v1/parties/${partyId}`, { token: alpha.token });
+    expect(removed.status).toBe(200);
+
+    const gone = await api(ctx.server, 'get', `/api/v1/parties/${partyId}`, { token: alpha.token });
+    expect(gone.body.data ?? gone.body).toEqual({});
+  });
+
   it('keeps contacts tenant-scoped and supports soft deletion', async () => {
     const created = await api(ctx.server, 'post', '/api/v1/parties', {
       token: alpha.token,

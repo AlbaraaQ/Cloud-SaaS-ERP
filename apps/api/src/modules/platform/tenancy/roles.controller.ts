@@ -31,7 +31,7 @@ export class RolesController {
   constructor(private readonly roles: RolesService) {}
 
   @Get()
-  @RequiresPermission('platform.role.manage')
+  @RequiresPermission('tenant.role.manage')
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   @ApiQuery({ name: 'filter[isSystem]', required: false })
@@ -44,7 +44,7 @@ export class RolesController {
   }
 
   @Get(':id')
-  @RequiresPermission('platform.role.manage')
+  @RequiresPermission('tenant.role.manage')
   @ApiOperation({ summary: 'Read one role with its permission codes (404 across tenants)' })
   @ApiResponse({ status: 200, description: 'Role' })
   @ApiResponse({ status: 404, description: 'Not found in this tenant' })
@@ -53,7 +53,7 @@ export class RolesController {
   }
 
   @Post()
-  @RequiresPermission('platform.role.manage')
+  @RequiresPermission('tenant.role.manage')
   @zodApiBody(roleCreateSchema)
   @ApiOperation({ summary: 'Create a role' })
   @ApiResponse({ status: 201, description: 'Role created' })
@@ -66,7 +66,7 @@ export class RolesController {
   }
 
   @Put(':id')
-  @RequiresPermission('platform.role.manage')
+  @RequiresPermission('tenant.role.manage')
   @zodApiBody(roleUpdateSchema)
   @ApiOperation({ summary: 'Update a role (system role names are immutable)' })
   @ApiResponse({ status: 200, description: 'Updated role' })
@@ -80,7 +80,7 @@ export class RolesController {
   }
 
   @Post(':id/permissions')
-  @RequiresPermission('platform.role.manage')
+  @RequiresPermission('tenant.role.manage')
   @zodApiBody(rolePermissionsSchema)
   @ApiOperation({ summary: 'Replace the permission set of a role' })
   @ApiResponse({ status: 201, description: 'Permissions replaced' })

@@ -1,0 +1,159 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmSavedMsg"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="تم الحفظ"
+    Width="420" Height="200"
+    MinWidth="380" MinHeight="200"
+    MaxWidth="440" MaxHeight="210"
+    WindowStartupLocation="CenterOwner"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ContinueBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#76B496" Offset="0"/>
+            <GradientStop Color="#4A8A6A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="10" ShadowDepth="2"
+                          Direction="270" Opacity="0.12" Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow"  BlurRadius="5"  ShadowDepth="1"
+                          Direction="270" Opacity="0.18" Color="#000000"/>
+
+        <Style x:Key="MsgBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Cairo, Tahoma, Arial"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="9"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Border Background="White"
+            CornerRadius="12"
+            Margin="8"
+            Effect="{StaticResource CardShadow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- ─── Header ─── -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource SaveBrush}"
+                    CornerRadius="12,12,0,0"
+                    Padding="14,10">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="✅"
+                               FontSize="18"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+                    <TextBlock x:Name="lblSave"
+                               Text="تم الحفظ بنجاح"
+                               Foreground="White"
+                               FontSize="14" FontWeight="Bold"
+                               FontFamily="Cairo, Tahoma, Arial"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ─── Message Body ─── -->
+            <StackPanel Grid.Row="1"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Margin="16,10">
+                <TextBlock Text="ماذا تريد أن تفعل الآن؟"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="#555"
+                           FontFamily="Cairo, Tahoma, Arial"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- ─── Buttons ─── -->
+            <Border Grid.Row="2"
+                    Background="#F0F4FF"
+                    CornerRadius="0,0,12,12"
+                    Padding="14,10">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center">
+
+                    <!-- جديد -->
+                    <Button x:Name="btnNew"
+                            Content="➕ جديد"
+                            Background="{StaticResource HeaderBrush}"
+                            Style="{StaticResource MsgBtn}"
+                            Width="100"
+                            Margin="0,0,8,0"
+                            Click="btnNew_Click"/>
+
+                    <!-- استمرار -->
+                    <Button x:Name="btnContu"
+                            Content="▶ استمرار"
+                            Background="{StaticResource ContinueBrush}"
+                            Style="{StaticResource MsgBtn}"
+                            Width="100"
+                            Margin="0,0,8,0"
+                            Click="btnContu_Click"/>
+
+                    <!-- خروج -->
+                    <Button x:Name="btnExit"
+                            Content="✖ خروج"
+                            Background="{StaticResource DangerBrush}"
+                            Style="{StaticResource MsgBtn}"
+                            Width="100"
+                            Click="btnExit_Click"/>
+
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</dx:ThemedWindow>

@@ -24,7 +24,6 @@ function invoice(overrides: Partial<ZatcaInvoiceInput> = {}): ZatcaInvoiceInput 
     subtotal: '370',
     taxTotal: '49.5',
     total: '419.5',
-    paidTotal: '419.5',
     paymentMeansCode: '10',
     counter: 1,
     previousHash: GENESIS_PIH,

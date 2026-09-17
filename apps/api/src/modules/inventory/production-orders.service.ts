@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { DomainError, newId } from '@erp/contracts';
 import {
   inventoryTransactions,
+  itemUnits,
   items,
   productionOrderComponents,
   productionOrders,
@@ -16,6 +17,7 @@ import {
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { tryGetAuthContext } from '../platform/context/tenant-context.js';
 import { SequencesService } from '../platform-services/index.js';
+import { CatalogService } from '../organization/catalog/catalog.service.js';
 
 import { InventoryService } from './inventory.service.js';
 
@@ -25,8 +27,18 @@ export type ProductionOrderInput = {
   orderDate?: string;
   outputItemId: string;
   outputQty: string;
+  /** 📄 رقم المرجع — the document this build answers. */
+  referenceNo?: string;
+  /** 📅 تاريخ المرجع — the date of the referenced document. */
+  referenceDate?: string;
+  /** 📐 الوحدة the produced quantity is counted in; defaults to the item's base unit. */
+  unitId?: string;
   notes?: string;
-  components: Array<{ itemId: string; qty: string }>;
+  /**
+   * Leave it out and the bill of materials on the item card fills it in, scaled to the
+   * quantity being built — that is what makes the المكونات tab worth keeping.
+   */
+  components?: Array<{ itemId: string; qty: string; unitId?: string }>;
 };
 
 const dec = (input: string | number | null | undefined) => new Decimal(input ?? 0);
@@ -49,6 +61,7 @@ export class ProductionOrdersService {
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly sequences: SequencesService,
     private readonly inventory: InventoryService,
+    private readonly catalog: CatalogService,
   ) {}
 
   async list(tenantId: string, filters: { status?: string; warehouseId?: string } = {}) {
@@ -78,25 +91,44 @@ export class ProductionOrdersService {
     if (!input.outputItemId) throw new DomainError('PRODUCTION_OUTPUT_REQUIRED', 'A production order needs an output item', 422);
     const outputQty = dec(input.outputQty);
     if (!outputQty.isFinite() || outputQty.lte(0)) throw new DomainError('PRODUCTION_OUTPUT_QTY_INVALID', 'The produced quantity must be greater than zero', 422);
-    if (!input.components?.length) throw new DomainError('PRODUCTION_COMPONENTS_REQUIRED', 'A production order needs at least one component', 422);
-
-    const seen = new Set<string>();
-    const components = input.components.map((component, index) => {
-      const qty = dec(component.qty);
-      if (!qty.isFinite() || qty.lte(0)) throw new DomainError('PRODUCTION_COMPONENT_QTY_INVALID', 'Every component needs a quantity greater than zero', 422);
-      if (component.itemId === input.outputItemId) throw new DomainError('PRODUCTION_COMPONENT_IS_OUTPUT', 'An item cannot be both a component and the output', 422);
-      if (seen.has(component.itemId)) throw new DomainError('PRODUCTION_COMPONENT_DUPLICATE', 'Each component may appear only once; combine the quantities', 422);
-      seen.add(component.itemId);
-      return { lineNo: index + 1, itemId: component.itemId, qty: qty.toFixed(4) };
-    });
+    const drafted = (input.components ?? []).map((component) => ({
+      itemId: component.itemId,
+      qty: component.qty,
+      unitId: component.unitId,
+    }));
 
     const id = newId();
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const [warehouse] = await tx.select().from(warehouses).where(and(eq(warehouses.tenantId, tenantId), eq(warehouses.id, input.warehouseId)));
       if (!warehouse) throw new DomainError('WAREHOUSE_NOT_FOUND', 'Warehouse was not found', 404);
+
+      // Nothing typed on the screen: read the bill of materials off the item card.
+      const lines =
+        drafted.length > 0
+          ? drafted
+          : await this.catalog.componentsFor(tx, tenantId, input.outputItemId, outputQty);
+      const seen = new Set<string>();
+      const components = lines.map((component, index) => {
+        const qty = dec(component.qty);
+        if (!qty.isFinite() || qty.lte(0)) throw new DomainError('PRODUCTION_COMPONENT_QTY_INVALID', 'Every component needs a quantity greater than zero', 422);
+        if (component.itemId === input.outputItemId) throw new DomainError('PRODUCTION_COMPONENT_IS_OUTPUT', 'An item cannot be both a component and the output', 422);
+        if (seen.has(component.itemId)) throw new DomainError('PRODUCTION_COMPONENT_DUPLICATE', 'Each component may appear only once; combine the quantities', 422);
+        seen.add(component.itemId);
+        return { lineNo: index + 1, itemId: component.itemId, qty: qty.toFixed(4), unitId: component.unitId ?? null };
+      });
+      if (components.length === 0)
+        throw new DomainError(
+          'PRODUCTION_COMPONENTS_REQUIRED',
+          'A production order needs at least one component — either pass them or define them on the item card',
+          422,
+        );
+
       const referenced = [input.outputItemId, ...components.map((component) => component.itemId)];
-      const known = await tx.select({ id: items.id }).from(items).where(and(eq(items.tenantId, tenantId), inArray(items.id, referenced)));
+      const known = await tx.select({ id: items.id, baseUnitId: items.baseUnitId }).from(items).where(and(eq(items.tenantId, tenantId), inArray(items.id, referenced)));
       if (known.length !== new Set(referenced).size) throw new DomainError('ITEM_NOT_FOUND', 'One of the items on this order was not found', 404);
+      const outputItem = known.find((row) => row.id === input.outputItemId)!;
+      // 📐 الوحدة — a unit the item does not carry has no ratio, so it cannot be honoured.
+      const unitId = input.unitId ? await this.outputUnit(tx, tenantId, outputItem, input.unitId) : outputItem.baseUnitId;
 
       const allocated = await this.sequences.next({ tenantId, branchId: input.branchId ?? warehouse.branchId ?? undefined, docType: 'production_order' }, tx, { prefix: 'MO-', padding: 6 });
       await tx.insert(productionOrders).values({
@@ -109,6 +141,9 @@ export class ProductionOrdersService {
         status: 'draft',
         outputItemId: input.outputItemId,
         outputQty: outputQty.toFixed(4),
+        unitId,
+        referenceNo: input.referenceNo?.trim() || null,
+        referenceDate: input.referenceDate || null,
         notes: input.notes,
         createdBy: tryGetAuthContext()?.userId,
       });
@@ -127,6 +162,7 @@ export class ProductionOrdersService {
         itemId: component.itemId,
         warehouseId: order.warehouseId,
         qty: component.qty,
+        unitId: component.unitId ?? undefined,
         direction: 'out' as const,
         docType: 'production_order',
         docId: id,
@@ -146,6 +182,7 @@ export class ProductionOrdersService {
         itemId: order.outputItemId,
         warehouseId: order.warehouseId,
         qty: order.outputQty,
+        unitId: order.unitId ?? undefined,
         unitCost: unitCost.toFixed(4),
         direction: 'in' as const,
         docType: 'production_order',
@@ -180,10 +217,27 @@ export class ProductionOrdersService {
     });
   }
 
+  /** A produced quantity may be counted in the item's base unit or any unit on its card. */
+  private async outputUnit(
+    tx: DrizzleTx,
+    tenantId: string,
+    outputItem: { id: string; baseUnitId: string },
+    unitId: string,
+  ) {
+    if (unitId === outputItem.baseUnitId) return unitId;
+    const [row] = await tx
+      .select({ unitId: itemUnits.unitId })
+      .from(itemUnits)
+      .where(and(eq(itemUnits.tenantId, tenantId), eq(itemUnits.itemId, outputItem.id), eq(itemUnits.unitId, unitId)));
+    if (!row) throw new DomainError('PRODUCTION_UNIT_INVALID', 'The produced quantity must be counted in the item base unit or one of its own units', 422, { field: 'unitId' });
+    return row.unitId;
+  }
+
   private async load(tx: DrizzleTx, tenantId: string, id: string) {
     const [order] = await tx.select().from(productionOrders).where(and(eq(productionOrders.tenantId, tenantId), eq(productionOrders.id, id)));
     if (!order) throw new DomainError('PRODUCTION_ORDER_NOT_FOUND', 'Production order was not found', 404);
     const components = await tx.select().from(productionOrderComponents).where(and(eq(productionOrderComponents.tenantId, tenantId), eq(productionOrderComponents.orderId, id)));
-    return { ...order, components: components.sort((a, b) => a.lineNo - b.lineNo) };
+    const [output] = await tx.select({ baseUnitId: items.baseUnitId }).from(items).where(and(eq(items.tenantId, tenantId), eq(items.id, order.outputItemId)));
+    return { ...order, unitId: order.unitId ?? output?.baseUnitId ?? null, components: components.sort((a, b) => a.lineNo - b.lineNo) };
   }
 }

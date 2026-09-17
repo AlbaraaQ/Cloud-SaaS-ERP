@@ -1,0 +1,184 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Platforms>AnyCPU;x86</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="DevExpress.Data" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Images" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Reporting.Core" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Win.Design" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Wpf.Core" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Wpf.ExpressionEditor" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Wpf.Grid.Core" Version="25.2.3" />
+    <PackageReference Include="DevExpress.Wpf.ThemesLW" Version="25.2.3" />
+    <PackageReference Include="Nancy" Version="2.0.0" />
+    <PackageReference Include="System.Management" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartAuditUpdater\SmartAuditUpdater.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="AuditorAPI">
+      <HintPath>..\..\المكاتب\AuditorAPI.exe</HintPath>
+    </Reference>
+    <Reference Include="BouncyCastle.Crypto">
+      <HintPath>..\..\المكاتب\BouncyCastle.Crypto.dll</HintPath>
+    </Reference>
+    <Reference Include="drHamiedNotify">
+      <HintPath>..\..\المكاتب\drHamiedNotify.dll</HintPath>
+    </Reference>
+    <Reference Include="EASendMail">
+      <HintPath>..\..\المكاتب\EASendMail.dll</HintPath>
+    </Reference>
+    <Reference Include="ECRPaymentsAPI">
+      <HintPath>..\..\المكاتب\ECRPaymentsAPI.dll</HintPath>
+    </Reference>
+    <Reference Include="ETA_Invoice">
+      <HintPath>..\..\المكاتب\ETA_Invoice.dll</HintPath>
+    </Reference>
+    <Reference Include="ExcelDataReader">
+      <HintPath>..\..\المكاتب\ExcelDataReader.dll</HintPath>
+    </Reference>
+    <Reference Include="ExcelDataReader.DataSet">
+      <HintPath>..\..\المكاتب\ExcelDataReader.DataSet.dll</HintPath>
+    </Reference>
+    <Reference Include="FastMember">
+      <HintPath>..\..\المكاتب\FastMember.dll</HintPath>
+    </Reference>
+    <Reference Include="FontAwesome.Sharp">
+      <HintPath>..\..\المكاتب\FontAwesome.Sharp.dll</HintPath>
+    </Reference>
+    <Reference Include="GenCode128">
+      <HintPath>..\..\المكاتب\GenCode128.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>..\..\المكاتب\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
+    <Reference Include="itextsharp">
+      <HintPath>..\..\المكاتب\itextsharp.dll</HintPath>
+    </Reference>
+    <Reference Include="JWT">
+      <HintPath>..\..\المكاتب\JWT.dll</HintPath>
+    </Reference>
+    <Reference Include="log4net">
+      <HintPath>..\..\المكاتب\log4net.dll</HintPath>
+    </Reference>
+    <Reference Include="M2Mqtt.Net">
+      <HintPath>..\..\المكاتب\M2Mqtt.Net.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.AspNet.SignalR.Client">
+      <HintPath>..\..\المكاتب\Microsoft.AspNet.SignalR.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.SqlServer.ConnectionInfo">
+      <HintPath>..\..\المكاتب\Microsoft.SqlServer.ConnectionInfo.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.SqlServer.ConnectionInfoExtended">
+      <HintPath>..\..\المكاتب\Microsoft.SqlServer.ConnectionInfoExtended.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualBasic.PowerPacks.Vs">
+      <HintPath>..\..\المكاتب\Microsoft.VisualBasic.PowerPacks.Vs.dll</HintPath>
+    </Reference>
+    <Reference Include="neoleapconnector">
+      <HintPath>..\..\المكاتب\neoleapconnector.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\المكاتب\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfSharp">
+      <HintPath>..\..\المكاتب\PdfSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="PdfSharp.Charting">
+      <HintPath>..\..\المكاتب\PdfSharp.Charting.dll</HintPath>
+    </Reference>
+    <Reference Include="Pkcs11Interop">
+      <HintPath>..\..\المكاتب\Pkcs11Interop.dll</HintPath>
+    </Reference>
+    <Reference Include="QLicense">
+      <HintPath>..\..\المكاتب\QLicense.dll</HintPath>
+    </Reference>
+    <Reference Include="QRCoder">
+      <HintPath>..\..\المكاتب\QRCoder.dll</HintPath>
+    </Reference>
+    <Reference Include="RestSharp">
+      <HintPath>..\..\المكاتب\RestSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="saxon-he-10.8">
+      <HintPath>..\..\المكاتب\saxon-he-10.8.dll</HintPath>
+    </Reference>
+    <Reference Include="saxon-he-api-10.8">
+      <HintPath>..\..\المكاتب\saxon-he-api-10.8.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Data.SqlClient">
+      <HintPath>C:\Users\Al-Bara Qasem\.nuget\packages\system.data.sqlclient\4.8.6\ref\netcoreapp2.1\System.Data.SqlClient.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http.Extensions">
+      <HintPath>..\..\المكاتب\System.Net.Http.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http.Formatting">
+      <HintPath>..\..\المكاتب\System.Net.Http.Formatting.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http.Primitives">
+      <HintPath>..\..\المكاتب\System.Net.Http.Primitives.dll</HintPath>
+    </Reference>
+    <Reference Include="Twilio">
+      <HintPath>..\..\المكاتب\Twilio.dll</HintPath>
+    </Reference>
+    <Reference Include="UtilitiesProj">
+      <HintPath>..\..\المكاتب\UtilitiesProj.dll</HintPath>
+    </Reference>
+    <Reference Include="WebDriver">
+      <HintPath>..\..\المكاتب\WebDriver.dll</HintPath>
+    </Reference>
+    <Reference Include="WebDriver.Support">
+      <HintPath>..\..\المكاتب\WebDriver.Support.dll</HintPath>
+    </Reference>
+    <Reference Include="websocket-sharp">
+      <HintPath>..\..\المكاتب\websocket-sharp.dll</HintPath>
+    </Reference>
+    <Reference Include="WhatsAppApi">
+      <HintPath>..\..\المكاتب\WhatsAppApi.dll</HintPath>
+    </Reference>
+    <Reference Include="Ws_Auditor">
+      <HintPath>..\..\المكاتب\Ws_Auditor.dll</HintPath>
+    </Reference>
+    <Reference Include="ZatcaIntegrationSDK">
+      <HintPath>..\..\المكاتب\ZatcaIntegrationSDK.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>

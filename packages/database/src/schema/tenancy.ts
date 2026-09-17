@@ -36,6 +36,14 @@ export const memberships = pgTable(
     /** CHECK(active,invited,suspended) */
     status: text('status').notNull().default('invited'),
     isOwner: boolean('is_owner').notNull().default(false),
+    /**
+     * Audience of the membership (migration 0032) — CHECK(staff,portal).
+     * `portal` memberships belong to external customers (see `portal_accounts`):
+     * they resolve their party from the token and are denied on every
+     * `@RequiresPermission` route even if a role were mis-granted. Defaults to
+     * `staff`; migration 0032 backfills portal rows from `portal_accounts`.
+     */
+    kind: text('kind').notNull().default('staff'),
     ...baseAuditColumns(),
     ...baseSoftDeleteColumns(),
   },
@@ -97,6 +105,43 @@ export const membershipRoles = pgTable(
   (table) => ({
     membershipRolesPk: primaryKey({ columns: [table.membershipId, table.roleId] }),
     membershipRolesRoleIdx: index('membership_roles_role_id_idx').on(table.roleId),
+  }),
+);
+
+/**
+ * Per-role scope restrictions (migration 0032).
+ *
+ * A membership may hold several roles (UNION semantics, DATABASE_DESIGN §2); each
+ * `(membership, role)` grant can additionally be restricted to a scope: the whole
+ * tenant (no row), one branch, one warehouse, one cash location or one POS
+ * terminal. `TenantGuard` publishes the scopes on the request context; enforcement
+ * is opt-in per endpoint through `ScopePolicy` (branch scope keeps its dedicated
+ * `branch_scope` + `X-Branch-Id` mechanism unchanged).
+ */
+export const membershipRoleScopes = pgTable(
+  'membership_role_scopes',
+  {
+    membershipId: uuid('membership_id')
+      .notNull()
+      .references(() => memberships.id, { onDelete: 'cascade' }),
+    roleId: uuid('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    /** CHECK(branch,warehouse,cash_location,pos_terminal) */
+    scopeType: text('scope_type').notNull(),
+    /** Id of the branch / warehouse / cash location / POS terminal. */
+    scopeId: uuid('scope_id').notNull(),
+    ...baseAuditColumns(),
+  },
+  (table) => ({
+    membershipRoleScopesPk: primaryKey({
+      columns: [table.membershipId, table.roleId, table.scopeType, table.scopeId],
+    }),
+    membershipRoleScopesRoleIdx: index('membership_role_scopes_role_idx').on(table.roleId),
+    membershipRoleScopesScopeIdx: index('membership_role_scopes_scope_idx').on(
+      table.scopeType,
+      table.scopeId,
+    ),
   }),
 );
 

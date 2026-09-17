@@ -5,6 +5,7 @@ import {
   createRoleFixture,
   createTenantFixture,
   createUserFixture,
+  grantPlatformRoleFixture,
   setMembershipStatusFixture,
   setTenantStatusFixture,
   setTenantSettingFixture,
@@ -14,8 +15,18 @@ import { PasswordService, TokenService } from '../src/modules/platform/index.js'
 
 import type { TestApp } from './test-app.js';
 
+/**
+ * @deprecated Use `ALL_TENANT_PERMISSIONS`. The `platform.*` codes are the legacy
+ * spelling of tenant self-administration; they stay seeded and stay honoured through
+ * the alias map, so suites that grant them keep passing unchanged.
+ */
 export const ALL_PLATFORM_PERMISSIONS = permissionRegistry
   .filter((entry) => entry.module === 'platform')
+  .map((entry) => entry.code);
+
+/** Canonical tenant self-administration codes (`tenant.*`, non-deprecated). */
+export const ALL_TENANT_PERMISSIONS = permissionRegistry
+  .filter((entry) => entry.module === 'tenant' && !entry.deprecated)
   .map((entry) => entry.code);
 
 /** Every PHASE_05 permission — the organization suites need all of them (PHASE_05 §7). */
@@ -93,6 +104,7 @@ export async function createActor(ctx: TestApp, options: ActorOptions): Promise<
     fullName: options.fullName ?? options.email.split('@')[0],
     passwordHash,
     status: options.password ? 'active' : 'invited',
+    isPlatformAdmin: options.isPlatformAdmin,
   });
 
   const membership = await createMembershipFixture(ctx.db.ownerUrl, {
@@ -102,10 +114,20 @@ export async function createActor(ctx: TestApp, options: ActorOptions): Promise<
     status: options.membershipStatus ?? 'active',
     isOwner: options.isOwner ?? true,
     branchScope: options.branchScope === undefined ? null : options.branchScope,
+    kind: options.kind,
   });
 
   for (const roleId of roleIds) {
     await assignRoleFixture(ctx.db.ownerUrl, membership.id, roleId);
+  }
+
+  // Mirrors login semantics: explicit platform roles are granted, and a legacy-flag
+  // administrator without explicit roles is treated as `platform_owner` (the same
+  // equivalence `resolvePlatformAccess` and migration 0032 apply).
+  const platformRoles =
+    options.platformRoles ?? (options.isPlatformAdmin ? ['platform_owner'] : []);
+  for (const roleCode of platformRoles) {
+    await grantPlatformRoleFixture(ctx.db.ownerUrl, { userId: user.id, roleCode });
   }
 
   const tokens = ctx.app.get(TokenService);
@@ -114,7 +136,8 @@ export async function createActor(ctx: TestApp, options: ActorOptions): Promise<
     tid: tenant.id,
     mid: membership.id,
     scope: ['erp'],
-    pam: options.isPlatformAdmin ?? false,
+    pam: (options.isPlatformAdmin ?? false) || platformRoles.length > 0,
+    proles: [...platformRoles],
   });
 
   return {
@@ -137,6 +160,7 @@ export {
   createRoleFixture,
   createTenantFixture,
   createUserFixture,
+  grantPlatformRoleFixture,
   setMembershipStatusFixture,
   setTenantSettingFixture,
   setTenantStatusFixture,

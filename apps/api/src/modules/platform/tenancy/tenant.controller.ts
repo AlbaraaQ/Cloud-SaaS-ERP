@@ -19,7 +19,7 @@ export class TenantController {
   constructor(private readonly tenants: TenantService) {}
 
   @Get()
-  @RequiresPermission('platform.tenant.view')
+  @RequiresPermission('tenant.view')
   @ApiOperation({ summary: 'Read the own tenant record and its effective settings' })
   @ApiResponse({ status: 200, description: 'Tenant' })
   async read(): Promise<{ data: TenantDto }> {
@@ -27,7 +27,7 @@ export class TenantController {
   }
 
   @Patch()
-  @RequiresPermission('platform.tenant.manage')
+  @RequiresPermission('tenant.manage')
   @zodApiBody(tenantPatchSchema)
   @ApiOperation({ summary: 'Update the own tenant record and typed settings in bulk' })
   @ApiResponse({ status: 200, description: 'Updated tenant' })

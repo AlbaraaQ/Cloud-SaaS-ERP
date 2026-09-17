@@ -26,6 +26,8 @@
 | PHASE_22 | 2026-09-07 | COMPLETE | Niche verticals and Salla integration completed: optics prescriptions, tailoring measurements, marina vessels/bookings/rental invoices, vehicle fitment and Salla OAuth/sync/webhook tables under FORCE RLS; feature-flagged `/optics`, `/tailoring`, `/marina`, `/fitment`, `/integrations/salla` APIs, encrypted Salla tokens, HMAC webhook verification, admin pages, docs, tests and OpenAPI export. `pnpm run verify` exits 0. See `PHASE_22_IMPLEMENTATION_REPORT.md`. |
 | PHASE_23 | 2026-09-07 | COMPLETE (READINESS PACK) | Hardening and go-live readiness artifacts completed: `/metrics`, deeper readiness checks, retention-plan service/tests, dependency/secret security sweep with ADR-021 waivers, operations runbooks, backup/restore drill template, perf report, endpoint inventory, UAT pack, program acceptance matrix and `RELEASE_NOTES.md` v1.0.0. Repository verification exits 0, but staging, real API DB/E2E evidence, backup/PITR drill, performance numbers and UAT signatures remain environment-owner gates; this is not production sign-off. See `PHASE_23_IMPLEMENTATION_REPORT.md` and `POST_PHASE_23_GAPS_AND_NOTES.md`. |
 
+| RBAC-REORG | 2026-09-10 | COMPLETE | Surface + RBAC reorganisation on `arena/01a0889e-cloud-saas-erp`: Family-A platform roles (`platform_memberships`, `pam` claim) replacing the blanket `is_platform_admin`; canonical `tenant.*` permissions with legacy `platform.*` aliases; `memberships.kind` (staff/buyer/api); standalone devices registry. Four separately-deployable surfaces on one API/DB: `apps/marketing` (:3002), `apps/staff` (:3001), `apps/platform-admin` (:3003), `apps/customer-portal` (:3004) — all build + tests green (staff 35, marketing 6, platform-admin 3, portal 6). New real screens: platform roles grant/revoke, licence activation requests, tenant audit log, smart login with `?token=` bridge. Docs: `docs/architecture-rbac/01–06`. See final report in PR. |
+
 ## Admin web UI — desktop menu coverage (2026-09-08)
 
 `apps/admin/lib/navigation.ts` is the single source of truth for the screen tree that
@@ -165,9 +167,1242 @@ Round 6 wired the two documents that reverse or transform recorded value (migrat
   because inventory value is conserved, so it raises no journal entry. The output item may
   not be one of its own components, a component may not repeat (combine the quantities),
   and completion fails on `STOCK_INSUFFICIENT` rather than driving stock negative. The
+  components are **optional**: when none are typed they are read from the item card's bill of
+  materials (`item_components`, `GET/POST/DELETE /organization/catalog/items/:id/components`)
+  and scaled by the produced quantity, each in the unit the card named — the desktop's
+  `Qty = qty × BaseQty × UnitEquality`. An item with no recipe and an order with no typed
+  components is refused `PRODUCTION_COMPONENTS_REQUIRED`. A component's unit must be its own
+  base unit or one defined on its card, and a recipe may not form a loop
+  (`CATALOG_COMPONENT_CYCLE`). The
+  `unit_id` (0038) holds the unit the produced quantity was counted in, so `2 علب` of a
+  six-piece box puts twelve pieces on the shelf. The
   `line_id` of each stock movement is the item id, so the existing
   `(tenant, doc_type, doc_id, line_id)` unique index enforces one movement per item per
   order. Screen `/inventory/production`, report key `production-orders`.
+
+* **الأرقام التسلسلية والدفعات** — `item_serials` + `item_lots`. A serial is a state machine
+  (`available → reserved → sold → available`) driven from `/inventory/serials` the way
+  `frmItemSerialNo` drives it: two grids (`📋 الأرقام المتاحة` / `📤 الأرقام المباعة`), a
+  generator that makes a batch off one prefix (`POST /inventory/serials/generate`,
+  all-or-nothing, `409 SERIAL_DUPLICATE` on a clash), and `DELETE /inventory/serials/:id`
+  for a number that never left the shelf — a sold one is refused `422 SERIAL_INVALID_STATE`,
+  because deleting it is how a stock count stops adding up. A lot carrying serials answers
+  `409 LOT_IN_USE`. Screens `/inventory/serials`, `/inventory/lots`, report keys
+  `serial-tracking`, `expiry-report`.
+* **الرقم التسلسلي على سطر المستند** (`InvoiceItemDetail.ItemSerialNo`,
+  `Class/InvoiceOper.cs:1635`) — migration `0039` puts `serial_nos` on the voucher,
+  adjustment and transfer line tables and adds `stock_document_serials`, so a document says
+  *which piece* it moved and a number can be traced back to the documents that moved it
+  (`GET /inventory/serials/:id/documents`, permission `inventory.view`). The numbers are
+  resolved at posting, not at saving: a draft invents no pieces for stock that has not
+  arrived, a count that disagrees with the quantity is `422 SERIAL_COUNT_MISMATCH`, a number
+  in another warehouse is `422 SERIAL_WRONG_WAREHOUSE`, and selling a number twice is
+  `422 SERIAL_INVALID_STATE`. إلغاء is the mirror image and deliberately asymmetric: a
+  receipt's numbers are withdrawn only while they are still on the shelf, an issue's numbers
+  go back on it. A مناقلة contributes two legs — the send that reserves the piece and the
+  receipt that releases it. Screens: the four stock document grids gained a
+  `🔢 الأرقام التسلسلية` column and a paste-box with a live count; the serials screen gained
+  a `🔍` trace per row.
+
+* **المرحلة 06 — الخزينة، الجزء الأول: سند القبض وسند الصرف** (`frmSandQ` / `frmSandD` /
+  `frmSandVAT` / `frmPaymentVoucher`، و`Class/ReceiptOper.cs` L21 `BindReceiptToEntry`).
+  Migration `0040` puts the document's context on the row — `description` (📝 البيان، وهو
+  نفسه بيان القيد كما في `entry.Note = Receipt.Notes`), `voucher_time` (⏰ الوقت، فكشف
+  الصندوق يُرشَّح بالساعة), `salesman_id → employees` (👔 المندوب) و`foreign_amount`
+  (💲 قيمة السند بعملتها) — and the engine now builds the entry a voucher writes instead
+  of waiting for the caller to supply lines: the cash location's own account against the
+  party's receivable/payable account, then the posting profile. Callers who forgot — HRM's
+  `payRun` chief among them — used to move cash out of the safe with **no entry at all**.
+  A cheque is a promise, not money: `chequesInHandAccountId` (أوراق القبض) holds it until
+  clearance, which now posts its own entry (`مدين الصندوق / دائن أوراق القبض`), and a
+  bounced cheque puts the debt back on the customer and is terminal
+  (`422 CHEQUE_INVALID_STATE`). `PATCH /vouchers/:id` edits a whole draft the way
+  `frmSandQ.xaml.cs:903` does and seals a posted one (`409 VOUCHER_IMMUTABLE`);
+  `GET /vouchers?from=&to=&q=` is the 🔍 panel of `frmSandQD`/`frmSandSD`. Screen
+  `/treasury/vouchers` rebuilt as a document: tabs 📥 سند قبض / 📤 سند صرف, a search panel,
+  a document header, `💼 تفاصيل الدفع` with the cheque block behind the bankish methods,
+  and a grid with `🔢 الرقم · 📅 التاريخ · ⏰ الوقت · الطرف · 📝 البيان · 🏦 الصندوق ·
+  💳 نوع الدفع · 💰 المبلغ · 📋 الحالة`. New profile key `chequesInHandAccountId`. Tests
+  `apps/api/test/treasury-vouchers.spec.ts` (7) and `scripts/verify-treasury.mjs`
+  (6 sections against the live stack).
+
+* **المرحلة 06 — الخزينة، الجزء الثاني: تعريف الخزن والبنوك** (`frmTreasury.xaml` +
+  `.xaml.cs` L87 grid / L222 «يجب اختيار موظف مسئول»، و`frmBanks.xaml`). Migration `0041`
+  is additive: `cash_locations.notes` for 📝 ملاحظات, and a real `cash_location_custodians`
+  table for the desktop's `Stock_Emps` — one row per (tenant, safe, employee), unique so an
+  employee cannot be signed twice onto the same safe, indexed by employee, RLS like the rest.
+  The desktop deletes `Stock_Emps` first and inserts after, so a typed typo leaves a safe
+  with no custodian on the way to failing; here the employees are validated **before any
+  write**, and emptying a safe of its custodians is refused with the same
+  «يجب اختيار موظف مسئول» rather than performed. Banks keep the full `frmBanks` card —
+  🌍 الدولة، 🏙️ المدينة، 📍 المنطقة، تليفون، موبايل، 💰 نسبة الاقتطاع — carried in the
+  `bank` JSON block, so no column touches half a table that is safes. Screens
+  `/treasury/safes` and `/treasury/banks` are one component with the desktop's three tabs
+  (📋 بيانات · 👤 مسئولي الصندوق · 📝 ملاحظات), and الخزينة became its own `🏦` module in
+  the staff navigation as it is in `Desktop_ERP`, taking 📄 سند قبض / 📄 سند صرف /
+  📒 بطاقة حساب المصاريف / 📊 إغلاق اليومية home from المحاسبة › العمليات — routes
+  untouched, endpoints untouched, duplicates removed. Tests
+  `apps/api/test/treasury-custody.spec.ts` (6) and section 7 of
+  `scripts/verify-treasury.mjs`. 488 API tests, 36 staff tests, 71 contract tests.
+
+* **المرحلة 06 — الخزينة، الجزء الثالث: حركة الصندوق** (`Form_WPF/frmRptKhzna.xaml` +
+  `.xaml.cs` L156–L260، والتقرير `Reports/RptKhzna.repx`). The decisive thing the desktop
+  does here is that the statement is read from the **ledger**, not from the receipts: it
+  resolves the safe's account and groups `Entry_sub` by entry, so a sale, a salary and a
+  transfer are movements of the same safe. The cloud's `cash-movement` report summed
+  receipts and payments per box, which silently omitted every movement the treasury screen
+  had not created. `GET /cash-locations/:id/movements` now returns the statement:
+  `رصيد سابق` opening row (only when a period is chosen, dated `من تاريخ − يوم` as at
+  L200), a running `⚖️ الرصيد`, and the two cards `⚖️ الرصيد الإجمالي` /
+  `📅 رصيد الفترة المحددة` (L482/L502) — with `من وقت / إلى وقت`, and only posted entries,
+  so a draft never moves a safe on paper. No migration: `vouchers.voucher_time` came with
+  part one. **One justified deviation:** the desktop's `Entry.date` carries the time, ours
+  carries it on the voucher, so a movement with no recorded time is never hidden and never
+  pushed into the opening balance — hiding a real entry from a statement is the worse
+  error — while timed movements obey the window exactly and the totals stay continuous.
+  Screen `/treasury/movements` with the desktop's filter panel, its eight columns, six
+  cards and its CSV header verbatim (`م,العملية,الرقم,التاريخ,وارد,صادر,الرصيد,البيان`).
+  Tests `apps/api/test/treasury-movements.spec.ts` (6) and section 8 of
+  `scripts/verify-treasury.mjs` (13 checks). 494 API tests, 36 staff tests, 71 contract
+  tests. The `🏦 حركة الصندوق` screen sits in a new التقارير group of the الخزينة module;
+  the desktop files it under المحاسبة › تقارير محاسبية, but a safe's statement belongs
+  with the safe now that الخزينة is a module of its own.
+
+* **المرحلة 06 — الخزينة، الجزء الرابع: إغلاقات اليومية** (`Form_WPF/frmCloseShift.xaml`
+  + `.xaml.cs` L214/L270/L330/L676/L735، `frmCloseShiftDetails.xaml`،
+  `frmCloseShiftInv.xaml`، والمحرك الحقيقي في `Form_WPF/ClosShiftAndroid.xaml.cs`
+  L592 وL780–L930). The grid's first column is `🔢 الرقم`, and in the desktop that is
+  `CasherClosed.ClosedID` — **a close is a document the cashier signs**, and
+  `BindCloseShiftToEntry1` builds a journal entry around it. The cloud created its
+  `shift_closes` row when the drawer was *opened* and gave it no number at all, so
+  "which close was Tuesday's?" had a uuid for an answer. Migration `0042` adds
+  `shift_closes.number` with a partial unique index, **nullable on purpose**: an open
+  shift is a draft, and the number is allocated at close from `document_sequences`
+  (`CS-`, padding 6) exactly as a voucher is numbered on posting. No renumbering, no
+  backfill: old rows keep their emptiness until a new shift is closed.
+  `GET /shift-closes/day-closes` (filters `from`/`to`/`branch_id`/`membership_id`/
+  `user_id`) is the list; `GET /shift-closes/:id` is one close with its two children —
+  🧾 الملاحظات المعدودة and the summary lines — and answers `404 SHIFT_NOT_FOUND` for an
+  unknown *or non-uuid* id. Three decisions carry the desktop's intent: **a draft is not
+  cash** (📤 المصاريف و💵 النقدي read *posted* vouchers, so an unposted expense never
+  shrinks a drawer on paper); **🏦 رصيد الصندوق is what was counted, 💵 النقدي is what
+  was expected**, and 📉 الفرق is between them — which is why an open row's safe balance
+  is empty rather than wrong; and **a close is a snapshot**, frozen into `summary` so a
+  voucher posted afterwards cannot rewrite a signed sheet. 🚗 توصيل · ☕ ضيافة · 🛒
+  المشتريات · 🛡️ تأمين come from the *name* of the expense type whose account the voucher
+  points at, because the desktop reads columns our invoices do not carry and a tenant that
+  names its types in Arabic gets the split for free. Filtering by 👤 الموظف resolves the
+  membership to its users, and an id that is nobody's returns an **empty list, not the
+  whole book** — a silently dropped filter is worse than a missing one. Screen
+  `/treasury/day-close`: six cards, a 🏦 الوردية الحالية card with nine denominations and
+  a live 📉 الفرق, a filter panel, and a grid whose eighteen headers are `frmCloseShift`'s
+  own labels with a totals footer and an expandable detail per row. Tests
+  `apps/api/test/treasury-dayclose.spec.ts` (8) and section 9 of
+  `scripts/verify-treasury.mjs` (23 checks, and it closes a drawer left open by an earlier
+  run so it stays re-runnable). 502 API tests, 36 staff tests, 71 contract tests.
+  **Deferred with a reason:** the close's journal entry (`BindCloseShiftToEntry1`) waits
+  for the accounting part of this phase, so entries come from one engine and not two, and
+  the printed reports (`Reports/rptCloseShift.repx`, `rptCloseday.repx`,
+  `rptClosedayCust.repx`) wait for the reporting phase — `printShiftData` only prepares
+  their data.
+
+* **المرحلة 06 — الخزينة، الجزء الخامس: التحويل البنكي والعميل النقدي**
+  (`Form_WPF/frmPayBank.xaml` + `.xaml.cs` `LoadBanks`/`BankTile_Click`،
+  `Form_WPF/frmCashCustomer.xaml` + `.xaml.cs` `SearchCustomers`، والقاعدة في
+  `Class/EntryOper.cs` L493/L537/L620). Two small windows with one idea each.
+  **🏦 التحويل البنكي** is a chooser, and its answer decides an *account*: the desktop
+  refuses a transfer with no bank («يرجى اختيار بنك أولًا») because `EntryOper.cs` keeps
+  a named transfer out of the generic شبكة bucket and, at close, debits **that bank's own
+  account** instead of `1221001`. The cloud could already route a transfer to a bank, but
+  nothing read the choice back: `shiftTakings` now groups bank payments **per bank**,
+  `closeShift` writes one signed `bank-transfer` line per bank, and every day-close row
+  carries `banks[]` — live while the drawer is open, frozen in `summary` once it is
+  counted. The bank rides in `metadata`, because `party_id` is a foreign key to `parties`
+  and a bank is not a party. 🌐 الشبكة still carries the full amount: the breakdown is a
+  detail *inside* it, not a subtraction from it, or 💰 مجموع الشبكة والنقدي would stop
+  adding up. **👤 العميل النقدي** is the opposite kind of answer: `SearchCustomers` does
+  not open a customer table, it reads the invoices — `SELECT CashCustomerName,
+  CashCustomerMobile FROM inv WHERE … AND CashCustomerName <> ''` — because a walk-in is
+  a name and a mobile **written on the sale**, which is why a till can produce one
+  without opening a ledger account. `GET /sales/cash-customers?name=&mobile=` is that
+  query: exact on mobile, partial on name, grouped so a name is one answer with an
+  invoice count. **No migration — deliberately**: `invoice_payments.cash_location_id`
+  and `sales_invoices.cash_customer_name/mobile` already existed; what was missing was
+  the rule that reads them, not a column. Screens: a `🏦 اختر البنك` window wired into
+  `/sales/pos` (replacing a dropdown a cashier clicks past) and `/treasury/vouchers`, and
+  a `👤 عميل نقدي` picker plus its own page `/sales/cash-customers`. Tests
+  `apps/api/test/treasury-bank-transfer.spec.ts` (8) and
+  `apps/api/test/sales-cash-customer.spec.ts` (7), and section 10 of
+  `scripts/verify-treasury.mjs` (12 checks). **517** API tests, 36 staff tests,
+  71 contract tests. **One justified deviation:** the desktop's cash-customer grid starts
+  empty and fills only on a keystroke; a list screen that opens empty looks broken, so
+  with no search term the API returns the most recently served names.
+
+* **المرحلة 06 — الخزينة، الجزء السادس: مناقلة الخزن**
+  (`Form_WPF/frmSafesTransfer.xaml` + `.xaml.cs` L690/L863/L872،
+  `Reports/rptSafeTransfer.repx`، والجدولان في `CrystalLiteDB.txt` L1620 `SafesTransfer`
+  وL1642 `SafesTransfer_Sub`). **The decisive finding came before the code**: the
+  desktop's `SafesTransfer` table has **no amount column** — its sub-table carries *items*
+  (`ItemId`, `value` = quantity, `AvrgCost`, `ReceivedValue`, `Diff`) and
+  `rptSafeTransfer.repx` prints الصنف / الفئة / المستودع / الباركود / الكمية. So
+  `frmSafesTransfer` is a **مناقلة أصناف بين المخازن**, and moving *money* between safes
+  is done in the desktop with a سند صرف and a سند قبض. The cloud therefore needed both
+  halves: a new money screen `/treasury/transfers` on `/cash-transfers` carrying the
+  window's own three tabs (📦 التحويل · 📥 استلام تحويل · 🔍 البحث) and its state machine
+  (draft → sent → received, with `🗑️ حذف` for drafts only), and the missing 🔍 tab on the
+  item screen `/inventory/transfers` (`🔢 رقم التحويل` · `📅 من تاريخ` · `📅 إلى تاريخ` ·
+  `📋 كل الفترة` · `🔍 بحث`). `transfers()` now returns `fromName`/`toName` resolved
+  server-side by joining `cash_locations` twice under aliases, so the grid never shows a
+  raw uuid where the desktop shows a name; `cancelTransfer` writes `voided`, the terminal
+  state migration `0011` already allows, rather than inventing `cancelled` and a migration
+  to go with it. **No migration — again deliberately.** Screens gated by
+  `treasury.view`, actions by `treasury.transfer.manage`; 📦 استلام الكل shows a live
+  count of what is on the road. Tests `apps/api/test/treasury-transfers.spec.ts` (9) and
+  section 11 of `scripts/verify-treasury.mjs` (19 checks, walking the whole lifecycle
+  against the live stack). **526** API tests, 36 staff tests, 71 contract tests.
+  **Two justified deviations:** `🏦 من خزنة` / `🏦 إلى خزنة` are the window's
+  `🏪 من مخزن` / `🏪 إلى مخزن` with the store replaced by the safe — this module moves
+  cash, not stock; and `📋 الحالة` names a column the desktop grid leaves unheaded.
+
+* **المرحلة 06 — الخزينة، الجزء السابع: 📒 قيد الإغلاق** (`Class/EntryOper.cs`
+  `BindCloseShiftToEntry` L404–L830، `Form_WPF/ClosShiftAndroid.xaml.cs:925`
+  `BindCloseShiftToEntry1`، و`EntryOper.cs` L620 للتحويل البنكي). **The entry was not
+  copied, and that is the finding.** The desktop builds one big entry at close — Dr
+  treasury, Dr `1221001` شبكة, Dr each named bank's own account, Cr `4100001` sales,
+  Cr `2222001` VAT, Dr `1211002` عهدة الإغلاق, and `3110004` فرق بالصندوق for the
+  difference — because in the desktop *nothing is posted when an invoice is saved*; the
+  close is the whole accounting event. The cloud is the mirror image: every posted
+  invoice already wrote its own entry (sales, VAT, discount, and the debit to the till's
+  or the **bank's own** account — `pos.service.ts` resolves a named bank cash location's
+  `accountId`, which is what `bank.AccCode` is in L620, and a live test asserts the sale
+  entry debits the bank and *not* the generic drawer). Copying the desktop's entry would
+  therefore post the day twice. What no other document can know is the **count**: the
+  drawer was counted by hand and it disagreed with the books, so 📉 الفرق is what the
+  close posts — Dr فرق الصندوق / Cr الصندوق for a shortage, mirrored for an overage, and
+  **nothing at all** for a balanced drawer (`422 SHIFT_BALANCED`, because a two-line
+  zero entry is not evidence). عهدة الإغلاق is deliberately *not* reproduced: it parks
+  the counted cash on the cashier's custody account until a deposit clears it, and there
+  is no deposit step yet. Migrations `0043` (additive `shift_closes.journal_entry_id` /
+  `posted_at`) and `0044`, which fixes a **real bug found on the way**: `0042` made
+  `number` unique per *tenant* but allocated it per *branch*, so two branches both
+  issued `CS-000001` and the second close died on a duplicate-key 500 — numbering is now
+  tenant-wide (as the desktop's global `ClosedID` is) and the migration seeds the
+  counter from the highest number each tenant already printed. New
+  `POST /shift-closes/:id/post` behind a new permission `treasury.shift.post` (counting
+  a drawer and posting its entry are different decisions — the cashier role gets the
+  first, not the second), new posting-profile key `cashDifferenceAccountId`, and every
+  day-close row now reports `journalEntryId` / `postable`. Screen `/treasury/day-close`
+  gained a 📒 القيد column. Tests `apps/api/test/treasury-shift-entry.spec.ts` (11) and
+  section 12 of `scripts/verify-treasury.mjs` (12 checks). **537** API tests, 36 staff,
+  71 contract. Side effect worth recording: `pnpm -r run lint` was **red** on
+  pre-existing `no-restricted-syntax`/`import/order` errors in `sales.service.ts` and
+  six test files; it is now green across the repository.
+
+* **المرحلة 07 — المحاسبة، الجزء الثاني: 📄 كشف الحساب**
+  (`Form_WPF/frmAccountBalance.xaml` «كشف حساب تفصيلي» و
+  `frmAccountsStatement.xaml` «كشف حساب رئيسي»). **The cloud had a ledger, not a
+  statement.** `GET /statements/general-ledger/:accountId` answered with bare posted
+  lines and no period at all, and the screen filtered by date *after* the fact — so a
+  statement for one month started its الرصيد at zero and disagreed with the tree it was
+  opened from. What the desktop does is defined in three places: `.xaml.cs` L216 keeps a
+  running total signed by the account's nature, L351 prepends a row whose البيان is
+  `رصيد مرحل من فترة سابقة` and whose النوع is `رصيد سابق`, and L307 chooses between
+  `تجميعي (ملخص)` (one row per entry, `SUM` + `GROUP BY`) and `تفصيلي (كامل)` (every
+  line). All three now exist in the service: `from`/`to` bound the period, the opening
+  row is everything posted *before* `from` **plus the account's `opening_balance`** — so
+  a كشف and a شجرة cannot print different numbers, which is the invariant the tests
+  assert directly — and `with_descendants=1` reports the account and its branch by
+  walking `path <@ :path::ltree`, the same walk as the desktop's `AccountHierarchy` CTE,
+  with `رمز الحساب`/`الحساب` in place of a running balance (the window has no الرصيد
+  column either: a running total over accounts of different natures is not readable).
+  `النوع` is read from the entry and the voucher behind it and named in the words of the
+  desktop's own `EntryTypes` table — قيد مبيعات · سند قبض · سند صرف · إغلاق اليومية ·
+  قيد اليومية. The response is `{ data, totals, account }`, so a caller that reads
+  `data` — and a request with no parameters at all — still gets exactly the old ledger.
+  **One desktop bug is deliberately not copied:** `الحالة` is derived there from the
+  nature-signed balance (`runningBalance >= 0 ? "مدين" : "دائن"`), which reports a
+  liability sitting on its own credit side as مدين; here الحالة names the side the money
+  is actually on. The screen carries the window's own filters —
+  `اسم الحساب` · `رقم الحساب` · `الفرع`/`كل الفروع` · `من تاريخ`/`إلى تاريخ` ·
+  `🚀 عرض البيانات` · `⚖️ نوع الرصيد` · `📊 طريقة العرض` · `فترة كاملة (من البداية)` ·
+  `عدم إظهار الرصيد السابق` — its four totals, and its twelve columns, and it opens with
+  the account chosen from 📂 دليل الحسابات' `كشف حساب` button; `تفاصيل` (👁️) opens the
+  entry in `القيود اليومية`, which now accepts `?entry=`. Tests
+  `apps/api/test/accounting-statement.spec.ts` (12) and sections 6–7 of
+  `scripts/verify-accounting.mjs` (18 more live checks, 37 in total). **557** API tests,
+  36 staff, 71 contract.
+
+* **المرحلة 07 — المحاسبة، الجزء الأول: 📂 دليل الحسابات**
+  (`Form_WPF/frmAccountsDirectory.xaml` — «دليل الحسابات» — مع
+  `frmAccountsTree.xaml` بطاقة الحساب و`frmAccountSrch` للبحث). **The gap was not the
+  tree, it was the number beside it.** The window binds `trBalance` on every node
+  (`.xaml.cs` L149 `LoadTreeView` / `BuildTreeHierarchy` over `trParentCode`), and the
+  cloud had no balance at all: `GET /accounts` returned a bare chart, and the tree screen
+  showed code, name and type. So the tree and the ledger and the ميزان could each print
+  a different figure for the same account. `GET /accounts` now takes
+  `q` / `type` / `branch_id` / `with_balances` (all optional, all backwards-compatible —
+  without `with_balances` the response is unchanged), and `with_balances=1` adds
+  `parentName` and a `balance` object per row: `ownDebit`/`ownCredit`/`ownBalance` for
+  the account itself and `debit`/`credit`/`balance`/`descendants` for its whole branch,
+  counted **from posted entries only** and rolled up the account's `ltree` `path`, so a
+  parent is exactly the sum of its children and the counting happens once, in the
+  service, not in three browsers. A reversal therefore disappears from the balance, and
+  a draft entry never enters it. Migration `0045` adds the three card fields the window
+  writes and the cloud had nowhere to put — `accounts.opened_at`, `opening_balance`
+  (default 0, so nothing that exists is affected) and `cost_center_id` — and
+  `💰 الرصيد الافتتاحي` is added to the account's own row on its `normalBalance` side and
+  rolled up from there, because it is money on the books *before* the first entry. It is
+  also frozen: patching `openingBalance` once an account carries a posted line is
+  refused with `409 ACCOUNT_POSTED` — an opening balance is set once, not re-written to
+  make a period agree. The directory screen is now the window: four summary tiles, the
+  search sent to the server behind `🚀 عرض البيانات`, `📂 شجرة الحسابات` with the balance
+  on every node and `مستويات التوسعة` `الكل`/0/1/2/3 (`MaxLevel = 3` in the window), and
+  selecting a node fills `📋 تفاصيل الحسابات` with `الحساب الرئيسي · رمز الحساب · اسم
+  الحساب · الفرع · الرصيد · كشف حساب · تعديل` — the parent named, not identified by uuid,
+  and `كشف حساب` opening the ledger for that account. `/accounting/accounts/tree` gained
+  the same balance column and levels, and the account form gained `⚖️ طبيعة الحساب`,
+  `📅 تاريخ فتح الحساب`, `💰 الرصيد الافتتاحي` and `📊 مركز التكلفة`. Tests
+  `apps/api/test/accounting-directory.spec.ts` (8) and the live
+  `scripts/verify-accounting.mjs` (17 checks against the `demo` stack). **545** API
+  tests, 36 staff, 71 contract. **Justified deviations:** `🚀 عرض البيانات` is the
+  execute button of the window's own search form, and the three summary-tile labels are
+  invented (the desktop has no tile row).
+
+* **المرحلة 07 — المحاسبة، الجزء الثالث: 📒 إنشاء قيد يومية**
+  (`Form_WPF/FrmNewEntry.xaml` «إنشاء قيد يومية»). **Two of the window's six card
+  fields did not exist in the data model.** `⏰ الوقت` matters more than it looks: the
+  desktop stores a *timestamp*, so two entries written on the same day keep the order
+  they were written in and حركة الصندوق filters by date and time, while the cloud stored
+  a date alone and could not tell 09:00 from 21:00. Migration `0046` adds
+  `journal_entries.entry_time`, `journal_entries.is_vat` (`✅ قيد ضريبي`, `Entry.IsVAT`)
+  and `journal_entry_lines.salesman_id` (`المندوب`, `Entry_sub.salesman`) — all three
+  nullable or false by default, so every entry already on the books and every caller
+  that sends none of them is untouched. The third thing the window does is fill in what
+  the clerk leaves empty, and that is not decoration: `Save()` writes
+  `سند قيد يومية رقم: {EntryNo} بتاريخ {date}` when الملاحظة is blank and names each
+  unnamed line after the account it settles, because an entry with no note is unfindable
+  a year later. Both defaults now live in the service — the note after the number has
+  been allocated, since the number is what the note quotes — and what the clerk *did*
+  write is kept, trimmed, never replaced. The screen is the window: the six card fields
+  (with `رقم القيد` and `🔑 الرقم العام` read-only, because both are allocated by the
+  server when the entry posts), `📋 تفاصيل القيد` with its nine columns,
+  `الفرق=` in the grid's header — green when the two sides agree, as the window colours
+  it — `مجموع المدين:` / `مجموع الدائن:` in its footer, `رمز الحساب` resolved to a name
+  as it is typed, and the four refusals in the window's own words (`لا يوجد بيانات` ·
+  `يجب إدخال اسم ورقم الحساب` · `يوجد بند رقم … بدون قيمة` ·
+  `لا يمكن حفظ قيد غير متوازن`) before the question `هل أنت متأكد من حفظ القيد؟` —
+  because a posted entry is not edited, only reversed. Tests
+  `apps/api/test/journal-entry-card.spec.ts` (9) and section 8 of
+  `scripts/verify-accounting.mjs` (11 more live checks, 48 in total). **566** API tests,
+  36 staff, 71 contract. Deferred on purpose: `🖨️ طباعة`/`👁️ معاينة` of the entry
+  document and the ⏮◀▶⏭ navigator, both of which belong to the reporting phase.
+
+* **المرحلة 07 — المحاسبة، الجزء الرابع: 🌳 مراكز التكلفة**
+  (`Form_WPF/frmCostCenter.xaml` «مركز التكلفة 🏢» و`frmCostCenterBalance.xaml`
+  «تقرير مركز كلفة»). **The cost-centre tree had no numbers on it.** `GET /cost-centers`
+  answered with a flat table of centres and no balance at all, so a centre could not be
+  asked what it had spent; the window's tree and its report were both missing. No
+  migration was needed for the tree itself — `cost_centers` already carried `parent_id`
+  and `branch_id`; what was missing was the figure, so it is now computed exactly as the
+  chart of accounts computes it: posted entries only, rolled up through `parent_id`, with
+  `parentName`, `level` and `🏷️ النوع` (`🟢 رئيسي`/`🔵 فرعي`) beside it, and a caller
+  that sends nothing still gets the old list. The report is new:
+  `GET /statements/cost-center/:id` is the account statement pointed at a centre — the
+  same `رصيد سابق` row, the same running الرصيد, the same totals — plus the window's own
+  `اسم الحساب` and `🌿 الفرع` filters, and `📑 نوع التقرير` (`تجميعي`/`تفصيلي`). One
+  deliberate difference: the window guesses a centre's nature from the first character of
+  its code, as it does for accounts; a cost centre accumulates costs, so الرصيد grows on
+  the debit side and `📌 الحالة` names the side the money is on. **Giving the centre a
+  balance is what exposed two defects that had nothing to do with cost centres.**
+  `prevent_posted_journal_mutation()` — installed by `0004_accounting.sql` L115 — allows
+  exactly one mutation of a posted entry (`status = 'void'`) and then returns `OLD`,
+  discarding the value it just allowed. Every `void` since then was silently thrown away:
+  a cancelled sale kept its revenue, a cancelled purchase kept its cost, and a reversal
+  left its original `posted`. No balance ever drifted, because a reversal also posts a
+  mirrored entry that cancels the original — which is exactly why no test had caught it.
+  And the mirrored lines carried only `partyId` and `description`, so every report scoped
+  to a dimension — cost centre, branch, or the `المندوب` of part three — kept an amount
+  the ledger had already released. Migration `0047` fixes the trigger's return value, the
+  mirror now carries its dimensions, and `reverseJournal` no longer asks for the `void`
+  at all: the mirror *is* the reversal, and voiding the original as well subtracts the
+  amount twice when every balance counts `posted` only. Tests
+  `apps/api/test/cost-centers.spec.ts` (9) and `reversal-and-void.spec.ts` (4, including
+  a direct regression test that the guard now applies the void it allows and still
+  refuses everything else), plus sections 9–10 of `scripts/verify-accounting.mjs`
+  (12 more live checks, 60 in total). **579** API tests, 36 staff, 71 contract. Two
+  navigation rows pointed at `/reports/cost-center-balances` and
+  `/reports/cost-center-report`, routes that had never been built; they are now one real
+  screen under `/accounting/cost-center-statement`, next to `كشف حساب`.
+
+* **المرحلة 07 — المحاسبة، الجزء الخامس: الفترات والميزان وقائمة الدخل**
+  (`Form_WPF/FrmAccountingPeriods.xaml` «إدارة الفترات المحاسبية» ·
+  `frmRptBalances.xaml` «أرصدة الحسابات» · `frmRptIncomeStatement.xaml`
+  «أرباح وخسائر حسابات رئيسية»). **Three things the cloud did not have: a period you can
+  write, a ميزان with a period, and an income statement at all.** `GET /fiscal-periods`
+  answered with rows that could be read, closed and reopened and nothing else — no name,
+  no dates, no active flag, no delete — so `🗂️ إدارة الفترات المحاسبية` had no card to
+  put on the screen. Migration `0048` adds the two columns the card carries
+  (`notes`, `is_active`) with a partial unique index that enforces `⚡ تفعيل` — one active
+  period, never a closed one — and `listPeriods` now returns the row the window binds:
+  `الرقم` (the period's ordinal in its year, which is what a read-only `PeriodID` is),
+  `yearName`, `isActive`, `notes` and `أغلقت بواسطة` **named** rather than a bare id (the
+  desktop writes `Environment.UserName`). `POST`/`PATCH`/`DELETE` and
+  `POST /fiscal-periods/:id/activate` follow `Class/AccountingPeriodManager.cs`
+  statement for statement, including its five refusals in its own words — «يوجد تداخل في
+  التواريخ مع فترة محاسبية أخرى» (409), «لا يمكن تفعيل فترة محاسبية مغلقة» (409),
+  «لا يمكن تعديل فترة مغلقة. يرجى إعادة فتحها أولاً» (409), «لا يمكن حذف فترة مغلقة»
+  (409) and the two 422s before any of them. The desktop has no fiscal years, so a period
+  resolves (or opens) the year covering its dates — otherwise `➕ إضافة` would be unusable
+  on an empty tenant. `GET /statements/trial-balance` was `accountId`/`debit`/`credit`
+  over the whole ledger; it now takes `من`/`إلى`/`الفرع`/`المندوب`/`الحساب الرئيسي` and
+  returns the window's ten columns — `افتتاحي · خلال الفترة المحددة · الرصيد · ختامي`,
+  each on its مدين ودائن side, with `الحالة` — computed by the window's own `ShowResult`
+  arithmetic, plus the account's `💰 الرصيد الافتتاحي`, and with `code`/`name` beside
+  `accountId` so the ميزان no longer has to be assembled in the browser from two
+  endpoints. A caller that sends nothing — and a row's four old keys — is unchanged, and
+  `totals` is an addition beside `data`. `GET /statements/income-statement` is new: the
+  accounts the desktop marks `FinalAcc = 2` (a code beginning `3` or `4`, written by
+  `DetermineFinalAccount()` — the cloud calls them `revenue` and `expense`), carried up
+  to their parents as the window does, then `قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ`
+  on the credit side and `صافي أرباح العام` as the plug that makes the columns meet.
+  Tests `apps/api/test/fiscal-periods.spec.ts` (8), `trial-balance.spec.ts` (8) and
+  `income-statement.spec.ts` (7, including a stock row backed by a real
+  `inventory_transactions` line rather than a fixture), plus sections 11–13 of
+  `scripts/verify-accounting.mjs` (23 more live checks, 83 in total — one of them checks
+  the closing-balance formula itself). **602** API tests, 36 staff, 71 contract. The
+  `قائمة الدخل التحليلية` navigation row pointed at `/reports/income-statement`, a
+  report-engine key; it now names the desktop window and opens the real screen.
+  Deferred: `Form_WPF/frmAddPeriod.xaml` (⏰ إدارة فترات التأجير — rental pricing per
+  item group, and there is no general rental module in the standard per-tenant list) and
+  the `من وقت`/`إلى وقت` boxes, which cut a day the cloud cuts by date.
+
+* **المرحلة 08 — الموظفون والرواتب، الجزء الأول: 👤 بطاقة الموظف**
+  (`Form_WPF/frmEmployees.xaml` «تعريف موظف» · `frmManagement.xaml` «الإدارات» ·
+  `frmDepartments.xaml` «إدخال بيانات الإدارات والأقسام» · `frmJobs.xaml` «الوظائف»).
+  **حزمة الرواتب كانت قائمة قبل هذه المرحلة — الإدارات والوظائف والموظفون
+  والمسيرات — لكن بطاقة الموظف كانت نصفَ بطاقة.** `GET /hrm/employees` يردّ ثلاثة
+  عشر حقلاً: جانبُ الراتب وما يحيط به، ولا ميلاد، ولا هاتف، ولا هوية، ولا حساب.
+  والديسكتوب لا يحفظ موظفاً بلا حساب: `frmEmployees.xaml.cs` L520 يرفض اسماً فارغاً
+  («يجب إدخال اسم الموظف»)، ثم L600 `SaveAccounts` يكتب شجرة حساب باسم الموظف تحت
+  حساب موظفي الفرع (`Common.CurrentBranch.EmployeeAcc`، وافتراضه 2241 — وهو
+  «موظفين الفرع الرئيسي» في الشجرة المزروعة عندنا)، ويعيد تسميتها إن كان الرمز
+  موجوداً، ويهمل نتيجتها فلا يُسقط فشلُها حفظَ الموظف. وL730 يرفض حذفَ موظفٍ له
+  مستخدم («لا يمكن حذف موظف مرتبط بمستخدم») أو فواتير («لا يمكن حذف موظف مرتبط
+  بفواتير»). ترحيل 0049 يضيف `departments.parent_id` والاثني عشر عموداً — وال
+  `parent_id` وحده هو ما يجعل الإدارة والقسم درجتين لا اسماً واحداً: صفٌّ بلا أبٍ هو
+  إدارة، وصفٌّ بأبٍ هو قسم، فلا تُخزَّن الإدارة مرتين فيمكن أن تختلف عن قسمها.
+  والآن: `رقم الحساب` يُخصَّص تلقائياً (`MaxId` نفسه: الرقم التالي تحت الأب) ويردّ
+  على البطاقة، وتغيير الاسم يغيّر اسم الحساب لأن الحساب هو الموظف داخل الدفتر،
+  و`إجمالي الرواتب والمستحقات` يُحسب من البدلات السبعة كما تفعل
+  `CalculateTotalSalary` — وهي الأرقام نفسها التي تجمعها حاسبة المسير، فلا يمكن أن
+  يختلف ما تراه البطاقة عمّا يراه مسيّر الرواتب. و`GET /hrm/employees?q=` يبحث
+  بالاسم أو بالرقم، وفلتر الإدارة يجلب موظفي أقسامها. **التوافق مصون:** الردّ مصفوفة
+  كما كان وكل مفتاحٍ قديم باقٍ. اختبارات `apps/api/test/employee-card.spec.ts`
+  (16 — أول اختبارات HTTP للوحدة: كانت `hrm` بلا اختبارٍ غير حاسبة الراتب)،
+  و`scripts/verify-hrm.mjs` (27 نقطة تحقّق حيّة، تُعاد ثلاث مرات بلا أثر).
+  **618** اختبار API (كان 602) · 36 staff · 71 contract · lint أخضر. أُجّلت
+  «🖼️ صورة الموظف» (بايتاتٌ في عمود الديسكتوب، وملفات السحابة تحتاج تدفّق
+  presign/finalize في الشاشة) و«🏬 فروع الموظف» (`EmpBranches` — موظفٌ على أكثر من
+  فرع، والسحابة تحمل فرعاً واحداً)، و`frmAttendM.xaml` لأن «تحضير المراكب» حضورُ
+  مراكبَ لا موظفين (مرحلة الوحدات الرأسية).
+
+* **المرحلة 08 — الموظفون والرواتب، الجزء الثاني: 🎁 الحوافز والجزاءات**
+  (`Form_WPF/frmEmpSalaryAddSub.xaml` «إدخال الحوافز والخصومات للموظفين» ·
+  `Class/AddSubEmployee.cs`). **السحابة كانت تعرف نصف الفكرة: إضافةً أو خصماً يعتمدُه
+  أحدهم فيدخل مسيرَ الرواتب. أما السند نفسه — المكافأة التي تُصرف اليوم من الصندوق،
+  والسلفة التي تُردّ من الراتب — فلم يكن له وجود.** النافذة أربعُ رفوضٍ بعبارة واحدة
+  لكلٍّ منها (`ValidateInputs` L566): «يجب اختيار موظف» · «يجب اختيار نوع الإجراء» ·
+  «يجب إدخال مبلغ» · «يجب اختيار الصندوق أو البنك» — والأنواع ثلاثةٌ بأرقامها في
+  `SalaryAddSubTypes`: **1 مكافأة** (إضافة) و**2 خصم** و**3 سلفة** (خصمان)، وهي التي
+  تكتب عنوان مربع الاختيار (L540): «✅ تضاف على الراتب» أو «✂️ تخصم من الراتب». «رقم
+  السند» هو `ISNULL(MAX(id),0)+1` (L225)، والملاحظة تُكتب نفسها إن تُرکت فارغة
+  (L665): «مكافأة للموظف…»/«خصم…»/«سلفة…». ولكل سندٍ قيدٌ (L718): المكافأة تمدين
+  «راتب أساسي» `3122001` وتدائن الصندوق، والسلفة والخصم يمدينان حساب الموظف — الحساب
+  الذي أنشأه الجزء الأول — ويدينان الصندوق. ترحيل 0050 يضيف جدول
+  `salary_adjustment_types` وخمسة أعمدة على `salary_adjustments` (`number` بفهرسٍ فريد
+  جزئي، و`type_id` بمفتاحٍ خارجي `restrict`، و`payment_method`، و`deleted_at`،
+  و`deleted_by`)؛ والأنواع الثلاثة تُزرع لكل مستأجر: في الترحيل لمن كان قائماً، وفي
+  `OrgProvisioningService` لمن يُنشأ بعده — فلا يولد مستأجرٌ بنافذةٍ فارغة. الحذف ناعم
+  بعد «⚠️ هل أنت متأكد من الحذف؟»، ويرفض حالتين لا ينظر فيهما الديسكتوب: حركةٌ مرحَّلة
+  (تُعكس قيدها، لا تُمحى)، وحركةٌ دخلت مسيراً مُرحَّلاً. **قراران يخالفان الديسكتوب:**
+  مكافأةٌ تُصرف نقداً تمدين «راتب أساسي» لا الصندوق — فالديسكتوب يجعل المكافأة تُنمي
+  النقد — وخصمٌ يركب الراتب لا يُقيَّد مرتين، بل مرةً واحدة في المسير. **التوافق
+  مصون:** `GET /hrm/adjustments` يردّ المصفوفة نفسها، وكل مفتاحٍ قديم باقٍ،
+  و`POST /hrm/adjustments/:id/approve` كما كان. `apps/api/test/salary-adjustments.spec.ts`
+  (11 اختباراً) و`scripts/verify-hrm.mjs` §7 (**45** نقطة تحقّق حيّة بعد أن كانت 27،
+  وتُعاد مرتين بلا أثر إلا السندَين المرحَّلَين). **629** اختبار API (كان 618) ·
+  36 staff · 71 contract · tsc وlint أخضران. أُجّل «⏰ الوقت» على السند كما أُجّل في
+  المرحلة 07، والمتنقّل بين السندات إلى الجزأين الثالث والخامس.
+
+* **المرحلة 08 — الموظفون والرواتب، الجزء الثالث: 💵 دفع الرواتب**
+  (`Form_WPF/frmSalaryPay.xaml` «دفع الرواتب»). **السحابة كانت تصرف شهراً كاملاً بسندٍ
+  واحد، أو لا تصرف شيئاً: `POST /hrm/payroll/runs/:id/pay` يُنشئ سند صرف واحداً
+  للمسيّر كلّه. أما إذن الصرف — السند الذي يُعطى للموظف، ويحمل رقمه وطريقته وصندوقه
+  ومَن أمضاه — فلم يكن له وجود.** النافذة إذنٌ واحد لكل موظف عن كل شهر:
+  `رقم الإذن` = `MAX(id)+1` (L120)، و`btnSave_Click` يرفض ثلاث مرات («يجب اختيار
+  الفرع.» · «يجب اختيار الموظف.» · «يجب اختيار الصندوق.»)، ثم «لقد تم دفع راتب الموظف
+  سابقاً.» (L470 — وهو قيدُ uniqueness على `(emp, month, year)` لا شرطٌ في الكود)،
+  ثم «لم يتم العثور على الحساب المقابل للصندوق.» (L486). و«📊 عرض الراتب» يقرأ الشهر
+  من `Salary_Res ⋈ Salary_Res_Details`، ويرفض موظفاً بلا مستحق بـ «لا يوجد رواتب
+  مستحقة للموظف.». و`RecalcNet` L340: **الصافي = الراتب الأساسي + بدل سكن + بدل
+  مواصلات + الحوافز − الخصومات**. ترحيل 0051 يضيف `salary_payments` بفهرسين فريدين
+  جزئيّين — على `(tenant_id, number)` وعلى `(tenant_id, employee_id, year_month)`،
+  وهو الثاني الذي يجعل «لقد تم دفع راتب الموظف سابقاً» حقيقةً في القاعدة لا رسالةً في
+  التطبيق. والمبلغ يُقرأ من سطر الموظف في مسيّر الشهر إن سُمّي، وإلا من بطاقته
+  وحوافزه المعتمدة — الحسبة نفسها التي يطبعها `POST /hrm/payroll/preview`، فلا يمكن أن
+  يصرف الإذن رقمين مختلفين عن المسير. ولكل إذنٍ سند صرف مرحَّل: مدينٌ حساب الموظف
+  (`Employees.AccCode` — الحساب الذي أنشأه الجزء الأول، والذي مدينتْه السلفة في الجزء
+  الثاني) ودائنٌ الصندوق. والحذف ناعم بعد «اختر سنداً ليتم حذفه.»، ويرفض إذناً مرحَّلاً:
+  «يُلغى سند الصرف أولاً» — فسند الخزينة مستندٌ له قيده، لا يُمحى بمحو الإذن الذي
+  أشار إليه. **التوافق مصون:** مسار صرف المسير القديم كما هو، وكل ما أُضيف جديد.
+  `apps/api/test/salary-payments.spec.ts` (12 اختباراً) و`scripts/verify-hrm.mjs` §8
+  (**64** نقطة تحقّق حيّة بعد أن كانت 45، ثلاث تشغيلات متتالية خضراء). **641** اختبار
+  API (كان 629) · 36 staff · 71 contract · tsc وlint أخضران. وأُضيفت الأنواع الثلاثة
+  إلى `seed-demo.ts` لأن المستأجر التجريبي يُبنى بسكربت البذر لا بـ
+  `OrgProvisioningService`، فكان المستأجر الوحيد بنافذة حوافز فارغة. مؤجَّل: أزرار
+  التنقّل بين الإذونات («الأول»/«السابق»/«التالي»/«الأخير») إلى أن تصير الشاشة بطاقةً
+  تُفتح بـ `?id=`، و`⏰ الوقت` على السند كما في المرحلة 07، و`PaySalary.repx` إلى مرحلة
+  التقارير.
+
+* **المرحلة 08 — الموظفون والرواتب، الجزء الرابع: 📄 كشف حساب موظف**
+  (`Form_WPF/frmEmpAccountGet.xaml` «كشف حساب موظف»). **لم يكن للموظف كشفٌ في السحابة:
+  السبيل الوحيد `GET /accounting/statements/general-ledger/:accountId`، ومن أراد كشف
+  موظف كان عليه أن يعرف رقم حسابه أولاً؛ وكان في الشجرة صفٌّ باسم «حساب موظف» يشير إلى
+  `/reports/employee-account` — مسارٌ لم يُبنَ قط.** النافذة three regions: الفلاتر
+  `اسم الموظف` («اختر الموظف...») · `🏢 الفرع` + `كل الفروع` · `📅 الفترة الزمنية` +
+  `فترة كاملة` + `من:`/`إلى:` · `🔍 عرض كشف الحساب`؛ والشبكة `📊 تفاصيل كشف الحساب`
+  بـ`م · مدين · دائن · الموظف · رقم القيد · تاريخ القيد · البيان · تفاصيل`
+  (`BuildResultTable` L305)؛ وأربع بطاقات `💳 إجمالي المدين` · `💵 إجمالي الدائن` ·
+  `⚖️ الرصيد المدين` · `⚖️ الرصيد الدائن` (`UpdateSummary` L318 — الرصيد على جانبٍ
+  واحد، والآخر «0»). و`ShowAccount` L226 هو الاستعلام نفسه: `Entry ⋈ Entry_sub` على
+  حساب الموظف، `IS_Deleted=0 AND state=1` (المرحَّل وحده)، والتاريخان `>= @date1 AND
+  <= @date2` حيث `@date2 = txtDateTo.AddHours(24)` — اليوم الأخير داخل الفترة — و
+  `GROUP BY Entry.GlobalID, …`: صفٌّ لكل قيد. و`LoadAccounts` L96
+  (`AccCode <> -1`): **لا يظهر إلا من له حساب**، ومن لا حساب له يُردّ بـ «لا يوجد حساب
+  للموظف في دليل الحسابات». **لا ترحيل ولا SQL جديد**: `HrmService.employeeStatement`
+  يأخذ حساب الموظف (`employeeAccountId ?? salaryPayableAccountId`) ويُفوِّض إلى
+  `AccountingService.accountStatement`، فالرصيد السابق والمتحرّك محسوبان مرّةً واحدة،
+  وكشف الموظف لا يختلف حساباً عن كشف الحساب ولا كشف مركز الكلفة. وصُحِّح عرضاً خللٌ
+  قديم: السلفة المصروفة نقداً كانت تُخصم من الراتب مرّة ثانية، فصارت
+  `adjustmentsForMonth` على صورة `FrmReseved.xaml.cs` L166 (`SubFromSalary = 1`
+  والتاريخ داخل الشهر) — أثرُه في مسيّر الشهر وفي إذن الصرف. ومربّعات «فترة كاملة» و
+  «عدم إظهار الرصيد السابق» و«تفصيلي» تقبل `1` و`true` و`on` كما في المحاسبة، ولم يكن
+  للأولين أثرٌ قبل ذلك. `apps/api/test/employee-statement.spec.ts` (11 اختباراً) و
+  `scripts/verify-hrm.mjs` §9 (**82** نقطة تحقّق حيّة بعد أن كانت 64، ثلاث تشغيلات
+  متتالية خضراء). **652** اختبار API (كان 641) · 36 staff · 71 contract · tsc وlint
+  أخضران. مؤجَّل: `👁️ معاينة` و`PaySalary.repx` إلى مرحلة التقارير.
+
+* **المرحلة 08 — الموظفون والرواتب، الجزء الخامس: 📈 حركات الموظف و📊 تقرير الرواتب**
+  (`Form_WPF/frmEmpInvs.xaml` «مبيعات ومشتريات موظف خلال الفترة» و
+  `Form_WPF/frmRptSalary.xaml` «تقرير الرواتب»). **لم يكن للموظف حركاتٌ في السحابة:
+  `sales_invoices.salesman_id` موجود ولا شيء يقرأه؛ وكان صفّ «تقرير الرواتب» في الشجرة
+  يشير إلى `/reports/payroll-payments` — تقرير المسيّر، لا تقرير الإذونات.**
+  `frmEmpInvs` — فلاتر `👤 الموظف` («اختر الموظف...» + `الكل`) · `🔄 نوع الحركة`
+  (`مبيعات` · `مرتجع` + `الكل`) · `📅 من تاريخ`/`📅 إلى تاريخ` · `🔍 عرض`، وشبكة
+  `📋 بيانات الحركات` بـ`نوع الحركة · التاريخ · رقم الفاتورة · الصنف · الكمية · السعر ·
+  إضافات · الإجمالي`، و`💰 الإجمالي`footer. و`ShowResult` L226 يقرأ `Inv ⋈ Inv_Sub`
+  على `Inv.sales_emp` بشرط `IS_Deleted=0` والتاريخين (`@date2 = txtDateTo.AddHours(24)`
+  — اليوم الأخير داخل الفترة): **صفٌّ لكل سطر فاتورة**. و`frmRptSalary` — `الشهر:` ·
+  `السنة:` · `كل الفترة` (يُعطّلهما) · `🔍 عرض` · `💰 سند استلام راتب لموظف`، وشبكة
+  `💼 بيانات الرواتب` بـ`م · SalId · رقم السند · الموظف · الراتب الأساسي · بدل سكن ·
+  بدل مواصلات · الحوافز · الإجمالي · الخصومات · صافي الراتب · 👁️ عرض` و
+  `💰 إجمالي الرواتب:`؛ و`btnShow_Click` L58 يقرأ `SalaryPay` (= `salary_payments`،
+  إذن الصرف من الجزء الثالث) بـ`IS_Deleted=0` والشهر والسنة، و
+  `gross = tot_salary + Houses + Travel + salary_add` و`net = gross − salary_sub`.
+  **لا ترحيلَ جديد**: الأولى تقرأ `sales_invoices` والثانية `salary_payments`.
+  وقراراتٌ مُعلَّلة في `PHASE_08_HRM.md` §8.4: لا «مشتريات» لأن `purchase_invoices`
+  لا تحمل موظفاً؛ ونقطة البيع يُميَّزها `orderType` كما يميّزها `inv_type=3`؛
+  و`💰 الإجمالي` يجمع الفواتير مرّة واحدة لا مرّةً لكل سطر كما تفعل النافذة؛
+  و`الإجمالي = الصافي + الخصومات` لأن حساب النافذة لا مكان فيه للبدلات الأربع؛
+  و`SalId` مفتاحٌ لا عمود. وصُحِّح عرضاً خللٌ في الجزء الثالث: إذنٌ مرفوض لعدم حساب
+  الموظف كان يبقى مسوَّداً في الدفاتر لأن شرط الحساب كان بعد الإدخال، فصار قبله.
+  `apps/api/test/employee-movements.spec.ts` (11) و`apps/api/test/salary-report.spec.ts`
+  (7) و`scripts/verify-hrm.mjs` §10 و§11 (**105** نقطة تحقّق حيّة بعد أن كانت 82،
+  أربع تشغيلات متتالية خضراء). **670** اختبار API (كان 652) · 36 staff · 71 contract ·
+  tsc وlint أخضران. مؤجَّل: «👁️ عرض» وعمود «عرض» إلى أن تُفتح شاشات السندات بـ`?id=`،
+  ونصف «مشتريات» إلى أن يحمل فاتورة الشراء موظفاً.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء الأول: 🧑‍💼 المندوبون والعمولات**
+  (`Form_WPF/frmSalesMen.xaml` «شاشة المندوبين» و`Form_WPF/frmInvBySalesMen.xaml`
+  «مبيعات مندوب خلال فترة»). **«كم يستحق هذا المندوب؟» لم يكن لها جواب في السحابة:
+  `sales_invoices.salesman_id` موجود ولا شيء يقرأه، والثلاث نسب التي يقرأها
+  `frmInvBySalesMen` (`comm` · `Colle_Comm` · `Profit_Comm`) لا مكان لها أصلاً —
+  فبطاقة المندوب كانت اسماً وعلماً.** ترحيل 0052 يضيفها إلى `salesmen` مع
+  `الهاتف · الجوال · البريد الإلكتروني · ملاحظات`، ويضيف `employee_id`: جسرٌ سحابيٌّ
+  لا نظير له في الديسكتوب لأن الديسكتوب يسمّي المندوب بجدولٍ واحد، أما السحابة فالفواتير
+  فيها تسمي بطاقة المندوب وسندات القبض تسمي بطاقة الموظف (`vouchers.salesman_id`)،
+  والجسر وحده هو ما يجعل مندوباً واحداً يملك الاثنين. وحساب العمولات منقولٌ نصّاً من
+  `ProcessInvoiceRow` L330–L341: `عمولة المبيعات = النسبة × صافي الفاتورة`،
+  و`عمولة التحصيل = النسبة × الصافي` إن حُصِّلت الفاتورة (الديسكتوب يقرأ `pay_type`
+  والسحابة تُثبت التحصيل بـ`paid_total`)، و`عمولة الربح = النسبة × (الصافي − التكلفة)`
+  إن كان الربح موجباً. وثلاثةُ مصادرَ للصفوف: الفواتير المرحَّلة، وإشعارُ المدين
+  المُعلَّق بفاتورة بيع (يستردّ عمولتي المبيعات والتحصيل بإشارةٍ سالبة)،
+  وسنداتُ القبض (`ReceiptType` 5 و7) بقيمتها بلا ضريبة وعمولتها على ما قُبض.
+  `GET /sales/salesmen/commissions` و`GET/POST/PATCH/DELETE /sales/salesmen` (لا جسمٌ
+  قائم تغيّر)، وشاشتان: `/sales/salesmen` بالبطاقة كاملةً والرابط إلى التقرير،
+  و`/sales/salesman-commissions` بصفٍّ في شجرة المبيعات. وقراراتٌ مُعلَّلة في
+  `PHASE_09_VERTICALS.md` §4.3 — أهمّها: «💰 إجمالي القيمة» هنا **بإشارة** لأن
+  `RecalculateSummary` L482 يجمع القيمة بلا `isPlus` فيكبر إجمالي الديسكتوب بالمرتجع؛
+  والنسبة تُرفض خارج 0–100 بدل أن تُخزَّن صفراً كما يفعل `double.TryParse`؛ وقيمة
+  السند `net_amount` بدل `NetVal × 100 / 115` المكتوبة في الكود؛ والسندات مقيدة
+  بالتاريخين دائماً وغير مقيدة بالفرع كما في النافذة — ومُثبَّتةٌ باختبارٍ حتى لا
+  تُصلَح صامتاً. `apps/api/test/salesman-card.spec.ts` (5) و
+  `apps/api/test/salesman-commissions.spec.ts` (9) و`scripts/verify-salesmen.mjs`
+  (**21** نقطة تحقّق حيّة، ثلاث تشغيلات متتالية خضراء: الوثائق التي لا يمكن إبطالها —
+  فاتورةٌ مُحصَّلة وإشعار مدين — تُنشأ مرّةً وتُعاد، وما سواها يُلغى).
+  **684** اختبار API (كان 670) · 36 staff · 71 contract · tsc وlint أخضران.
+  مؤجَّل: «👁️ عرض» و«👁️ معاينة» و`.repx` إلى مرحلة التقارير، ونصف «مشتريات» إلى أن
+  تحمل فاتورة الشراء موظفاً.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء الثاني: 🧵 طلب التفصيل**
+  (`Form_WPF/frmOrders.xaml` «إدارة طلبات التفصيل» و`Form_WPF/frmOrderDetails.xaml`
+  «إضافة طلب تفصيل» و`Form_WPF/frmOptions.xaml` «⚙️ إدارة الخيارات الجاهزة»).
+  **وحدة `tailoring` في السحابة كانت تجيب عن سؤالٍ واحد: «ما قياس هذا العميل؟».
+  لا طلب، ولا حالة، ولا موعد تسليم، ولا سعر — ولا شيء مما يكتبه الخيّاط على البطاقة.**
+  ترحيل 0053 يضيف ستة جداول: `tailoring_orders` (رقم · العميل · القياس · نوع التفصيل ·
+  الحالة · التاريخان · الكمية · السعر · المدفوع · القماش والتصميم) و
+  `tailoring_order_options` و`tailoring_order_statuses` و`tailoring_types` و
+  `tailoring_option_categories` و`tailoring_option_values`. والحالات الأربع —
+  `مستلم · في الخياطة · جاهز · تم التسليم` — مبذورة في الترحيل لكل مؤسسة قائمة وفي
+  `OrgProvisioningService` لكل مؤسسة تُخلق بعده، لأن صفوف `OrderStatus` ليست في هذا
+  المستودع والموضع الوحيد الذي كُتبت فيه دورة التفصيل كلماتٍ هو
+  `frmViewOrders.GetStateText` L119. والقواعد منقولةٌ بنصّها: الرفوض الثلاثة
+  «الرجاء اختيار عميل» · «الرجاء اختيار نوع التفصيل» · «الرجاء إدخال السعر»
+  (`btnSave_Click` L318–L341)، و⌛ المتبقي = 💰 السعر − 💵 المدفوع وهو **سالبٌ مسموح**
+  (`CalculateRemaining` L290 يلوّنه أخضر ولا يرفضه)، و⌛ متأخّر = مضى موعد التسليم
+  والحالة ليست نهائية (تلويث الصف `#FFE4E4` L146)، و«🔄 تغيير الحالة» يستدعي
+  `sp_UpdateOrderStatus`، و⭐ تعيين افتراضي يُصفّر التصنيف ثم يُعيّن المختار (L323/L330).
+  النهايات: `GET/POST/PATCH/DELETE /tailoring/orders` و`POST /tailoring/orders/{id}/status`
+  و`GET /tailoring/order-statuses` و`GET/POST/PATCH/DELETE /tailoring/types` و
+  `/tailoring/option-categories` و`/tailoring/option-values` و
+  `POST /tailoring/option-values/{id}/default` — القراءة `tailoring.view` والكتابة
+  `tailoring.manage` — وشاشتان: `/tailoring/orders` (الشبكة والفلاتر والبطاقة في نافذة)
+  و`/tailoring/options` (لوحتا «📂 التصنيفات (الأنواع)» و«🔧 الخيارات المتاحة»)، ووحدة
+  جديدة في الشجرة: 🧵 التفصيل. وقراراتٌ مُعلَّلة في `PHASE_09_VERTICALS.md` §5.3 —
+  أهمّها: **«✏️ تعديل» يُعدّل الطلب المختار**، لأن `LoadOrderData` L417 في الديسكتوب
+  **فارغة** («يمكن تطويرها لاحقًا») وحفظُها يُدرج طلباً ثانياً؛ والعميل لا يُستبدل من
+  تحت الطلب (`TAILORING_CUSTOMER_IMMUTABLE`)؛ ورقم الطلب من سلسلة الوثائق بالبادئة `TO-`
+  لأن الإجراء الذي يولّده في الديسكتوب ليس في المستودع؛ و«🧵 أنواع التفصيل» تُدار
+  بالـ API بلا شاشة — كما في الديسكتوب إذ تُبذَر في القاعدة — وصفٌّ في الشجرة بحالة
+  `api`. وإصلاحٌ عارض كشفه سكربت التحقّق: `PartiesService.softDelete` كان يقارن الرصيد
+  — نصّاً بأربعة أعشار — بالسلسلة `'0'`، فكان **يرفض كل حذف عميل**؛ والمقارنة الآن
+  رقمية ومُثبَّتة باختبار. `apps/api/test/tailoring-orders.spec.ts` (**11** اختباراً)
+  واختبارٌ في `parties.spec.ts` و`scripts/verify-tailoring.mjs` (**38** نقطة تحقّق
+  حيّة، خمس تشغيلات متتالية خضراء، وأربعٌ منها تبدأ من قاعدة نظيفة وتنتهي بلا أثر:
+  لا طلب ولا نوع ولا تصنيف ولا عميل). **696** اختبار API (كان 684) · 36 staff ·
+  71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة أنواع التفصيل مع شاشة القياسات،
+  وتاريخُ الحالات (لا شاشة تقرأه).
+
+* **المرحلة 10 — التقارير، الجزء السابع: 🖨️ إعدادات الطباعة**
+  (`Form_WPF/frmSettings.xaml` «خيارات الطباعة» (الأسطر 889-1312 من 2364) ·
+  `frmInvRptType.xaml` «🖨️ افتراضي طباعة الفواتير» (122/72) · `Class/Print.cs` (1237) ·
+  `Reports/header.repx` · `Reports/footer.repx` · جدول `SettingPrint`
+  (`CrystalLiteDB.txt` L2260-L2280)). **جدول `print_settings` جديد** (ترحيل `0061`)
+  يحمل كل ما يحمله الديسكتوب — الترويسة · التذييل · الختم · «طباعة تفاصيل الأصناف» ·
+  «طباعة مجموعات الأصناف مع إغلاق اليومية» · «طباعة مكونات الأصناف المركبة بشكل منفرد» ·
+  «طباعة make pay» · عدد النسخ · «طابعة الكاشير» · «طابعة المطبخ» · «اسم التقرير» ·
+  «مسار التقرير» · «ملاحظات التقرير» — بسبعة نطاقات هي راديوات «🧩 تفعيل إعدادات
+  الطباعة» (`frmSettings.xaml.cs` L2095-L2116: 0 الإفتراضي · 1 مشتريات · 2 مبيعات ·
+  3 نقطة بيع · 4 تأجير · 5 عقود · 6 تقارير) ونطاق `report:<key>` لكل تقرير؛ فالنوافذ
+  نفسها لا تتفق على معنى الأعداد (`frmRptKhzna` L106 يقرأ 12، و`frmRptEntries` يقرأ 9،
+  و`frmRptRentInvoices` L541 يقرأ 14) فحُفظ المعنى وسُمّي النطاق. والبحث يسير
+  `report:<key>` → «تقارير» → «الإفتراضي». **الورقة تحترم الإعدادات**: `printNo` نسخاً
+  كلٌّ في صفحة كما يكرّر `Printing()` الطباعة (L201-L206)، و`printType` ورقة A4 أو
+  🧾 ورق صغير 80mm (راديوا `frmInvRptType`)، و`printHeader`/`printFooter` ترويسة
+  المنشأة (`header.repx`) وسطر الاتصال (`footer.repx`)، و`printStamp` صورة الختم تحت
+  «أعده · راجعه · المدير»، و`note` «ملاحظات التقرير» تحت الجدول، و«طابعة الكاشير /
+  المطبخ» تُعرض للمشغّل ولا تُطبع؛ و`?copies=` و`?paper=` يتجاوزانها لمرةٍ واحدة.
+  **🧾 والوثائق الخمس تقرأ الإعدادات كذلك** — `frmPurchInv` يطبع بـ`new Print(1)`
+  «مشتريات»، و`frmSalesInvoice` بـ`new Print(InvType)` = 2 «مبيعات»، و`frmCloseShift`
+  يقرأ `Inv_Id = 6` «تقارير»، والسند (`new Print(11)`) والقيد (`Inv_Id=9`) يرجعان إلى
+  «الإفتراضي» لأنّ عددَيهما لا راديوَ لهما؛ فكل وثيقةٍ نسخُها وورقُها وترويسُها
+  وتذييلُها وختمُها من الصفّ نفسه (`PrintTemplatesService.documentPage`).
+  **«👁️ معاينة الطباعة» و«طباعة / PDF» ورقةٌ واحدة** — كلاهما يمرّ
+  بـ`ReportingService.printOptionsFor()` كما يمرّ زرّا الديسكتوب بـ`Print.cs` نفسه.
+  وشاشة `/settings/printing` في `apps/staff` (ضمن «الإعدادات»، بإذن
+  `reporting.layout.manage`) وزرّ «إعدادات الطباعة» بجانب «طباعة / PDF» في كل تقرير.
+  `apps/api/test/print-settings.spec.ts` (**15** اختباراً) و
+  `scripts/verify-print-settings.mjs` (**50** نقطة تحقّق حيّة، ثلاث مراتٍ متتالية بصفر
+  فشل، خطّ أساس لما كان محفوظاً، وتنظيفٌ يعيد كل نطاقٍ إلى ما كان). **852** اختبار API
+  (كان 837) · 36 staff · 71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: شبكة
+  `PrinterSettings` «📑 ربط الطابعات بالتقارير» (الخادم لا يرى طابعات المحل)، وأثر
+  `PrintItemType` و`PrintComponentsItemsIndividually` على ترتيب بنود الفاتورة،
+  والصور روابط لا بايتات لأنّ السحابة لا تخزّن ملفات.
+* **المرحلة 10 — التقارير، الجزء الثامن: 📑 كشوف الحساب** (`Form_WPF/frmCustAccount.xaml`
+  «أرصدة حساب العملاء» (556/683) · `frmCustAccountGet.xaml` «📋 كشف حساب عميل» (747/1017) ·
+  `frmCustLastPay.xaml` «📋 حركة آخر سداد للعملاء» (628/630) · `frmAccountBalance.xaml`
+  «كشف حساب تفصيلي» · `frmCostCenterBalance.xaml` «تقرير مركز كلفة`). **عائلةٌ من سبع
+  نوافذ خارج جدول `frmRpt*` الاثنتين والثلاثين**: أربعٌ منها كانت حيّة من المرحلتين 07 و08
+  (`GET /statements/general-ledger/:id` بـ`with_descendants`، و`GET /statements/cost-center/:id`،
+  و`GET /hrm/employee-statement`)، وثلاثٌ لم تكن — فبُنيت: **`customer-balances`** شبكةُ
+  الأعمدة السبعة (`#` · `🔢 رقم الحساب` · `👤 اسم العميل` · `💸 حركة مدين` · `💰 حركة دائن` ·
+  `⚖️ الرصيد` · `📌 الحالة`) وحركة الطرف هي حركة **حسابه** (`Entry_sub.acc_no`، L221-L231)
+  والرصيد `Abs(debit − credit)` وحالته بزيادة الجانب (L258-L288) ولا يُطبع من لا حركة له؛
+  و**`party-statement`** كشفٌ قيداً بسطر (`GROUP BY GlobalID, date, notes, acc_no`، L336)
+  بأربع بطاقات يوضع الرصيد فيها على **جانبٍ واحد** (`UpdateSummary` L583-L609)؛
+  و**`customer-last-payment`** آخر قيدٍ حرّك الحساب (`TOP 1 … ORDER BY id DESC`، L222-L231)
+  بقيمته (`dept == 0 ? credit : dept`، L258) ورصيده وثلاث بطاقات `💳 الإجمالي` · `⚖️ الرصيد` ·
+  `📌 السجلات` — وبلا فلتر فترة، لأنّ النافذة لا مربّع تاريخ فيها. وفلتر «🏷️ نوع الحساب»
+  (الكل · عملاء · موردين) يجعل كشف العميل كشف المورد. **واستُكملت النوافذ الأربع** بفلترَي
+  ⏰ الوقت (`frmAccountBalance` L458-L463: صندوقا وقتٍ مع صندوقي تاريخ، والرصيد السابق
+  يقرأ الساعة نفسها) و📋 نوع القيد (بمفردات `source_type` التي يطبعها عمود «النوع»، لأنّ
+  قائمة `cmbEntryType` L108-L127 بالفهرس وتخالف `GetEntryTypeName` في معنى الأرقام).
+  `apps/api/test/report-party-statements.spec.ts` (**14** اختباراً) واختباران ملحقان
+  بـ`accounting-statement.spec.ts` (13 · 14) و`scripts/verify-party-statements.mjs`
+  (**67** نقطة تحقّق حيّة، أربع تشغيلات متتالية بصفر فشل، كل رقمٍ فرقٌ عن خطّ أساس،
+  والقيود تُعكس ولا تُمحى كما في الدفاتر). **868** اختبار API (كان 852) · 36 staff ·
+  71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: عمود «الجوال» (لا `mobile` على
+  `parties`)، وزرّا «تفاصيل» و«عرض»، و«⚖️ نوع الرصيد» الذي يُخفي عموداً في النافذة ولا
+  يُسقط صفّاً.
+
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء الأول: ⚙️ إعدادات الربط الضريبي - زاتكا
+  ZATCA** (`Form_WPF/frmZatcaSetting.xaml` (472) + `.xaml.cs` (1160) ·
+  `Class/ZatcaService.cs` (546) · `Class/ZatcaCredential.cs` · الجداول الثلاثة
+  `SettingZatca` · `CSRProperties` · `ZatcaCredential`). **محرّك الفاتورة الإلكترونية كان
+  يستقبل الشهادة جاهزة**: لا توليد، ولا تأهيل، ولا اختبار ربط — فصار للتأهيل ladder
+  بأربعة درجات خلف تسعة مسارات: `GET/PUT /einvoice/settings` ·
+  `POST /einvoice/settings/fill-from-company` (🔄 تعبئة تلقائي) ·
+  `POST /einvoice/csr/generate` (⚡ توليد) ·
+  `POST /einvoice/onboarding/compliance-csid` (🔵 بالـ 🔑 OTP) ·
+  `…/production-csid` (🔐 حفظ مفتاح التشفير) · `…/compliance-check` (🧪 اختبار الربط) ·
+  `…/renew` (🔄 Renews CSID) · `POST /einvoice/link/toggle` (⏸ إيقاف الربط / ▶ تشغيل).
+  **جدول `einvoice_settings` جديد** (ترحيل `0062` + `down`) يحمل أعمدة
+  `SettingZatca` وخصائص `CSRProperties` التسع وختم كل درجة، وأربعة أعمدة على
+  `einvoice_credentials` للزوجيْن: الامتثال (`request_id`) والإنتاج (`p_request_id` ·
+  `p_csid_enc` · `p_secret_enc`). و**طلب التوقيع PKCS#10 حقيقي** على `secp256k1` بموضوع
+  `C·OU·O·CN` و`subjectAltName` بخمس خصائص (`SN` = السريال بصيغة
+  `1-CloudERP|2-{الإصدار}|3-{uuid}` · `UID` = الرقم الضريبي · `title` = نوع الفواتير ·
+  `registeredAddress` · `businessCategory`) والامتداد
+  `1.3.6.1.4.1.311.20.2 = ZATCA-Code-Signing` — لأنّ `AuditorAPI` التي يستخدمها الديسكتوب
+  مكتبةٌ مغلقة، فكُتب الطلب على المواصفة المنشورة، والدليل أنّ `openssl req -verify`
+  يقول `self-signature verify OK`. **وبوابةٌ بثلاثة أوضاع** (🧪 محاكاة · 🔵 امتثال ·
+  🔴 إنتاج): المحاكاة ليست نجاحاً دائماً — وثيقةٌ يرفضها الفحص المحلي تُرجع `FAILED` —
+  وحين لا تُبلغ البوابة تكون النتيجة `502 EINVOICE_GATEWAY_UNREACHABLE` بعبارةٍ صريحة،
+  لا خطأ 500 مبهم. **والست وثائق لاختبار الربط** بالبيانات الثابتة في الديسكتوب
+  (UUID `8d487816…`، PIH = تجزئة البداية، «قلم رصاص» ×2 بسعر 2.00، 4.00 + 0.60 = 4.60،
+  والعميل «Acme Widget's LTD 2»)، بأنواعها 388/383/381 × 0100000/0200000 وحالاتها
+  CLEARED/REPORTED، وفحصٍ محليٍّ يغلق الحساب ويطلب الرقم الضريبي للمنشأة — فمؤسسةٌ لم
+  تُكمل بطاقتها ترى «Standard Invoice compliance check failed.» وأسبابها. والترتيب
+  محفوظ بعبارات الديسكتوب: «يجب إدخال OTP» · «يجب عليك إنشاء CSR أولاً!» · «يجب إصدار
+  شهادة الامتثال أولاً» · «يجب إكمال إعدادات الربط أولاً» · «تم الحفظ» · «تم بنجاح» ·
+  «تم الإيقاف بنجاح» · «تم التشغيل بنجاح». الأسرار مشفّرة `aes-256-gcm` ومقنّعة،
+  والمفتاح الخاص **يُعطى مرة واحدة**، وتوليد شهادةٍ جديدة **يُلغي** الشهادات المصدَّرة
+  كما يفعل `SaveCSR` بـ`DELETE FROM ZatcaCredential` (L511). وشاشة `/settings/zatca`
+  بتسميات النافذة كلها، وقائمةُ الخطوات الخمس، والست وثائق بعد آخر اختبار.
+  `apps/api/test/einvoicing-zatca-onboarding.spec.ts` (**18** اختباراً) و
+  `scripts/verify-einvoice-zatca.mjs` (**64** نقطة تحقّق حيّة، ثلاث تشغيلات متتالية
+  خضراء، وخطّ أساس يُعاد: الإعدادات وبطاقة المنشأة تعودان كما كانتا).
+  **886** اختبار API (كان 868) · 36 staff · 71 contract · tsc وlint أخضران. ومؤجَّل عن
+  قصد: ☁️ Load Data (يقرأ ملفّين من جهاز الكاشير)، و🏗️ Industry (لا عمودَ للنشاط
+  التجاري في بطاقة المنشأة بعد — ويُبلَّغ عنه تحذيراً)، وربط مسار الإرسال الحالي
+  بالبيئة المحفوظة (جاء في الجزء الثاني)، والأجزاء 4-5 (مصر · التكاملات).
+
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء الثالث: 📊 حالة المزامنة**
+  (`Form_WPF/frmInvsSyncStatusZatca.xaml` (559) + `.xaml.cs` (1165) ·
+  `Reports/rptInvSumByClient.repx` · `Class/InvoiceOper.cs` `GetInvoiceTypeAr` (L346)
+  و`GetCustomerTaxType` (L302)). سؤال الكاشير في آخر النهار: **أيّ هذه الفواتير قبلتها
+  زاتكا؟** صارت النافذة **تقريراً مسجّلاً في محرّك التقارير** (`einvoice-sync-status`)
+  لا شاشةً مكتوبةً وحدها: الأعمدة الأحد عشر نفسها (م · ID · الفرع · نوع الفاتورة · رقم
+  الفاتورة · التاريخ · العميل · المستخدم · الصافي · الرسالة · حالة المزامنة، و«المستودع»
+  و«نوع العملية» مخفيّان كما يخفيهما `Visible="False"`)، والمرشّحات نفسها (🔄 حالة
+  المزامنة: 🔵 الكل · ✅ مرسل · ❌ غير مرسل، و📋 نوع الفاتورة: مبيعات · نقطة بيع ·
+  إشعار · مقاولات · أندرويد، و📅 الفترة الزمنية بـ📌 كل الفترة أو من/إلى). **ولأنّها
+  تقريرٌ مسجّل، صارت 🖨️ طباعة و👁️ معاينة تمرّان بمحرّك الطباعة نفسه** — كما يمرّ
+  `PrintReport` (L970) بـ`rptInvSumByClient.repx` بترويسة المنشأة وتذييلها وختمها
+  و«أعده · راجعه · المدير» — **وصار 📊 تصدير Excel ملفّ `xlsx` حقيقياً من الخادم**
+  لا `.csv` خلف اسم Excel كما يكتبه `ExportToCsv` (L1078). **و«الصافي» ثلاث بطاقات لا
+  واحدة**: `RecalculateNetSummary` (L329) تحسب مجموعين — `sum` للفواتير و`sum1`
+  للمرتجعات — و`BuildReportDataSet` (L1058) يطبع فرقهما وحده، فعُرضت الثلاثة كلها،
+  ومجاميعها محسوبة من الصفوف المعروضة فلا تخالفها. **و«نوع الفاتورة» بمنطق
+  `GetInvoiceTypeAr` نفسه**: عميلٌ له رقم ضريبي ⇒ «فاتورة ضريبية»، وبيعٌ نقدي ⇒ «فاتورة
+  ضريبية مبسطة»، ومرتجعٌ أو إشعار ⇒ «إشعار دائن للفاتورة الضريبية (المبسطة)».
+  **و«الرسالة» نصّ الهيئة**: غلطة الإرسال، ثم رسائل التحقّق والتحذير، ثم سبب التوقّف
+  («الربط موقوف…»)، من **أحدث** صفّ إرسال لا من أول ما يصادفه `GetZatcaMessage` (L310).
+  **و🔄 مزامنة ZATCA صار مساراً**: `POST /einvoice/sync` بصلاحية `einvoice.submit`
+  يرسل ما اختاره الكاشير سطراً سطراً — `BuildZatcaResponse` لكل سطر (L527) — ويجيب
+  `sent`/`failed`/`skipped` لكل واحد: المُرسلة والمسوَّدة صفّان **مُتجاوَزان** لا
+  فاشلان، و⏸ إيقاف الربط يقولها بدل أن يصمت الزرّ كما يصمت خلف
+  `if (MainSetting.ZatcaIntegerationActive)` (L396)، ولا وثيقة تُحفظ والربط موقوف.
+  و«تمت العملية بنجاح ✅» عبارة النافذة نفسها (L563) حين تُقبل كلها، وإلا عددُ ما أُرسل
+  وما لم يُقبل. **والصلاحيات ثلاث**: القراءة `reporting.view` (لأنّ الشبكة تقرير)،
+  والإرسال `einvoice.submit`، والتصدير `reporting.export.execute` — مختبرة بأدوارٍ
+  حقيقيّة (المحاسب يقرأ ويُرسل ولا يُصدّر، وأمين الصندوق لا يقرأ). وشاشة
+  `/settings/zatca/status` بتسميات النافذة ومرشّحاتها وتحديد الصفوف وأزرارها.
+  `apps/api/test/einvoicing-zatca-sync.spec.ts` (**16** اختباراً) و
+  `scripts/verify-einvoice-zatca-sync.mjs` (**53** نقطة تحقّق حيّة في أحد عشر قسماً،
+  ثلاث تشغيلات خضراء، كلها على 🧪 المحاكاة، وتُعيد الإعدادات إلى خطّ أساسها).
+  **918** اختبار API (كان 902) · 36 staff · 71 contract · tsc وlint أخضران. ومؤجَّل عن
+  قصد: 🚫 إلغاء الفاتورة و❌ رفض الفاتورة (نداءان على وثيقة ETA — الجزء الرابع)،
+  وتوقيع XAdES المغلَّف وكتلة `UBLExtensions`.
+
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء السادس: 📱 إرسال الفاتورة عبر واتساب**
+  (`Form_WPF/frmInvSale.xaml` L1190 «💬 واتساب» · `frmInvSale.xaml.cs`
+  `SendWhatsapp_Click` L3124-L3126 ثم `printwhatsapp` L3128-L3199 ·
+  `Class/WhatsAppSender.cs` (267) · `Class/Session.cs` L12-L31). **كان الديسكتوب يرسل
+  الفاتورة من متصفّح الكاشير**: `WhatsAppSender` يفتح Chrome على ملفّ تعريفٍ دائم
+  (`%LocalAppData%\MyApp\chrome-profile`، L43-L48)، فيجب أن يكون أحدهم قد مسح رمز QR
+  (`InitializeWhatsAppAsync` L66)، ثم ينتظر صندوق الكتابة خمساً وعشرين ثانية (L119-L142)
+  ويكتب الرسالة (L151-L153) ويمرّر ملفّ PDF إلى `input[type='file']` (L188)، ولا يسجّل
+  شيئاً: صندوق رسالة يمحوه «موافق». **فصار الاتصال إعداداً يُضبط مرّة**: ترحيل `0065`
+  يضيف `whatsapp_settings` (صفٌّ واحد لكل مستأجر: تفعيل · «عنوان الواتساب» Phone Number
+  ID · «الرمز» مشفّراً بـ`aes-256-gcm` ولا يُقرأ إلا مقنَّعاً · «رمز الدولة» · 📎 · 🧪)
+  و`whatsapp_messages` — **السجلّ الذي لم يكن له**: الرقم · النصّ · اسم المرفق وحالته ·
+  معرّف ميتا · الخطأ، فيُجاب «هل وصلت الفاتورة؟» من جدول لا من ذاكرة كاشير. **والنداء
+  على Cloud API كما نُشرت** (Graph `v21.0` على `https://graph.facebook.com`): رسالة نصّ،
+  ثم `POST /{phone-number-id}/media` لرفع الملفّ، ثم رسالة مستند، و`GET
+  /{phone-number-id}` ل🧪 اختبار — وهو سؤال «هل هذا الرقم لنا وهذا الرمز صالح له؟» الذي
+  لم يكن للديسكتوب جوابٌ عنه. **والتحية تحية الديسكتوب نصّاً**:
+  «🧾 مرحباً {custName}، هذه فاتورتك رقم {invRef} من {foundName}» (L3182-L3183) باسم
+  المنشأة من `companyProfiles.nameAr` كما كان من `Common.FoundationInfoDT.Rows[0]["nameA"]`.
+  **والرقم بقاعدته نفسها**: `0551234567` → `966551234567` بقاعدة
+  `if (!text.StartsWith("966")) text = "966" + text.TrimStart('0');` (L113-L116)، إلا أنّ
+  رمز الدولة صار إعداداً لا ثابتاً. **و🧪 محاكاة مفعلةٌ أبداً في الاختبارات**: لا رقم
+  حقيقي يُنادى، و«❌ الرقم غير مرتبط بحساب WhatsApp أو لم يتم تحميل المحادثة.» (L142)
+  يُسجَّل صفّاً لا صندوقاً. **وخمسة مسارات بصلاحيّتين**: `GET/PUT /whatsapp/settings`
+  و`POST /whatsapp/test` بـ`tenant.settings.manage` (الضبط لمن يملك الإعدادات)، و
+  `POST /whatsapp/send` و`GET /whatsapp/messages` بـ`sales.view` (الإرسال لمن يرى
+  الفاتورة — المحاسب والكاشير كلاهما). **وسبعة رفضٍ بعباراتها**: فاتورة غير مرحَّلة 409
+  `SALES_INVOICE_NOT_POSTED` «لا يمكن إرسال الفاتورة قبل ترحيلها — رحّلها أولاً.» ·
+  بوابة موقوفة 409 `WHATSAPP_DISABLED` «الرجاء تفعيل الإرسال عبر واتساب.» · بلا جوال
+  422 `WHATSAPP_PHONE_MISSING` «❌ لا يوجد رقم جوال للعميل» · رقمٌ تالف 422
+  `WHATSAPP_PHONE_INVALID` · غير مضبوطة 404 `WHATSAPP_NOT_CONFIGURED` · فاتورة غير
+  موجودة 404 · رمزٌ لا يُفكّ 500 `SECRET_DECRYPT_FAILED`. **وشاشتان**:
+  `/settings/whatsapp` بتسميات النافذة وصندوق «Logging»، وبطاقة «💬 واتساب» بسجلّها على
+  نافذة الفاتورة نفسها. `apps/api/test/whatsapp-invoice.spec.ts` (**17** اختباراً) و
+  `scripts/verify-whatsapp.mjs` (**71** نقطة تحقّق حيّة في أحد عشر قسماً، ثلاث تشغيلات
+  خضراء، تُعيد الإعدادات إلى خطّ أساسها). **951** اختبار API (كان 934) · 36 staff · 71
+  contract · tsc وlint وbuild أخضران. **وملفّ الفاتورة نصٌّ عربي UTF-8 لا PDF**: لا
+  مكتبة PDF في المشروع، وتصديرٌ على الخادم لملفٍّ عربي يحتاج خطّاً يشكّل الحروف،
+  والطباعة عندنا صفحة HTML يطبعها المتصفّح — و`text/plain` نوع مستندٍ تقبله ميتا.
+  ومؤجَّل: توقيع XAdES المغلَّف وكتلة `UBLExtensions`.
+
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء الخامس: 💳 بوابات الدفع (جيديا ·
+  NeoLeap)** (`Form_WPF/frmSettings.xaml` L1726-L1831: تاب «إعدادات جيديا» و`GroupBox`
+  «NeoLeap» فيه · `frmSettings.xaml.cs` `BtnSaveGedia_Click` (L2456) · `testGedia`
+  (L2498) · `BtnTestGedia_Click` (L2513) · `Btnsavneoleap_Click` (L2535) ·
+  `Btntestneoleap_Click` (L4047) · `Class/Geidea.cs` (57) · `Class/NeoleapService.cs`
+  (165) · `frmPOSBill.xaml.cs` L460-L492 · `frmPOSPay.xaml.cs` L428-L441). **كان
+  الديسكتوب يخصم البطاقة في أثناء حفظ الفاتورة ولا يسجّل شيئاً**: يطبع إيصالاً، ويترك
+  طريقة الدفع في الفاتورة تقول «شبكة». فحُفظ صفّاه (`GediaSetting` و`SettingNeoleap`)
+  كما هما — «تفعيل الدفع عن طريق جيديا» · «طباعة ايصال» · «المنفذ» · «المبلغ» ·
+  «Token» · «Logging» — وأُضيف **السجلّ الذي لم يكن له**: ترحيل `0064` يضيف
+  `payment_gateway_settings` بمفتاح `(tenant_id, provider)` و`payment_gateway_transactions`
+  بمرجعٍ فريد لكل `(مستأجر · بوابة)`، حتى لا تكون الضغطتان على 💳 خصمين. **وجيديا
+  تُنادي على مواصفتها المنشورة**: `POST /payment-intent/api/v2/direct/session` لفتح
+  الجلسة بتوقيع `base64(HMAC-SHA256(كلمة السرّ، المعرّف العام ‖ المبلغ بعشرتين ‖ العملة ‖
+  المرجع ‖ الطابع))`، و`GET /pgw/api/v1/direct/order?MerchantReferenceId=…` لسؤالها،
+  وصفحة الدفع `…/hpp/checkout/?<sessionId>` — فالجلسة تبقى ⏳ «بانتظار الدفع» حتى يدفع
+  صاحب البطاقة، و🔄 `POST /payment-gateways/transactions/:id/refresh` يسألها مرّةً أخرى.
+  **ونيوليب على عقدها كما في ملفّها**: طلب `SALE` واحد (`requestType` · `merchantToken` ·
+  `amount` · `ecrRef` · `ecrToken` · `printFlag` · `cashBack`) وجوابه يُقرأ بمنطق
+  `ParseResponse` نفسه — `ErrorMsg`، ثم `TransactionResult.StatusCode` `00` مقبولة ·
+  `01` مرفوضة · `02` ملغاة — ويُخرج `ApprovalCode` · `RRN` · `STAN` ·
+  `CardScheme.English` · `PAN` (مقنَّعاً `****4242`) · `TransactionType.English`؛
+  أمّا النقل فكان داخل `neoleapconnector` المترجَمة، فصار عنواناً يُضبط، و«المنفذ»
+  يبنيه (`http://127.0.0.1:<المنفذ>`)، ولا مسار حالة يُخترع لأنّ الجهاز يجيب في الحال.
+  **و🧪 Simulation مطفأٌ أبداً في الاختبارات** (كما في زاتكا): لا بوابة تُطلب ولا بطاقة
+  تُخصم، وجواب صاحب البطاقة يُقرَّر من بادئة `ecrRef` (`DECLINE-` · `CANCEL-` ·
+  `ERROR-` · `UNKNOWN-` · `PENDING-`) — السبيل الوحيد لاختبار الرفض بلا بطاقة.
+  **والمقبولة تُقيَّد مرّةً واحدة** عبر `SalesService.addPayment` بالوسيلة `card`
+  ومفتاح التكرار نفسه، ثم يُوسَم الصفّ `settled`، فلا تُدفع الفاتورة مرتين وإن أُعيد
+  السؤال. **والمرفوضة تُسجَّل ولا تُبتلع**: «العملية مرفوضة، يرجى إعادة الدفع» كانت
+  صندوقَ رسالةٍ يمحوه «موافق»، وصارت صفّاً بكلمة البوابة (`Declined` ·
+  `Cancelled or Error` · «تعذّر الوصول إلى بوابة NeoLeap») وبردّها الخامّ بعد حذف السرّ
+  منه. **ستة مسارات بثلاث صلاحيّات**: `GET /payment-gateways` و`PUT …/:provider` و
+  `POST …/:provider/test` بـ`pos.config.manage` (الإعدادات للمدير)، و
+  `POST …/:provider/sale` و`POST …/transactions/:id/refresh` بـ`sales.invoice.pay`
+  (التحصيل للكاشير)، و`GET …/transactions` بـ`sales.view` (السجلّ لمن يقرأ) — مختبرة
+  بأدوارٍ حقيقيّة (المحاسب يقرأ ولا يُحصِّل، والكاشير يُحصِّل ولا يضبط البوابة).
+  وثمانية رفضٍ بعباراتها: بوابة موقوفة 409 `PAYMENT_GATEWAY_DISABLED` · مبلغٌ غير موجب
+  422 · فاتورة غير مرحَّلة 409 · أكثر من المتبقي 422 · مرجعٌ مكرَّر 409 · منفذٌ خارج
+  النطاق 422 · بوابة مجهولة 422 · مفتاحٌ لا يُفكّ 500. وشاشة
+  `/settings/payment-gateways` بتسميات النافذة وبطاقتيها وصندوق «Logging» و«📜 آخر
+  العمليات». `apps/api/test/payment-gateways.spec.ts` (**16** اختباراً) و
+  `scripts/verify-payment-gateways.mjs` (**64** نقطة تحقّق حيّة في أحد عشر قسماً، ثلاث
+  تشغيلات خضراء، تُعيد إعدادات البوابتين إلى خطّ أساسها). **934** اختبار API (كان 918) ·
+  36 staff · 71 contract · tsc وlint وbuild أخضران. **وقرارٌ صريح: 🇪🇬 مصر
+  (`frmEtaSetting` · `EtaService` · `EtaReciptService`) خارج النطاق** — النظام موجّهٌ
+  اليوم للسعودية، ويتبعه نداءا 🚫 إلغاء الفاتورة و❌ رفض الفاتورة لأنّهما على وثيقة
+  ETA؛ ومصادرها مثبتة في الوثيقة تُقرأ يوم تُطلب. ومؤجَّل: توقيع XAdES المغلَّف وكتلة
+  `UBLExtensions`.
+
+* **المرحلة 11 — الفاتورة الإلكترونية، الجزء الثاني: 🧾 الإرسال والتوقيع والسلسلة**
+  (`Form_WPF/frmSentEinvoice.xaml` (358) + `.xaml.cs` (304) · أعمدة
+  `frmInvsSyncStatusZatca.xaml` (559) · `Class/ZatcaService.cs` `IntegrateInvoice`
+  (L78-L410) و`GetEncodedInvoiceQRCode` (L460) و`LoadZatcaCredential` (L430) ·
+  `Class/InvoiceOper.cs` `SendZatca` (L2209)). **كان الإرسال فرعاً واحداً خلف متغيّر
+  بيئة**: الوثيقة تُبنى وتُجزَّأ وتُوقَّع، ثم تُترك إن لم تكن بوابةٌ مضبوطة. فصار
+  الإرسال درجةً كاملة على البيئة المحفوظة في «⚙️ إعدادات الربط الضريبي»: **الضريبية
+  `0100000` إلى التخليص** (`POST /invoices/clearance/single` بترويسة
+  `Clearance-Status: 1`) فتعود بوثيقةٍ مُعادة التوقيع تُحفظ في `cleared_invoice`،
+  **ويرمزُها يُقرأ منها** بمسار XPath الديسكتوب نفسه (L474-L477: الوسم
+  `AdditionalDocumentReference` الذي `cbc:ID`ـه `QR`) لا من وثيقتنا؛ **والمبسّطة
+  `0200000` إلى الترحيل** (`/invoices/reporting/single`) فتحفظ رمزها المحسوب، لأن الهيئة
+  لا تُعيد وثيقةً في الترحيل. و**ترحيل `0063`** يضيف إلى `einvoice_submissions` — وهي
+  صفّ `ZatcaResponse` في الديسكتوب — ثلاثة أعمدة: `chain_index` (عدّاد ICV: كان داخل
+  `jsonb` فلا يُرتَّب عليه ولا يُعرض على مفتّش)، و`authority_status` (كلمة الهيئة
+  نفسها `CLEARED`/`REPORTED` كما في `ZatcaResponse.Status` L538-L540)، و
+  `cleared_invoice` (الوثيقة التي يطلبها المفتّش)، وفهرساً على `(tenant_id,
+  created_at DESC)` لأن الشبكة تصفّح بالأحدث أولاً. **والسلسلة** تسحب التجزئة السابقة
+  والعدّاد في استعلامٍ واحد بـ`SELECT … FOR UPDATE`: لا فاتورتان تشتركان في عدّاد.
+  **والمقبولة لا تُرسل مرتين**: إرسالٌ ثانٍ أو إعادةٌ لفاتورةٍ مقبولة =
+  `409 EINVOICE_ALREADY_ACCEPTED` «تم إرسال هذه الفاتورة مسبقاً — استخدم «🔁 إعادة
+  الإرسال» إن فشل الإرسال.»؛ **والفشل لا يُسقط البيع**: الوثيقة محفوظة أصلاً، فتُكتب
+  الغلطة على الصفّ ويُرجَع `201` بحالة `failed`؛ **و⏸ إيقاف الربط** يوقف عند
+  الوثيقة الموقّعة (`signed` + `LINK_PAUSED`) فإذا شُغِّل الربط أكملها 🔁 إعادة
+  الإرسال بذات التجزئة وذات البايتات، رافعاً `attempts` وحده. و**صار للشبكة ثلاثة
+  مسارات**: `GET /einvoice/filings` (🔍 عرض بـ«رقم الصفحة:» و«حجم الصفحة:»، موصولة
+  بالفاتورة: رقمها · نوعها · عميلها · فرعها · مستخدمها · صافيها)، و
+  `GET /einvoice/filings/:id` (📄 بيانات الفاتورة: الوثيقتان والوسوم الثمانية بأسمائها
+  ومكانها في السلسلة)، و`GET /einvoice/chain`. و`inspectInvoiceXml()` يفحص الوثيقة قبل
+  أن تُتلى: مجاميعٌ لا تُغلق تُسقط الإرسال، ورقمٌ ضريبيٌّ غيرُ سعوديّ الشكل تحذيرٌ لا
+  منع. و`cbc:PrepaidAmount` دائماً `0.00` — لا حقلَ مدفوعاتٍ مقدَّمة في نموذج
+  الديسكتوب، وإعلانُ نقد الصندوق مدفوعاً مقدَّماً يُصفّر `PayableAmount`. **حقيقةٌ
+  غيّرت الترتيب**: `.xaml.cs` لا يكلّم زاتكا — مساره `api/v1.0/documents/recent` على
+  `api.invoicing.eta.gov.eg` (L62 وL75)، و`UUID` و`Public URL` حقّان من حقوق وثيقة
+  **ETA**، و🚫 إلغاء الفاتورة و❌ رفض الفاتورة نداءان مصريّان — فالقائمة وأزرارها هنا،
+  والزرّان إلى الجزء الرابع. وشاشة `/settings/zatca/sent` بتسميات النافذة وأعمدة
+  `frmInvsSyncStatusZatca` (م · رقم الفاتورة · نوع الفاتورة · التاريخ · العميل · الفرع ·
+  المستخدم · الصافي · حالة المزامنة · الرسالة · تفاصيل) ومرشّحاتها (🔵 الكل · ✅ مرسل ·
+  ❌ غير مرسل · من/إلى · 🔄 حالة المزامنة ZATCA) و🖨️ طباعة و🔁 إعادة الإرسال.
+  `apps/api/test/einvoicing-zatca-filing.spec.ts` (**16** اختباراً) و
+  `scripts/verify-einvoice-zatca-filing.mjs` (**53** نقطة تحقّق حيّة في أحد عشر قسماً،
+  ثلاث تشغيلات متتالية خضراء، تعمل كلها على 🧪 المحاكاة فلا يخرج منها نداءٌ إلى هيئة،
+  وتُعيد الإعدادات إلى خطّ أساسها ولا تُلغي شهادةً قائمة). **902** اختبار API (كان
+  886) · 36 staff · 71 contract · tsc وlint أخضران. ومؤجَّل عن قصد: 🚫 إلغاء الفاتورة
+  و❌ رفض الفاتورة (نداءان على وثيقة ETA — الجزء الرابع)، و📊 حالة المزامنة بوصفها
+  نافذةً مستقلّة (الجزء الثالث)، وتوقيع XAdES المغلَّف وكتلة `UBLExtensions`.
+
+* **المرحلة 10 — التقارير، الجزء السادس: 💰 تقارير الخزينة والرواتب والمستخدمين**
+  (`Form_WPF/frmRptKhzna.xaml` «حركة الصندوق» (558/538) · `frmRptSalary.xaml` «تقرير
+  الرواتب» (489/190) · `frmRptReseved.xaml` «تقرير الرواتب المستحقة» (393/225) ·
+  `frmrptUsersRecords.xaml` «سجلات المستخدمين» (313/168) · `frmRptRentInvoices.xaml`
+  «تقرير فواتير التأجير» (562/716)). **خمسة تقارير** — «حركة الصندوق» كشفاً بسطر
+  «رصيد سابق» يفتح الفترة ورصيدٍ متحرك على كل سطر وبطاقتي «⚖️ الرصيد الإجمالي» و«📅
+  رصيد الفترة المحددة»، وحسابُ الصندوق مأخوذٌ من الخزينة نفسها لا بمطابقة الاسم كما في
+  `frmRptKhzna.xaml.cs` L159-L164؛ و«تقرير الرواتب» بإذن صرفٍ لكل سطر حيث «💰 الإجمالي =
+  الصافي + الخصومات» و«إجمالي الرواتب» مجموعُ الصوافي (L104-L113)؛ و«تقرير الرواتب
+  المستحقة» بمسيّرٍ لكل سطر (رقم سنده قيدُه، وملاحظاته سببُ العكس، وعدّاد موظفيه
+  ومستحقه من شبكة التفاصيل التي يفتحها الديسكتوب بزر «👁️ عرض»)؛ و«سجلات المستخدمين»
+  من سجلّ التدقيق (`Log4NetLog`) بجهاز المنادِي وعمليته ومستخدمه؛ و«تقرير فواتير
+  التأجير» بثلاثة بنود live — «تأجير» فاتورةٌ مُرحَّلة، و«معلق» لم تُرحَّل، و«حجوزات»
+  حجزٌ بلا فاتورة — وبطاقات «إيرادات · مرتجع · الصافي» على قاعدة `CalcIncome`
+  (L258-L274: 1 و3 إيراد، و2 مرتجع، و4 خارج الحساب). `apps/api/test/report-treasury-hrm.spec.ts`
+  (**9** اختبارات) و`scripts/verify-reports-treasury-hrm.mjs` (**62** نقطة تحقّق حيّة،
+  أربع مراتٍ متتالية بصفر فشل، كل رقمٍ فارقٌ عن خطّ أساس، والسندات تُلغى والقيود تُعكس،
+  وما لا رجعة فيه يُرفض: `SALARY_PAYMENT_POSTED` · `EMPLOYEE_ON_PAYROLL` ·
+  `ACCOUNT_POSTED`). **837** اختبار API (كان 828) · 36 staff · 71 contract · tsc وlint
+  أخضران. ومؤجَّل عن قصد: `frmInvRptType` «🖨️ افتراضي طباعة الفواتير» (نافذة إعدادٍ
+  تكتب `UPDATE sett SET val = 1|2` — إلى الجزء السابع)، و«إجمالي الفترة:» (تسميةٌ بلا
+  صندوق قيمة عند الديسكتوب نفسه)، وفلتر «📱 الجوال»، و`Marine.IS_InPlan` علماً ثابتاً.
+
+* **المرحلة 10 — التقارير، الجزء الخامس: 📒 تقارير المحاسبة**
+  (`Form_WPF/frmRptBalances.xaml` «أرصدة الحسابات» (540/662) · `frmRptEntries.xaml`
+  «القيود اليومية» (751/788) · `frmRptIncomeStatement.xaml` «أرباح وخسائر حسابات رئيسية»
+  (510/637) · `frmRptCostCenter.xaml` «تقرير مراكز التكلفة» (560/842) ·
+  `frmTaxRptPeriod.xaml` «إقرار ضريبي» (910/952)). **ستة تقارير** — «أرصدة الحسابات»
+  بعشرة أعمدة و**صيغة الرصيد من وجهين** (`حركة = max(مدين − دائن، 0)`، ثم `ختامي =
+  افتتاحي + حركة`، ثم تصفيةٌ ثانية تُبقي وجهاً واحداً) و«الحساب الرئيسي» شجرةً
+  (`accounts.path <@ <المختار>` سيرُ `GetParent` في `ParentCode`)، و«القيود اليومية»
+  بسبعة أعمدة وستة عشر نوع قيد من `EntryTypes` وحالةٍ تقرأ «لاغي» من القيد العكسي،
+  و«🧾 تفاصيل القيد» بسبعة أعمدة وإجمالي المدين والدائن والفرق، و«أرباح وخسائر حسابات
+  رئيسية» بـ`FinalAcc = 2` (`accounts.type IN ('revenue','expense')`) مُجمَّعةً على
+  الآباء مع سطر «قيمة مخزون بضاعة آخر المدة حتى هذا التاريخ» و«صافي أرباح العام»،
+  و«تقرير مراكز التكلفة» بأربعة عشر عموداً — «تجميعي» بكل الأبناء و«تفصيلي»
+  بالأبناء المباشرين أو المركز نفسه إن لم يكن له أبناء — و«الإقرار الضريبي» بثلاثة عشر
+  بنداً (ستة مبيعات وستة مشتريات وصافي الضريبة) من `TaxRptPeriod.repx`، حيث «سندات
+  الصرف» تقرأ سند الصرف **والقيد الضريبي** (`is_vat`) مفروزاً بحساب الضريبة من
+  `tax_groups.vat_account_id`، و«ربع سنة» و«شهري» يكتبان الفترة فوق صندوقي التاريخ كما
+  تفعل `SetDate`. `apps/api/test/report-accounting.spec.ts` (**12** اختباراً) و
+  `scripts/verify-reports-accounting.mjs` (**77** نقطة تحقّق حيّة، ستّ مراتٍ متتالية
+  بصفر فشل، كل رقمٍ فارقٌ عن خطّ أساس، والقيود تُعكس لا تُلغى، والحسابات والمراكز التي
+  حملت حركة تُرفض حذفها: `ACCOUNT_POSTED` · `ACCOUNT_HAS_CHILDREN` ·
+  `COST_CENTER_IN_USE`). **828** اختبار API (كان 816) · 36 staff · 71 contract · tsc
+  وlint أخضران. ومؤجَّل عن قصد: «المبيعات المحلية الخاضعة للنسبة الصفرية» وبندا
+  «الاستيرادات» (النافذة لا تملؤها أصلاً)، و`cost_center.type = 2`، وأزرار «تفاصيل».
+
+* **المرحلة 10 — التقارير، الجزء الرابع: 📚 تقارير المخزون والأرقام التسلسلية**
+  (`Form_WPF/frmRptInventory.xaml` «📋 الفواتير» (580/769) · `frmRptItemsActivity.xaml`
+  «مادة باجمالي الحركات» (824/964) · `frmRptItemsActivityDetailed.xaml` «حركة صنف
+  تفصيلي» (829/1195) · `frmRptItemsExpiration.xaml` «صلاحية المواد» (599/448) ·
+  `frmRptSerialNo.xaml` «حركة الأرقام التسلسلية» (516/491) ·
+  `frmRptSerialNoSummary.xaml` «أرصدة الأرقام التسلسلية» (432/324) ·
+  `frmRptProducedItems.xaml` «تقرير مواد المنتجة» (481/376)). **ثمانية تقارير** —
+  «تقرير مستندات المخزون» بثمانية أنواع عملية من `cmbOperation` (مناقلة مرسلة · مناقلة
+  مستلمة · بضاعة أول مدة · أمر توريد · أمر صرف · أمر إنتاج · طلب بضاعة · تسوية جردية)،
+  و**«مادة باجمالي الحركات» بثلاثة عشر عمود حركة وصيغة الرصيد نفسها** (`100+20−5−10+2−1
+  −25+3−2+7−4−8 = 77`، كل عمودٍ حجم حركة والإشارة من اسمه) مع «متوسط التكلفة» من رصيد
+  المخزون و«إجمالي التكلفة» = الرصيد × متوسط التكلفة، و«حركة صنف تفصيلي» برصيدٍ متحرك
+  واسم نوع الفاتورة ورقم المرجع و«🔄 نوع العملية» و«📋 أنماط الفواتير»، و«صلاحية المواد»
+  من `dbo.ItemsExpirationStock` (`AlterDb.txt:2157`) بباقي سنوات وأشهر وأيام، و«حركة
+  الأرقام التسلسلية» و«أرصدة الأرقام التسلسلية» من `funCalculateSerialNoSummary`
+  (`AlterDb.txt:3615`) — العدد رصيدٌ لا عدد صفوف: ما استُهلك خرج وما أُرجع عاد —
+  و«تقرير مواد المنتجة» (🏭 المواد المنتجة) و«مكونات المواد المنتجة» (🔧 المكونات) بأربع
+  بطاقات (إجمالي المواد · الرصيد · التكلفة · البيع). `apps/api/test/report-inventory.spec.ts`
+  (**10** اختبارات) و`scripts/verify-reports-inventory.mjs` (**150** نقطة تحقّق حيّة، كل
+  رقمٍ مستأجَرٍ واسع فارقٌ عن خطّ أساس، والتنظيف في `finally`، وما لا يُلغى مفحوصٌ أنه
+  يُرفض: أمرُ إنتاجٍ مكتمل `PRODUCTION_ORDER_INVALID_STATUS` ومناقلةٌ مستلمة
+  `TRANSFER_INVALID_STATE`). **816** اختبار API (كان 806) · 36 staff · 71 contract ·
+  tsc وlint أخضران. ومؤجَّل عن قصد: 👤 المستخدم في «مستندات المخزون»، و«المجموع · الخصم
+  · الإجمالي · الضريبة · الصافي» لمستندات المخزون (السحابة تحفظ تكلفةً وكمية لا سعراً
+  وضريبة)، و«أمر توريد» و«طلب بضاعة» — وثيقتان في السحابة لا تُحرّكان الرصيد.
+
+* **المرحلة 10 — التقارير، الجزء الثالث: 🧾 تقارير الفواتير والإشعارات والحركة اليومية**
+  (`Form_WPF/frmRptInvSalesDetails.xaml` «تقرير فواتير المبيعات» (1143/1513) ·
+  `frmRptInvSalesDetailsPos.xaml` «تقرير مبيعات الفواتير» ·
+  `frmRptInvSalesDetailsPosAndroid.xaml` «تقرير مبيعات أندرويد» ·
+  `frmRptInvNotfic.xaml` «تقرير الإشعارات» · `frmRptInvPurchaseDetails.xaml`
+  «تفاصيل فواتير المشتريات» · `frmRptDailySales.xaml` «تقرير مبيعات حسب اليوم» ·
+  `frmRptDailyProcess.xaml` «تقرير الحركة اليومية» · `frmRptInvAnalysis.xaml`
+  «تقرير تحليل المبيعات»). **سبعة تقارير: صفّ فاتورةٍ واحد (21 عموداً: نوع الفاتورة ·
+  رقم الفاتورة · 🔗 رقم المرجع · التاريخ · الوقت · نوع الدفع · المدفوع · العميل · نقدي ·
+  شبكة · المجموع · الخصم · الإجمالي · الضريبة · ضريبة إضافية · إجمالي الضريبة · الصافي ·
+  المستودع · الفرع · المندوب · المستخدم) تتقاسمه ثلاث نوافذ** — الفواتير (`inv_type`
+  2/3/20) والإشعارات (21/22) — و«تفاصيل فواتير المشتريات» (17 عموداً بـ«المدفوع»
+  و«المتبقي»)، و«مبيعات حسب اليوم» (الرقم · التاريخ · اليوم · الإجمالي قبل الضريبة ·
+  الضريبة · الإجمالي) باسم اليوم من `ToString("ddd", ar)`، و«الحركة اليومية» بست
+  حركاتٍ مرتَّبة (`DoProcess`: مبيعات · مرتجع مبيعات · نقطة البيع · مرتجع نقطة البيع ·
+  مشتريات · مرتجع مشتريات) ونقديها وآجلها، و«تحليل المبيعات» بثمانية أبعاد
+  (المخزن · العميل · الصنف · مندوب البيع · المستخدم · الأيام · الشهور · مجموعة الصنف)
+  ونسبتيه. **«📊 ملخص النتائج» عشر بطاقات بالإشارات: `Calc(x) = purchases.Sum(x) −
+  returns.Sum(x)`** — المرتجع يخصم، وكذلك الإشعار الدائن (`credit_note` سالب و
+  `debit_note` موجب). و«نوع الدفع» نصّ `GetPaymentText` (آجل · نقدي · شبكة · متعدد)،
+  و«🔗 رقم المرجع» يُقرأ من رابط الفاتورة (`reference_invoice_id`) لأن `inv.Reff_No`
+  صندوقٌ نصّي لا مقابل له. `apps/api/test/report-invoices.spec.ts` (**15** اختباراً)
+  و`scripts/verify-reports-invoices.mjs` (**159** نقطة تحقّق حيّة، كل رقمٍ فارقٌ عن خطّ
+  أساس، والتنظيف في `finally` إلا الفاتورة المسدَّدة التي تمنع قاعدة الدفاتر إلغاءها).
+  **806** اختبار API (كان 791) · 36 staff · 71 contract · tsc وlint أخضران. ومؤجَّل عن
+  قصد: أنواع `DoProcess2` (سندات القبض) و`FrmRptSalesChart` و🧑‍💼 المندوب في المشتريات
+  و«رقم المرجع» نصّاً حرّاً.
+
+* **المرحلة 10 — التقارير، الجزء الثاني: 📦 تقارير الأصناف**
+  (`Form_WPF/frmRptItemsSalesDetails.xaml` «مبيعات الأصناف تجميعي» — وهي نفسها
+  «مشتريات الأصناف تجميعي» بـ`OperType = 2` — و`frmRptItemsSalesDetailsPOS.xaml`
+  و`frmRptItemsProfit.xaml` و`frmRptItemsProfitDetails.xaml` و`frmRptSalesByCategory.xaml`
+  و`frmRptCategorySaleByDay.xaml`). **سبعة تقارير من ست نوافذ: «مبيعات الأصناف تجميعي»
+  (رمز الصنف · الصنف · المجموعة · الكمية · صافي البيع) و«نقطة البيع» (المحصورة في
+  `inv_type=3`) و«أرباح المواد تجميعي» (الكمية · متوسط التكلفة · صافي البيع · الربح ·
+  نسبة الربح) و«أرباح المواد تفصيلي» (ستة عشر عموداً: الرقم · التاريخ · نوع العملية ·
+  المستودع · المادة · الوحدة · الكمية · التكلفة · السعر · المجموع · الإجمالي · الخصم ·
+  الربح · …) و«تقرير مبيعات الأصناف حسب المجموعة» (إجمالي الكمية · الإجمالي · الضريبة ·
+  الصافي · الخصم) و«تقرير المبيعات اليومية للمجموعة» (الرمز · المجموعة · اليوم ·
+  التاريخ · الإجمالي) و«مشتريات الأصناف تجميعي».** وكل صنفٍ صافٍ من مردوده
+  (`saleVal − retSaleVal + posVal − posRetVal`)، وصنفٌ لا حركة له لا يظهر
+  (`if (!hasMovement) continue;` — أيّ حركة، لا صافٍ غير صفر، بخلاف الجزء الأول).
+  وخصمُ رأس الفاتورة موزَّعٌ **عند الحفظ** في `line.net` لا في التقرير، فصارت «الضريبة»
+  تُقرأ من السطر لا مضروبةً في 15%. وصار `grandTotal` في المحرّك **بطاقةً أو قائمة
+  بطاقات**: «💵 إجمالي صافي البيع» + «📦 إجمالي الكميات»، وخمس بطاقات في التفصيلي،
+  والشريط المطبوع `(totals-strip)` يرسمها كلها. `apps/api/test/report-items-summary.spec.ts`
+  (**14** اختباراً) و`scripts/verify-reports-items.mjs` (**126** نقطة تحقّق حيّة، أربع
+  تشغيلات خضراء، كل رقمٍ فارقٌ عن خطّ أساس، والتنظيف في `finally` — حتى الفواتير
+  تُبطَل كلها). **791** اختبار API (كان 777) · 36 staff · 71 contract · tsc وlint
+  أخضران. ومؤجَّل عن قصد: 👤 المستخدم و🧑‍💼 المندوب (لا مرشِّح عضوية بعد)،
+  والضريبة الإضافية، وزرّا «تفاصيل» و«📄 الفاتورة».
+
+* **المرحلة 10 — التقارير، الجزء الأول: 📊 حركة المبيعات**
+  (`Form_WPF/frmRptSalesInPeriod.xaml` «حركة المبيعات» و`Reports/RptSalesInPeriod1.repx`
+  و`RptSalesInPeriod2.repx` و`header.repx`/`footer.repx`). **نافذةٌ ذات تبوبيْن يقرآن
+  الوثائق نفسها: الأول «📊 إجمالي المبيعات» (رقم الصنف · الصنف · الكمية · الإجمالي)
+  والثاني «🧾 عرض الفواتير» (رقم الحركة · رقم الفاتورة · نوع الفاتورة · التاريخ ·
+  الوقت · آجل · نقدي · شبكة · الإجمالي · الضريبة · الخصم · الصافي)، وتحت كل شبكة
+  «💰 إجمالي المبيعات:» — `txtSumSale` مجموعُ الصافي و`txtSumSale2` المبيعات ناقص
+  المردودات.** وفلاترها: 🧾 نوع الفاتورة («مبيعات نقطة البيع» · «مبيعات عادية») و📅
+  التواريخ و⏰ الوقت (HH:mm:ss) بجانب كل تاريخ؛ ورفضُها الأول «لا توجد عمليات
+  بالجدول». فصار للتقريريْن تعريفان في سجلّ التقارير، وثلاث خصالٍ جديدة في المحرّك
+  لم تكن فيه: `grandTotal` (💰 الرقم الواحد تحت الشبكة، من صفوف الشاشة نفسها، وعمودٌ
+  مخفيّ يحمل إشارة المردود) و`emptyAr` (جملة التقرير الفارغ) و`signature`
+  («أعده · راجعه · المدير»)، وصنفا مرشِّح جديدان: `time` و`invType`؛ و`GET
+  /reports/print/:key` يطبع التقرير برأس المنشأة واسم «المستخدم» وتاريخ الطباعة.
+  `apps/api/test/report-sales-movement.spec.ts` (**10** اختبارات)
+  و`scripts/verify-reports-sales.mjs` (**59** نقطة تحقّق حيّة، أربع تشغيلات خضراء،
+  وكل رقمٍ فيها فارقٌ عن خطّ أساس، والتنظيف في `finally`). **777** اختبار API (كان
+  767) · 36 staff · 71 contract · 17 database · tsc وlint أخضران. ومؤجَّل عن قصد:
+  `SettingPrint` (الطابعة وعدد النسخ والختم) إلى جزءٍ لاحق، وصور الرأس والتذييل.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء التاسع: ⛵ المرسى — ➕ الإضافات**
+  (`Form_WPF/frmAdditions.xaml` «📋 إضافات» — لوحتها «📋 إدارة الإضافات»، و«🎁
+  الإضافات» في `Form_WPF/frmBookingM.xaml` «الحجوزات»). **أصغر نوافذ المرحلة، وأوحدُها
+  التي لا تُملأ تعاريفها يدوياً في كل حجز: ثلاثة صناديق (🔢 الرقم — مقروء فقط — و📝
+  الاسم و💰 القيمة) وثلاثة أزرار (➕ جديد · 💾 حفظ · 🗑️ حذف)، وشبكة تحتها بالأعمدة
+  نفسها. وهي ما يملأ «🎁 الإضافات» في الحجز: `LoadAdditions` = `select id, Name from
+  Additions where IsDeleted=0`، واختيارٌ منها يكتب «السعر» من `SalePrice`
+  (`cmbAdditions_SelectionChanged`).** وحفظها: رفضٌ بلا اسم «يجب إدخال اسم الإضافة ⚠️»،
+  وقيمةٌ فارغةٌ صفر، ثم `insert`/`update`، و«✅ تم الحفظ بنجاح» أو «✅ تم حفظ
+  التعديلات بنجاح»؛ وحذفها: «يجب تحديد الإضافة المراد حذفها ⚠️» ثم تأكيد ثم `delete
+  from Additions`. ترحيل 0060 يضيف `marina_additions` (الرقم · الاسم · القيمة، وحذفٌ
+  ناعم) و`marina_booking_additions.addition_id` — `BookingAddition.AditionID`، فصار
+  صفّ «🎁 الإضافات» يشير إلى تعريفه بدل أن ينسخ اسمه فقط. و«➕» على الشبكة يجمع كمّية
+  إضافةٍ مكرَّرة على صفّها (`Quantity += quant`) ولا يفتح صفّاً ثانياً، و«الإجمالي» =
+  الكمية × السعر، و«يجب إدخال الكمية  » بكميةٍ فارغة. `apps/api/test/marina-additions.spec.ts`
+  (**8** اختبارات) و`scripts/verify-marina-additions.mjs` (**44** نقطة تحقّق حيّة، ثلاث
+  تشغيلات خضراء، والتنظيف في `finally`). **767** اختبار API (كان 759) · 36 staff ·
+  71 contract · 17 database · tsc وlint أخضران. ومؤجَّل عن قصد: «تعريف مالك»
+  (`frmOwners`) إلى جزءٍ يبني بطاقته، والطباعة والتقارير إلى مرحلتها.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء الثامن: 🛒 متجر سلة**
+  (`Form_WPF/FrmSallah.xaml` «تكامل Salla API»، و`Class/SallaAPI.cs` و
+  `Class/ProductsManager.cs` و`Class/OrdersManager.cs` و`Class/CustomersManager.cs` و
+  `Class/SallaAuth.cs`). **النافذة عند الديسكتوب أربعة أزرار تُحصي ما تجلبه ولا تحفظه:
+  «📦 جلب المنتجات» → «تم جلب {n} منتج.»، و«📋 جلب الطلبات» → «تم جلب {n} طلب.»،
+  و«➕ إضافة منتج» → «تم إضافة المنتج بنجاح.»، و«📥 جلب الطلبات (2)» → `await Task.Run(() => { })`
+  وصندوق رسالة. والرمزُ مموضعٌ في الكود (`new SallaAPI("2adcaba8-…")`)， وقوائم «متجر سلة»
+  الثلاث في `Home.xaml` L394 معالجاتُها فارغة، ونوافذها (`FrmSallaProducts` · `FrmOrderSalla`
+  · `FrmSallaBranchMapping`) معلَّقة وغير موجودة.** وقراءة `Class/ManagerOnline.cs` أثبتت
+  أنه **ليس من سلة**: نبضةُ رخصةٍ (QLicense) وتاريخ ZATCA إلى
+  `app-cloud-rmxb.onrender.com`. ترحيل 0059 يضيف `salla_products` (مرآة ما في المتجر) و
+  `salla_orders` (كل طلبٍ برقمه البعيد وحالته ومرآته وارتباطه بفاتورته) — فصار للإحصاء
+  مكانٌ يوضع فيه، وصار الرقم البعيد مانعاً لتكرار الاستيراد. والنقل (`SallaTransport`)
+  محقون: `fetch` في الإنتاج، ومتجرٌ في الذاكرة حين يبدأ معرّف المتجر بـ `MOCK-` أو حين
+  تُضبط `SALLA_TRANSPORT=mock` — وبه صار مسارٌ لا يُختبر عند الديسكتوب قابلاً للاختبار.
+  و«➕ إضافة منتج» يُرسل صنفاً حقيقياً بالمفاتيح الأربعة التي يرسلها الديسكتوب
+  (`name · price · quantity · description`) لا كائناً مثبَّتاً. `apps/api/test/salla-store.spec.ts`
+  (**10** اختبارات) و`scripts/verify-salla.mjs` (**40** نقطة تحقّق حيّة، ثلاث تشغيلات
+  خضراء، والتنظيف في `finally`). **759** اختبار API (كان 749) · 36 staff · 71 contract ·
+  17 database · tsc وlint أخضران. ومؤجَّل عن قصد: منعُ تحويل منتجات المتجر إلى أصناف
+  محلية، وربطُ الطلب بعميلٍ قائم، ومزامنة الكمية مع المخزون، و`ManagerOnline`.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء السابع: ⛵ المرسى — 📋 بطاقة الفئة و⏰ فترات
+  التأجير** (`Form_WPF/frmGroupM.xaml` «📋 بطاقة فئة» و`Form_WPF/frmAddPeriod.xaml`
+  «⏰ فترات التأجير»). **الفئة هي تعريفة المرسى: منها يُسعَّر الحجز في `frmBookingM` —
+  قيمة الساعة وقيمة النصف ساعة وعرضاهما بالدقائق؛ والسحابة كان لها فئةٌ باسمها ورمزها
+  لا أكثر، ولا سعرَ فيها ولا مدة.** وحفظ `frmGroupM` ثلاثة أمور بنسقٍ واحد: صفُّ
+  `GroupMarine`، ثم `delete RentPeriodSub where MGroupID=…`، ثم `ساعة` من قيمة الساعة
+  و`نصف ساعة` من قيمة النصف ساعة — **في كل حفظة**، حتى لو كانت `frmAddPeriod` قد أضافت
+  مدداً أخرى؛ و`frmAddPeriod` مرآتها: `delete` ثم كل صفٍّ من شبكة «⏰ المدة · 💵 السعر ·
+  🎁 العرض · 🗑️». ورفوضها بلسانها: «ادخل الفئة» · «الفئة تم ادخالها مسبقا» · «يجب
+  إستكمال البيانات ⚠️» · «هذه الفئة لها ارتباطات فرعية لايمكن حذفها» · «اختر الفئة ليتم
+  حذفها». ترحيل 0058 يضيف على `vessel_groups`: 🔢 الرقم · الاسم (EN) · قيمة الساعة ·
+  عرض الساعة (دقيقة) · قيمة النصف ساعة · عرض النصف ساعة (دقيقة) · رابط الصورة؛ وعلى
+  `vessel_group_pricing`: ⏰ المدة (`RentPeriod.id`) وطولها بالدقائق و🎁 العرض — وقيد
+  `period_kind` وُسِّع من أربع قيم إلى عشر لأن المدد عشر. و🖼️ صورة الفئة رابطٌ لا بايتات
+  (`GroupMarine.image` عمود صورة، ولا مخزن ملفّاتٍ هنا). و⏰ المدة العشر ثابتةٌ في الخدمة
+  كما ثبت نصّا «حجز عادي» و«بحر مفتوح» في الجزء السادس: لا نافذةَ للقائمة. و⏮ ◀ ▶ ⏭
+  نُقلت كما هي — تقف عند الطرف (`if (!reader.HasRows) return;`) — وهي أول نافذةٍ تُنقل
+  أسهمها. وأُضيف `DELETE /marina/vessels/{id}` (تقاعد مركب) لأن الفئة التي تحمل مركباً
+  لا تُمحى، فبلا هذا الطريق لا مخرج. `apps/api/test/marina-group-cards.spec.ts`
+  (**9** اختبارات) و`scripts/verify-marina-groups.mjs` (**58** نقطة تحقّق حيّة، ثلاث
+  تشغيلات خضراء، والتنظيف في `finally`). **749** اختبار API (كان 740) · 36 staff ·
+  71 contract · 17 database · tsc وlint أخضران. ومؤجَّل عن قصد: سلة إلى الجزء الثامن،
+  والطباعة والتقارير إلى مرحلتها، وتعاريف `Additions` إلى جزءٍ يبني تعاريف المرسى.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء السادس: ⛵ المرسى — الحجوزات والمخالفات**
+  (`Form_WPF/frmBookingM.xaml` «الحجوزات» و`Form_WPF/frmViolationM.xaml` «المخالفات» و
+  `Form_WPF/frmInvoiceRentSrch.xaml` «بحث الفواتير»). **الحجز عند الديسكتوب وثيقةٌ
+  برقمها وتاريخها وقيمتها ومدتها وإضافاتها، ومجاميعها أربعة: «إجمالي الإضافات · الإجمالي
+  · ضريبة 15% · الصافي» — والسحابة كان لها حجزٌ بلا رقم ولا حالة ولا نوع ولا مدة ولا
+  قيمة، وإضافاتُه مبلغٌ واحد بلا كمية ولا سعر.** وما يحفظه الديسكتوب صفقةٌ واحدة تكتب
+  ثلاثة جداول: `RentInvoice` ثم `Booking` ثم `delete BookingAddition` وإدراجها من جديد؛
+  وأوّل ما ترفضه «يجب تحديد مدة الحجز» — ساعةٌ ودقيقة على صفر. والمجاميع `CalcuAll`
+  بنصّها: `الضريبة = ROUND(الإجمالي × MainVAT ÷ 100, 2)` و`الصافي = الإجمالي + الضريبة`
+  و`MainVAT` من `SettingGeneral where Inv_Id=4` (ضريبة المرسى وحدها، و«ضريبة 15%» في
+  الملف ظلّها). والمخالفة أصغر: 🔢 الرقم (`MAX(id)+1`) · ⛵ المركب · ⚠️ نوع المخالفة ·
+  ⏱️ مدة المخالفة (يوم) · 📝 ملاحظة، وثلاثة رفوض بترتيبها: «يجب اختيار المركب» ·
+  «يجب تحديد مدة المخالفة» · «يجب تحديد نوع المخالفة». ترحيل 0057 يضيف على
+  `marina_bookings`: الرقم · 📅 التاريخ · 🚢 نوع الحجز · ⏱️ المدة (ساعة · دقيقة) ·
+  💰 القيمة؛ وعلى الإضافات: الكمية وسعر الوحدة؛ وعلى المخالفات: الرقم · النوع · المدة؛
+  وعلى فاتورة التأجير: الضريبة والصافي. والحالة والنوع يُحفظان بنصّهما العربي لأن
+  `cmbBookingStatu.Content` و`rbNormal` هكذا يكتبانهما، و`'booked'` القديم يُقرأ
+  «مؤكد». و«🔍 البحث» صار مرشِّحاتٍ على القائمة، و«🔍 خيارات البحث» صارت مرشِّحاتٍ على
+  فواتير التأجير (العميل أو جواله · التاريخان · الصافي من/إلى). وعمود «الحالة» في شبكة
+  المخالفات مربوطٌ بالمدة عند الديسكتوب (`Binding="{Binding period}"`) — فصار لكلٍّ
+  عموده. `apps/api/test/marina-booking-documents.spec.ts` (**11** اختباراً) و
+  `scripts/verify-marina.mjs` (**45** نقطة تحقّق حيّة، تشغيلان أخضران، والتنظيف في
+  `finally`). **740** اختبار API (كان 729) · 36 staff · 71 contract · 17 database ·
+  tsc وlint أخضران. ومؤجَّل عن قصد: بطاقة الفئة وأسعارها (`frmGroupM`) إلى الجزء
+  السابع، والطباعة والتقارير إلى مرحلتها، ورفع الضريبة إلى سطر فاتورة البيع مع الفاتورة
+  الإلكترونية.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء الخامس: 👓 النظارات**
+  (`Form_WPF/frmGlasses.xaml` «👓 بيانات النظارات»، ومعها
+  `Form_WPF/frmInvSale.xaml.cs` L2505 `glassesOptions` و`Class/InvoiceOper.cs` L1662
+  و`Class/Print.cs` L710 و`Other_Column`). **عشر قيمٍ لعينين، وأسماؤها ليست في الملف:**
+  «👓  القياسات» عمودان — «🔴 العين اليمنى (RE)» و«🟢 العين اليسرى (LE)» — وخمسة
+  صناديق في كلٍّ، وعناوينها تُقرأ وقت التشغيل
+  (`select isnull(L1,'LE-SPH') … isnull(R5,'RE-IPD') from Other_Column`)؛ فالتبويب
+  الثاني «⚙  أسماء الحقول» — حقل 1…5 لليمين و6…10 لليسار — هو ما يسمّيها كل مؤسسة،
+  و«💾 حفظ الأسماء» يستبدل الصفّ (`delete` ثم `insert`) لا يُرقّعه. ترحيل 0056 يضيف
+  `optics_field_labels` على صورة `Other_Column` نفسها: عشرة أعمدة وبدائلها في defaults
+  الأعمدة، وصفٌّ واحد لكل مؤسسة، ولا بذور — فمن لم يفتح النافذة يقرأ «RE-SPH» …
+  «LE-IPD» كما يفعل `isnull`. والقيم نصوص: أعمدة `SPH … IPD` في الديسكتوب `VarChar`
+  و`Conversions.ToString` لا يُحلّل، ف«PL» و«+1.25» تُحفظ كما كُتبت وبلا تحقّق. وحدة
+  `optics` كانت قائمة بلا شاشة ولا اختبار، فصارت: `GET/POST /optics/prescriptions` و
+  `GET/PATCH/DELETE /optics/prescriptions/{id}` و`GET/PUT /optics/field-labels`،
+  والقراءة `optics.view` والكتابة `optics.manage`، وقسم الطباعة يحمل العناوين مع
+  الصفوف؛ وشاشتان في وحدة «👓 النظارات»: `/optics/prescriptions` (أزرارها «🔄 جديد ·
+  ✔ إدراج · ✖ خروج» بنصّها) و`/optics/field-labels`. والرفض «الرجاء اختيار عميل» هو
+  جملة الديسكتوب (`frmOrderDetails.xaml.cs` L324): نافذة النظارات لا ترفض شيئاً،
+  ورفضاها للفاتورة لا للوصفة. `apps/api/test/optics-prescriptions.spec.ts` (**11**
+  اختباراً) و`scripts/verify-optics.mjs` (**33** نقطة تحقّق حيّة، تشغيلان أخضران،
+  والتنظيف في `finally`). **729** اختبار API (كان 718) · 36 staff · 71 contract ·
+  17 database · tsc وlint أخضران. ومؤجَّل عن قصد: فتح البطاقة من سطر الفاتورة
+  (`invoice_line_id` جاهز) وغلاف `frmInvPOS` الفارغ.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء الرابع: 📏 القياسات**
+  (`Form_WPF/frmMeasurements.xaml` «إدارة قياسات العملاء» و
+  `Form_WPF/frmMeasurementDetails.xaml` «📏 بيانات القياس» و
+  `Form_WPF/frmMeasurementAttributes.xaml` «📏 إدارة خصائص القياسات»). **القياس عند
+  الديسكتوب وثيقةٌ باسمها وتاريخها وقيمها، والسحابة كانت تحفظ `jsonb` واحداً بلا اسم
+  ولا تاريخ ولا شاشة — ولا شيء من «خصائص القياس» التي تُبنى منها بطاقة القياس وقت
+  التشغيل.** ترحيل 0055 يضيف `tailoring_measurement_attributes`
+  (اسم الخاصية · ترتيبها · حالتها) وعمودين على `customer_measurements`: 👤 اسم صاحب
+  القياس و📅 التاريخ. والحساب منقولٌ بنصّه: القيمة تُكتب إن فسّرت عدداً أكبر من الصفر
+  (`btnSave_Click` في `frmMeasurementDetails`)، و📐 عدد المقاسات هو عدد ما كُتب،
+  والترتيب `ISNULL(MAX(DisplayOrder),0)+1`، و«🔕 تعطيل» هو `IsActive = 0` لا حذفاً
+  («سيتم إخفاؤها من القياسات الجديدة»)، و«▲▼ تحريك» يبادل الترتيب مع الجار. والخصائص
+  الثلاث المبذورة — الطول · العرض · الكم — هي مثال الديسكتوب نفسه في سؤال الإضافة:
+  «أدخل اسم الخاصية (مثل: الطول، العرض، الكم)»؛ فصفوف `MeasurementAttributes` بيانات
+  لا كود، وهذه الثلاث وحدها ما يسمّيه المستودع. والرفوض بنصّها: «الرجاء إدخال رقم
+  الجوال أو اسم العميل» · «لم يتم العثور على عميل» · «الرجاء البحث عن عميل أولًا» ·
+  «الرجاء إدخال اسم صاحب القياس» · «الرجاء إدخال قياس واحد على الأقل». النهايات:
+  `GET/POST /tailoring/measurements` و`GET/PATCH/DELETE /tailoring/measurements/{id}` و
+  `GET/POST/PATCH /tailoring/measurement-attributes` و`…/{id}/deactivate` و`…/{id}/move`
+  — القراءة `tailoring.view` والكتابة `tailoring.manage` — وشاشتان:
+  `/tailoring/measurements` (البحث و«العميل: …» «الجوال: …» والشبكة والبطاقة) و
+  `/tailoring/measurements/attributes`، ومجموعة «القياسات» في وحدة 🧵 التفصيل. وقراراتٌ
+  مُعلَّلة في `PHASE_09_VERTICALS.md` §7.3 — أهمّها: **القيم تُفتاح بمعرّف الخاصية لا
+  باسمها** فإعادة التسمية لا تُضيّع رقماً مأخوذاً؛ و**المفاتيح الحرّة القديمة باقية**
+  لأنها أعمدة «📐 المقاسات» في `frmCustomers` L1184 وهي الوثيقة نفسها عند الديسكتوب؛
+  و👤 الاسم مرفوضٌ إن أُرسل فارغاً لا إن أُغفل — فبقي توافق النهاية القديمة، و«قياس
+  بتاريخ …» هو عنوان الديسكتوب للقياس بلا اسم. `apps/api/test/tailoring-measurements.spec.ts`
+  (**11** اختباراً) و`scripts/verify-measurements.mjs` (**37** نقطة تحقّق حيّة؛ ثلاث
+  تشغيلات متتالية خضراء، والتنظيف في `finally` ففشلُ فحصٍّ لا يترك صفوفاً، و🔢 الترتيب
+  يعود كما كان، والخاصية المضافة تُعطَّل لا تُحذف). **718** اختبار API (كان 707) ·
+  36 staff · 71 contract · 17 database · tsc وlint أخضران. ومؤجَّل عن قصد: شاشة
+  «📐 المقاسات» على بطاقة العميل (`frmCustomers` L1184) و`sp_DeleteMeasurement` حرفيّاً.
+
+* **المرحلة 09 — الوحدات الرأسية، الجزء الثالث: 🧾 فاتورة التفصيل**
+  (`Form_WPF/frmViewOrders.xaml` «عرض الطلبات - ViewOrders» و`Form_WPF/AddNewSizes.xaml`
+  «إضافة مقاس جديد» و`Form_WPF/frmSandQ.xaml` بـ`ISTailor = true`). **«عرض الطلبات»
+  لا يقرأ `TailoringOrders`: `SearchInData` L55 يقرأ `Inv_Tailor` — وثيقةٌ أخرى برقمها
+  وإجماليها ومدفوعها وباقيها.** ترحيل 0054 يضيف ثلاثة جداول: `tailoring_invoices`
+  (رقم · العميل · الجوال · التاريخ · العدد · السعر · الإجمالي · المدفوع · الحالة ·
+  نوع الثوب · `measurements jsonb` · ملاحظات) و`tailoring_invoice_payments`
+  (`voucher_id` → سند القبض، `ON DELETE set null`) و`tailoring_garment_types`
+  (سعودي · بحريني · اماراتي · كويتي، مبذورة كما في `typeCB` L423). والحساب منقولٌ
+  بنصّه: 💵 الإجمالي = 💰 السعر × 🔢 العدد (`CalculateTotalPrice` L860)، و💰 الإجمالي في
+  الشبكة هو الصافي × 1.05 (L88) — نسبة الـ5% نفسها التي يمرّرها `CreateInvoice` L419 إلى
+  نقطة البيع — و⏳ الباقي = الصافي − المدفوع (L90)، والرفضان «برجاء اختيار العميل»
+  و«يرجي إدخال السعر» (`btnSave_Click` L191). والـ39 عموداً من `Inv_Sub_Tailor` تصير
+  `measurements jsonb` بمفاتيحها كما في الديسكتوب (`height1` · `shoulder` ·
+  `handShape` …)، وتسمياتها تُخدم في `GET /tailoring/measurement-fields` بمجموعاتها
+  الثلاث (📐 المقاسات · ✨ الأشكال والتفاصيل · 📏 مقاسات إضافية) فترسمها الشاشة من
+  السجلّ، ويُرفض أي مفتاحٍ ليس فيه. النهايات: `GET /tailoring/garment-types` و
+  `GET /tailoring/measurement-fields` و`GET/POST /tailoring/invoices` و
+  `GET/PATCH/DELETE /tailoring/invoices/{id}` و`POST …/status` و`POST …/payments` —
+  القراءة `tailoring.view` والكتابة `tailoring.manage` — وشاشة `/tailoring/invoices`:
+  شبكة `frmViewOrders` بصندوق بحثها «🔍 الهاتف أو اسم العميل...» و«النتائج: N»، ونافذة
+  «👁️ عرض» ببطاقة `AddNewSizes` كاملة، ونافذتا «🔄 تغيير الحالة» و«💵 إستلام دفعة».
+  وقراراتٌ مُعلَّلة في `PHASE_09_VERTICALS.md` §6.3 — أهمّها: **الحالة من صفوف
+  `tailoring_order_statuses` نفسها** فدورةٌ واحدة تُسمّى مرةً واحدة؛ و👔 نوع الثوب جدولٌ
+  جديد غير `tailoring_types`؛ ورقم الفاتورة `TI-000001` من سلسلة الوثائق؛
+  و**«إستلام دفعة» تُسجَّل دائماً، وتكتب سند قبض حقيقياً بعبارة «تم استلام دفعة من
+  عملية رقم {code}» (L683) إن أُرسل الصندوق** — والسند `ON DELETE set null` يبقى في
+  الخزينة إن حُذفت الفاتورة. ومؤجَّل عن قصد: زرّ «فاتورة» في «⚙️ لوحة التحكم» (يملأ
+  سلّة ويستدعي نقطة البيع) و`frmSandQ` كاملاً وشاشة القياسات.
+  `apps/api/test/tailoring-invoices.spec.ts` (**11** اختباراً) و
+  `scripts/verify-tailoring-invoices.mjs` (**41** نقطة تحقّق حيّة؛ تشغيلان متتاليان
+  أخضران والثاني يبدأ من قاعدة بلا فواتير وينتهي بلا أثر، والسند باقٍ). **707** اختبار
+  API (كان 696) · 36 staff · 71 contract · 17 database · tsc وlint أخضران.
 
 New permissions `inventory.production.manage` and `inventory.production.complete` (123
 total): planning a recipe and consuming the warehouse against it are different decisions.

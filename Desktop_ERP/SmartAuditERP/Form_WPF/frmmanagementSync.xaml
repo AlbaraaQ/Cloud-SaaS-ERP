@@ -1,0 +1,243 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmmanagementSync"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="إدارة المزامنة"
+    Width="665"
+    Height="430"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Form1_Load">
+
+    <dx:ThemedWindow.Resources>
+
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="UploadBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2E4E9E" Offset="0"/>
+            <GradientStop Color="#1D3268" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DownloadBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="8" ShadowDepth="2"
+                          Direction="270" Opacity="0.12"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6" ShadowDepth="1"
+                          Direction="270" Opacity="0.18"
+                          Color="#000000"/>
+
+        <Style x:Key="SyncCheckBox" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+        </Style>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="SyncBtn" TargetType="Button">
+            <Setter Property="Height" Value="56"/>
+            <Setter Property="Width" Value="180"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="12"
+                                Padding="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="14,10">
+            <TextBlock Text="🔃 إدارة المزامنة"
+                       Foreground="White"
+                       FontSize="15"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- Content -->
+        <Border Grid.Row="1"
+                Background="White"
+                Margin="10,8,10,4"
+                CornerRadius="10"
+                Padding="14"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Branch Selector -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="lblBranch"
+                               Grid.Column="0"
+                               Text="🏢 الفرع"
+                               FontSize="12"
+                               FontWeight="Bold"
+                               Foreground="#1B2642"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+
+                    <ComboBox x:Name="cmbBranch"
+                              Grid.Column="1"
+                              Style="{StaticResource ModernComboBox}"
+                              DisplayMemberPath="name"
+                              SelectedValuePath="BranchId"/>
+
+                    <CheckBox x:Name="chkAll"
+                              Grid.Column="3"
+                              Content="الكل"
+                              Style="{StaticResource SyncCheckBox}"
+                              VerticalAlignment="Center"
+                              Checked="chkAll_CheckedChanged"
+                              Unchecked="chkAll_CheckedChanged"/>
+                </Grid>
+
+                <!-- CheckBoxes Grid -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Column 1 -->
+                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                        <CheckBox x:Name="ckitems"        Content="📦 مزامنة الأصناف"         Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckunits"        Content="📐 مزامنة الوحدات"         Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckaccounts"     Content="📊 مزامنة الحسابات"        Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckboxes"        Content="💰 مزامنة الصناديق"        Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckEmp"          Content="👤 مزامنة الموظفين"        Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="chkPaymentTypes" Content="💳 مزامنة طرق الدفع"      Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="chkPriceType"   Content="💲 مزامنة الأسعار"         Style="{StaticResource SyncCheckBox}"/>
+                    </StackPanel>
+
+                    <!-- Column 2 -->
+                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                        <CheckBox x:Name="ckgroups"       Content="📂 مزامنة المجموعات"       Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckclients"      Content="👥 مزامنة العملاء"          Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckbanks"        Content="🏦 مزامنة البنوك"           Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckInventories"  Content="🏪 مزامنة المستودعات"       Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ckBranches"     Content="🌐 مزامنة الفروع"           Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="chkOffers"      Content="🎁 مزامنة العروض"           Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="ChkUser"        Content="🔑 مزامنة المستخدمين"       Style="{StaticResource SyncCheckBox}"/>
+                    </StackPanel>
+
+                    <!-- Column 3 -->
+                    <StackPanel Grid.Column="2">
+                        <CheckBox x:Name="chksettingpos"  Content="⚙️ إعدادات نقطة البيع"     Style="{StaticResource SyncCheckBox}"/>
+                        <CheckBox x:Name="chkFoundation"  Content="🏢 بيانات المنشأة"          Style="{StaticResource SyncCheckBox}"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="#F8FAFD"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,1,0,0"
+                Padding="12,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Center">
+
+                    <Button x:Name="btnUploadData"
+                            Content="☁️ مشاركة البيانات"
+                            Background="{StaticResource UploadBrush}"
+                            Style="{StaticResource SyncBtn}"
+                            Margin="0,0,20,0"
+                            Click="btnUploadData_ClickAsync"/>
+
+                    <Button x:Name="btnDownloadData"
+                            Content="⬇️ تحميل البيانات"
+                            Background="{StaticResource DownloadBrush}"
+                            Style="{StaticResource SyncBtn}"
+                            Click="btnDownloadData_ClickAsync"/>
+
+                </StackPanel>
+
+                <ProgressBar x:Name="ProgressBar1"
+                             Grid.Row="2"
+                             Height="8"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"
+                             Foreground="#2E7D32"
+                             Background="#E8EBF5"/>
+            </Grid>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>

@@ -5,7 +5,9 @@ import {
   ROLE_FILTERS,
   ROLE_SORT_COLUMNS,
   buildMeta,
+  canonicalizePermissionCode,
   errorCodes,
+  isConsolePermissionCode,
   parseFilters,
   parseSort,
   type ListEnvelope,
@@ -170,16 +172,31 @@ export class RolesService {
   // --- internals ---------------------------------------------------------------
 
   private async assertPermissionsExist(codes: readonly string[]): Promise<string[]> {
-    if (codes.length === 0) return [];
+    // The planes are disjoint: platform-console (`console.*`) permissions are granted
+    // only through `platform_memberships`, never through a tenant role — not even the
+    // tenant owner's. See docs/architecture-rbac/03-roles-permissions-matrix.md.
+    const consoleCodes = [...new Set(codes)].filter((code) => isConsolePermissionCode(code));
+    if (consoleCodes.length > 0) {
+      throw new DomainError(
+        errorCodes.VALIDATION_FAILED,
+        `Platform permissions cannot be granted to a tenant role: ${consoleCodes.join(', ')}`,
+        422,
+        { field: 'permissionCodes' },
+      );
+    }
+    // Normalise legacy `platform.*` spellings to canonical `tenant.*` on write, so the
+    // database converges on the canonical namespace (reads accept both spellings).
+    const canonical = [...new Set(codes.map((code) => canonicalizePermissionCode(code)))];
+    if (canonical.length === 0) return [];
     const found = await withTx(this.database.db, async (tx) =>
       tx
         .select({ code: permissions.code })
         .from(permissions)
-        .where(inArray(permissions.code, [...codes])),
+        .where(inArray(permissions.code, [...canonical])),
     );
-    if (found.length !== new Set(codes).size) {
+    if (found.length !== canonical.length) {
       const known = new Set(found.map((row) => row.code));
-      const unknown = [...new Set(codes)].filter((code) => !known.has(code));
+      const unknown = canonical.filter((code) => !known.has(code));
       throw new DomainError(
         errorCodes.VALIDATION_FAILED,
         `Unknown permission code(s): ${unknown.join(', ')}`,
@@ -187,7 +204,7 @@ export class RolesService {
         { field: 'permissionCodes' },
       );
     }
-    return [...new Set(codes)];
+    return canonical;
   }
 
   private async replacePermissionRows(

@@ -28,7 +28,8 @@
     "db:roles": "pnpm --dir packages/database run roles",
     "db:up": "docker compose -f infrastructure/docker-compose.yml up -d postgres redis",
     "verify": "pnpm run typegen && pnpm exec tsc --project tsconfig.base.json --noEmit && pnpm -r run lint && pnpm run build && pnpm --dir apps/api run test:smoke && pnpm -r run test && pnpm run openapi:export",
-    "db:local": "node ./scripts/local-db.mjs"
+    "db:local": "node ./scripts/local-db.mjs",
+    "db:seed:coa": "pnpm --dir packages/database run seed:coa"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.1.0",

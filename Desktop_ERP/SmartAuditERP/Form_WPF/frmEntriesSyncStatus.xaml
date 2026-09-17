@@ -1,0 +1,601 @@
+﻿<dx:DXWindow
+    x:Class="SmartAuditERP.Form_WPF.frmEntriesSyncStatus"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    xmlns:dxg="http://schemas.devexpress.com/winfx/2008/xaml/grid"
+    Title="🔄 مزامنة القيود"
+    FlowDirection="RightToLeft"
+    WindowState="Maximized"
+    WindowStartupLocation="CenterScreen"
+    ShowIcon="False"
+    FontFamily="Tahoma"
+    FontSize="13"
+    FontWeight="Bold"
+    Background="#F0F2F5">
+
+    <dx:DXWindow.Resources>
+        <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1A237E" Offset="0"/>
+            <GradientStop Color="#283593" Offset="0.5"/>
+            <GradientStop Color="#3949AB" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="SidebarGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFF" Offset="0"/>
+            <GradientStop Color="#F8F9FF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BtnShowGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#43A047" Offset="0"/>
+            <GradientStop Color="#2E7D32" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BtnSyncGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#1E88E5" Offset="0"/>
+            <GradientStop Color="#1565C0" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BtnExcelGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#43A047" Offset="0"/>
+            <GradientStop Color="#1B5E20" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BtnPrintGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FB8C00" Offset="0"/>
+            <GradientStop Color="#E65100" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BtnPreviewGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#8E24AA" Offset="0"/>
+            <GradientStop Color="#6A1B9A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="BtnCloseGradient" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E53935" Offset="0"/>
+            <GradientStop Color="#B71C1C" Offset="1"/>
+        </LinearGradientBrush>
+
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12"
+                          ShadowDepth="3"
+                          Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="ButtonShadow"
+                          BlurRadius="6"
+                          ShadowDepth="2"
+                          Opacity="0.25"
+                          Color="#000000"/>
+
+        <Style x:Key="CardBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1A237E"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#37474F"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+        </Style>
+
+        <Style x:Key="ModernCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#37474F"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="ModernRadioStyle" TargetType="RadioButton">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#37474F"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+        </Style>
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Effect" Value="{StaticResource ButtonShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernComboStyle" TargetType="dxe:ComboBoxEdit">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="30"/>
+        </Style>
+
+        <Style x:Key="ModernDateStyle" TargetType="dxe:DateEdit">
+            <Setter Property="FontFamily" Value="Tahoma"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="30"/>
+        </Style>
+
+        <Style x:Key="ModernProgressStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="Foreground" Value="#1E88E5"/>
+            <Setter Property="Background" Value="#E3F2FD"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </dx:DXWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="18"/>
+            <RowDefinition Height="56"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{StaticResource HeaderGradient}">
+            <Grid Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🔄" FontSize="22" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock Text="مزامنة القيود"
+                               FontFamily="Tahoma"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBlock x:Name="lblCurrentDate"
+                           Grid.Column="1"
+                           FontFamily="Tahoma"
+                           FontSize="12"
+                           Foreground="#D6E2FF"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="10,10,10,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="248"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource CardBorderStyle}"
+                    Margin="0,0,8,0"
+                    Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Background="#E8EAF6"
+                            CornerRadius="10,10,0,0"
+                            Padding="12,8">
+                        <TextBlock Text="📋  القيود المحاسبية"
+                                   Style="{StaticResource SectionHeaderStyle}"
+                                   Margin="0"/>
+                    </Border>
+
+                    <dxg:GridControl x:Name="GridControl1"
+                                     Grid.Row="1"
+                                     AutoGenerateColumns="None"
+                                     FlowDirection="RightToLeft">
+                        <dxg:GridControl.View>
+                            <dxg:TableView x:Name="GridView1"
+                                           ShowGroupPanel="False"
+                                           AutoWidth="False"/>
+                        </dxg:GridControl.View>
+
+                        <dxg:GridControl.Columns>
+                            <dxg:GridColumn x:Name="ColSelect"
+                                            Header="تحديد"
+                                            FieldName="IsSelected"
+                                            Width="60"/>
+
+                            <dxg:GridColumn x:Name="DgvNo"
+                                            Header="م"
+                                            FieldName="DgvNo"
+                                            Width="50"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvEntryGlobalID"
+                                            Header="ID"
+                                            FieldName="DgvEntryGlobalID"
+                                            Width="140"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvEntryBranch"
+                                            Header="الفرع"
+                                            FieldName="DgvEntryBranch"
+                                            Width="110"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvEntryType"
+                                            Header="نوع القيد"
+                                            FieldName="DgvEntryType"
+                                            Width="130"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvEntryNo"
+                                            Header="رقم القيد"
+                                            FieldName="DgvEntryNo"
+                                            Width="90"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvRefNo"
+                                            Header="رقم المرجع"
+                                            FieldName="DgvRefNo"
+                                            Width="110"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvDate"
+                                            Header="التاريخ"
+                                            FieldName="DgvDate"
+                                            Width="100"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvUser"
+                                            Header="المستخدم"
+                                            FieldName="DgvUser"
+                                            Width="110"
+                                            AllowEditing="False"/>
+
+                            <dxg:GridColumn x:Name="DgvSyncStatus"
+                                            Header="حالة المزامنة"
+                                            FieldName="DgvSyncStatus"
+                                            Width="120"
+                                            AllowEditing="False">
+                                <dxg:GridColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock x:Name="txtSyncStatus"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding RowData.Row[DgvSyncStatus]}" Value="True">
+                                                <Setter TargetName="txtSyncStatus" Property="Text" Value="✔ متزامن"/>
+                                                <Setter TargetName="txtSyncStatus" Property="Foreground" Value="Green"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding RowData.Row[DgvSyncStatus]}" Value="False">
+                                                <Setter TargetName="txtSyncStatus" Property="Text" Value="✘ غير متزامن"/>
+                                                <Setter TargetName="txtSyncStatus" Property="Foreground" Value="OrangeRed"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </dxg:GridColumn.CellTemplate>
+                            </dxg:GridColumn>
+
+                            <dxg:GridColumn x:Name="DgvISDeleted"
+                                            Header="محذوف"
+                                            FieldName="DgvISDeleted"
+                                            Width="90"
+                                            AllowEditing="False">
+                                <dxg:GridColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock x:Name="txtDeleted"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding RowData.Row[DgvISDeleted]}" Value="True">
+                                                <Setter TargetName="txtDeleted" Property="Text" Value="🗑 محذوف"/>
+                                                <Setter TargetName="txtDeleted" Property="Foreground" Value="SlateGray"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding RowData.Row[DgvISDeleted]}" Value="False">
+                                                <Setter TargetName="txtDeleted" Property="Text" Value="—"/>
+                                                <Setter TargetName="txtDeleted" Property="Foreground" Value="#90A4AE"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </dxg:GridColumn.CellTemplate>
+                            </dxg:GridColumn>
+
+                            <dxg:GridColumn x:Name="BtnDetails"
+                                            Header="تفاصيل"
+                                            FieldName="BtnDetails"
+                                            Width="90"
+                                            AllowEditing="False">
+                                <dxg:GridColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="📄 عرض"
+                                                FontFamily="Tahoma"
+                                                FontSize="11"
+                                                FontWeight="Bold"
+                                                Background="#3949AB"
+                                                Foreground="White"
+                                                BorderThickness="0"
+                                                Cursor="Hand"
+                                                Height="24"
+                                                Padding="6,0"
+                                                Click="BtnDetailsCell_Click"
+                                                Tag="{Binding RowData.Row}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            CornerRadius="4"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </DataTemplate>
+                                </dxg:GridColumn.CellTemplate>
+                            </dxg:GridColumn>
+                        </dxg:GridControl.Columns>
+                    </dxg:GridControl>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Style="{StaticResource CardBorderStyle}"
+                    Background="{StaticResource SidebarGradient}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="4,0">
+
+                        <TextBlock Text="🏢  فرع القيود" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <CheckBox x:Name="CheckBox1"
+                                  Content="الكل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"
+                                  Margin="0,0,0,6"
+                                  Checked="CheckBox1_CheckedChanged"
+                                  Unchecked="CheckBox1_CheckedChanged"/>
+
+                        <dxe:ComboBoxEdit x:Name="cmbBranches"
+                                          Style="{StaticResource ModernComboStyle}"
+                                          Margin="0,0,0,12"
+                                          IsEnabled="False"
+                                          IsTextEditable="False"
+                                          NullText="-- اختر الفرع --"/>
+
+                        <Border Background="#E8EAF6"
+                                CornerRadius="8"
+                                Padding="10,8"
+                                Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="🔗  حالة المزامنة"
+                                           Style="{StaticResource SectionHeaderStyle}"
+                                           Margin="0,0,0,6"/>
+
+                                <RadioButton x:Name="rbAllSync"
+                                             Content="الكل"
+                                             IsChecked="True"
+                                             Style="{StaticResource ModernRadioStyle}"
+                                             GroupName="SyncStatusGroup"/>
+
+                                <RadioButton x:Name="rbSynced"
+                                             Content="✔ متزامنة"
+                                             Style="{StaticResource ModernRadioStyle}"
+                                             GroupName="SyncStatusGroup"/>
+
+                                <RadioButton x:Name="rbNotSynced"
+                                             Content="✘ غير متزامنة"
+                                             Style="{StaticResource ModernRadioStyle}"
+                                             GroupName="SyncStatusGroup"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="📑  نوع القيد" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <CheckBox x:Name="ckAllInvs"
+                                  Content="الكل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"
+                                  Margin="0,0,0,6"
+                                  Checked="ckAllInvs_CheckedChanged"
+                                  Unchecked="ckAllInvs_CheckedChanged"/>
+
+                        <dxe:ComboBoxEdit x:Name="cmbEntryType"
+                                          Style="{StaticResource ModernComboStyle}"
+                                          Margin="0,0,0,12"
+                                          IsEnabled="False"
+                                          IsTextEditable="False"
+                                          NullText="-- اختر النوع --"/>
+
+                        <TextBlock Text="👤  المستخدم" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <CheckBox x:Name="ckAllUsers"
+                                  Content="الكل"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"
+                                  Margin="0,0,0,6"
+                                  Checked="ckAllUsers_CheckedChanged"
+                                  Unchecked="ckAllUsers_CheckedChanged"/>
+
+                        <dxe:ComboBoxEdit x:Name="cmbusers"
+                                          Style="{StaticResource ModernComboStyle}"
+                                          Margin="0,0,0,12"
+                                          IsEnabled="False"
+                                          IsTextEditable="False"
+                                          NullText="-- اختر المستخدم --"/>
+
+                        <TextBlock Text="📅  الفترة الزمنية" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <CheckBox x:Name="ckTotalPeriod"
+                                  Content="كل الفترة"
+                                  IsChecked="True"
+                                  Style="{StaticResource ModernCheckBoxStyle}"
+                                  Margin="0,0,0,8"
+                                  Checked="ckTotalPeriod_CheckedChanged"
+                                  Unchecked="ckTotalPeriod_CheckedChanged"/>
+
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="من :"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,6,0"/>
+                            <dxe:DateEdit x:Name="txtFromDate"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ModernDateStyle}"
+                                          IsEnabled="False"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="إلى :"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,6,0"/>
+                            <dxe:DateEdit x:Name="txtToDate"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ModernDateStyle}"
+                                          IsEnabled="False"/>
+                        </Grid>
+
+                        <Border Background="#FFF8E1"
+                                CornerRadius="8"
+                                Padding="10,8"
+                                Margin="0,0,0,12">
+                            <CheckBox x:Name="ckDeleted"
+                                      Content="🗑 إظهار المحذوفات"
+                                      IsChecked="False"
+                                      Style="{StaticResource ModernCheckBoxStyle}"/>
+                        </Border>
+
+                        <TextBlock Text="📤  إرسال إلى" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <dxe:ComboBoxEdit x:Name="cmbMainBranch"
+                                          Style="{StaticResource ModernComboStyle}"
+                                          Margin="0,0,0,16"
+                                          IsTextEditable="False"
+                                          NullText="-- اختر الفرع الرئيسي --"/>
+
+                        <Button x:Name="btnShow"
+                                Content="🔍  عرض النتائج"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Background="{StaticResource BtnShowGradient}"
+                                Margin="0,0,0,8"
+                                Click="btnShow_Click"/>
+
+                        <Button x:Name="btnSync"
+                                Content="🔄  مزامنة القيود المحددة"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Background="{StaticResource BtnSyncGradient}"
+                                Click="btnSync_Click"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Background="White"
+                Padding="10,0">
+            <ProgressBar x:Name="ProgressBar1"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="0"
+                         Style="{StaticResource ModernProgressStyle}"
+                         VerticalAlignment="Center"/>
+        </Border>
+
+        <Border Grid.Row="3"
+                Background="White"
+                BorderBrush="#E0E0E0"
+                BorderThickness="0,1,0,0">
+            <Grid Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="btnExportExcel"
+                        Grid.Column="0"
+                        Content="📊  تصدير Excel"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="{StaticResource BtnExcelGradient}"
+                        Width="140"
+                        Margin="0,0,8,0"
+                        Click="btnExportExcel_Click"/>
+
+                <Button x:Name="btnPrint"
+                        Grid.Column="1"
+                        Content="🖨  طباعة"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="{StaticResource BtnPrintGradient}"
+                        Width="120"
+                        Margin="0,0,8,0"
+                        Click="btnPrint_Click"/>
+
+                <Button x:Name="btnPreview"
+                        Grid.Column="2"
+                        Content="👁  معاينة"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="{StaticResource BtnPreviewGradient}"
+                        Width="120"
+                        Margin="0,0,8,0"
+                        Click="btnPreview_Click"/>
+
+                <Button x:Name="btnClose"
+                        Grid.Column="3"
+                        Content="✖  خروج"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="{StaticResource BtnCloseGradient}"
+                        Width="100"
+                        Click="btnClose_Click"/>
+            </Grid>
+        </Border>
+    </Grid>
+</dx:DXWindow>

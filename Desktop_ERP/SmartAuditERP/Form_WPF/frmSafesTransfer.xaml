@@ -1,0 +1,1178 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmSafesTransfer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="مناقلة"
+    WindowState="Maximized"
+    MinWidth="1022" MinHeight="726"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    Loaded="Window_Loaded">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══ Brushes ═══ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="SaveBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2CC36B" Offset="0"/>
+            <GradientStop Color="#1B8E4A" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="InfoBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#3FA8D5" Offset="0"/>
+            <GradientStop Color="#1E7AA8" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="OrangeBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F5A623" Offset="0"/>
+            <GradientStop Color="#C47D0A" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <!-- ═══ Effects ═══ -->
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="12" ShadowDepth="2"
+                          Direction="270" Opacity="0.15" Color="#000000"/>
+        <DropShadowEffect x:Key="BtnShadow"  BlurRadius="6"  ShadowDepth="1"
+                          Direction="270" Opacity="0.20" Color="#000000"/>
+
+        <!-- ═══ Styles ═══ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4B7BFF"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsReadOnly" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F0F2F8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="MinWidth" Value="42"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SaveBtn"   TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource SaveBrush}"/>
+        </Style>
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        </Style>
+        <Style x:Key="InfoBtn"   TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource InfoBrush}"/>
+        </Style>
+        <Style x:Key="OrangeBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Background" Value="{StaticResource OrangeBrush}"/>
+        </Style>
+        <Style x:Key="NavBtn"    TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Width" Value="42"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="2,0"/>
+        </Style>
+
+        <!-- DataGrid Styles -->
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="BorderBrush" Value="#3A63C3"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#D6E4FF"/>
+                    <Setter Property="Foreground" Value="#1B2642"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- CheckBox Style -->
+        <Style x:Key="ModernCheckBox" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1B2642"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!--                 Main Layout                 -->
+    <!-- ═══════════════════════════════════════════ -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <!-- TabControl -->
+            <RowDefinition Height="Auto"/>
+            <!-- Footer Buttons -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══ TabControl ═══ -->
+        <TabControl x:Name="TabControl1"
+                    Grid.Row="0"
+                    Margin="4,4,4,2"
+                    FontFamily="Cairo, Tahoma, Arial"
+                    FontSize="12" FontWeight="Bold">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Padding" Value="16,6"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="FontSize" Value="12"/>
+                </Style>
+            </TabControl.Resources>
+
+            <!-- ══════════════════════════════════ -->
+            <!--        TabPage1: التحويل           -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="📦 التحويل">
+                <Grid Background="#F3F5F9">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- GroupBox5: بيانات الرأس -->
+                        <RowDefinition Height="*"/>
+                        <!-- GroupBox3: جدول الأصناف -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- الإجمالي -->
+                    </Grid.RowDefinitions>
+
+                    <!-- ─── GroupBox5: بيانات التحويل ─── -->
+                    <Border Grid.Row="0"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12,8"
+                            Margin="4,4,4,3"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Header -->
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="7" Padding="10,4"
+                                    Margin="0,0,0,8">
+                                <TextBlock Text="📋 إدخال بيانات التحويل"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <!-- Fields -->
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- رقم المناقلة -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="🔢 رقم المناقلة" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="txtNo"
+                                             Style="{StaticResource ModernTextBox}"
+                                             IsReadOnly="True"/>
+                                </StackPanel>
+
+                                <!-- التاريخ -->
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="📅 التاريخ" Style="{StaticResource FieldLabel}"/>
+                                    <dxe:DateEdit x:Name="txtDate" Height="28" FontSize="11"/>
+                                </StackPanel>
+
+                                <!-- من مخزن -->
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="🏪 من مخزن" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="cmbSafeFrom"
+                                              Style="{StaticResource ModernComboBox}"/>
+                                </StackPanel>
+
+                                <!-- إلى مخزن -->
+                                <StackPanel Grid.Column="6">
+                                    <TextBlock Text="🏪 إلى مخزن" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="cmbSafeTo"
+                                              Style="{StaticResource ModernComboBox}"/>
+                                </StackPanel>
+
+                                <!-- زر الاعتماد -->
+                                <Button Grid.Column="8"
+                                        x:Name="btnExecute"
+                                        Content="✅ اعتماد الإرسال"
+                                        Style="{StaticResource OrangeBtn}"
+                                        Width="120"
+                                        VerticalAlignment="Bottom"
+                                        Click="btnExecute_Click"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- ─── GroupBox3: جدول الأصناف ─── -->
+                    <Border Grid.Row="1"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Margin="4,0,4,3"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="10,10,0,0" Padding="10,5">
+                                <TextBlock Text="📦 أصناف التحويل"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <DataGrid x:Name="dgvItems"
+                                      Grid.Row="1"
+                                      AutoGenerateColumns="False"
+                                      ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                                      RowStyle="{StaticResource DgvRow}"
+                                      CanUserAddRows="True"
+                                      CanUserDeleteRows="False"
+                                      SelectionMode="Single"
+                                      SelectionUnit="FullRow"
+                                      FlowDirection="RightToLeft"
+                                      Background="White"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#E8EBF5"
+                                      AlternatingRowBackground="#F8F9FD"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      BorderThickness="0"
+                                      CellEditEnding="dgvItems_CellEditEnding"
+                                      SelectionChanged="dgvItems_SelectionChanged"
+                                      CurrentCellChanged="dgvItems_CurrentCellChanged">
+                                <DataGrid.Columns>
+
+                                    <!-- # -->
+                                    <DataGridTextColumn Header="#" Binding="{Binding RowNo}"
+                                                        Width="40" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- رمز الصنف -->
+                                    <DataGridTextColumn Header="🔖 رمز الصنف"
+                                                        Binding="{Binding ItemCode}"
+                                                        Width="100">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- رقم الصنف (مخفي) -->
+                                    <DataGridTextColumn Header="رقم الصنف"
+                                                        Binding="{Binding ItemId}"
+                                                        Width="0" Visibility="Collapsed"/>
+
+                                    <!-- الصنف -->
+                                    <DataGridTextColumn Header="📦 الصنف"
+                                                        Binding="{Binding ItemName}"
+                                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- رصيد المستودع -->
+                                    <DataGridTextColumn Header="📊 رصيد المستودع"
+                                                        Binding="{Binding StoreBalance}"
+                                                        Width="110" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- متوسط التكلفة -->
+                                    <DataGridTextColumn Header="💲 متوسط التكلفة"
+                                                        Binding="{Binding AvgCost}"
+                                                        Width="110" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الوحدة -->
+                                    <DataGridTextColumn Header="📐 الوحدة"
+                                                        Binding="{Binding UnitName}"
+                                                        Width="80">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- كمية التحويل -->
+                                    <DataGridTextColumn Header="📦 كمية التحويل"
+                                                        Binding="{Binding TransferQty}"
+                                                        Width="110">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الإجمالي -->
+                                    <DataGridTextColumn Header="💰 الإجمالي"
+                                                        Binding="{Binding TotalCost, StringFormat=N2}"
+                                                        Width="90" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الكمية المستلمة -->
+                                    <DataGridTextColumn Header="✅ الكمية المستلمة"
+                                                        Binding="{Binding ReceivedQty}"
+                                                        Width="110" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الفرق -->
+                                    <DataGridTextColumn Header="↕ الفرق"
+                                                        Binding="{Binding Diff}"
+                                                        Width="70" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- التعادل (مخفي) -->
+                                    <DataGridTextColumn Header="التعادل"
+                                                        Binding="{Binding UnitEquality}"
+                                                        Width="0" Visibility="Collapsed"/>
+
+                                    <!-- الكمية بالوحدة الأساسية (مخفي) -->
+                                    <DataGridTextColumn Header="الكمية الأساسية"
+                                                        Binding="{Binding PrimaryQty}"
+                                                        Width="0" Visibility="Collapsed"/>
+
+                                    <!-- المستخدم -->
+                                    <DataGridTextColumn Header="👤 المستخدم"
+                                                        Binding="{Binding UserName}"
+                                                        Width="130" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- حذف -->
+                                    <DataGridTemplateColumn Header="🗑️" Width="50">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="🗑️"
+                                                        Width="28" Height="20"
+                                                        FontSize="11"
+                                                        Background="{StaticResource DangerBrush}"
+                                                        Foreground="White"
+                                                        BorderThickness="0"
+                                                        Cursor="Hand"
+                                                        Tag="{Binding}"
+                                                        Click="BtnDeleteRow_Click">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}"
+                                                                    CornerRadius="4">
+                                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                                  VerticalAlignment="Center"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+
+                    <!-- ─── Panel3: الإجمالي ─── -->
+                    <Border Grid.Row="2"
+                            Background="#F0F4FF"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,6"
+                            Margin="4,0,4,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="💰 الإجمالي :"
+                                       FontSize="13" FontWeight="Bold"
+                                       Foreground="#213A7A"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,10,0"/>
+                            <TextBox Grid.Column="1"
+                                     x:Name="txtNetWithoutVAT"
+                                     Style="{StaticResource ModernTextBox}"
+                                     IsReadOnly="True"
+                                     Text="0"
+                                     FontSize="13" FontWeight="Bold"
+                                     Foreground="#1B8E4A"
+                                     MaxWidth="200"
+                                     HorizontalAlignment="Right"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ══════════════════════════════════ -->
+            <!--    TabPage3: استلام تحويل          -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="📥 استلام تحويل">
+                <Grid Background="#F3F5F9">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ─── GroupBox2: بحث استلام ─── -->
+                    <Border Grid.Row="0"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12,8"
+                            Margin="4,4,4,3"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Header -->
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="7" Padding="10,4"
+                                    Margin="0,0,0,8">
+                                <TextBlock Text="📥 استلام تحويل"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <!-- الصف الأول: رقم المناقلة + مستودع من/إلى -->
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- رقم المناقلة -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="🔢 رقم المناقلة" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="txtNo2"
+                                             Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+
+                                <!-- من مخزن -->
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="🏪 من مخزن" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="cmbStoreFrom2"
+                                              Style="{StaticResource ModernComboBox}"
+                                              IsEnabled="False"/>
+                                </StackPanel>
+
+                                <!-- إلى مخزن -->
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="🏪 إلى مخزن" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="cmbStoreTo2"
+                                              Style="{StaticResource ModernComboBox}"
+                                              IsEnabled="False"/>
+                                </StackPanel>
+
+                                <!-- زر عرض -->
+                                <Button Grid.Column="6"
+                                        x:Name="btnShow"
+                                        Content="👁️ عرض"
+                                        Style="{StaticResource ActionBtn}"
+                                        Width="90"
+                                        VerticalAlignment="Bottom"
+                                        Click="btnShow_Click"/>
+
+                                <!-- زر تأكيد الاستلام -->
+                                <Button Grid.Column="8"
+                                        x:Name="btnReceiveQuantity"
+                                        Content="✅ تأكيد الاستلام"
+                                        Style="{StaticResource SaveBtn}"
+                                        Width="130"
+                                        VerticalAlignment="Bottom"
+                                        Click="btnReceiveQuantity_Click"/>
+                            </Grid>
+
+                            <!-- الصف الثاني: بيانات إضافية -->
+                            <Grid Grid.Row="2" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- قام بالمناقلة -->
+                                <TextBlock Grid.Column="0"
+                                           Text="👤 قام بالمناقلة:"
+                                           Style="{StaticResource FieldLabel}"
+                                           Margin="0,0,6,0"/>
+                                <TextBlock Grid.Column="1"
+                                           x:Name="lblEmp1"
+                                           FontSize="11" FontWeight="Bold"
+                                           Foreground="Blue"
+                                           VerticalAlignment="Center"/>
+
+                                <!-- التاريخ -->
+                                <TextBlock Grid.Column="2"
+                                           Text="📅 التاريخ:"
+                                           Style="{StaticResource FieldLabel}"
+                                           Margin="16,0,6,0"/>
+                                <TextBlock Grid.Column="3"
+                                           x:Name="txtDate3"
+                                           FontSize="11" FontWeight="Bold"
+                                           Foreground="Blue"
+                                           VerticalAlignment="Center"/>
+
+                                <!-- الحالة -->
+                                <TextBlock Grid.Column="4"
+                                           Text="📋 الحالة:"
+                                           Style="{StaticResource FieldLabel}"
+                                           Margin="16,0,6,0"/>
+                                <TextBlock Grid.Column="5"
+                                           x:Name="lblstatus"
+                                           FontSize="11" FontWeight="Bold"
+                                           Foreground="#213A7A"
+                                           VerticalAlignment="Center"/>
+
+                                <!-- استلام الكل -->
+                                <CheckBox Grid.Column="6"
+                                          x:Name="ckReceiveAll"
+                                          Content="📦 استلام الكل"
+                                          Style="{StaticResource ModernCheckBox}"
+                                          Margin="16,0,0,0"
+                                          Checked="ckReceiveAll_CheckedChanged"
+                                          Unchecked="ckReceiveAll_CheckedChanged"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- ─── GroupBox7: جدول الاستلام ─── -->
+                    <Border Grid.Row="1"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Margin="4,0,4,4"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="10,10,0,0" Padding="10,5">
+                                <TextBlock Text="📥 تفاصيل الاستلام"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <DataGrid x:Name="dgvReceive"
+                                      Grid.Row="1"
+                                      AutoGenerateColumns="False"
+                                      ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                                      RowStyle="{StaticResource DgvRow}"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      SelectionMode="Single"
+                                      SelectionUnit="FullRow"
+                                      FlowDirection="RightToLeft"
+                                      Background="White"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#E8EBF5"
+                                      AlternatingRowBackground="#F8F9FD"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      BorderThickness="0"
+                                      CellEditEnding="dgvReceive_CellEditEnding">
+                                <DataGrid.Columns>
+
+                                    <!-- رقم الصنف (مخفي) -->
+                                    <DataGridTextColumn Header="رقم الصنف"
+                                                        Binding="{Binding ItemId}"
+                                                        Width="0" Visibility="Collapsed"/>
+
+                                    <!-- الصنف -->
+                                    <DataGridTextColumn Header="📦 الصنف"
+                                                        Binding="{Binding ItemName}"
+                                                        Width="*" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الوحدة -->
+                                    <DataGridTextColumn Header="📐 الوحدة"
+                                                        Binding="{Binding UnitName}"
+                                                        Width="80" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الكمية المرسلة -->
+                                    <DataGridTextColumn Header="📤 الكمية المرسلة"
+                                                        Binding="{Binding SentQty}"
+                                                        Width="110" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- متوسط التكلفة -->
+                                    <DataGridTextColumn Header="💲 متوسط التكلفة"
+                                                        Binding="{Binding AvgCost}"
+                                                        Width="110" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الكمية المستلمة (قابلة للتعديل) -->
+                                    <DataGridTextColumn Header="✅ الكمية المستلمة"
+                                                        Binding="{Binding ReceivedQty, UpdateSourceTrigger=LostFocus}"
+                                                        Width="120">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="Background" Value="#FFF0D0"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الفرق -->
+                                    <DataGridTextColumn Header="↕ الفرق"
+                                                        Binding="{Binding Diff}"
+                                                        Width="80" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Setter Property="Background" Value="#FFF0D0"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- الحالة -->
+                                    <DataGridTextColumn Header="📋 الحالة"
+                                                        Binding="{Binding StatusText}"
+                                                        Width="80" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- استلام (CheckBox) -->
+                                    <DataGridCheckBoxColumn Header="☑ استلام"
+                                                            Binding="{Binding IsReceived}"
+                                                            Width="70"/>
+
+                                    <!-- التعادل (مخفي) -->
+                                    <DataGridTextColumn Header="التعادل"
+                                                        Binding="{Binding UnitEquality}"
+                                                        Width="0" Visibility="Collapsed"/>
+
+                                    <!-- المستخدم -->
+                                    <DataGridTextColumn Header="👤 المستخدم"
+                                                        Binding="{Binding UserName}"
+                                                        Width="130" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- متوسط التكلفة 2 (مخفي) -->
+                                    <DataGridTextColumn Header="متوسط التكلفة"
+                                                        Binding="{Binding AvgCost2}"
+                                                        Width="0" Visibility="Collapsed"/>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ══════════════════════════════════ -->
+            <!--        TabPage2: البحث             -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="🔍 البحث">
+                <Grid Background="#F3F5F9">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ─── GroupBox6: معايير البحث ─── -->
+                    <Border Grid.Row="0"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12,8"
+                            Margin="4,4,4,3"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="7" Padding="10,4"
+                                    Margin="0,0,0,8">
+                                <TextBlock Text="🔍 معايير البحث"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- رقم التحويل -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="🔢 رقم التحويل" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox x:Name="txtSrchNo"
+                                             Style="{StaticResource ModernTextBox}"
+                                             PreviewTextInput="txtSrchNo_PreviewTextInput"/>
+                                </StackPanel>
+
+                                <!-- من تاريخ -->
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="📅 من تاريخ" Style="{StaticResource FieldLabel}"/>
+                                    <dxe:DateEdit x:Name="txtFromDate" Height="28" FontSize="11"/>
+                                </StackPanel>
+
+                                <!-- إلى تاريخ -->
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="📅 إلى تاريخ" Style="{StaticResource FieldLabel}"/>
+                                    <dxe:DateEdit x:Name="txtToDate" Height="28" FontSize="11"/>
+                                </StackPanel>
+
+                                <!-- كل الفترة -->
+                                <CheckBox Grid.Column="6"
+                                          x:Name="chkAllPeriod"
+                                          Content="📋 كل الفترة"
+                                          Style="{StaticResource ModernCheckBox}"
+                                          IsChecked="True"
+                                          VerticalAlignment="Center"
+                                          Checked="chkAllPeriod_CheckedChanged"
+                                          Unchecked="chkAllPeriod_CheckedChanged"/>
+
+                                <!-- زر بحث -->
+                                <Button Grid.Column="8"
+                                        x:Name="btnSearch"
+                                        Content="🔍 بحث"
+                                        Style="{StaticResource ActionBtn}"
+                                        Width="90"
+                                        VerticalAlignment="Center"
+                                        Click="btnSearch_Click"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- ─── GroupBox4: نتائج البحث ─── -->
+                    <Border Grid.Row="1"
+                            Background="White"
+                            BorderBrush="{StaticResource BorderLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Margin="4,0,4,4"
+                            Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource HeaderBrush}"
+                                    CornerRadius="10,10,0,0" Padding="10,5">
+                                <TextBlock Text="📊 نتائج البحث"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+
+                            <DataGrid x:Name="dgvSrch"
+                                      Grid.Row="1"
+                                      AutoGenerateColumns="False"
+                                      ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                                      RowStyle="{StaticResource DgvRow}"
+                                      IsReadOnly="True"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      SelectionMode="Single"
+                                      SelectionUnit="Cell"
+                                      FlowDirection="RightToLeft"
+                                      Background="White"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#E8EBF5"
+                                      AlternatingRowBackground="#F8F9FD"
+                                      BorderThickness="0"
+                                      MouseLeftButtonUp="dgvSrch_MouseLeftButtonUp">
+                                <DataGrid.Columns>
+
+                                    <!-- الرقم -->
+                                    <DataGridTextColumn Header="🔢 الرقم"
+                                                        Binding="{Binding TransferId}"
+                                                        Width="80">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- التاريخ -->
+                                    <DataGridTextColumn Header="📅 التاريخ"
+                                                        Binding="{Binding TransferDate}"
+                                                        Width="150">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- من صندوق -->
+                                    <DataGridTextColumn Header="🏪 من مخزن"
+                                                        Binding="{Binding SafeFromName}"
+                                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- إلى صندوق -->
+                                    <DataGridTextColumn Header="🏪 إلى مخزن"
+                                                        Binding="{Binding SafeToName}"
+                                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <!-- حالة الاستلام -->
+                                    <DataGridCheckBoxColumn Header="☑ حالة الاستلام"
+                                                            Binding="{Binding IsReceived}"
+                                                            Width="110"/>
+
+                                    <!-- زر استلام -->
+                                    <DataGridTemplateColumn Header="📥 استلام" Width="90">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="📥 استلام"
+                                                        Height="22"
+                                                        FontSize="10"
+                                                        Background="{StaticResource SaveBrush}"
+                                                        Foreground="White"
+                                                        BorderThickness="0"
+                                                        Cursor="Hand"
+                                                        Tag="{Binding}"
+                                                        Click="BtnReceiveFromGrid_Click">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}"
+                                                                    CornerRadius="4"
+                                                                    Padding="4,2">
+                                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                                  VerticalAlignment="Center"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- ═══ Footer Buttons ═══ -->
+        <Border Grid.Row="1"
+                Background="{StaticResource FooterBrush}"
+                FlowDirection="LeftToRight"
+                Padding="10,7">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- أزرار التنقل -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="btnClose"
+                            Content="✖"
+                            Style="{StaticResource DangerBtn}"
+                            Width="42" ToolTip="إغلاق"
+                            Margin="0,0,4,0"
+                            Click="btnClose_Click"/>
+                    <Button x:Name="btnFirst"
+                            Content="⏮"
+                            Style="{StaticResource NavBtn}"
+                            ToolTip="الأول"
+                            Margin="0,0,3,0"
+                            Click="btnFirst_Click"/>
+                    <Button x:Name="btnPrevious"
+                            Content="◀"
+                            Style="{StaticResource NavBtn}"
+                            ToolTip="السابق"
+                            Margin="0,0,3,0"
+                            Click="btnPrevious_Click"/>
+                    <Button x:Name="btnNext"
+                            Content="▶"
+                            Style="{StaticResource NavBtn}"
+                            ToolTip="التالي"
+                            Margin="0,0,3,0"
+                            Click="btnNext_Click"/>
+                    <Button x:Name="btnLast"
+                            Content="⏭"
+                            Style="{StaticResource NavBtn}"
+                            ToolTip="الأخير"
+                            Click="btnLast_Click"/>
+                </StackPanel>
+
+                <!-- أزرار العمليات -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="btnView"
+                            Content="👁️ معاينة"
+                            Style="{StaticResource InfoBtn}"
+                            Width="90" Margin="0,0,4,0"
+                            Click="btnView_Click"/>
+                    <Button x:Name="btnPrint"
+                            Content="🖨️ طباعة"
+                            Style="{StaticResource ActionBtn}"
+                            Width="90" Margin="0,0,4,0"
+                            Click="btnPrint_Click"/>
+                    <Button x:Name="btnDelete"
+                            Content="🗑️ حذف"
+                            Style="{StaticResource DangerBtn}"
+                            Width="80" Margin="0,0,4,0"
+                            Click="btnDelete_Click"/>
+                    <Button x:Name="btnSave"
+                            Content="💾 حفظ"
+                            Style="{StaticResource SaveBtn}"
+                            Width="80" Margin="0,0,4,0"
+                            Click="btnSave_Click"/>
+                    <Button x:Name="btnNew"
+                            Content="➕ جديد"
+                            Style="{StaticResource ActionBtn}"
+                            Width="80"
+                            Click="btnNew_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</dx:ThemedWindow>

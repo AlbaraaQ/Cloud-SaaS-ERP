@@ -21,7 +21,22 @@ export class PartiesService {
   async get(tenantId: string, id: string) { const [row] = await withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(parties).where(and(eq(parties.tenantId, tenantId), eq(parties.id, id), isNull(parties.deletedAt)))); return row; }
   async update(tenantId: string, id: string, input: Partial<PartyInput>) { await withTenantTx(this.database.db, tenantId, (tx) => tx.update(parties).set({ ...input, updatedAt: new Date(), version: sql`${parties.version} + 1` }).where(and(eq(parties.tenantId, tenantId), eq(parties.id, id), isNull(parties.deletedAt)))); return this.get(tenantId, id); }
   async create(tenantId: string, input: PartyInput) { const id = newId(); const code = await withTenantTx(this.database.db, tenantId, async (tx) => { const result = await tx.execute(sql`SELECT COALESCE(MAX(CAST(code AS INTEGER)), 0) + 1 AS next FROM parties WHERE tenant_id = ${tenantId} AND code ~ '^[0-9]+$'`); return String(Number((result.rows[0] as { next: string }).next).toString().padStart(6, '0')); }); await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(parties).values({ id, tenantId, code, ...input, creditLimit: input.creditLimit ?? '0' })); return this.get(tenantId, id); }
-  async softDelete(tenantId: string, id: string) { const balance = await this.partyBalance(tenantId, id); if (balance.receivable !== '0' || balance.payable !== '0' || balance.open.length) throw new DomainError('PARTY_HAS_OPEN_BALANCE', 'Party has an open balance and cannot be deleted', 422); await withTenantTx(this.database.db, tenantId, (tx) => tx.update(parties).set({ deletedAt: new Date() }).where(and(eq(parties.tenantId, tenantId), eq(parties.id, id)))); }
+  /**
+   * 🗑️ حذف عميل — `frmCustomers`. A party with a balance stays: the refusal protects the
+   * ledger, not the row.
+   *
+   * The comparison is numeric on purpose. `partyBalance` returns money as four-decimal
+   * strings, so comparing them to `'0'` refused **every** delete — a عميل with no
+   * movement at all could never be removed. Found by `scripts/verify-tailoring.mjs`.
+   */
+  async softDelete(tenantId: string, id: string) {
+    const balance = await this.partyBalance(tenantId, id);
+    const receivable = new Decimal(balance.receivable);
+    const payable = new Decimal(balance.payable);
+    if (!receivable.isZero() || !payable.isZero() || balance.open.length)
+      throw new DomainError('PARTY_HAS_OPEN_BALANCE', 'Party has an open balance and cannot be deleted', 422);
+    await withTenantTx(this.database.db, tenantId, (tx) => tx.update(parties).set({ deletedAt: new Date() }).where(and(eq(parties.tenantId, tenantId), eq(parties.id, id))));
+  }
   async contacts(tenantId: string, partyId: string) { return withTenantTx(this.database.db, tenantId, (tx) => tx.select().from(partyContacts).where(and(eq(partyContacts.tenantId, tenantId), eq(partyContacts.partyId, partyId), isNull(partyContacts.deletedAt)))); }
   async addContact(tenantId: string, partyId: string, input: ContactInput) { const id = newId(); await withTenantTx(this.database.db, tenantId, (tx) => tx.insert(partyContacts).values({ id, partyId, tenantId, ...input })); return this.contacts(tenantId, partyId); }
   async removeContact(tenantId: string, partyId: string, id: string) { await withTenantTx(this.database.db, tenantId, (tx) => tx.update(partyContacts).set({ deletedAt: new Date() }).where(and(eq(partyContacts.tenantId, tenantId), eq(partyContacts.partyId, partyId), eq(partyContacts.id, id)))); return this.contacts(tenantId, partyId); }

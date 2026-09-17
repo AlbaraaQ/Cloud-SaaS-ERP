@@ -1,0 +1,413 @@
+﻿<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.frmDevicesAndroid"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    xmlns:dxg="http://schemas.devexpress.com/winfx/2008/xaml/grid"
+    xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
+    Title="📱 إدارة أجهزة أندرويد"
+    Width="1080" Height="620"
+    MinWidth="900" MinHeight="540"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    ShowIcon="False">
+
+    <dx:ThemedWindow.Resources>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--              Gradient Brushes               -->
+        <!-- ═══════════════════════════════════════════ -->
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#2E4E9E" Offset="0.6"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FooterBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#1D3268" Offset="0"/>
+            <GradientStop Color="#2B4B98" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="ShowBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#5A8DFF" Offset="0"/>
+            <GradientStop Color="#3D66D6" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="DangerBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#E35656" Offset="0"/>
+            <GradientStop Color="#B92F2F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--              Solid Brushes                  -->
+        <!-- ═══════════════════════════════════════════ -->
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--              Drop Shadows                   -->
+        <!-- ═══════════════════════════════════════════ -->
+        <DropShadowEffect x:Key="CardShadow"
+                          BlurRadius="12"
+                          ShadowDepth="2"
+                          Direction="270"
+                          Opacity="0.15"
+                          Color="#000000"/>
+
+        <DropShadowEffect x:Key="BtnShadow"
+                          BlurRadius="6"
+                          ShadowDepth="1"
+                          Direction="270"
+                          Opacity="0.20"
+                          Color="#000000"/>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--              Button Style                   -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Height"          Value="44"/>
+            <Setter Property="MinWidth"         Value="140"/>
+            <Setter Property="Foreground"       Value="White"/>
+            <Setter Property="FontSize"         Value="13"/>
+            <Setter Property="FontWeight"       Value="Bold"/>
+            <Setter Property="BorderThickness"  Value="0"/>
+            <Setter Property="Padding"          Value="14,0"/>
+            <Setter Property="Cursor"           Value="Hand"/>
+            <Setter Property="Effect"           Value="{StaticResource BtnShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--           Small Unlink Button Style         -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Style x:Key="UnlinkBtn" TargetType="Button">
+            <Setter Property="Height"         Value="28"/>
+            <Setter Property="Foreground"     Value="White"/>
+            <Setter Property="FontSize"       Value="11"/>
+            <Setter Property="FontWeight"     Value="Bold"/>
+            <Setter Property="Background"     Value="#E35656"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding"        Value="8,3"/>
+            <Setter Property="Cursor"         Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.70"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </dx:ThemedWindow.Resources>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--                  Root Layout                        -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Grid -->
+            <RowDefinition Height="*"/>
+            <!-- Status Bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--                  Header Bar                 -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource HeaderBrush}"
+                Padding="16,12"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Title -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="📱"
+                               FontSize="22"
+                               Foreground="White"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0"/>
+                    <TextBlock Text="إدارة أجهزة أندرويد المتصلة"
+                               Foreground="White"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Device Count Badge -->
+                <Border Grid.Column="1"
+                        Background="#1565C0"
+                        CornerRadius="10"
+                        Padding="12,4"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📌 إجمالي الأجهزة: "
+                                   Foreground="#B3E5FC"
+                                   FontFamily="Tahoma"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock x:Name="txtDeviceCount"
+                                   Text="0"
+                                   Foreground="White"
+                                   FontFamily="Tahoma"
+                                   FontSize="12"
+                                   FontWeight="Bold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--                  Toolbar                    -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border Grid.Row="1"
+                Background="#EEF2FB"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
+
+                <!-- Load Button -->
+                <Button x:Name="BtnGetDevice"
+                        Content="🔄 عرض الأجهزة المتصلة">
+                    <Button.Style>
+                        <Style TargetType="Button"
+                               BasedOn="{StaticResource ActionBtn}">
+                            <Setter Property="Background"
+                                    Value="{StaticResource ShowBrush}"/>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Loading Message -->
+                <TextBlock x:Name="txtLoadingMsg"
+                           Text=""
+                           FontFamily="Tahoma"
+                           FontSize="12"
+                           Foreground="#546E7A"
+                           VerticalAlignment="Center"
+                           Margin="15,0,0,0"/>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--              Main Grid Card                 -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border Grid.Row="2"
+                Margin="10,8,10,6"
+                Background="White"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Grid Title Bar -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource HeaderBrush}"
+                        CornerRadius="12,12,0,0">
+                    <TextBlock Text="📋 قائمة الأجهزة المرتبطة"
+                               Foreground="White"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Margin="14,0"/>
+                </Border>
+
+                <!-- ─────────────────────────────────── -->
+                <!--         DevExpress GridControl      -->
+                <!-- ─────────────────────────────────── -->
+                <dxg:GridControl x:Name="GridControl1"
+                                 Grid.Row="1">
+
+                    <dxg:GridControl.Columns>
+
+                        <!-- م -->
+                        <dxg:GridColumn x:Name="ColId"
+                                        Header="م"
+                                        FieldName="id"
+                                        Width="55"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- رقم المستخدم -->
+                        <dxg:GridColumn x:Name="ColUserId"
+                                        Header="رقم المستخدم"
+                                        FieldName="UserId"
+                                        Width="110"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- اسم المستخدم -->
+                        <dxg:GridColumn x:Name="ColUserName"
+                                        Header="👤 اسم المستخدم"
+                                        FieldName="UserName"
+                                        Width="140"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- كود المزامنة -->
+                        <dxg:GridColumn x:Name="ColClientCode"
+                                        Header="🔑 كود المزامنة"
+                                        FieldName="ClientCode"
+                                        Width="120"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- رقم الجهاز -->
+                        <dxg:GridColumn x:Name="ColDeviceId"
+                                        Header="📟 رقم الجهاز"
+                                        FieldName="DeviceId"
+                                        Width="140"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- اسم الجهاز -->
+                        <dxg:GridColumn x:Name="ColDeviceName"
+                                        Header="📱 اسم الجهاز"
+                                        FieldName="DeviceName"
+                                        Width="140"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- تاريخ الربط -->
+                        <dxg:GridColumn x:Name="ColCreatedAt"
+                                        Header="📅 تاريخ الربط"
+                                        FieldName="CreatedAt"
+                                        Width="120"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- الحالة - ✅ بدون Converter -->
+                        <dxg:GridColumn x:Name="ColIsActive"
+                                        Header="الحالة"
+                                        FieldName="IsActive"
+                                        Width="90"
+                                        AllowEditing="False"
+                                        HorizontalHeaderContentAlignment="Center"/>
+
+                        <!-- إلغاء ربط -->
+                        <dxg:GridColumn x:Name="ColUnlink"
+                                        Header="إلغاء ربط"
+                                        FieldName="removedevice"
+                                        Width="100"
+                                        AllowEditing="True"
+                                        HorizontalHeaderContentAlignment="Center">
+                            <dxg:GridColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="🔓 إلغاء"
+                                            Style="{StaticResource UnlinkBtn}"
+                                            Click="BtnUnlink_Click"
+                                            ToolTip="إلغاء ربط هذا الجهاز"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                                </DataTemplate>
+                            </dxg:GridColumn.CellTemplate>
+                        </dxg:GridColumn>
+
+                    </dxg:GridControl.Columns>
+
+                    <dxg:GridControl.View>
+                        <dxg:TableView x:Name="GridView1"
+                                       ShowGroupPanel="False"
+                                       AllowGrouping="False"
+                                       AutoWidth="False"
+                                       NavigationStyle="Row"
+                                       AllowPerPixelScrolling="True"
+                                       SearchPanelNullText="🔍 ابحث هنا..."
+                                       ShowSearchPanelCloseButton="True"
+                                       EnableImmediatePosting="True"/>
+                    </dxg:GridControl.View>
+
+                </dxg:GridControl>
+
+            </Grid>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!--                 Status Bar                  -->
+        <!-- ═══════════════════════════════════════════ -->
+        <Border Grid.Row="3"
+                Background="#ECEFF1"
+                BorderBrush="{StaticResource BorderLight}"
+                BorderThickness="0,1,0,0"
+                Padding="14,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="txtStatusBar"
+                           Grid.Column="0"
+                           Text="جاهز"
+                           FontFamily="Tahoma"
+                           FontSize="11"
+                           Foreground="#546E7A"
+                           VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="SmartAuditERP - إدارة الأجهزة"
+                           FontFamily="Tahoma"
+                           FontSize="10"
+                           Foreground="#90A4AE"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</dx:ThemedWindow>

@@ -94,11 +94,13 @@ export default [
   {
     // The Next.js apps run in the browser and use the automatic JSX runtime, so they need
     // the DOM globals and the `React` type namespace without an explicit default import.
-    // Matched both from the repo root (`apps/admin/app/page.tsx`) and from inside the app
+    // Matched both from the repo root (`apps/staff/app/page.tsx`) and from inside the app
     // itself (`app/page.tsx`), because each app runs eslint with its own directory as cwd.
     files: [
-      '**/apps/admin/**/*.{ts,tsx}',
-      '**/apps/customer/**/*.{ts,tsx}',
+      '**/apps/staff/**/*.{ts,tsx}',
+      '**/apps/marketing/**/*.{ts,tsx}',
+      '**/apps/platform-admin/**/*.{ts,tsx}',
+      '**/apps/customer-portal/**/*.{ts,tsx}',
       'app/**/*.{ts,tsx}',
       'components/**/*.{ts,tsx}',
       'lib/**/*.{ts,tsx}',

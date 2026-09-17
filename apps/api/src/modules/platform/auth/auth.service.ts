@@ -27,6 +27,7 @@ import { toMembershipDto, toUserDto, type MembershipRow, type UserRow } from '..
 
 import { MfaService } from './mfa.service.js';
 import { PasswordService } from './password.service.js';
+import { resolvePlatformAccess } from './platform-access.js';
 import { TokenService } from './token.service.js';
 
 /**
@@ -66,6 +67,7 @@ const MEMBERSHIP_COLUMNS = {
   status: memberships.status,
   isOwner: memberships.isOwner,
   branchScope: memberships.branchScope,
+  kind: memberships.kind,
 };
 
 @Injectable()
@@ -236,12 +238,14 @@ export class AuthService {
       return plaintext;
     });
 
+    const platform = await resolvePlatformAccess(this.database, user.id, user.isPlatformAdmin);
     const accessToken = await this.tokens.signAccessToken({
       sub: user.id,
       tid: tenant.id,
       mid: membership.id,
       scope: ['erp'],
-      pam: user.isPlatformAdmin,
+      pam: platform.isPlatformAdmin,
+      proles: platform.platformRoles,
     });
 
     return {
@@ -249,7 +253,7 @@ export class AuthService {
       refreshToken: rotatedRefreshToken,
       tokenType: 'Bearer',
       expiresIn: this.tokens.accessTtlSeconds,
-      user: toUserDto(user),
+      user: toUserDto({ ...user, isPlatformAdmin: platform.isPlatformAdmin, platformRoles: platform.platformRoles }),
       memberships: [await this.toMembershipDto(membership)],
     };
   }
@@ -370,12 +374,14 @@ export class AuthService {
     membership: MembershipRow,
     meta: RequestMeta,
   ): Promise<LoginResponse> {
+    const platform = await resolvePlatformAccess(this.database, user.id, user.isPlatformAdmin);
     const accessToken = await this.tokens.signAccessToken({
       sub: user.id,
       tid: membership.tenantId,
       mid: membership.id,
       scope: ['erp'],
-      pam: user.isPlatformAdmin,
+      pam: platform.isPlatformAdmin,
+      proles: platform.platformRoles,
     });
 
     const refreshToken = this.tokens.generateRefreshToken();
@@ -397,7 +403,7 @@ export class AuthService {
       refreshToken,
       tokenType: 'Bearer',
       expiresIn: this.tokens.accessTtlSeconds,
-      user: toUserDto(user),
+      user: toUserDto({ ...user, isPlatformAdmin: platform.isPlatformAdmin, platformRoles: platform.platformRoles }),
       memberships: [await this.toMembershipDto(membership)],
     };
   }

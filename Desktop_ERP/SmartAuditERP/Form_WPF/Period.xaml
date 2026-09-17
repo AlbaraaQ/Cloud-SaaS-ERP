@@ -1,0 +1,175 @@
+<dx:ThemedWindow
+    x:Class="SmartAuditERP.Form_WPF.Period"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+    Title="المدة"
+    Width="550" Height="380"
+    WindowStartupLocation="CenterScreen"
+    FlowDirection="RightToLeft"
+    Background="#F3F5F9"
+    FontFamily="Cairo, Tahoma, Arial"
+    WindowStyle="None"
+    AllowsTransparency="False"
+    Loaded="Window_Loaded"
+    Deactivated="Window_Deactivated">
+
+    <dx:ThemedWindow.Resources>
+        <LinearGradientBrush x:Key="HeaderBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#213A7A" Offset="0"/>
+            <GradientStop Color="#3A63C3" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="BorderLight" Color="#D0D7E8"/>
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="10" ShadowDepth="2"
+                          Direction="270" Opacity="0.12" Color="#000000"/>
+
+        <Style x:Key="DgvColHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource HeaderBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+        </Style>
+
+        <Style x:Key="DgvRow" TargetType="DataGridRow">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#D6E4FF"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEF1FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </dx:ThemedWindow.Resources>
+
+    <Border Background="White" BorderBrush="#808080" BorderThickness="2"
+            CornerRadius="8">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Header -->
+                <RowDefinition Height="*"/>
+                <!-- Grid -->
+                <RowDefinition Height="Auto"/>
+                <!-- Footer -->
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource HeaderBrush}"
+                    CornerRadius="6,6,0,0" Padding="10,7">
+                <TextBlock Text="📅 المدة"
+                           Foreground="White" FontSize="14" FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           FontFamily="Cairo, Tahoma, Arial"/>
+            </Border>
+
+            <!-- الجدول -->
+            <DataGrid x:Name="dvgPeriod"
+                      Grid.Row="1"
+                      AutoGenerateColumns="False"
+                      ColumnHeaderStyle="{StaticResource DgvColHeader}"
+                      RowStyle="{StaticResource DgvRow}"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      FlowDirection="RightToLeft"
+                      Background="White"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#E8EBF5"
+                      AlternatingRowBackground="#F8F9FD"
+                      BorderThickness="0"
+                      
+                      MouseLeftButtonUp="dvgPeriod_MouseLeftButtonUp">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="📅 المدة"
+                                        Binding="{Binding PeriodName}" Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="🏷️ العرض"
+                                        Binding="{Binding Offer}" Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="💰 السعر"
+                                        Binding="{Binding Rent, StringFormat=N2}" Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <!-- PeriodId مخفي -->
+                    <DataGridTextColumn Header="رقم المدة"
+                                        Binding="{Binding PeriodId}"
+                                        Width="0" Visibility="Collapsed"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Footer -->
+            <Border Grid.Row="2"
+                    Background="#F0F4FF"
+                    CornerRadius="0,0,6,6"
+                    Padding="10,7">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="➕ إضافة"
+                            Background="#213A7A"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Width="90" Height="32"
+                            Cursor="Hand"
+                            FontFamily="Cairo, Tahoma, Arial"
+                            FontWeight="Bold"
+                            Margin="0,0,10,0"
+                            Click="btnAddPeriod_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button Content="🚪 إغلاق"
+                            Background="#B92F2F"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Width="90" Height="32"
+                            Cursor="Hand"
+                            FontFamily="Cairo, Tahoma, Arial"
+                            FontWeight="Bold"
+                            Click="btnClose_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</dx:ThemedWindow>
