@@ -75,10 +75,12 @@ export type PlatformSettingDefinition = {
 };
 
 /**
- * The eight settings P-C1 declares. Every key is read by a real consumer:
+ * The settings catalogue. Every key is read by a real consumer:
  * `limits.*` are the defaults a newly provisioned tenant inherits (P-C5 enforces them),
  * `platform.maintenance*` is the switch the console flips during an upgrade window, and
- * `support.*` is what the marketing site and the console footer show.
+ * `support.*` is what the marketing site and the console footer show,
+ * `branding.*` is one customer's own look (P-C2), and
+ * `billing.*` is what the platform prints on the tax invoice it issues (P-C4).
  */
 export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = [
   {
@@ -189,7 +191,86 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
     max: 60,
     scopes: ['tenant'],
   },
+
+  // --- ما يظهر على فاتورة المنصة (P-C4) ----------------------------------------
+  // ستة مفاتيح بنطاق المنصة: الفاتورة الضريبية التي تصدرها المنصة لعملائها يجب أن تحمل
+  // **هوية البائع** — الاسم النظامي والرقم الضريبي والعنوان — والرقمين اللذين يشكّلان الورقة
+  // (نسبة الضريبة ومهلة السداد). حقنُها في الشيفرة يطبع بائعاً لا يستطيع أحد تصحيحه بلا
+  // إصدار جديد، وترحيل `platform_invoices` ينسخ هذه القيم على كل فاتورة، فتغيير مفتاحٍ لا
+  // يعيد كتابة مستندٍ صادر.
+  {
+    key: 'billing.seller_name',
+    labelAr: 'اسم البائع (للفاتورة الضريبية)',
+    labelEn: 'Seller legal name',
+    kind: 'string',
+    helpAr: 'الاسم النظامي للمنصة كما يجب أن يظهر على الفاتورة الضريبية التي تصدرها لعملائها.',
+    defaultValue: 'منصة ERP السحابية',
+    max: 120,
+  },
+  {
+    key: 'billing.seller_tax_number',
+    labelAr: 'الرقم الضريبي للبائع',
+    labelEn: 'Seller VAT number',
+    kind: 'string',
+    helpAr: 'الرقم الضريبي المكوَّن من 15 رقماً. القيمة الافتراضية رقمٌ تجريبي للعرض ويجب تغييره قبل الإنتاج.',
+    defaultValue: '300000000000003',
+    max: 15,
+  },
+  {
+    key: 'billing.seller_address',
+    labelAr: 'عنوان البائع',
+    labelEn: 'Seller address',
+    kind: 'string',
+    helpAr: 'عنوان المنصة كما يُطبع تحت اسم البائع في الفاتورة.',
+    defaultValue: 'الرياض، المملكة العربية السعودية',
+    max: 200,
+  },
+  {
+    key: 'billing.tax_rate',
+    labelAr: 'نسبة ضريبة القيمة المضافة',
+    labelEn: 'VAT rate',
+    kind: 'integer',
+    helpAr: 'النسبة المئوية المطبَّقة على فواتير الاشتراكات (15٪ هي النسبة النظامية في السعودية).',
+    defaultValue: 15,
+    min: 0,
+    max: 100,
+  },
+  {
+    key: 'billing.payment_terms_days',
+    labelAr: 'مهلة السداد (أيام)',
+    labelEn: 'Payment terms (days)',
+    kind: 'integer',
+    helpAr: 'عدد الأيام من تاريخ الإصدار إلى تاريخ الاستحقاق عند إصدار فاتورة اشتراك.',
+    defaultValue: 14,
+    min: 0,
+    max: 180,
+  },
+  {
+    key: 'billing.dunning_days',
+    labelAr: 'أيام متابعة التحصيل',
+    labelEn: 'Dunning ladder (days)',
+    kind: 'string-list',
+    helpAr: 'الأيام التي تُجدول فيها محاولة متابعة بعد الاستحقاق (سطر لكل يوم: 0 ثم 3 ثم 7).',
+    defaultValue: ['0', '3', '7'],
+  },
 ] as const;
+
+/**
+ * يُقرأ الرقم الضريبي للبائع من الإعدادات — ويُتحقّق منه هنا لا في الشاشة: 15 رقماً كما
+ * تشترط هيئة الزكاة والضريبة والجمارك، أو النص الفارغ (منصة لم تُسجَّل بعد).
+ */
+export function isSellerTaxNumber(value: string): boolean {
+  return value.length === 0 || /^\d{15}$/.test(value);
+}
+
+/** سلّم المتابعة بالأيام: الأعداد الصحيحة الموجبة فقط، مرتَّبةً ومُزالة التكرار. */
+export function billingDunningLadder(value: readonly string[]): number[] {
+  const days = value
+    .map((entry) => Number(entry.trim()))
+    .filter((entry) => Number.isInteger(entry) && entry >= 0)
+    .sort((left, right) => left - right);
+  return [...new Set(days)];
+}
 
 export const platformSettingKeySchema = z.string().refine(
   (key) => platformSettingDefinitions.some((definition) => definition.key === key),

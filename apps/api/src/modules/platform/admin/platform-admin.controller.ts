@@ -1,16 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { OrgProvisioningService } from '../../organization/provisioning/org-provisioning.service.js';
 import { RequiresPlatformRole } from '../decorators/requires-platform-role.decorator.js';
 import { PlatformAdminGuard } from '../guards/platform-admin.guard.js';
 
-import {
-  PlatformAdminService,
-  type CreateTenantInput,
-  type GrantSubscriptionInput,
-  type PlanInput,
-} from './platform-admin.service.js';
+import { PlatformAdminService, type CreateTenantInput } from './platform-admin.service.js';
 
 /**
  * `/api/v1/platform/*` — the SaaS control plane consumed by the admin console at
@@ -29,12 +24,6 @@ import {
  * | `GET tenants` | `console.tenants.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
  * | `POST tenants` | `console.tenants.manage` | ✓ | | | | |
  * | `POST tenants/:id/status` (P-C2, in `PlatformTenantsController`) | `console.tenants.manage` | ✓ | | | | |
- * | `GET plans` | `console.plans.manage` | ✓ | | ✓ | | |
- * | `POST plans` | `console.plans.manage` | ✓ | | ✓ | | |
- * | `PATCH plans/:id/active` | `console.plans.manage` | ✓ | | ✓ | | |
- * | `GET subscriptions` | `console.subscriptions.manage` | ✓ | | ✓ | | |
- * | `POST subscriptions` | `console.subscriptions.manage` | ✓ | | ✓ | | |
- * | `POST subscriptions/:id/cancel` | `console.subscriptions.manage` | ✓ | | ✓ | | |
  * | `GET activation-requests` | `console.activation.review` | ✓ | | ✓ | | |
  * | `POST activation-requests/:id/review` | `console.activation.review` | ✓ | | ✓ | | |
  * | `GET users` | `console.users.view` | ✓ | | | | |
@@ -93,51 +82,12 @@ export class PlatformAdminController {
   // «السبب»: suspending a customer must be explainable a month later, and two routes for one
   // decision — one of them reason-less — means the rule is only as strong as the caller.
 
-  // ------------------------------------------------------------------ plans
-
-  @Get('plans')
-  @RequiresPlatformRole('console.plans.manage')
-  @ApiOperation({ summary: 'List subscription plans including retired ones' })
-  async listPlans() {
-    return { data: await this.admin.listPlans() };
-  }
-
-  @Post('plans')
-  @RequiresPlatformRole('console.plans.manage')
-  @ApiOperation({ summary: 'Create or update a subscription plan (upsert by code)' })
-  async createPlan(@Body() body: PlanInput) {
-    return { data: await this.admin.createPlan(body) };
-  }
-
-  @Patch('plans/:id/active')
-  @RequiresPlatformRole('console.plans.manage')
-  @ApiOperation({ summary: 'Activate or retire a plan' })
-  async setPlanActive(@Param('id') id: string, @Body() body: { active: boolean }) {
-    return { data: await this.admin.setPlanActive(id, body.active) };
-  }
-
-  // ------------------------------------------------------------------ licences
-
-  @Get('subscriptions')
-  @RequiresPlatformRole('console.subscriptions.manage')
-  @ApiOperation({ summary: 'List every licence across all customers' })
-  async listSubscriptions(@Query('status') status?: string) {
-    return { data: await this.admin.listSubscriptions(status) };
-  }
-
-  @Post('subscriptions')
-  @RequiresPlatformRole('console.subscriptions.manage')
-  @ApiOperation({ summary: 'Issue or extend a licence manually' })
-  async grantSubscription(@Body() body: GrantSubscriptionInput) {
-    return { data: await this.admin.grantSubscription(body) };
-  }
-
-  @Post('subscriptions/:id/cancel')
-  @RequiresPlatformRole('console.subscriptions.manage')
-  @ApiOperation({ summary: 'Cancel a licence' })
-  async cancelSubscription(@Param('id') id: string) {
-    return { data: await this.admin.cancelSubscription(id) };
-  }
+  // «الباقات» and «التراخيص» used to be answered here. P-C4 moved them — **with their
+  // paths** — to `PlatformBillingController`, because a plan's entitlement set, a licence's
+  // lifecycle and the invoices that follow are one subject, and the class that answers them
+  // should be the one that owns that subject. Two handlers were *replaced* rather than moved
+  // (recorded in the P-C4 report): `PATCH plans/:id/active` became `PATCH plans/:id`, and
+  // `POST subscriptions/:id/cancel` gained a reason and `atPeriodEnd`.
 
   // ------------------------------------------------------------------ activation queue
 

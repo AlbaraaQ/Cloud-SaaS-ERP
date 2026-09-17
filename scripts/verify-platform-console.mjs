@@ -208,7 +208,17 @@ console.log('\n■ 5. ⚙️ إعدادات المنصة');
 const settingsSnapshot = await get('/platform/settings');
 const snapshotValues = Object.fromEntries(settingsSnapshot.settings.map((setting) => [setting.key, setting.value]));
 check('البيئة مُعلَنة بوسمٍ عربي', typeof settingsSnapshot.environment.name === 'string' && settingsSnapshot.environment.labelAr.length > 0, `${settingsSnapshot.environment.name} / ${settingsSnapshot.environment.labelAr}`);
-check('ثمانية إعدادات معرَّفة', settingsSnapshot.settings.length === 8, `${settingsSnapshot.settings.length}`);
+check(
+  'أربعة عشر إعداداً معرَّفاً (ستة منها للفوترة: P-C4)',
+  settingsSnapshot.settings.length === 14,
+  `${settingsSnapshot.settings.length}`,
+);
+check(
+  'ومفاتيح الفاتورة الضريبية بينها',
+  ['billing.seller_name', 'billing.seller_tax_number', 'billing.seller_address', 'billing.tax_rate', 'billing.payment_terms_days', 'billing.dunning_days'].every(
+    (key) => settingsSnapshot.settings.some((setting) => setting.key === key),
+  ),
+);
 check('وكل إعداد له تسمية عربية وشرح', settingsSnapshot.settings.every((setting) => setting.labelAr.length > 0 && setting.helpAr.length > 0));
 check(
   'والحدود الافتراضية الثلاثة معروضة',

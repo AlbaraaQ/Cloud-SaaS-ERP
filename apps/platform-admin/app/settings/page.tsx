@@ -18,6 +18,11 @@ import { useQuery } from '../../lib/use-query';
  *
  * The form is read-only for an operator without `console.settings.manage` — the API would
  * answer 403 anyway; disabling the inputs says so before the click.
+ *
+ * P-C4 added six `billing.*` keys to the same catalogue — the seller identity, the VAT rate,
+ * the payment terms and the collection ladder that the tax invoice and the dunning board are
+ * built from. They appear here with no change to this file: the screen renders the catalogue,
+ * so a key added on the contract side is a field on the screen the moment the API serves it.
  */
 
 type SettingKind = 'string' | 'email' | 'string-list' | 'integer' | 'boolean';
@@ -102,7 +107,7 @@ export default function PlatformSettingsPage() {
   return (
     <Screen
       title="إعدادات المنصة"
-      subtitle="ما كان يُضبط بتحرير ملف البيئة على المضيف: جهات اتصال الدعم، نطاقات الخدمة، الحدود الافتراضية، ومفتاح الصيانة."
+      subtitle="ما كان يُضبط بتحرير ملف البيئة على المضيف: جهات اتصال الدعم، نطاقات الخدمة، الحدود الافتراضية، مفتاح الصيانة، وبيانات الفاتورة الضريبية (P-C4)."
       crumbs={['المنصة', 'المنصة', 'الإعدادات']}
       actions={
         <>

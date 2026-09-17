@@ -7,8 +7,10 @@
  * pages and seventeen endpoints) plus the two screens P-C1 adds — إعدادات المنصة and the
  * cross-tenant التدقيق — and every label that already existed is re-used **verbatim**:
  * نظرة عامة · العملاء · التراخيص · الباقات · طلبات التفعيل · المستخدمون · أدوار المنصة ·
- * التدقيق · الصحة (`components/platform-guard.tsx`, pre-P-C1). The invented labels and
- * their justification are listed in the part document (§«ما اخترعناه»).
+ * التدقيق · الصحة (`components/platform-guard.tsx`, pre-P-C1), plus the three screens P-C4
+ * adds to the money group — الفواتير · المتابعة والتحصيل · الإيراد — whose labels the plan
+ * already names («`/invoices`», «dunning screen», «revenue dashboard»). The invented labels
+ * and their justification are listed in the part document (§«ما اخترعناه»).
  *
  * `status` is part of the data model for the same reason the staff tree has it: a screen
  * is never allowed to pretend. `ready` here means the page exists **and** the endpoint it
@@ -91,6 +93,20 @@ export const consoleGroups: readonly ConsoleGroup[] = [
         'GET /platform/subscriptions',
       ),
       item('plans', 'الباقات', 'Plans', '/plans', 'console.plans.manage', 'GET /platform/plans'),
+      // P-C4 — three money screens the console did not have: the documents the platform
+      // issues, the collection ladder that follows them, and the revenue board. All three are
+      // behind `console.billing.manage` (declared in P-C1, first used here), which is why the
+      // auditor — read-only over customers and the audit trail — does not see them.
+      item('invoices', 'الفواتير', 'Invoices', '/invoices', 'console.billing.manage', 'GET /platform/invoices'),
+      item(
+        'dunning',
+        'المتابعة والتحصيل',
+        'Dunning',
+        '/dunning',
+        'console.billing.manage',
+        'GET /platform/dunning',
+      ),
+      item('revenue', 'الإيراد', 'Revenue', '/revenue', 'console.billing.manage', 'GET /platform/revenue'),
       item(
         'activation-requests',
         'طلبات التفعيل',

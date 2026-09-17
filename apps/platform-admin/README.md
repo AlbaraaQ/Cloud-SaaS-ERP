@@ -87,6 +87,36 @@ Three properties of this part are worth knowing before touching it:
 The user card is reached from the directory (and from the holders table on `/roles`), never
 from the sidebar: an operator reading it is already inside the identity area.
 
+## Screens deepened/added by P-C4 (2026-09-17)
+
+| Screen | Route | Console code | Endpoints |
+|---|---|---|---|
+| الباقات والأسعار (price list + an entitlement per plan: وحدة · حدّ · راية) | `/plans` | read/write `console.plans.manage` | `GET /platform/plans` · `GET /platform/plans/entitlement-keys` · `POST /platform/plans` · `PATCH /platform/plans/:id` (+ reason) · `PUT /platform/plans/:id/entitlements` |
+| الاشتراكات والتراخيص (grant with trial · change plan · pause · resume · cancel) | `/subscriptions` | `console.subscriptions.manage` | `GET/POST /platform/subscriptions` · `POST …/:id/change-plan` · `POST …/:id/pause·resume·cancel` (each with a reason) |
+| الفواتير والإشعارات الدائنة (**new**) | `/invoices` | `console.billing.manage` | `GET/POST /platform/invoices` · `GET /platform/invoices/:id` · `POST …/:id/issue·pay·void` |
+| طباعة الفاتورة (**new**, A4 preview in an isolated frame) | `/invoices/[id]/print` | `console.billing.manage` | `GET /platform/invoices/:id/print` |
+| المتابعة والتحصيل (**new**: schedule · attempts · messages) | `/dunning` | `console.billing.manage` | `GET /platform/dunning` · `POST /platform/dunning/:subscription/run` |
+| الإيراد (**new**: MRR · ARR · overdue) | `/revenue` | `console.billing.manage` | `GET /platform/revenue` |
+
+What to know before touching the money screens:
+
+1. **The three money codes are the point.** `console.plans.manage`, `console.subscriptions.manage`
+   and `console.billing.manage` were declared in P-C1 and unused until here: the price list,
+   the licence and the document are three different decisions, and `platform_support` — which
+   reads customers all day — holds none of them. The sidebar hides what a session cannot open.
+2. **A draft is not a tax document.** It carries no number; issuing allocates the next one from
+   the platform series, and voiding keeps it (an auditor reads the sequence). The print preview
+   therefore shows the number, the buyer VAT number, the ZATCA QR and the amount in words —
+   and nothing at all for a void document.
+3. **Money is a two-decimal string end to end.** The API normalises (`platformFormatAmount`) so
+   `499.0000` never reaches a screen; the screens format for display only.
+4. **The proration preview is the server's.** `/subscriptions` renders the numbers
+   `change-plan` returns (credit of the unused part, full charge for the new plan, net) — the
+   console never recomputes money, which is how a screen and a document stay in agreement.
+5. **Settings are the invoice.** The seller identity, the VAT rate, the payment terms and the
+   dunning ladder live in ستة `billing.*` keys on `/settings` (P-C1's catalogue) and are copied
+   onto every document as it is created.
+
 ## Security
 
 - No self-service signup: operators are provisioned by hand and granted Family-A

@@ -273,7 +273,8 @@ describe('platform console RBAC and cross-tenant audit (P-C1)', () => {
     expect(body.settings.map((row) => row.key)).toEqual(
       platformSettingsForScope('platform').map((definition) => definition.key),
     );
-    expect(body.settings.length).toBe(8);
+    // ستة مفاتيح فوترة أضافها P-C4 (`billing.*`) إلى نفس النطاق.
+    expect(body.settings.length).toBe(14);
     for (const row of body.settings) {
       expect(row.labelAr.length).toBeGreaterThan(0);
     }

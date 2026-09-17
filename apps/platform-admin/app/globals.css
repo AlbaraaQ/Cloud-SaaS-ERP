@@ -94,6 +94,11 @@ td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; font-famil
 .badge.draft, .badge.running, .badge.pending, .badge.incomplete, .badge.api { background: #fef3c7; color: var(--warn); }
 .badge.failed, .badge.voided, .badge.revoked, .badge.suspended, .badge.rejected, .badge.canceled, .badge.past_due { background: #fee2e2; color: var(--danger); }
 .badge.planned, .badge.archived { background: #e2e8f0; color: #475569; }
+/* P-C4 — licence and invoice lifecycle states. */
+.badge.trialing, .badge.issued, .badge.scheduled { background: #e0f2fe; color: #075985; }
+.badge.paused { background: #ede9fe; color: #5b21b6; }
+.badge.paid, .badge.sent { background: #dcfce7; color: var(--ok); }
+.badge.void, .badge.expired, .badge.skipped, .badge.credit_note { background: #e2e8f0; color: #475569; }
 
 .alert { border-radius: 10px; padding: 9px 12px; margin: 0; font-size: 13px; }
 .alert.danger { background: #fee2e2; color: #7f1d1d; }

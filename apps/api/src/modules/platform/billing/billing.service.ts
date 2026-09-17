@@ -48,6 +48,10 @@ export class BillingService {
     if (event.type !== 'checkout.session.completed' && event.type !== 'checkout.session.async_payment_succeeded') return { handled: false };
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.payment_status !== 'paid' || !session.subscription || !session.metadata?.tenantId || !session.metadata.planId) return { handled: false };
+    // 0068 makes "one live licence per customer" a database rule (`tenant_subscriptions_active_tenant_key`),
+    // so a Stripe checkout that completes while a manual licence is still live must retire the
+    // older one *first* — otherwise the unique index rejects the activation itself.
+    await this.database.db.execute(sql`UPDATE tenant_subscriptions SET status = 'canceled', canceled_at = now(), canceled_reason = 'استُبدل باشتراك Stripe', updated_at = now() WHERE tenant_id = ${session.metadata.tenantId}::uuid AND status IN ('trialing', 'active', 'past_due', 'paused') AND NOT (provider = 'stripe' AND status = 'incomplete')`);
     await this.database.db.execute(sql`UPDATE tenant_subscriptions SET status = 'active', provider_customer_id = ${typeof session.customer === 'string' ? session.customer : null}, provider_subscription_id = ${typeof session.subscription === 'string' ? session.subscription : null}, activated_at = now(), current_period_start = now(), updated_at = now() WHERE tenant_id = ${session.metadata.tenantId}::uuid AND plan_id = ${session.metadata.planId}::uuid AND provider = 'stripe' AND status = 'incomplete'`);
     return { handled: true };
   }

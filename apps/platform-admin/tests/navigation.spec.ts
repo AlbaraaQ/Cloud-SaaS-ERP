@@ -64,6 +64,22 @@ describe('platform console navigation', () => {
     expect(supportHrefs).not.toContain('/plans');
     expect(supportHrefs).not.toContain('/audit');
     expect(supportHrefs).not.toContain('/users');
+    // P-C4 — the money documents are `console.billing.manage`, which support does not hold.
+    expect(supportHrefs).not.toContain('/invoices');
+    expect(supportHrefs).not.toContain('/dunning');
+
+    // …and the role that does hold it sees the three screens and the two it already had.
+    const billing = visibleConsoleGroups([
+      'console.tenants.view',
+      'console.subscriptions.manage',
+      'console.plans.manage',
+      'console.activation.review',
+      'console.billing.manage',
+    ]).flatMap((group) => group.items.map((entry) => entry.href));
+    expect(billing).toContain('/invoices');
+    expect(billing).toContain('/dunning');
+    expect(billing).toContain('/revenue');
+    expect(billing).not.toContain('/users');
 
     // Nobody sees anything with no codes at all — the console never assumes access.
     expect(visibleConsoleGroups([])).toEqual([]);
@@ -98,7 +114,7 @@ describe('platform console navigation', () => {
   });
 
   it('ships every console page as a real page file', () => {
-    // The eleven pre-P-C1 pages plus إعدادات المنصة.
+    // The eleven pre-P-C1 pages plus إعدادات المنصة (P-C1) and the three money screens (P-C4).
     const pages = readdirSync(appDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
@@ -106,6 +122,9 @@ describe('platform console navigation', () => {
       'tenants',
       'subscriptions',
       'plans',
+      'invoices',
+      'dunning',
+      'revenue',
       'activation-requests',
       'users',
       'roles',

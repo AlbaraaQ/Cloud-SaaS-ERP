@@ -25,6 +25,11 @@ const CONSOLE_ROUTES = [
   '/tenants/[id]',
   // P-C3 — بطاقة المستخدم: reached from the directory, never from the sidebar.
   '/users/[id]',
+  // P-C4 — الفواتير والمتابعة والإيراد، ومعاينة الطباعة خلف صفّ الفاتورة.
+  '/invoices',
+  '/invoices/[id]/print',
+  '/dunning',
+  '/revenue',
 ];
 
 function pageFileFor(href: string): string {
@@ -154,6 +159,70 @@ describe('platform console routes', () => {
     expect(roles).toContain('/platform/permissions');
     for (const label of ['الحائزون', 'إرجاع إلى الفهرس', 'تجاوز مسجَّل']) {
       expect(roles, label).toContain(label);
+    }
+  });
+
+  /**
+   * P-C4 — the money screens are real too: every lifecycle action, every document step and
+   * the print preview call the endpoint the plan names. A button that calls nothing is a
+   * picture, and a money screen of pictures is worse than no screen.
+   */
+  it('drives the licence lifecycle from the subscriptions screen', () => {
+    const page = readFileSync(join(appDir, 'subscriptions', 'page.tsx'), 'utf8');
+    for (const call of [
+      "apiPost('/platform/subscriptions'",
+      '`/platform/subscriptions/${subscription.id}/change-plan`',
+      '`/platform/subscriptions/${subscription.id}/${kind}`',
+      '`/platform/subscriptions/${subscription.id}/cancel`',
+    ]) {
+      expect(page, call).toContain(call);
+    }
+    // The five lifecycle words the plan asks for, in the screen's own labels.
+    for (const label of ['تجربة', 'تفعيل', 'ترقية/تخفيض', 'إيقاف مؤقّت', 'استئناف', 'إلغاء']) {
+      expect(page, label).toContain(label);
+    }
+  });
+
+  it('shows plan entitlements as وحدة · حدّ · راية and writes them with a reason', () => {
+    const page = readFileSync(join(appDir, 'plans', 'page.tsx'), 'utf8');
+    expect(page).toContain('`/platform/plans/${plan.id}/entitlements`');
+    expect(page).toContain('`/platform/plans/${plan.id}`');
+    expect(page).toContain('/platform/plans/entitlement-keys');
+    for (const label of ['وحدة', 'حدّ', 'راية', 'الحقوق']) {
+      expect(page, label).toContain(label);
+    }
+  });
+
+  it('issues, collects, voids and prints an invoice from the invoices screen', () => {
+    const page = readFileSync(join(appDir, 'invoices', 'page.tsx'), 'utf8');
+    for (const call of [
+      "apiPost<Invoice>('/platform/invoices'",
+      '`/platform/invoices/${invoice.id}/issue`',
+      '`/platform/invoices/${invoice.id}/pay`',
+      '`/platform/invoices/${invoice.id}/void`',
+      '`/platform/invoices/${id}`',
+      'href={`/invoices/${row.id}/print`}',
+    ]) {
+      expect(page, call).toContain(call);
+    }
+    // The printed page carries the plate the API returns, rendered by the same A4 printer.
+    const print = readFileSync(join(appDir, 'invoices', '[id]', 'print', 'page.tsx'), 'utf8');
+    expect(print).toContain('`/platform/invoices/${id}/print`');
+    expect(print).toContain('srcDoc');
+  });
+
+  it('runs the collection ladder and reads the revenue board', () => {
+    const dunning = readFileSync(join(appDir, 'dunning', 'page.tsx'), 'utf8');
+    expect(dunning).toContain('`/platform/dunning/${row.subscriptionId}/run`');
+    expect(dunning).toContain("apiData<Board>('/platform/dunning'");
+    for (const label of ['الجدول', 'المحاولات', 'الرسائل']) {
+      expect(dunning, label).toContain(label);
+    }
+
+    const revenue = readFileSync(join(appDir, 'revenue', 'page.tsx'), 'utf8');
+    expect(revenue).toContain("apiData<Revenue>('/platform/revenue'");
+    for (const label of ['MRR', 'ARR', 'المتأخّر']) {
+      expect(revenue, label).toContain(label);
     }
   });
 
