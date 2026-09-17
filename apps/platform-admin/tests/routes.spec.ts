@@ -32,6 +32,8 @@ const CONSOLE_ROUTES = [
   '/revenue',
   // P-C5 — شبكة الاستخدام: من بلغ حدّه، ورسوم استدعاءات الـAPI، وتصدير البيان.
   '/usage',
+  // P-C6 — خدمة البريد: القوالب والسجلّ والإعدادات والحجر في شاشةٍ واحدة بأربعة تبويبات.
+  '/email',
 ];
 
 function pageFileFor(href: string): string {

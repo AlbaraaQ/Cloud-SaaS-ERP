@@ -24,10 +24,10 @@ console work from any host without touching CORS.
   المنصة), each item carrying the `console.*` code that opens it. **This file is the single
   source of truth**: `tests/navigation.spec.ts` fails the build when an item claims `ready`
   without a page file, or names a code the registry does not declare.
-- `app/` — 19 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
+- `app/` — 20 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
   `subscriptions`, `plans`, `activation-requests`, `users`, `users/[id]` (operator card),
   `roles`, `audit`, `health`, `jobs`, `settings`, `invoices`, `invoices/[id]/print`, `dunning`,
-  `revenue`, `usage`.
+  `revenue`, `usage`, `email`.
 - `components/` — session auth gate, platform-only login screen (no signup path), the shell
   (`PlatformGuard`), and the shared screen kit.
 - `lib/` — API client (same origin, refresh-on-401), session provider (`can()` for tenant
@@ -139,6 +139,37 @@ What to know before touching the usage screens:
 4. **`null` is not a reset.** `PUT /platform/settings` rejects `null`/blank for numeric keys
    (422) — it used to store `0`, which now means «block the customer».
 
+
+
+## Screens added by P-C6 (2026-09-17)
+
+| Screen | Route | Console code | Endpoints |
+|---|---|---|---|
+| البريد (**new**: القوالب · السجلّ · الإعدادات · الحجر) | `/email` | read `console.email.view` · write `console.email.manage` | `GET /platform/email/templates` · `POST/PUT/DELETE …/templates[/:id]` · `POST …/templates/:id/test` · `GET /platform/email/messages` · `POST …/messages/:id/retry` · `GET/PUT /platform/email/settings` · `POST …/settings/test` · `GET/POST/DELETE /platform/email/suppressions` |
+
+What to know before touching the mail screens:
+
+1. **The event index is code, the text is data.** `packages/contracts/src/platform/email.ts`
+   declares the 17 events with their variables; `email_templates` holds the text — one platform
+   row per (event, locale) and one override row per tenant, so «تجاوز نصّي بلا كود» is a row,
+   not a deploy. Editing without a written reason is refused (400), and an unknown `{{variable}}`
+   is refused at save time just as a missing one is refused at delivery time.
+2. **Delivery is inline-first; the queue is the safety net.** Every send writes the message row
+   **and** an `email.send` job on `notifications` in the same transaction, then delivers the
+   first attempt in the request path (`inline`, recorded in `delivery_mode`). Waiting for the
+   worker would mean no mail at all in a Redis-less install or with `WORKER=0`; only a
+   deliberately deferred message (`sendAt` in the future) stays `queued`. Retries walk
+   1m · 5m · 30m up to three attempts, then «فاشلة» — manual retry from the log takes a mandatory
+   reason.
+3. **Suppression is checked before the queue and is recorded.** A blocked address never enters
+   the queue; the row is written as `suppressed` with its reason, so the log says «محجوبة»
+   instead of staying silent. A bounce/complaint also marks the last `sent` row `bounced`.
+4. **Two gates, two codes.** The enforced P-C5 quota (`limits.max_emails_per_month`) refuses
+   `409 USAGE_LIMIT_REACHED`; the `email_settings` daily/monthly caps refuse `429`. Test
+   messages (`is_test`) are excluded from the tenant's meter — a console probe is not usage.
+5. **SMTP credentials live in the environment, never in the table.** The provider is switchable
+   from the screen without a redeploy (`console` | `smtp`), and the settings payload reports
+   `smtpConfigured` honestly instead of echoing a secret.
 
 ## Security
 

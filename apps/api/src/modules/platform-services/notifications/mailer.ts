@@ -23,6 +23,13 @@ export type MailMessage = {
   text: string;
   /** Tenant the message belongs to; used for per-tenant templates later. */
   tenantId?: string | null;
+  /**
+   * P-C6 — هوية المُرسِل من `email_settings` (اسمٌ عربيّ وعنوانٌ لكل عميل). غيابها يعني
+   * `MAIL_FROM` من البيئة، وهو ما كان قبل خدمة البريد.
+   */
+  from?: string;
+  fromName?: string;
+  replyTo?: string | null;
 };
 
 export interface MailerPort {
@@ -97,10 +104,11 @@ export class SmtpMailer implements MailerPort {
     const session = await SmtpSession.open(this.options);
     try {
       await session.deliver({
-        from: this.options.from,
+        from: formatFrom(message.fromName, message.from) ?? this.options.from,
         to: message.to,
         subject: message.subject,
         text: message.text,
+        ...(message.replyTo ? { replyTo: message.replyTo } : {}),
       });
     } finally {
       await session.quit().catch(() => undefined);
@@ -151,7 +159,13 @@ class SmtpSession {
     return session;
   }
 
-  async deliver(message: { from: string; to: string; subject: string; text: string }): Promise<void> {
+  async deliver(message: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    replyTo?: string;
+  }): Promise<void> {
     await this.command(`MAIL FROM:<${message.from}>`, [250]);
     await this.command(`RCPT TO:<${message.to}>`, [250, 251]);
     await this.command('DATA', [354]);
@@ -297,8 +311,28 @@ function clientHostname(): string {
   return env.SMTP_CLIENT_HOSTNAME || 'erp-saas.local';
 }
 
+/**
+ * `اسم عربي <address@domain>` — وصيغة `from` في الرسالة تبقى العنوان وحده إن لم يُضبط اسم.
+ * الاسم يُرمَّز (`=?UTF-8?B?…?=`) كما تُرمَّز العناوين، لا كبايتات خام.
+ */
+export function formatFrom(fromName?: string, from?: string): string | undefined {
+  if (!from) return undefined;
+  if (!fromName) return from;
+  return `${encodedWord(fromName)} <${from}>`;
+}
+
 /** Chooses the wired implementation from `MAIL_TRANSPORT` (read live — see `live`). */
 export function createMailer(): MailerPort {
   if (live('MAIL_TRANSPORT', env.MAIL_TRANSPORT) === 'smtp') return new SmtpMailer(smtpOptionsFromEnv());
+  return new ConsoleMailer();
+}
+
+/**
+ * P-C6 — المزوّد المختار من `email_settings` لحظة الإرسال، لا من البيئة وحدها: المشغّل يبدّل
+ * `console` ↔ `smtp` من الشاشة بلا إعادة نشر (نصّ الخطة §7.2). واعتمادات SMTP تبقى في
+ * البيئة ولا تُخزَّن في جدول. و`MAIL_TRANSPORT` يظلّ الافتراضيّ حين لا صفَّ إعدادات.
+ */
+export function createMailerFor(provider: 'console' | 'smtp'): MailerPort {
+  if (provider === 'smtp') return new SmtpMailer(smtpOptionsFromEnv());
   return new ConsoleMailer();
 }

@@ -89,6 +89,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-C1: the platform's own configuration belongs to the owner of the platform.
       // Operations reads it under `console.tenants.view`; nobody else writes it.
       'console.settings.manage',
+      // P-C6: the mail service is operated daily — the owner holds it like everything else.
+      'console.email.view',
+      'console.email.manage',
     ],
   },
   {
@@ -101,6 +104,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C6: queued mail is production queue health, so operations can act on it.
+      'console.email.view',
+      'console.email.manage',
     ],
   },
   {
@@ -114,6 +120,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.plans.manage',
       'console.activation.review',
       'console.billing.manage',
+      // P-C6: invoices are sent by mail — billing reads the log, never sends.
+      'console.email.view',
     ],
   },
   {
@@ -121,7 +129,13 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
     nameAr: 'دعم المنصة',
     nameEn: 'Platform support',
     description: 'Customer support with read-only tenant visibility and ticket handling.',
-    permissions: ['console.tenants.view', 'console.health.view', 'console.support.manage'],
+    permissions: [
+      'console.tenants.view',
+      'console.health.view',
+      'console.support.manage',
+      // P-C6: support answers «لم يصلني البريد» — needs the log, not the templates.
+      'console.email.view',
+    ],
   },
   {
     code: 'platform_auditor',
@@ -133,6 +147,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C6: reading what the platform sent is oversight.
+      'console.email.view',
     ],
   },
 ] as const;
@@ -180,6 +196,9 @@ export const tenantAdminRoleCatalog: readonly RoleCatalogEntry[] = [
       'einvoice.manage',
       'einvoice.credentials.manage',
       'reporting.view',
+      // P-C6: the tenant administrator owns the wording of its own mail and reads its log.
+      'tenant.email.template.manage',
+      'tenant.email.log.view',
     ],
   },
   {
@@ -251,6 +270,8 @@ export const tenantAdminRoleCatalog: readonly RoleCatalogEntry[] = [
       'purchase.view',
       'treasury.view',
       'reporting.view',
+      // P-C6: an auditor may see what left the tenant in its name.
+      'tenant.email.log.view',
     ],
   },
 ] as const;

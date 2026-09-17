@@ -61,6 +61,8 @@ export type QueueHealthDto = z.infer<typeof queueHealthDtoSchema>;
 /** Job types Phase 04 owns. Later phases add their own under their queue. */
 export const jobTypes = {
   NOTIFICATION_EMAIL: 'notification.email',
+  // P-C6 — تسليم رسالة من `email_messages`: يُخزَّن في الطابور، ويُعاد بتراجعٍ أسّي.
+  EMAIL_SEND: 'email.send',
   FILES_ORPHAN_GC: 'files.orphan-gc',
   IDEMPOTENCY_GC: 'idempotency.gc',
 } as const;

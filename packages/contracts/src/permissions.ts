@@ -82,6 +82,9 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('tenant.notification.view', 'Read own in-app notifications and mark them read.'),
   perm('tenant.notification.manage', 'Create notifications for other memberships of the tenant.'),
   perm('tenant.job.view', 'Read the transactional outbox and background-queue health.'),
+  // P-C6 — خدمة البريد: تجاوز نصّ قالب، وقراءة سجلّ ما أُرسل باسم المنشأة.
+  perm('tenant.email.template.manage', 'Override the text of e-mail templates for the own tenant.'),
+  perm('tenant.email.log.view', 'Read the outbound e-mail log of the own tenant.'),
   // tenant device registry (2026-09) — canonical Device entity, see `devices` table.
   perm('tenant.device.view', 'List and read registered tenant devices.'),
   perm('tenant.device.manage', 'Register, activate, suspend and rotate credentials of tenant devices.'),
@@ -290,6 +293,9 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
   perm('console.jobs.view', 'Read background-queue and outbox health.'),
   perm('console.billing.manage', 'Manage billing operations and dunning.'),
   perm('console.support.manage', 'Handle platform support tickets and break-glass access.'),
+  // P-C6 — خدمة البريد: قراءة السجلّ بلا قدرة إرسال، وإدارة القوالب والإعدادات وإعادة الإرسال.
+  perm('console.email.view', 'Read the outbound e-mail log across tenants.'),
+  perm('console.email.manage', 'Manage e-mail templates, sender settings and suppressions.'),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

@@ -194,6 +194,13 @@ describe('staff navigation tree', () => {
     expect(item?.href).toBe('/settings/usage');
     expect(item?.permission).toBe('tenant.view');
     expect(item?.endpoint).toBe('GET /usage');
+
+    // P-C6 — البريد في سطح العميل: القوالب والسجلّ وهوِيّة المُرسِل على مسارٍ واحد.
+    const mail = allScreens.find((screen) => screen.key === 'email');
+    expect(mail?.status).toBe('ready');
+    expect(mail?.href).toBe('/settings/email');
+    expect(mail?.permission).toBe('tenant.email.log.view');
+    expect(mail?.endpoint).toContain('PUT /email/templates/:event');
   });
 
   it('resolves a screen from its href, ignoring the query string', () => {

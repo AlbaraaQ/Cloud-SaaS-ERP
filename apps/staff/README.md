@@ -49,6 +49,20 @@ read-only on purpose — limits are the platform's to set (`/platform/tenants/:i
 operator side, or the `limits.*` defaults), and a tenant that could raise its own ceiling would
 make the gate decorative.
 
+## Screens added by P-C6 (2026-09-17)
+
+| Screen | Route | Permission | Endpoints |
+|---|---|---|---|
+| البريد — القوالب والسجلّ | `/settings/email` | `tenant.email.log.view` (read) · `tenant.email.template.manage` (edit) | `GET /email/templates` · `PUT /email/templates/:event` · `GET /email/messages` · `GET/PUT /email/settings` |
+
+Three tabs: **قوالبي** (edit the tenant's own text over the platform's, with «أعِد نصّ المنصة»
+to drop the override) · **سجلّي** (the tenant's outbound log with event/status filters and
+counts) · **هويّة المُرسِل** (sender name, reply-to and sending domain, plus the provider —
+read-only). The provider and the caps belong to the platform console on purpose: a tenant that
+could switch the transport or raise its own ceiling would make the platform's gate decorative.
+`{{variables}}` are the event's declared ones only — an unknown variable is refused at save
+time, and a missing one at delivery time, so neither reaches a customer's inbox.
+
 ## Coverage
 
 All core sections are navigable: organization, catalog, accounting,

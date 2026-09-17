@@ -58,7 +58,12 @@ describe('platform console navigation', () => {
   });
 
   it('hides exactly what the permissions deny', () => {
-    const support = visibleConsoleGroups(['console.tenants.view', 'console.health.view', 'console.support.manage']);
+    const support = visibleConsoleGroups([
+      'console.tenants.view',
+      'console.health.view',
+      'console.support.manage',
+      'console.email.view',
+    ]);
     const supportHrefs = support.flatMap((group) => group.items.map((entry) => entry.href));
     expect(supportHrefs).toContain('/tenants');
     expect(supportHrefs).not.toContain('/plans');
@@ -67,6 +72,8 @@ describe('platform console navigation', () => {
     // P-C4 — the money documents are `console.billing.manage`, which support does not hold.
     expect(supportHrefs).not.toContain('/invoices');
     expect(supportHrefs).not.toContain('/dunning');
+    // P-C6 — support reads the mail log (`console.email.view`) but does not write templates.
+    expect(supportHrefs).toContain('/email');
 
     // …and the role that does hold it sees the three screens and the two it already had.
     const billing = visibleConsoleGroups([

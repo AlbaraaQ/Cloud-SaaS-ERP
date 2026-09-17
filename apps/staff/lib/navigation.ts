@@ -1603,6 +1603,20 @@ const settings: ModuleNode = {
             endpoint: 'GET /whatsapp/settings · PUT · POST /whatsapp/test · POST /whatsapp/send · GET /whatsapp/messages',
           },
         ),
+        // P-C6 — البريد: نصّ رسائلنا، وسجلّ ما خرج باسمنا، وهوِيّة المُرسِل. الوصول إلى
+        // السجلّ `tenant.email.log.view` (مدقّق المنشأة يراه بلا قدرة على التعديل)، وتحرير
+        // النصّ `tenant.email.template.manage`. ولا شاشة إرسال: الإرسال فعلُ حدثٍ في النظام.
+        screen(
+          'email',
+          'البريد — القوالب والسجلّ',
+          'E-mail',
+          '/settings/email',
+          'ready',
+          {
+            permission: 'tenant.email.log.view',
+            endpoint: 'GET /email/messages · GET /email/templates · PUT /email/templates/:event · GET/PUT /email/settings',
+          },
+        ),
       ],
     },
     {

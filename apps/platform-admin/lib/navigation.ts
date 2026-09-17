@@ -124,6 +124,9 @@ export const consoleGroups: readonly ConsoleGroup[] = [
     icon: '🛠️',
     items: [
       item('audit', 'التدقيق', 'Audit', '/audit', 'console.audit.view', 'GET /platform/audit'),
+      // P-C6 — «البريد»: خدمةٌ تُشرَف لا تقريرٌ يُقرأ. موضعها في التشغيل لأنها تُسائل الجواب
+      // نفسه الذي تُسائله الطوابير والصحة: ما خرج، وما لم يخرج، ولماذا.
+      item('email', 'البريد', 'E-mail', '/email', 'console.email.view', 'GET /platform/email/messages'),
       item('jobs', 'المهام والطوابير', 'Jobs', '/jobs', 'console.jobs.view', 'GET /platform/jobs/outbox'),
       item('health', 'الصحة', 'Health', '/health', 'console.health.view', 'GET /api/health/ready'),
     ],

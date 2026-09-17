@@ -58,7 +58,7 @@
 ├─ 4  الباقات والتراخيص         P-C4 ✅
 ├─ 5  الفوترة والتحصيل          P-C4 ✅
 ├─ 6  الاستخدام والحصص          P-C5 ✅
-├─ 7  البريد                    P-C6   ← خدمة احترافية مقترحة (§7)
+├─ 7  البريد                    P-C6 ✅ (خدمة احترافية مقترحة — §7)
 ├─ 8  الإعلانات والإشعارات      P-C7
 ├─ 9  مكتب الدعم + دخول مؤقّت   P-C8
 ├─ 10 العمليات (مهام · صحة · رايات · ملفات) P-C9
@@ -187,7 +187,20 @@
 | **ترحيل** | `0069_usage_metering.sql` — `usage_counters(tenant_id, metric, period, value)` فريد `(tenant, metric, period)`، و§3 ترميم `platform_admin_plane` على `items`/`files`/`whatsapp_messages` |
 | **اختبار** | `platform-usage.spec.ts` (≥ 8): العدّاد يزيد، الحدّ يمنع، التصدير، عزل |
 
-### P-C6 — خدمة البريد 🔴 (أكبر خدمة احترافية مقترحة — تفصيلها في §7)
+### P-C6 — خدمة البريد ✅ (أكبر خدمة احترافية مقترحة — تفصيلها في §7)
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C6_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C6_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **1077** اختباراً (132 ملفاً، كان 1056) · `platform-email.spec.ts`
+> **21** (طُلِب ≥ 16) · contracts **104** (كان 88) · platform-admin **24** (المسارات 20) ·
+> staff **37** (الشاشات 231) · `scripts/verify-platform-email.mjs` = **73** نقطة في **9** أقسام
+> (طُلب ≈ 55؛ ولا يُرسل بريداً حقيقياً أبداً — الإعدادات تُصوَّر وتُعاد).
+> **ثلاثة أمور تستحقّ الانتباه:** (1) **التسليم `inline` بعد الالتزام** والطابور شبكة أمان
+> (مهمّة `email.send` في نفس معاملة صفّ الرسالة) — لأن انتظار العامل يعني ألّا يخرج بريد في
+> تثبيتٍ بلا Redis أو `WORKER=0`، ورسالةٌ **مؤجَّلة** (`sendAt` مستقبلي) تبقى `queue` وحدها؛
+> (2) **حصّتان لا واحدة** — حدّ P-C5 المطبَّق يرفض **409** ويُدقَّق، وسقفا `email_settings`
+> يرفضان **429**، ورسائل الاختبار (`is_test`) لا تُحتسب على العميل؛ (3) **الحجر قبل الطابور**
+> ويُسجَّل `suppressed` بسببه — فالصمت غير مقبول، والشاشة تقول «محجوبة» لا «لم تُرسَل».
+> نصّ الخطة (§7) لم يسمِّ سكربت تحقّق، فبُني القياس كما في P-C5.
 
 ### P-C7 — الإعلانات والإشعارات 🟡
 
@@ -197,7 +210,7 @@
 | **الشاشات** | `/announcements` (إنشاء · استهداف بالباقة أو الحالة · جدولة · معاينة عربية/إنجليزية · قراءات) · **مركز الإشعارات في staff** (جرس + شاشة؛ الخلفية قائمة: `GET/POST /notifications` · `POST /:id/read`) |
 | **نقاط نهاية** | `GET/POST/PATCH /platform/announcements` · `POST /platform/announcements/:id/publish` · `GET /platform/announcements/:id/reads` · (staff) لا جديد: الاستهلاك من `/notifications` |
 | **صلاحيات** | **`console.notifications.manage`** (جديد) · `tenant.notification.view` (قائم) |
-| **ترحيل** | `0070_announcements.sql` — `announcements` · `announcement_reads` |
+| **ترحيل** | `0071_announcements.sql` — `announcements` · `announcement_reads` (صُحِّح الرقم: كان 0070، وقد أخذه بريد P-C6) |
 | **اختبار** | `platform-announcements.spec.ts` (≥ 8) |
 
 ### P-C8 — مكتب الدعم والدخول المؤقّت 🟡
@@ -269,7 +282,7 @@
 | P-C3 الهوية والوصول ✅ | 🟠 | P-C1 | 21 منفَّذ | 159 منفَّذ (تراكمي) |
 | P-C4 الباقات والفوترة ✅ | 🟠 | P-C2 | 23 منفَّذ | 307 منفَّذ (تراكمي) |
 | P-C5 الاستخدام والحصص ✅ | 🟠 | P-C4 | 13 منفَّذ | 394 منفَّذ (تراكمي) |
-| P-C6 البريد | 🔴 | P-C1 | 16 | 55 |
+| P-C6 البريد ✅ | 🔴 | P-C1 | 21 منفَّذ | 467 منفَّذ (تراكمي) |
 | P-C7 الإعلانات والإشعارات | 🟡 | P-C6 | 8 | +20 |
 | P-C8 الدعم والدخول المؤقّت | 🟡 | P-C1 | 10 | +25 |
 | P-C9 العمليات | 🟠 | P-C1 | 10 | +25 |
@@ -277,11 +290,12 @@
 | P-C11 بوابة المطوّر | 🟢 | P-C1 | 10 | +25 |
 | P-C12 التحليلات | 🟢 | P-C4 · P-C5 | 8 | +20 |
 
-**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد خمسة
-أجزاء: رقم `verify` التراكمي صار **394** نقطة في **40** قسماً (162/17 من
+**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد ستة
+أجزاء: رقم `verify` التراكمي صار **467** نقطة في **49** قسماً (162/17 من
 `verify-platform-console.mjs` · 147/12 من `verify-platform-billing.mjs` · 85/11 من
-`verify-platform-usage.mjs`) والمجموع المنفَّذ من الاختبارات المخصّصة للأجزاء 100 اختبار
-(20+23+21+23+13). الأجزاء 6–12 (تبدأ من P-C6) تُقاس من هنا.
+`verify-platform-usage.mjs` · 73/9 من `verify-platform-email.mjs`) والمجموع المنفَّذ من
+الاختبارات المخصّصة للأجزاء 121 اختباراً (20+23+21+23+13+21). الأجزاء 7–12 (تبدأ من P-C7)
+تُقاس من هنا.
 
 ---
 
@@ -295,9 +309,9 @@
 |---|---|---|
 | `0066_platform_settings.sql` ✅ | `platform_settings` | P-C1 |
 | `0067_tenant_card.sql` ✅ | `tenant_notes` + سياسات المنصة الناقصة + ترميم `nullif` | P-C2 |
-| `0068_platform_billing.sql` | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
-| `0069_usage_metering.sql` | `usage_counters` | P-C5 |
-| `0070_email_service.sql` | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
+| `0068_platform_billing.sql` ✅ | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
+| `0069_usage_metering.sql` ✅ | `usage_counters` | P-C5 |
+| `0070_email_service.sql` ✅ | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
 | `0071_announcements.sql` | `announcements` · `announcement_reads` | P-C7 |
 | `0072_support_desk.sql` | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
 | `0073_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |

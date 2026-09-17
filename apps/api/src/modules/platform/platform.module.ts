@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 
+import { EmailModule } from '../email/email.module.js';
+
+import { PlatformEmailController } from './admin/platform-email.controller.js';
 import { AuthController } from './auth/auth.controller.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
@@ -26,10 +29,12 @@ import { TenantService } from './tenancy/tenant.service.js';
  * Everything later phases need to authorise a request is exported from `./index.js`.
  */
 @Module({
+  imports: [EmailModule],
   controllers: [
     AuthController,
     MfaController,
     BillingController,
+    PlatformEmailController,
     IdentityController,
     TenantController,
     MembershipsController,
