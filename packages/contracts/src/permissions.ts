@@ -91,12 +91,32 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
 
   // tenant self-administration — legacy `platform.*` spelling (deprecated, still honoured).
   legacy('platform.tenant.view', 'tenant.view', 'Read the own tenant record and its effective settings.'),
-  legacy('platform.tenant.manage', 'tenant.manage', 'Update the own tenant record and typed settings in bulk.'),
-  legacy('platform.membership.manage', 'tenant.membership.manage', 'Invite, update and remove tenant memberships.'),
-  legacy('platform.role.manage', 'tenant.role.manage', 'Create and maintain roles and their permission sets.'),
-  legacy('platform.settings.manage', 'tenant.settings.manage', 'Read and write individual typed tenant settings.'),
+  legacy(
+    'platform.tenant.manage',
+    'tenant.manage',
+    'Update the own tenant record and typed settings in bulk.',
+  ),
+  legacy(
+    'platform.membership.manage',
+    'tenant.membership.manage',
+    'Invite, update and remove tenant memberships.',
+  ),
+  legacy(
+    'platform.role.manage',
+    'tenant.role.manage',
+    'Create and maintain roles and their permission sets.',
+  ),
+  legacy(
+    'platform.settings.manage',
+    'tenant.settings.manage',
+    'Read and write individual typed tenant settings.',
+  ),
   legacy('platform.audit.view', 'tenant.audit.view', 'Read the tenant audit log.'),
-  legacy('platform.file.upload', 'tenant.file.upload', 'Request pre-signed uploads, attach and download files.'),
+  legacy(
+    'platform.file.upload',
+    'tenant.file.upload',
+    'Request pre-signed uploads, attach and download files.',
+  ),
   legacy(
     'platform.notification.view',
     'tenant.notification.view',
@@ -172,7 +192,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('inventory.request.approve', 'Approve, reject or fulfil goods requests.'),
   perm('inventory.delivery.manage', 'Record stock deliveries against posted sales invoices.'),
   perm('inventory.production.manage', 'Create, edit and cancel production orders.'),
-  perm('inventory.production.complete', 'Complete production orders: consume components and receive the finished item.'),
+  perm(
+    'inventory.production.complete',
+    'Complete production orders: consume components and receive the finished item.',
+  ),
   perm('inventory.negative.override', 'Allow negative stock movements.'),
 
   // sales / purchases (PHASE_13)
@@ -250,7 +273,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('installments.manage', 'Create and maintain installment contracts and schedule templates.'),
   perm('installments.collect', 'Collect installment receipts and allocate them to due schedule rows.'),
   perm('projects.view', 'Read projects, stages, BOQ terms, progress bills and requirements.'),
-  perm('projects.manage', 'Create and maintain projects, stage templates, BOQ terms and requirement registers.'),
+  perm(
+    'projects.manage',
+    'Create and maintain projects, stage templates, BOQ terms and requirement registers.',
+  ),
   perm('projects.bill.post', 'Post progress bills and release retention invoices.'),
   perm('projects.contractor.pay', 'Approve and pay contractor payment certificates.'),
   perm('projects.stage.accredit', 'Accredit or reject project stages assigned to a user.'),
@@ -261,7 +287,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('tailoring.view', 'Read customer measurement cards and latest measurements.'),
   perm('tailoring.manage', 'Create and maintain customer measurements.'),
   perm('marina.view', 'Read marina groups, vessels, bookings and operation plans.'),
-  perm('marina.manage', 'Create and maintain marina vessels, owners, bookings, pricing, violations and plans.'),
+  perm(
+    'marina.manage',
+    'Create and maintain marina vessels, owners, bookings, pricing, violations and plans.',
+  ),
   perm('marina.invoice', 'Create rental invoices from marina bookings.'),
   perm('fitment.view', 'Read vehicle compatibility lookups.'),
   perm('fitment.manage', 'Maintain vehicle makes, models and item fitment rows.'),
@@ -296,6 +325,11 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
   // P-C6 — خدمة البريد: قراءة السجلّ بلا قدرة إرسال، وإدارة القوالب والإعدادات وإعادة الإرسال.
   perm('console.email.view', 'Read the outbound e-mail log across tenants.'),
   perm('console.email.manage', 'Manage e-mail templates, sender settings and suppressions.'),
+  // P-C7 — الإعلانات: كتابة الإعلان واستهدافه ونشره، ومتابعة قراءاته.
+  perm(
+    'console.notifications.manage',
+    'Write, target and publish platform announcements, and read their delivery.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

@@ -97,7 +97,14 @@ export const consoleGroups: readonly ConsoleGroup[] = [
       // issues, the collection ladder that follows them, and the revenue board. All three are
       // behind `console.billing.manage` (declared in P-C1, first used here), which is why the
       // auditor — read-only over customers and the audit trail — does not see them.
-      item('invoices', 'الفواتير', 'Invoices', '/invoices', 'console.billing.manage', 'GET /platform/invoices'),
+      item(
+        'invoices',
+        'الفواتير',
+        'Invoices',
+        '/invoices',
+        'console.billing.manage',
+        'GET /platform/invoices',
+      ),
       item(
         'dunning',
         'المتابعة والتحصيل',
@@ -127,6 +134,17 @@ export const consoleGroups: readonly ConsoleGroup[] = [
       // P-C6 — «البريد»: خدمةٌ تُشرَف لا تقريرٌ يُقرأ. موضعها في التشغيل لأنها تُسائل الجواب
       // نفسه الذي تُسائله الطوابير والصحة: ما خرج، وما لم يخرج، ولماذا.
       item('email', 'البريد', 'E-mail', '/email', 'console.email.view', 'GET /platform/email/messages'),
+      // P-C7 — «الإعلانات والإشعارات»: رسالة المنصة إلى عملائها. محلها التشغيل لأنها تُوجَّه
+      // وتُجدول وتُقاس وصولها؛ ولا يقود إليها غير `console.notifications.manage` (المالك
+      // والتشغيل)، فالدعم والمدقّق لا يكتبان رسالةً تخرج إلى كل عميل.
+      item(
+        'announcements',
+        'الإعلانات',
+        'Announcements',
+        '/announcements',
+        'console.notifications.manage',
+        'GET /platform/announcements',
+      ),
       item('jobs', 'المهام والطوابير', 'Jobs', '/jobs', 'console.jobs.view', 'GET /platform/jobs/outbox'),
       item('health', 'الصحة', 'Health', '/health', 'console.health.view', 'GET /api/health/ready'),
     ],
@@ -174,7 +192,9 @@ export function visibleConsoleGroups(permissions: readonly string[]): ConsoleGro
 /** The group a path belongs to — used by the shell's breadcrumb. */
 export function groupForPath(pathname: string): ConsoleGroup | undefined {
   return consoleGroups.find((group) =>
-    group.items.some((entry) => entry.href === pathname || (entry.href !== '/' && pathname.startsWith(entry.href))),
+    group.items.some(
+      (entry) => entry.href === pathname || (entry.href !== '/' && pathname.startsWith(entry.href)),
+    ),
   );
 }
 

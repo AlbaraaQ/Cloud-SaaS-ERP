@@ -34,6 +34,8 @@ const CONSOLE_ROUTES = [
   '/usage',
   // P-C6 — خدمة البريد: القوالب والسجلّ والإعدادات والحجر في شاشةٍ واحدة بأربعة تبويبات.
   '/email',
+  // P-C7 — الإعلانات: كتابةٌ بنصّين، واستهداف، وجدولة، وقراءات.
+  '/announcements',
 ];
 
 function pageFileFor(href: string): string {
@@ -104,9 +106,16 @@ describe('platform console routes', () => {
       expect(card, label).toContain(label);
     }
     // The order is part of the contract with the plan, not an accident of typing.
-    const positions = ['نظرة عامة', 'الاشتراك', 'المستخدمون', 'الاستخدام', 'الرايات', 'الصحة', 'التدقيق', 'الملاحظات'].map(
-      (label) => card.indexOf(`label: '${label}'`),
-    );
+    const positions = [
+      'نظرة عامة',
+      'الاشتراك',
+      'المستخدمون',
+      'الاستخدام',
+      'الرايات',
+      'الصحة',
+      'التدقيق',
+      'الملاحظات',
+    ].map((label) => card.indexOf(`label: '${label}'`));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });

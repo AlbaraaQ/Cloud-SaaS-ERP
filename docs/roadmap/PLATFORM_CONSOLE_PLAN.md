@@ -59,7 +59,7 @@
 ├─ 5  الفوترة والتحصيل          P-C4 ✅
 ├─ 6  الاستخدام والحصص          P-C5 ✅
 ├─ 7  البريد                    P-C6 ✅ (خدمة احترافية مقترحة — §7)
-├─ 8  الإعلانات والإشعارات      P-C7
+├─ 8  الإعلانات والإشعارات      P-C7 ✅
 ├─ 9  مكتب الدعم + دخول مؤقّت   P-C8
 ├─ 10 العمليات (مهام · صحة · رايات · ملفات) P-C9
 ├─ 11 البيانات والاسترجاع       P-C10
@@ -202,7 +202,7 @@
 > ويُسجَّل `suppressed` بسببه — فالصمت غير مقبول، والشاشة تقول «محجوبة» لا «لم تُرسَل».
 > نصّ الخطة (§7) لم يسمِّ سكربت تحقّق، فبُني القياس كما في P-C5.
 
-### P-C7 — الإعلانات والإشعارات 🟡
+### P-C7 — الإعلانات والإشعارات ✅
 
 | | |
 |---|---|
@@ -211,7 +211,22 @@
 | **نقاط نهاية** | `GET/POST/PATCH /platform/announcements` · `POST /platform/announcements/:id/publish` · `GET /platform/announcements/:id/reads` · (staff) لا جديد: الاستهلاك من `/notifications` |
 | **صلاحيات** | **`console.notifications.manage`** (جديد) · `tenant.notification.view` (قائم) |
 | **ترحيل** | `0071_announcements.sql` — `announcements` · `announcement_reads` (صُحِّح الرقم: كان 0070، وقد أخذه بريد P-C6) |
-| **اختبار** | `platform-announcements.spec.ts` (≥ 8) |
+| **اختبار** | `platform-announcements.spec.ts` (≥ 8) — **11** منفَّذاً + 7 في عقود الإعلانات |
+
+> **نُفِّذ (2026-09-17) — أربعة قرارات مصرَّح بها** (تفصيلها في
+> [`../PLATFORM_CONSOLE_P_C7_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C7_IMPLEMENTATION_REPORT.md)):
+> (1) **الجمهور snapshot لحظة النشر** — من دخل بعدها لا يُشمل، فصفُّ المتابعة يعدّ من استُهدف
+> فعلاً، وإعادة النشر تُكمل الناقص ولا تُضاعف (حجزٌ بـ`INSERT … ON CONFLICT … RETURNING`)؛
+> (2) **الجدولة زمنيّة والنشر idempotent** — مهمّة `announcement.publish` بوقتها في نفس معاملة
+> الكتابة، **ومسحٌ من `GET /platform/announcements`** لا يعتمد على العامل (هذا المستودع يعمل
+> بـ`WORKER=0`، فلو كان النشر مربوطاً بالطابور لتوقّف عند أول بيئةٍ بلا Redis)؛
+> (3) **بريدُ المالك وحده وإشعارُ كل عضو نشط** — التطبيق إبلاغٌ لمن يعمل، والبريد تمثيلٌ لمن
+> يملك، ومنشأة المشغّلين تُستثنى فلا تُعلن لنفسها؛ (4) **القراءة مصدرٌ واحد** — وسم الإشعار
+> مقروءاً (كما كان) يوسم صفّ التسليم في نفس المعاملة، فلا عدّادٌ ثانٍ ولا رقمان لسؤالٍ واحد.
+> **واستدراكٌ على P-C6**: تجاوز نصّ العميل كان مفتوحاً لكل حدث، فأُقفل على أحداث النطاق
+> `tenant` — إعلان المنصة ليس كلام العميل (حدثٌ بلا مُنتِج لا يُظهر الخلل، وأول إعلانٍ يُظهره).
+> والشاشتان: `/announcements` في اللوحة (`GET` · `POST` · `PATCH /:id` · `POST /:id/publish` ·
+> `GET /:id/reads`) و`/notifications` في staff بجرسٍ في الشريط — بلا نقاط نهاية جديدة كما نصّت §4.
 
 ### P-C8 — مكتب الدعم والدخول المؤقّت 🟡
 
@@ -283,19 +298,19 @@
 | P-C4 الباقات والفوترة ✅ | 🟠 | P-C2 | 23 منفَّذ | 307 منفَّذ (تراكمي) |
 | P-C5 الاستخدام والحصص ✅ | 🟠 | P-C4 | 13 منفَّذ | 394 منفَّذ (تراكمي) |
 | P-C6 البريد ✅ | 🔴 | P-C1 | 21 منفَّذ | 467 منفَّذ (تراكمي) |
-| P-C7 الإعلانات والإشعارات | 🟡 | P-C6 | 8 | +20 |
+| P-C7 الإعلانات والإشعارات ✅ | 🟡 | P-C6 | 11 منفَّذ | 521 منفَّذ (تراكمي) |
 | P-C8 الدعم والدخول المؤقّت | 🟡 | P-C1 | 10 | +25 |
 | P-C9 العمليات | 🟠 | P-C1 | 10 | +25 |
 | P-C10 البيانات والاسترجاع | 🟠 | P-C1 | 8 | 30 |
 | P-C11 بوابة المطوّر | 🟢 | P-C1 | 10 | +25 |
 | P-C12 التحليلات | 🟢 | P-C4 · P-C5 | 8 | +20 |
 
-**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد ستة
-أجزاء: رقم `verify` التراكمي صار **467** نقطة في **49** قسماً (162/17 من
-`verify-platform-console.mjs` · 147/12 من `verify-platform-billing.mjs` · 85/11 من
-`verify-platform-usage.mjs` · 73/9 من `verify-platform-email.mjs`) والمجموع المنفَّذ من
-الاختبارات المخصّصة للأجزاء 121 اختباراً (20+23+21+23+13+21). الأجزاء 7–12 (تبدأ من P-C7)
-تُقاس من هنا.
+**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد سبعة
+أجزاء: رقم `verify` التراكمي صار **521** نقطة في **57** قسماً (169/18 من
+`verify-platform-console.mjs` · 47/7 من `verify-platform-announcements.mjs` · 147/12 من
+`verify-platform-billing.mjs` · 85/11 من `verify-platform-usage.mjs` · 73/9 من
+`verify-platform-email.mjs`) والمجموع المنفَّذ من الاختبارات المخصّصة للأجزاء 132 اختباراً
+(20+23+21+23+13+21+11). الأجزاء 8–12 (تبدأ من P-C8) تُقاس من هنا.
 
 ---
 
@@ -312,7 +327,7 @@
 | `0068_platform_billing.sql` ✅ | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
 | `0069_usage_metering.sql` ✅ | `usage_counters` | P-C5 |
 | `0070_email_service.sql` ✅ | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
-| `0071_announcements.sql` | `announcements` · `announcement_reads` | P-C7 |
+| `0071_announcements.sql` ✅ | `announcements` · `announcement_reads` | P-C7 |
 | `0072_support_desk.sql` | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
 | `0073_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |
 | `0074_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |

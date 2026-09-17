@@ -11,7 +11,13 @@ import { paginationQuerySchema } from '../pagination.js';
  * than string literals so a typo is a compile error.
  */
 
-export const QUEUE_NAMES = ['einvoice', 'notifications', 'reports-export', 'migration', 'maintenance'] as const;
+export const QUEUE_NAMES = [
+  'einvoice',
+  'notifications',
+  'reports-export',
+  'migration',
+  'maintenance',
+] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
@@ -63,6 +69,8 @@ export const jobTypes = {
   NOTIFICATION_EMAIL: 'notification.email',
   // P-C6 — تسليم رسالة من `email_messages`: يُخزَّن في الطابور، ويُعاد بتراجعٍ أسّي.
   EMAIL_SEND: 'email.send',
+  // P-C7 — نشر إعلانٍ مجدول في وقته: يبقى المسح في `list` شبكةَ أمانٍ لمن لا عامل له.
+  ANNOUNCEMENT_PUBLISH: 'announcement.publish',
   FILES_ORPHAN_GC: 'files.orphan-gc',
   IDEMPOTENCY_GC: 'idempotency.gc',
 } as const;

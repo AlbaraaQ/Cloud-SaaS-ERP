@@ -138,6 +138,13 @@ export class NotificationsService {
         .where(and(eq(notifications.id, id), eq(notifications.tenantId, tenantId)))
         .returning();
 
+      // P-C7: الإعلان يقيس قراءته من هنا — العلامة تُوسم على صفّ التسليم نفسه، فلا رقمان
+      // لسؤالٍ واحد (`announcement_reads` هو مصدر الحقيقة)، والوسم idempotent مثله.
+      await tx.execute(sql`
+        UPDATE announcement_reads SET read_at = now()
+         WHERE notification_id = ${id} AND read_at IS NULL
+      `);
+
       return toNotificationDto((updated ?? current) as NotificationRow);
     });
   }

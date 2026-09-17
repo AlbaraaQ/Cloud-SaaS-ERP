@@ -28,19 +28,10 @@
  */
 
 export type PlatformRoleCode =
-  | 'platform_owner'
-  | 'platform_operations'
-  | 'platform_billing'
-  | 'platform_support'
-  | 'platform_auditor';
+  'platform_owner' | 'platform_operations' | 'platform_billing' | 'platform_support' | 'platform_auditor';
 
 export type TenantAdminRoleCode =
-  | 'tenant_owner'
-  | 'tenant_admin'
-  | 'branch_manager'
-  | 'device_manager'
-  | 'security_admin'
-  | 'tenant_auditor';
+  'tenant_owner' | 'tenant_admin' | 'branch_manager' | 'device_manager' | 'security_admin' | 'tenant_auditor';
 
 export type ErpFunctionalRoleCode =
   | 'accountant'
@@ -92,6 +83,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-C6: the mail service is operated daily — the owner holds it like everything else.
       'console.email.view',
       'console.email.manage',
+      // P-C7: announcements are the platform speaking to its customers — owner and operations.
+      'console.notifications.manage',
     ],
   },
   {
@@ -107,6 +100,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-C6: queued mail is production queue health, so operations can act on it.
       'console.email.view',
       'console.email.manage',
+      // P-C7: operations owns the maintenance window, so it owns the notice about it.
+      'console.notifications.manage',
     ],
   },
   {
@@ -620,7 +615,8 @@ export function platformPermissionsForRoles(
 ): string[] {
   const out = new Set<string>();
   for (const code of codes) {
-    const override = overrides && Object.prototype.hasOwnProperty.call(overrides, code) ? overrides[code] : undefined;
+    const override =
+      overrides && Object.prototype.hasOwnProperty.call(overrides, code) ? overrides[code] : undefined;
     const granted = override ?? platformByCode.get(code)?.permissions ?? [];
     for (const permission of granted) out.add(permission);
   }

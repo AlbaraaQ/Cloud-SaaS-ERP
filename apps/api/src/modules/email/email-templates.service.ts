@@ -137,7 +137,12 @@ export class EmailTemplatesService implements OnModuleInit {
     tenantId: string | null,
     event: EmailEvent,
     locale: EmailLocale,
-  ): Promise<{ templateId: string | null; subject: string; body: string; source: 'seed' | 'platform' | 'tenant' }> {
+  ): Promise<{
+    templateId: string | null;
+    subject: string;
+    body: string;
+    source: 'seed' | 'platform' | 'tenant';
+  }> {
     const [template] = await this.effective(tenantId, { event, locale });
     if (!template) {
       throw new DomainError(errorCodes.NOT_FOUND, `لا قالب للحدث ${event} باللغة ${locale}`, 404);
@@ -151,16 +156,14 @@ export class EmailTemplatesService implements OnModuleInit {
   }
 
   /** `POST /platform/email/templates` — إنشاءٌ لا تعديل: الموجود يُرفض بـ422. */
-  async create(
-    input: {
-      event: EmailEvent;
-      locale: EmailLocale;
-      subject: string;
-      body: string;
-      tenantId?: string | null;
-      reason: string;
-    },
-  ): Promise<EmailTemplate> {
+  async create(input: {
+    event: EmailEvent;
+    locale: EmailLocale;
+    subject: string;
+    body: string;
+    tenantId?: string | null;
+    reason: string;
+  }): Promise<EmailTemplate> {
     this.assertTextUsesKnownVariables(input.event, input.subject, input.body);
     const tenantId = input.tenantId ?? null;
     const id = newId();
@@ -173,12 +176,11 @@ export class EmailTemplatesService implements OnModuleInit {
          LIMIT 1
       `);
       if (existing.rows.length > 0) {
-        throw new DomainError(
-          errorCodes.VALIDATION_FAILED,
-          'القالب موجود — استعمل PUT لتعديله',
-          422,
-          { event: input.event, locale: input.locale, tenantId },
-        );
+        throw new DomainError(errorCodes.VALIDATION_FAILED, 'القالب موجود — استعمل PUT لتعديله', 422, {
+          event: input.event,
+          locale: input.locale,
+          tenantId,
+        });
       }
 
       await tx.execute(sql`
@@ -290,8 +292,18 @@ export class EmailTemplatesService implements OnModuleInit {
       throw new DomainError(errorCodes.NOT_FOUND, 'لا قالب لهذا الحدث', 404, { event, locale });
     }
 
-    const subject =
-      input.subject === null ? platformTemplate.subject : (input.subject ?? current.subject);
+    // P-C7: نصّ المنصة ليس نصّ العميل. أحداث `platform` (دعوة، إعلان، تفعيل) يكتبها
+    // المشغّل وحده — ولو جاز للعميل تجاوزها لأمكن لعميلٍ أن يعيد صياغة إعلان المنصة إليه.
+    if (emailEventDefinition(event).scope !== 'tenant') {
+      throw new DomainError(
+        errorCodes.VALIDATION_FAILED,
+        'نصّ هذا الحدث نصّ المنصة — لا يُتجاوز من سطح العميل',
+        422,
+        { event },
+      );
+    }
+
+    const subject = input.subject === null ? platformTemplate.subject : (input.subject ?? current.subject);
     const body = input.body === null ? platformTemplate.body : (input.body ?? current.body);
     this.assertTextUsesKnownVariables(event, subject, body);
 

@@ -486,9 +486,12 @@ async function main() {
   );
   const tenantLog = await raw('get', '/email/messages?limit=50', undefined, demoToken);
   check('وسجلّ العميل يُقرأ', tenantLog.status === 200, `${tenantLog.body?.data?.length ?? 0} رسالة`);
-  const leaked = (tenantLog.body?.data ?? []).filter(
-    (row) => row.tenantId !== (mine.body?.data?.[0]?.tenantId ?? null) && row.tenantId !== null,
-  );
+  // المرجع هو **معرّف منشأة الجلسة** من `/me`، لا من أوّل صفّ قالب: مَن كتبت له إعلاناً في
+  // P-C7 صارت أصفاره متغيّرة، وكان الأساس السابق يعتمد على وجود تجاوزٍ له في القوالب —
+  // فقياسُ العزل يجب أن يسأل عن الهوية لا عن رصيدٍ متبقٍّ.
+  const demoIdentity = await request('get', '/me', undefined, demoToken);
+  const demoId = demoIdentity?.membership?.tenantId ?? null;
+  const leaked = (tenantLog.body?.data ?? []).filter((row) => row.tenantId !== demoId);
   check('ولا يحمل رسالة عميلٍ آخر', leaked.length === 0, `${leaked.length} تسرّباً`);
   const unknownEvent = await attempts(
     'put',

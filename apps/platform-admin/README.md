@@ -24,10 +24,10 @@ console work from any host without touching CORS.
   المنصة), each item carrying the `console.*` code that opens it. **This file is the single
   source of truth**: `tests/navigation.spec.ts` fails the build when an item claims `ready`
   without a page file, or names a code the registry does not declare.
-- `app/` — 20 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
+- `app/` — 21 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
   `subscriptions`, `plans`, `activation-requests`, `users`, `users/[id]` (operator card),
   `roles`, `audit`, `health`, `jobs`, `settings`, `invoices`, `invoices/[id]/print`, `dunning`,
-  `revenue`, `usage`, `email`.
+  `revenue`, `usage`, `email`, `announcements`.
 - `components/` — session auth gate, platform-only login screen (no signup path), the shell
   (`PlatformGuard`), and the shared screen kit.
 - `lib/` — API client (same origin, refresh-on-401), session provider (`can()` for tenant
@@ -170,6 +170,23 @@ What to know before touching the mail screens:
 5. **SMTP credentials live in the environment, never in the table.** The provider is switchable
    from the screen without a redeploy (`console` | `smtp`), and the settings payload reports
    `smtpConfigured` honestly instead of echoing a secret.
+
+## Screens added by P-C7 (2026-09-17)
+
+| Screen | Route | Permission | Endpoints |
+|---|---|---|---|
+| الإعلانات | `/announcements` | `console.notifications.manage` | `GET/POST /platform/announcements` · `PATCH /platform/announcements/:id` · `POST …/:id/publish` · `GET …/:id/reads` |
+
+Two tabs: **الإعلانات** (the list — title, status, audience, channels, due time, delivery
+figures, with **نشر الآن** on drafts/scheduled rows and **القراءات** under published ones) ·
+**كتابة إعلان / تعديل إعلان** (both texts ar+en, audience `all`/`plan`/`status`, channels
+«إشعار داخل التطبيق» + «رسالة بريد», a schedule, a reason — and a live preview in the chosen
+direction). «نشر الآن» reports the fan-out it caused (tenants · in-app · e-mails).
+
+The decisions the screen makes visible: **the audience is an snapshot taken at publish time**
+(so «نشر الآن» twice only fills gaps), **published announcements are frozen** (`PATCH` → 422,
+what was said is not rewritten), and **the e-mail goes to the owner only** while the in-app
+notice reaches every active staff membership.
 
 ## Security
 

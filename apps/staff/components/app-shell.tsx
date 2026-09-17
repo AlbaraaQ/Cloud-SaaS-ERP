@@ -8,24 +8,45 @@ import { useLang, type Lang } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { visibleModules, type ModuleNode, type ScreenItem } from '../lib/navigation';
 
+import { NotificationBell } from './notification-bell';
+
 const label = (lang: Lang, item: { labelAr: string; labelEn: string }): string =>
   lang === 'ar' ? item.labelAr : item.labelEn;
 
 function statusDot(status: string, lang: Lang) {
   const title =
     status === 'ready'
-      ? lang === 'ar' ? 'جاهز' : 'Ready'
+      ? lang === 'ar'
+        ? 'جاهز'
+        : 'Ready'
       : status === 'api'
-        ? lang === 'ar' ? 'الواجهة البرمجية جاهزة' : 'API ready'
-        : lang === 'ar' ? 'قيد التطوير' : 'Planned';
+        ? lang === 'ar'
+          ? 'الواجهة البرمجية جاهزة'
+          : 'API ready'
+        : lang === 'ar'
+          ? 'قيد التطوير'
+          : 'Planned';
   return <span className={`dot ${status}`} title={title} aria-label={title} />;
 }
 
-function ModuleBlock({ module, pathname, filter, lang }: { module: ModuleNode; pathname: string; filter: string; lang: Lang }) {
+function ModuleBlock({
+  module,
+  pathname,
+  filter,
+  lang,
+}: {
+  module: ModuleNode;
+  pathname: string;
+  filter: string;
+  lang: Lang;
+}) {
   const matches = (text: string) => text.toLowerCase().includes(filter.toLowerCase());
   const groups = filter
     ? module.groups
-        .map((group) => ({ ...group, items: group.items.filter((item) => matches(item.labelAr) || matches(item.labelEn)) }))
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => matches(item.labelAr) || matches(item.labelEn)),
+        }))
         .filter((group) => group.items.length > 0)
     : module.groups;
 
@@ -37,7 +58,12 @@ function ModuleBlock({ module, pathname, filter, lang }: { module: ModuleNode; p
 
   return (
     <div className={`nav-module ${expanded ? 'open' : ''}`}>
-      <button type="button" className="nav-module-head" onClick={() => setOpen(!expanded)} aria-expanded={expanded}>
+      <button
+        type="button"
+        className="nav-module-head"
+        onClick={() => setOpen(!expanded)}
+        aria-expanded={expanded}
+      >
         <span className="nav-icon" aria-hidden>
           {module.icon}
         </span>
@@ -51,33 +77,33 @@ function ModuleBlock({ module, pathname, filter, lang }: { module: ModuleNode; p
       </button>
       {expanded && (
         <div className="nav-groups">
-              {groups.map((group) => (
-                <div className="nav-group" key={group.key}>
-                  <p className="nav-group-title">{label(lang, group)}</p>
-                  {group.items.map((item: ScreenItem) =>
-                    item.status === 'ready' ? (
-                      <Link
-                        key={item.key}
-                        href={item.href}
-                        className={pathname === item.href.split('?')[0] ? 'nav-link active' : 'nav-link'}
-                      >
-                        {statusDot(item.status, lang)}
-                        <span>{label(lang, item)}</span>
-                      </Link>
-                    ) : (
-                      <span
-                        key={item.key}
-                        className="nav-link disabled"
-                        title={item.endpoint ?? (lang === 'ar' ? 'قيد التطوير' : 'Planned')}
-                        aria-disabled="true"
-                      >
-                        {statusDot(item.status, lang)}
-                        <span>{label(lang, item)}</span>
-                      </span>
-                    ),
-                  )}
-                </div>
-              ))}
+          {groups.map((group) => (
+            <div className="nav-group" key={group.key}>
+              <p className="nav-group-title">{label(lang, group)}</p>
+              {group.items.map((item: ScreenItem) =>
+                item.status === 'ready' ? (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className={pathname === item.href.split('?')[0] ? 'nav-link active' : 'nav-link'}
+                  >
+                    {statusDot(item.status, lang)}
+                    <span>{label(lang, item)}</span>
+                  </Link>
+                ) : (
+                  <span
+                    key={item.key}
+                    className="nav-link disabled"
+                    title={item.endpoint ?? (lang === 'ar' ? 'قيد التطوير' : 'Planned')}
+                    aria-disabled="true"
+                  >
+                    {statusDot(item.status, lang)}
+                    <span>{label(lang, item)}</span>
+                  </span>
+                ),
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -141,7 +167,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="main">
         <header className="topbar">
           <div className="row" style={{ alignItems: 'center' }}>
-            <button className="btn only-mobile" type="button" onClick={() => setMobileOpen(!mobileOpen)} aria-label={t('nav.searchPlaceholder')}>
+            <button
+              className="btn only-mobile"
+              type="button"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={t('nav.searchPlaceholder')}
+            >
               ☰
             </button>
             <div>
@@ -159,10 +190,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="row" style={{ alignItems: 'center' }}>
             <span className="muted">{me?.user.fullName}</span>
+            {/* P-C7: جرسٌ يقود إلى مركز الإشعارات — الرقم إشعاراتٌ غير مقروءة للعضويّة الحالية. */}
+            <NotificationBell label={lang === 'ar' ? 'الإشعارات' : 'Notifications'} />
             <Link className="btn" href="/settings/change-password">
               {lang === 'ar' ? 'كلمة المرور' : 'Password'}
             </Link>
-            <Link className="btn" href="/settings/two-factor" title={lang === 'ar' ? 'التحقق بخطوتين' : 'Two-factor authentication'}>
+            <Link
+              className="btn"
+              href="/settings/two-factor"
+              title={lang === 'ar' ? 'التحقق بخطوتين' : 'Two-factor authentication'}
+            >
               🔐
             </Link>
             <button className="btn danger" type="button" onClick={() => void signOut()}>

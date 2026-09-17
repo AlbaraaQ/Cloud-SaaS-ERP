@@ -329,6 +329,11 @@ export class PlatformConsoleService {
       attempts: number;
       lastError: string | null;
       createdAt: string;
+      /**
+       * P-C7: موعد التنفيذ. مهمّةُ نشرٍ مجدولة لا معنى لصفّها بلا وقتها — والعمود قائم
+       * في الجدول أصلاً، فإظهاره يجعل «مجدولة» في شاشة الإعلانات قابلةً للتحقّق من الطابور.
+       */
+      runAt: string;
     }>;
     total: number;
     limit: number;
@@ -354,6 +359,7 @@ export class PlatformConsoleService {
           attempts: outboxJobs.attempts,
           lastError: outboxJobs.lastError,
           createdAt: outboxJobs.createdAt,
+          runAt: outboxJobs.runAt,
         })
         .from(outboxJobs)
         .leftJoin(tenants, eq(tenants.id, outboxJobs.tenantId))
@@ -367,6 +373,7 @@ export class PlatformConsoleService {
           ...row,
           lastError: row.lastError ?? null,
           createdAt: row.createdAt.toISOString(),
+          runAt: row.runAt.toISOString(),
         })),
         total: totalRow[0]?.value ?? 0,
         limit: query.limit,
@@ -406,12 +413,9 @@ export class PlatformConsoleService {
 function parseDate(value: string, field: string): Date {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    throw new DomainError(
-      errorCodes.VALIDATION_FAILED,
-      `filter[${field}] must be an ISO-8601 date`,
-      400,
-      { field: `filter[${field}]` },
-    );
+    throw new DomainError(errorCodes.VALIDATION_FAILED, `filter[${field}] must be an ISO-8601 date`, 400, {
+      field: `filter[${field}]`,
+    });
   }
   return parsed;
 }

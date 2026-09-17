@@ -128,6 +128,12 @@ const envSchema = z.object({
   SMTP_CLIENT_HOSTNAME: z.string().optional(),
   /** Public URL of the customer portal, used inside outbound e-mails. */
   CUSTOMER_PUBLIC_URL: z.string().default(''),
+  /**
+   * P-C7 — Public URL of the staff workspace, used inside outbound e-mails
+   * (the announcement template's `{{link}}` points at its notification centre).
+   * Empty means the link stays a relative path rather than a dead absolute one.
+   */
+  STAFF_PUBLIC_URL: z.string().default(''),
 
   /** AES-256-GCM data-encryption key, base64 (SECURITY_ARCHITECTURE §9). */
   DATA_ENC_KEY: z.string().optional(),

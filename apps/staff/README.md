@@ -63,6 +63,19 @@ could switch the transport or raise its own ceiling would make the platform's ga
 `{{variables}}` are the event's declared ones only — an unknown variable is refused at save
 time, and a missing one at delivery time, so neither reaches a customer's inbox.
 
+## Screens added by P-C7 (2026-09-17)
+
+| Screen | Route | Permission | Endpoints |
+|---|---|---|---|
+| مركز الإشعارات | `/notifications` | `tenant.notification.view` | `GET /notifications` · `POST /notifications/:id/read` |
+
+The inbox lists what was addressed to the calling membership — platform announcements
+(`type=announcement`, text read from the notification `payload` in the UI language) and system
+notices — newest first, with «تحديد كمقروء» per row and «قراءة الكل». The **bell in the top
+bar** shows the same `meta.unread` this screen shows (no second counter), polling once a minute
+and staying silent when the call fails. Marking a read **also stamps the platform's delivery
+ledger** (`announcement_reads`), which is what makes the console's «القراءات» column truthful.
+
 ## Coverage
 
 All core sections are navigable: organization, catalog, accounting,

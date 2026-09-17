@@ -22,7 +22,8 @@
  *  14. 🗒️ الملاحظات — تُضاف، ولا تُحذف من بطاقة عميل آخر
  *  15. 🔐 أبواب بطاقة العميل — جلسة المستأجر لا تدخل
  *  16. 🪪 الهوية والوصول — الدليل والبطاقة والجلسات والمصفوفة ودعوة مشغّل (P-C3)
- *  17. 🧹 التنظيف — الحالة تعود كما كانت
+ *  17. 📣 الإعلانات — شاشة المنصة تقرأ ما كتبته شاشة الإعلانات (P-C7)
+ *  18. 🧹 التنظيف — الحالة تعود كما كانت
  *
  * Re-runnable and non-destructive: the settings are snapshotted before anything is written
  * and restored at the end, and the temporary platform role granted in §8 is revoked in §10.
@@ -214,18 +215,22 @@ check(
 const ownerRole = roles.find((role) => role.code === 'platform_owner');
 const operationsRole = roles.find((role) => role.code === 'platform_operations');
 check(
-  'مالك المنصة يحمل الرموز الخمسة عشر',
-  ownerRole.permissions.length === 15,
+  'مالك المنصة يحمل الرموز الستة عشر',
+  ownerRole.permissions.length === 16,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 15, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 16, `${registry.length} رمزاً`);
 check(
   'والمفتاح الجديد فيه',
   registry.some((entry) => entry.code === 'console.settings.manage'),
+);
+check(
+  'ورمز الإعلانات (P-C7) في السجل أيضاً',
+  registry.some((entry) => entry.code === 'console.notifications.manage'),
 );
 
 // ════════════════════════════════════════════════ 5. ⚙️ إعدادات المنصة
@@ -1075,7 +1080,61 @@ const anonymousIdentity = await refused('get', '/platform/users', undefined, '')
 check('وترفض بلا جلسة 401', anonymousIdentity.status === 401, String(anonymousIdentity.status));
 
 // ═════════════════════════════════════════════════════════════ 17. 🧹 التنظيف
-console.log('\n■ 17. 🧹 التنظيف');
+// ════════════════════════════════════════════════ 17. 📣 الإعلانات
+console.log('\n■ 17. 📣 الإعلانات — شاشة المنصة تقرأ ما كتبته شاشة الإعلانات (P-C7)');
+// القسم العميق لهذا الجزء في `scripts/verify-platform-announcements.mjs`؛ وهنا ما يخصّ شاشة
+// اللوحة وحدها: أن المسار يعمل للمالك، وأن مرشّحاته من الفهرس المسموح، وأن حارسه رمزُ
+// الإعلانات وحده — لا الدعم ولا المدقّق.
+const announcementRows = await get('/platform/announcements?limit=50');
+check('قائمة الإعلانات تُقرأ للمالك', Array.isArray(announcementRows), `${announcementRows.length} صفاً`);
+const publishedRows = announcementRows.filter((row) => row.status === 'published');
+check(
+  'وكل منشورٍ يُوسَم بمن كتبه',
+  publishedRows.every((row) => typeof row.createdByLabel === 'string' && row.createdByLabel.length > 0),
+  `${publishedRows.length} منشوراً`,
+);
+check(
+  'وكل صفٍّ بحصيلة توزيعٍ معلَنة',
+  announcementRows.every(
+    (row) =>
+      typeof row.stats?.tenants === 'number' &&
+      typeof row.stats?.inApp === 'number' &&
+      typeof row.stats?.emails === 'number' &&
+      typeof row.stats?.reads === 'number',
+  ),
+);
+const filtered = await get('/platform/announcements?filter[status]=published&limit=10');
+check(
+  'ومرشّح الحالة يعمل',
+  Array.isArray(filtered) && filtered.every((row) => row.status === 'published'),
+  `${filtered.length} صفاً`,
+);
+const announcementBadFilter = await refused(
+  'get',
+  '/platform/announcements?filter[nope]=1',
+  undefined,
+  ownerToken,
+);
+check(
+  'ومرشّحٌ غير مسموح يُرفض 400',
+  announcementBadFilter.status === 400,
+  `HTTP ${announcementBadFilter.status}`,
+);
+check(
+  'ورمز الإعلانات عند المالك والتشغيل وحدهما',
+  ownerRole.permissions.includes('console.notifications.manage') &&
+    (roles.find((role) => role.code === 'platform_operations')?.permissions ?? []).includes(
+      'console.notifications.manage',
+    ) &&
+    !(roles.find((role) => role.code === 'platform_support')?.permissions ?? []).includes(
+      'console.notifications.manage',
+    ) &&
+    !(roles.find((role) => role.code === 'platform_auditor')?.permissions ?? []).includes(
+      'console.notifications.manage',
+    ),
+);
+
+console.log('\n■ 18. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);
