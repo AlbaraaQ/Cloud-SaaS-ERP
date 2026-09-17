@@ -1,9 +1,27 @@
-import Link from 'next/link';
+import type { Metadata } from 'next';
 
-import { Kpi } from '../components/card';
-import { copy } from '../lib/i18n';
-import { surfaceHref } from '../lib/surfaces';
+import { HomeView } from '../components/site/views';
+import { fetchFaq, fetchPosts, fetchShell } from '../lib/content';
+import { staticMetadata } from '../lib/meta';
 
-export default function Home() {
-  return <div className="grid"><section className="hero"><p className="muted">Cloud SaaS ERP</p><h1>{copy.ar.title}</h1><p>{copy.ar.subtitle}</p><div className="toolbar"><Link className="btn primary" href="/onboarding">اشترك الآن</Link><a className="btn" href={surfaceHref('portal', '/portal')}>{copy.ar.portal}</a><Link className="btn" href="/verify">{copy.ar.verify}</Link><Link className="btn" href="/contact">{copy.ar.contact}</Link></div></section><section className="grid cols"><Kpi label="فواتير إلكترونية" value="QR" hint="ZATCA verification friendly" /><Kpi label="كشف حساب" value="PDF/CSV" hint="self-service exports" /><Kpi label="تهيئة سريعة" value="5 خطوات" hint="company to first branch" /></section></div>;
+export const dynamic = 'force-dynamic';
+
+export async function generateMetadata(): Promise<Metadata> {
+  return staticMetadata({ locale: 'ar', path: '/', titleKey: 'home.top' });
+}
+
+/**
+ * P-M2 — الصفحة الرئيسية.
+ *
+ * البطل من **إعدادات الموقع** (`/public/site`)، وشبكة الوحدات من شجرة `apps/staff`،
+ * والآراء والأسئلة الشائعة من **نظام المحتوى** (وتُخفى أقسامها حين لا محتوى — لا شهادة
+ * مخترعة ولا رقم مفترض).
+ */
+export default async function HomePage() {
+  const [shell, faq, cases] = await Promise.all([
+    fetchShell(),
+    fetchFaq(6),
+    fetchPosts({ kind: 'case_study', limit: 3 }),
+  ]);
+  return <HomeView locale="ar" shell={shell} faq={faq} cases={cases.items} />;
 }

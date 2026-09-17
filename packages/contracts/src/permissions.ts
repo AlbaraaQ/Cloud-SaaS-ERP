@@ -359,6 +359,13 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
     'console.analytics.view',
     'Read platform analytics: MRR, churn, activation funnel, cohorts, trial conversion and usage per plan.',
   ),
+  // P-M5 — نظام إدارة المحتوى: رمزان لا رمز، لأن **قراءة المسوّدة ليست كتابتها**. مراجعةٌ
+  // لغوية تقرأ ما كُتب قبل النشر بلا أن تملك ما يُنشر، ومن ينشر ليس بالضرورة من يحرّر.
+  perm('console.content.view', 'Read marketing content pages, drafts, menus and banners.'),
+  perm(
+    'console.content.manage',
+    'Write, publish, schedule, retract and restore marketing content pages, menus and banners.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

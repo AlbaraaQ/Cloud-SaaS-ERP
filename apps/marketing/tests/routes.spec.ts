@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { publicRoutes } from '../lib/navigation.js';
+import { publicRoutes } from '../lib/navigation';
 
 const appDir = fileURLToPath(new URL('../app', import.meta.url));
 

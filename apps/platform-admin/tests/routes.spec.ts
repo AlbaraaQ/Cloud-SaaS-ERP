@@ -51,6 +51,8 @@ const CONSOLE_ROUTES = [
   '/api-keys',
   '/webhooks',
   '/api-explorer',
+  // P-M5 — المحتوى: الصفحات وكتلها، والقوائم الخمس، واللافتات في شاشةٍ واحدة بأربعة تبويبات.
+  '/content',
 ];
 
 function pageFileFor(href: string): string {

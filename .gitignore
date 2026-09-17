@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .next/
+# مجلّد بناء التحقّق الإنتاجيّ (`NEXT_DIST_DIR=.next-build`) — لا يُودَع
+.next-build/
 coverage/
 .env
 .env.*

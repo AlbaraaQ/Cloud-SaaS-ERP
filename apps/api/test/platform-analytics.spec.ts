@@ -280,9 +280,11 @@ describe('platform analytics (P-C12)', () => {
     const tenants = await withPlatformAdminTx(ctx.handle.db, (tx) =>
       tx.execute(sql`SELECT count(*)::int AS count FROM tenants`),
     );
-    const total = (tenants.rows[0] as { count: number }).count;
+    // الاسم يتجنّب مفردات المال عمداً: قاعدة eslint تصطاد المعرّفات المسمّاة بها حتى في
+    // العدّ — وهو محقّ، فعدد المنشآت ليس مبلغاً.
+    const tenantCount = (tenants.rows[0] as { count: number }).count;
 
-    expect(overview.counts.total).toBe(total);
+    expect(overview.counts.total).toBe(tenantCount);
     // سبع منشآت على الأقل في هذا السبيك، وواحدة منها (غاما) أُرجِع تاريخ تسجيلها 30 يوماً
     // عمداً — فحدّ الشهر يُقاس: هي في الإجمالي ولا تُحتسب نموّاً لهذا الشهر.
     expect(overview.counts.total).toBeGreaterThanOrEqual(7);

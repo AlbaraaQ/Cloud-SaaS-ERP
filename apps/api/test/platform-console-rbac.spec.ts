@@ -274,8 +274,9 @@ describe('platform console RBAC and cross-tenant audit (P-C1)', () => {
       platformSettingsForScope('platform').map((definition) => definition.key),
     );
     // أربعة عشر مفتاحاً أضافها P-C3/P-C4 إلى النطاق: ستة `billing.*` للفوترة، وخمسة
-    // `limits.*` للحصص (P-C5) — وكلها بحاجةٍ إلى تسمية عربية وشرح، وهذا ما يفحصه السطر التالي.
-    expect(body.settings.length).toBe(19);
+    // `limits.*` للحصص (P-C5)، ثم ثمانية `site.*` أضافها P-M5 (هوية الموقع ونطاقه ولغته
+    // وحالة الصيانة) — وكلها بحاجةٍ إلى تسمية عربية وشرح، وهذا ما يفحصه السطر التالي.
+    expect(body.settings.length).toBe(27);
     for (const row of body.settings) {
       expect(row.labelAr.length).toBeGreaterThan(0);
     }

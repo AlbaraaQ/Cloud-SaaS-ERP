@@ -148,6 +148,11 @@ export const consoleGroups: readonly ConsoleGroup[] = [
       // P-C8 — «مكتب الدعم» و«الدخول المؤقّت»: كلاهما عملٌ تشغيليّ يوميّ (صندوق التذاكر،
       // ونظرةٌ بعين العميل عند الحاجة)، ولذلك يقود إليهما هذا القسم نفسه الذي يقود إلى
       // البريد والإعلانات — بمجموعات P-C1 الأربع كما هي، بلا مجموعةٍ خامسة.
+      // P-M5 — «المحتوى»: نظام إدارة محتوى الموقع التسويقي (الصفحات · الكتل · القوائم ·
+      // اللافتات). محلها التشغيل لا العملاء: هي خدمةٌ تُشرف على واجهة المنصة نفسها، وقارئُها
+      // (`console.content.view`) غير كاتبها (`console.content.manage`) — فالدعم والمدقّق
+      // يرون ما يُنشر بلا أن يغيّروا نصّاً يراه الزوّار.
+      item('content', 'المحتوى', 'Content', '/content', 'console.content.view', 'GET /platform/content/pages'),
       item('tickets', 'التذاكر', 'Tickets', '/tickets', 'console.support.manage', 'GET /platform/tickets'),
       item(
         'impersonation',

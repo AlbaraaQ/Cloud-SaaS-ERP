@@ -1,13 +1,78 @@
 import './globals.css';
 
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
+import { Suspense } from 'react';
 
-import { publicRoutes } from '../lib/navigation';
+import { SiteShellLayout } from '../components/site/shell';
+import { JsonLd } from '../components/site/pieces';
+import { fetchShell } from '../lib/content';
+import { dir, localeFromPath, t, DEFAULT_LOCALE } from '../lib/i18n';
+import { absoluteUrl, fallbackSite, organizationJsonLd, softwareJsonLd } from '../lib/site';
 
-export const metadata: Metadata = { title: 'Cloud SaaS ERP', description: 'نظام تخطيط موارد المؤسسات السحابي — الأسعار والاشتراك والتحقق' };
+/**
+ * P-M1 — تخطيط الموقع: هويّة `<html>` + القشرة + البيانات المنظَّمة.
+ *
+ * **كيف تُعرف اللغة؟** من **المسار** لا من كوكي: `middleware.ts` يضع `x-pathname` على
+ * الطلب، وهذا التخطيط يقرؤه ويشتقّ اللغة بـ`localeFromPath` — وهي الدالّة نفسها التي تبني
+ * `hreflang` ومبدّل اللغة. البديل كان مجموعتين من المسارات لكل لغة (نقل كل ملفٍّ إلى
+ * `(ar)/` و`(en)/`)، وهو تكرارُ بنيةٍ لا تكرارُ ترجمة — والمكسب صفر.
+ *
+ * ولأن هذا التخطيط يقرأ ترويسةً، فكل صفحات الموقع ديناميكية (تُرسم عند الطلب) — وهو
+ * الصواب هنا: المحتوى يُدار من اللوحة، وصفحةٌ تُخبأ ساعةً لا تُظهر مقالاً نُشر الآن.
+ */
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="ar" dir="rtl"><body><div className="wrap"><header className="top"><Link className="brand" href="/"><span className="logo">ERP</span><span>Cloud SaaS ERP</span></Link><nav className="nav" aria-label="public navigation">{publicRoutes.map((route) => <Link href={route.href} key={route.key}>{route.labelAr}</Link>)}<Link href="/onboarding">اشترك</Link><Link className="btn primary" href="/login">دخول</Link></nav></header><main style={{ marginTop: 18 }}>{children}</main></div></body></html>;
+export async function generateMetadata(): Promise<Metadata> {
+  const pathname = (await headers()).get('x-pathname') ?? '/';
+  const locale = localeFromPath(pathname);
+  const shell = await fetchShell();
+  const description = locale === 'ar' ? shell.taglineAr : shell.taglineEn;
+  return {
+    title: { default: shell.brandName, template: `%s · ${shell.brandName}` },
+    description,
+    applicationName: shell.brandName,
+    metadataBase: shell.siteUrl ? new URL(shell.siteUrl) : undefined,
+    openGraph: {
+      title: shell.brandName,
+      description,
+      url: absoluteUrl(pathname, shell.siteUrl),
+      siteName: shell.brandName,
+      locale: locale === 'ar' ? 'ar_SA' : 'en_US',
+      type: 'website',
+    },
+    twitter: { card: 'summary_large_image', title: shell.brandName, description },
+    icons: { icon: '/favicon.ico' },
+  };
+}
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const pathname = (await headers()).get('x-pathname') ?? '/';
+  const locale = localeFromPath(pathname);
+  const shell = await fetchShell();
+
+  const site = {
+    ...fallbackSite,
+    ...shell,
+    locales: shell.locales.length > 0 ? shell.locales : fallbackSite.locales,
+    defaultLocale: shell.defaultLocale ?? DEFAULT_LOCALE,
+  };
+
+  return (
+    <html lang={locale} dir={dir(locale)}>
+      <body>
+        <a className="skip-link" href="#main">
+          {locale === 'ar' ? 'تخطَّ إلى المحتوى' : 'Skip to content'}
+        </a>
+        <JsonLd data={organizationJsonLd(site)} />
+        <JsonLd data={softwareJsonLd(site, locale, locale === 'ar' ? site.taglineAr : site.taglineEn)} />
+        <Suspense fallback={null}>
+          <SiteShellLayout shell={shell} locale={locale}>
+            {children}
+          </SiteShellLayout>
+        </Suspense>
+        <p className="sr-only">{t(locale, 'meta.localeName')}</p>
+      </body>
+    </html>
+  );
 }

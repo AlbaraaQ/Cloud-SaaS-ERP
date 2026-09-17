@@ -40,6 +40,12 @@ export const platformSettingKinds = [
   'color',
   /** `https://…` or an internal `/…` path (P-C2 branding). */
   'url',
+  /**
+   * P-M5: قيمةٌ من قائمةٍ مغلقة (`options`). أُضيف هذا النوع لأن إعدادات الموقع تُدخل
+   * **اللغة الافتراضية**، ونصٌّ حرّ فيها يعني أن مشغّلاً يكتب `fr` فيسقط الموقع في لغةٍ لا
+   * ترجمة لها — والخطأ لا يظهر إلا في المتصفّح. القائمة في العقد، والشاشة تعرضها اختياراً.
+   */
+  'select',
 ] as const;
 export type PlatformSettingKind = (typeof platformSettingKinds)[number];
 
@@ -67,6 +73,8 @@ export type PlatformSettingDefinition = {
   /** Inclusive bounds for `integer` kinds. */
   min?: number;
   max?: number;
+  /** القيم المسموحة لنوع `select` — بلاها يُرفض النوع عند التحقّق. */
+  options?: readonly string[];
   /**
    * Writers allowed for this key. Omitted means `['platform']` — P-C1's eight keys keep
    * their original meaning without a line of churn.
@@ -313,6 +321,82 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
     helpAr: 'الأيام التي تُجدول فيها محاولة متابعة بعد الاستحقاق (سطر لكل يوم: 0 ثم 3 ثم 7).',
     defaultValue: ['0', '3', '7'],
   },
+
+  // --- هوية الموقع التسويقي (P-M1 · P-M5) --------------------------------------
+  // ثمانية مفاتيح بنطاق المنصة تُدار من **شاشة الإعدادات القائمة**، فلا شاشةَ ثانية لعنوانٍ
+  // ورابطٍ وبريد. وكان البديل جدول `site_settings` جديداً — وذاك كان سيُنشئ سطحاً ثانياً
+  // للإعدادات في منتجٍ فيه سطحٌ واحد، بلا قيمة تقابل الازدواج.
+  {
+    key: 'site.brand_name',
+    labelAr: 'اسم الموقع',
+    labelEn: 'Site brand name',
+    kind: 'string',
+    helpAr: 'الاسم الظاهر في رأس الصفحة وفي عنوان المتصفّح وفي بيانات المشاركة.',
+    defaultValue: 'Cloud SaaS ERP',
+    max: 60,
+  },
+  {
+    key: 'site.brand_initials',
+    labelAr: 'أحرف الشعار',
+    labelEn: 'Brand initials',
+    kind: 'string',
+    helpAr: 'حرفان أو ثلاثة داخل المربّع الملوّن في الرأس (لا شعار صورةً بعد).',
+    defaultValue: 'ERP',
+    max: 4,
+  },
+  {
+    key: 'site.tagline_ar',
+    labelAr: 'الوعد بالعربية',
+    labelEn: 'Tagline (Arabic)',
+    kind: 'string',
+    helpAr: 'السطر الذي يشرح ما يفعله النظام — يظهر تحت الاسم في الرئيسية وفي وصف المشاركة.',
+    defaultValue: 'نظام تخطيط موارد المؤسسات السحابي',
+    max: 160,
+  },
+  {
+    key: 'site.tagline_en',
+    labelAr: 'الوعد بالإنجليزية',
+    labelEn: 'Tagline (English)',
+    kind: 'string',
+    helpAr: 'المقابل الإنجليزي للوعد — يُعرض حين يكون الموقع بالإنجليزية.',
+    defaultValue: 'Cloud ERP for growing businesses',
+    max: 160,
+  },
+  {
+    key: 'site.default_locale',
+    labelAr: 'اللغة الافتراضية',
+    labelEn: 'Default locale',
+    kind: 'select',
+    options: ['ar', 'en'],
+    helpAr: 'اللغة التي يفتح بها الموقع لمن لا مسار لغةٍ في رابطه.',
+    defaultValue: 'ar',
+  },
+  {
+    key: 'site.url',
+    labelAr: 'نطاق الموقع',
+    labelEn: 'Site URL',
+    kind: 'string',
+    helpAr: 'النطاق العام بلا شرطة أخيرة — تُبنى به الروابط المطلقة في خريطة الموقع ووسوم المشاركة.',
+    defaultValue: 'http://127.0.0.1:3002',
+    max: 200,
+  },
+  {
+    key: 'site.company_legal_name',
+    labelAr: 'الاسم النظامي للمنصة',
+    labelEn: 'Company legal name',
+    kind: 'string',
+    helpAr: 'يظهر في التذييل وفي بيانات الهوية المنظَّمة (JSON-LD) للصفحة الرئيسية.',
+    defaultValue: 'منصة ERP السحابية',
+    max: 160,
+  },
+  {
+    key: 'site.maintenance',
+    labelAr: 'صفحة الصيانة',
+    labelEn: 'Maintenance page',
+    kind: 'boolean',
+    helpAr: 'حين تُشغَّل يرى الزائر صفحة صيانة، ويبقى في الاستطاعة الوصول إلى الدخول والاشتراك.',
+    defaultValue: false,
+  },
 ] as const;
 
 /**
@@ -419,6 +503,14 @@ export function validatePlatformSettingValue(
         return { ok: false, reason: 'صيغة البريد الإلكتروني غير صحيحة' };
       }
       return { ok: true, value: email };
+    }
+    case 'select': {
+      if (typeof value !== 'string') return { ok: false, reason: 'القيمة يجب أن تكون نصاً' };
+      const choice = value.trim();
+      if (!(definition.options ?? []).includes(choice)) {
+        return { ok: false, reason: `القيمة يجب أن تكون إحدى: ${(definition.options ?? []).join(' · ')}` };
+      }
+      return { ok: true, value: choice };
     }
     case 'string-list': {
       if (!Array.isArray(value)) return { ok: false, reason: 'القيمة يجب أن تكون قائمة نصية' };

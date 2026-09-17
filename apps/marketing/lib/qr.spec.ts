@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodeZatcaQr } from './qr.js';
+import { decodeZatcaQr } from './qr';
 
 /** Builds a TLV payload the way the API's zatca/qr.ts does, so the decoder is tested against the real shape. */
 function encode(fields: Array<[number, string]>): string {

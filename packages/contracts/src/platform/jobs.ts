@@ -71,6 +71,9 @@ export const jobTypes = {
   EMAIL_SEND: 'email.send',
   // P-C7 — نشر إعلانٍ مجدول في وقته: يبقى المسح في `list` شبكةَ أمانٍ لمن لا عامل له.
   ANNOUNCEMENT_PUBLISH: 'announcement.publish',
+  // P-M5 — نشر صفحةٍ مجدولة في وقتها. وُضع في طابور «الصيانة» لا «الإشعارات»: أسماء
+  // الطوابير الخمسة مجمّدة في TARGET_ARCHITECTURE §6، ونشر صفحةٍ ليس تسليم رسالة.
+  CONTENT_PUBLISH: 'content.publish',
   FILES_ORPHAN_GC: 'files.orphan-gc',
   IDEMPOTENCY_GC: 'idempotency.gc',
 } as const;

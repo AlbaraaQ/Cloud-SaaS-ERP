@@ -36,6 +36,9 @@ export const errorCodes = {
   // revoke one twice, or retry a delivery that already succeeded. 409, not 400: the
   // request was well-formed and the resource exists — it is its state that refuses.
   INVALID_STATE: 'INVALID_STATE',
+  // P-M5 — رابط محتوى مكرَّر: الرابط العام هو هويّة الصفحة في نظر محرّك البحث، وتكراره يعني
+  // أن صفحةً ستُظلّل الأخرى بصمت. 409 لأن الطلب سليم والصراع على موردٍ قائم.
+  CONTENT_SLUG_TAKEN: 'CONTENT_SLUG_TAKEN',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -72,6 +75,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   MFA_REQUIRED: 401,
   USAGE_LIMIT_REACHED: 409,
   INVALID_STATE: 409,
+  CONTENT_SLUG_TAKEN: 409,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -102,6 +106,7 @@ export const errorTitle: Record<ErrorCode, string> = {
   MFA_REQUIRED: 'Verification code required',
   USAGE_LIMIT_REACHED: 'Usage limit reached',
   INVALID_STATE: 'Invalid state transition',
+  CONTENT_SLUG_TAKEN: 'Content slug already taken',
 };
 
 export function statusForCode(code: string): number {

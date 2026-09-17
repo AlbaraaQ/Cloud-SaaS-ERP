@@ -9,7 +9,7 @@
  *   1. 🔐 الجلسة والصلاحيات — ما يقوله `/me` لمشغّل المنصة ولغيره
  *   2. 🗺️ المسارات — كل مسار `/platform/*` يعمل للمالك
  *   3. 🚫 الأبواب المغلقة — جلسة مستأجر لا تصل إلى اللوحة
- *   4. 👥 الأدوار والرموز — الأدوار الخمسة، والرموز العشرون (آخرها رمزا المطوّر P-C11)
+ *   4. 👥 الأدوار والرموز — الأدوار الخمسة، والرموز الثلاثة والعشرون (آخرها رمزا المحتوى P-M5)
  *   5. ⚙️ إعدادات المنصة — قراءة، كتابة، تدقيق، رفض، واستعادة
  *   6. 📜 التدقيق العابر للمستأجرين — بلا حدود منشأةٍ واحدة
  *   7. 🔎 البحث الشامل — Ctrl+K على الرمز والاسم العربي
@@ -183,6 +183,11 @@ const GET_ROUTES = [
   '/platform/settings',
   '/platform/tenants/search?q=demo',
   '/platform/jobs/outbox?limit=5',
+  // P-M5 — شاشة المحتوى: الصفحات والقوائم واللافتات والتصنيفات المشتقّة.
+  '/platform/content/pages',
+  '/platform/content/menus',
+  '/platform/content/banners',
+  '/platform/content/categories',
 ];
 for (const path of GET_ROUTES) {
   const result = await refused('get', path, undefined, ownerToken);
@@ -226,15 +231,21 @@ const operationsRole = roles.find((role) => role.code === 'platform_operations')
 // بلا أن يظهر على الدور يعني أن أحداً لن يستطيع استخدام الشاشة، وهو ما يجب أن يسقط هنا لا في
 // يد المشغّل.
 check(
-  'مالك المنصة يحمل الرموز الواحد والعشرين',
-  ownerRole.permissions.length === 21,
+  // ٢٣ منذ P-M5: رمزا نظام إدارة المحتوى (`console.content.view` و`console.content.manage`).
+  'مالك المنصة يحمل الرموز الثلاثة والعشرين',
+  ownerRole.permissions.length === 23,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 21, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 23, `${registry.length} رمزاً`);
+check(
+  'ورموز المحتوى بينها (ترحيل 0078)',
+  registry.some((entry) => entry.code === 'console.content.view') &&
+    registry.some((entry) => entry.code === 'console.content.manage'),
+);
 check(
   'والمفتاح الجديد فيه',
   registry.some((entry) => entry.code === 'console.settings.manage'),
@@ -271,9 +282,18 @@ check(
   `${settingsSnapshot.environment.name} / ${settingsSnapshot.environment.labelAr}`,
 );
 check(
-  'تسعة عشر إعداداً معرَّفاً (ستة للفوترة P-C4 · خمسة حدود للحصص P-C5)',
-  settingsSnapshot.settings.length === 19,
+  // P-M5: صار 27 — أُضيفت ثمانية مفاتيح بهوية الموقع التسويقي (`site.*`)، تُدار من هذه
+  // الشاشة نفسها فلا شاشةَ ثانية لعنوانٍ ورابطٍ وبريد.
+  'سبعة وعشرون إعداداً معرَّفاً (ستة للفوترة P-C4 · خمسة حدود للحصص P-C5 · ثمانية للموقع P-M5)',
+  settingsSnapshot.settings.length === 27,
   `${settingsSnapshot.settings.length}`,
+);
+check(
+  'ومفاتيح الموقع الثمانية بينها',
+  ['site.brand_name', 'site.tagline_ar', 'site.default_locale', 'site.url', 'site.maintenance'].every(
+    (key) => settingsSnapshot.settings.some((setting) => setting.key === key),
+  ),
+  settingsSnapshot.settings.filter((setting) => setting.key.startsWith('site.')).length + ' مفتاحاً',
 );
 check(
   'ومفاتيح الحدود الخمسة الجديدة بينها',
