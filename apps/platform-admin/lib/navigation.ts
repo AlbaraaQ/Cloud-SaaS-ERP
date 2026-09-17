@@ -145,6 +145,18 @@ export const consoleGroups: readonly ConsoleGroup[] = [
         'console.notifications.manage',
         'GET /platform/announcements',
       ),
+      // P-C8 — «مكتب الدعم» و«الدخول المؤقّت»: كلاهما عملٌ تشغيليّ يوميّ (صندوق التذاكر،
+      // ونظرةٌ بعين العميل عند الحاجة)، ولذلك يقود إليهما هذا القسم نفسه الذي يقود إلى
+      // البريد والإعلانات — بمجموعات P-C1 الأربع كما هي، بلا مجموعةٍ خامسة.
+      item('tickets', 'التذاكر', 'Tickets', '/tickets', 'console.support.manage', 'GET /platform/tickets'),
+      item(
+        'impersonation',
+        'الدخول المؤقّت',
+        'Temporary access',
+        '/impersonation',
+        'console.support.manage',
+        'GET /platform/impersonate/sessions',
+      ),
       item('jobs', 'المهام والطوابير', 'Jobs', '/jobs', 'console.jobs.view', 'GET /platform/jobs/outbox'),
       item('health', 'الصحة', 'Health', '/health', 'console.health.view', 'GET /api/health/ready'),
     ],

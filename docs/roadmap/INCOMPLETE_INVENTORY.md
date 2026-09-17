@@ -7,7 +7,15 @@
 > `console.*` غير مستخدم: 16 رمزاً كلها مستعملة) · شاشات اللوحة **21** ومساراتها **77** ·
 > شجرة staff **232** شاشة (228 `ready`).
 > كل بند مشفوع بمكانه وبدليل قياسه اليوم. ما كُتب فيه «✅ مُتحقَّق» فقد اختُبر على
-> الخادم المحلي، وما كُتب فيه «موثّق» فمصدره قسم «المؤجَّل» في وثيقة المرحلة.
+> الخادم المحلي، وما كُتب فيه «موثّق» فمصدره قسم «المؤجّل» في وثيقة المرحلة.
+>
+> **تحديث 2026-09-17 (بعد P-C8):** مكتب الدعم والدخول المؤقّت مُنجَز (P-C8 ✅): تذاكر بمهلٍ
+> محسوبة من الأولوية وملاحظاتٍ داخلية، و`break-glass` بحدودٍ مفروضة في الـAPI. الأثر على هذا
+> الجرد: شاشات اللوحة **24** ومسارات `/platform/*` **86**، والرمز الأخير المعلَّق
+> (`console.support.manage`) دخل الخدمة فصار **صفر** رمز `console.*` غير مستعمل. ويبقى
+> **مؤجَّلاً صراحةً**: مرفقات التذاكر عبر وحدة `files` (وحدتها في P-C9)، ومرفقاتٌ وردودٌ جاهزة
+> **محتوى واجهةٍ** لا عقدَ API. الوثيقة:
+> [`../PLATFORM_CONSOLE_P_C8_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C8_IMPLEMENTATION_REPORT.md).
 
 ---
 
@@ -103,7 +111,7 @@
 | الملاحظة | الدليل |
 |---|---|
 | 17 نقطة نهاية `/platform/*` تعمل | `overview` · `tenants` · `plans` · `subscriptions` · `activation-requests` · `users` · `roles` · `permissions` · منح/سحب الأدوار |
-| **رمزان فقط** من 12 رمز `console.*` مستخدمان في الكود | `grep -rn "RequiresPlatformRole" apps/api/src` → `console.users.manage` مرّتان فقط؛ الباقي (`console.tenants.view` · `console.tenants.manage` · `console.subscriptions.manage` · `console.plans.manage` · `console.activation.review` · `console.users.view` · `console.audit.view` · `console.health.view` · `console.jobs.view` · `console.billing.manage` · `console.support.manage`) معلَن بلا استخدام — أي أن كل عملية حساسة تعمل بادّعاء `pam` وحده |
+| ~~**رمزان فقط** من 12 رمز `console.*` مستخدمان في الكود~~ **أُغلق** | `grep -rn "RequiresPlatformRole" apps/api/src` → `console.users.manage` مرّتان فقط؛ الباقي (`console.tenants.view` · `console.tenants.manage` · `console.subscriptions.manage` · `console.plans.manage` · `console.activation.review` · `console.users.view` · `console.audit.view` · `console.health.view` · `console.jobs.view` · `console.billing.manage` · `console.support.manage`) معلَن بلا استخدام — أي أن كل عملية حساسة تعمل بادّعاء `pam` وحده. **أُغلق في P-C1 ثم P-C8**: كل رمزٍ من الرموز الستّة عشر يُفرض على مسارٍ حقيقي الآن، ومنها `console.support.manage` الذي دخل مع مكتب الدعم والدخول المؤقّت (`/platform/tickets` · `/platform/impersonate*`) |
 | لا توجد نقطة نهاية `/platform/audit-log` | `GET /platform/audit-log` → **404** |
 | صفحة `/audit` تقرأ السجل **الخاص بمستأجر المنصة فقط** | `GET /audit-log?limit=5` يعود 200 بصفوف مستأجر `platform`؛ لا سجلّ عابر للمستأجرين |
 | `/jobs/outbox` كذلك مستأجرٌ واحد | يعود `data: []` |

@@ -18,6 +18,7 @@ import {
   RateLimitGuard,
   TenantGuard,
 } from './modules/platform/index.js';
+import { ImpersonationGuard } from './modules/support/impersonation.guard.js';
 import { PlatformAdminModule } from './modules/platform/admin/platform-admin.module.js';
 import { AccountingModule } from './modules/accounting/accounting.module.js';
 import { OrganizationModule } from './modules/organization/index.js';
@@ -121,6 +122,12 @@ import { OpsModule } from './ops/ops.module.js';
     { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
+    // P-C8: the break-glass guard sits *immediately after* authentication on purpose. The
+    // `imp` claim is only known once AuthGuard has published the context, and a token that
+    // came from `POST /platform/impersonate` must be limited on **every** route it can
+    // reach, not only on the console's own. It returns at once for ordinary tokens, so the
+    // frozen pipeline above keeps its meaning and its cost.
+    { provide: APP_GUARD, useClass: ImpersonationGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
     { provide: APP_GUARD, useClass: BranchScopeGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

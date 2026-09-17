@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AnnouncementsModule } from '../../announcements/announcements.module.js';
+import { SupportModule } from '../../support/support.module.js';
 import { OrganizationModule } from '../../organization/organization.module.js';
 import { PlatformModule } from '../platform.module.js';
 
@@ -24,7 +25,7 @@ import { SignupController } from './signup.controller.js';
  * one-directional here avoids a module cycle.
  */
 @Module({
-  imports: [PlatformModule, OrganizationModule, AnnouncementsModule],
+  imports: [PlatformModule, OrganizationModule, AnnouncementsModule, SupportModule],
   controllers: [
     PlatformAdminController,
     PlatformBillingController,

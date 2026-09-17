@@ -76,6 +76,20 @@ bar** shows the same `meta.unread` this screen shows (no second counter), pollin
 and staying silent when the call fails. Marking a read **also stamps the platform's delivery
 ledger** (`announcement_reads`), which is what makes the console's «القراءات» column truthful.
 
+## Screens added by P-C8 (2026-09-17)
+
+| Screen | Route | Permission | Endpoints |
+|---|---|---|---|
+| (لا شاشة جديدة) لافتة الدخول المؤقّت | كل شاشة | — | `GET /me` (حقل `impersonation`) |
+
+When the console hands a **temporary access token** over (the token travels in the URL
+*fragment*: `#support=…`, so it is never sent to a server), the workspace adopts it as a
+**view-only session**: `readSession()` returns it without a refresh token — a break-glass token
+is never renewed — and a red banner (`components/impersonation-banner.tsx`) sits above every
+screen saying who is inside the tenant, why, and for how long. The banner is driven by
+`me.impersonation` alone, so it cannot be dismissed while the token still carries `imp`; its
+button leaves the view locally, and the session itself is ended from the console.
+
 ## Coverage
 
 All core sections are navigable: organization, catalog, accounting,

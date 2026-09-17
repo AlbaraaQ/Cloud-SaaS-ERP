@@ -23,7 +23,8 @@
  *  15. 🔐 أبواب بطاقة العميل — جلسة المستأجر لا تدخل
  *  16. 🪪 الهوية والوصول — الدليل والبطاقة والجلسات والمصفوفة ودعوة مشغّل (P-C3)
  *  17. 📣 الإعلانات — شاشة المنصة تقرأ ما كتبته شاشة الإعلانات (P-C7)
- *  18. 🧹 التنظيف — الحالة تعود كما كانت
+ *  18. 🎧 مكتب الدعم — الصندوق وسجلّ الدخول المؤقّت (P-C8)
+ *  19. 🧹 التنظيف — الحالة تعود كما كانت
  *
  * Re-runnable and non-destructive: the settings are snapshotted before anything is written
  * and restored at the end, and the temporary platform role granted in §8 is revoked in §10.
@@ -1134,7 +1135,64 @@ check(
     ),
 );
 
-console.log('\n■ 18. 🧹 التنظيف');
+// ════════════════════════════════════════════════ 18. 🎧 مكتب الدعم
+console.log('\n■ 18. 🎧 مكتب الدعم — الصندوق وسجلّ الدخول المؤقّت (P-C8)');
+// القسم العميق لهذا الجزء في `scripts/verify-platform-support.mjs`؛ وهنا ما يخصّ شاشة
+// اللوحة وحدها: أن المسار يعمل بصلاحية الدعم، وأن المدقّق لا يراه، وأن الحادّة في الواجهة
+// (المهلة من الخادم) موجودة في الصفّ نفسه.
+const ticketRows = await get('/platform/tickets?limit=50');
+check('صندوق التذاكر يُقرأ', Array.isArray(ticketRows), `${ticketRows.length} تذكرة`);
+check(
+  'وكل صفٍّ يحمل مهلته وحالة أول ردّ',
+  ticketRows.every(
+    (row) =>
+      typeof row.status === 'string' &&
+      typeof row.priority === 'string' &&
+      'slaDueAt' in row &&
+      'firstResponseAt' in row &&
+      typeof row.messageCount === 'number',
+  ),
+);
+const openTickets = await get('/platform/tickets?filter[status]=open&limit=50');
+check(
+  'ومرشّح الحالة يحصر النتائج',
+  openTickets.every((row) => row.status === 'open'),
+  `${openTickets.length} مفتوحة`,
+);
+const ticketBadFilter = await refused(
+  'get',
+  '/platform/tickets?filter[severity]=high',
+  undefined,
+  ownerToken,
+);
+check('ومرشّحٌ غير مسموح يُرفض 400', ticketBadFilter.status === 400, `HTTP ${ticketBadFilter.status}`);
+
+const sessionRows = await get('/platform/impersonate/sessions');
+check('وسجلّ الدخول المؤقّت يُقرأ', Array.isArray(sessionRows), `${sessionRows.length} جلسة`);
+check(
+  'وكل جلسةٍ بحالةٍ محسوبة وسببٍ وطوابع',
+  sessionRows.every(
+    (row) =>
+      ['active', 'ended', 'expired'].includes(row.status) &&
+      typeof row.reason === 'string' &&
+      Boolean(row.startedAt) &&
+      Boolean(row.expiresAt),
+  ),
+);
+check(
+  'ورمز الدعم عند دور الدعم وحده',
+  (roles.find((role) => role.code === 'platform_support')?.permissions ?? []).includes(
+    'console.support.manage',
+  ) &&
+    !(roles.find((role) => role.code === 'platform_auditor')?.permissions ?? []).includes(
+      'console.support.manage',
+    ) &&
+    !(roles.find((role) => role.code === 'platform_billing')?.permissions ?? []).includes(
+      'console.support.manage',
+    ),
+);
+
+console.log('\n■ 19. 🧹 التنظيف');
 await request('delete', `/platform/users/${demoRow.id}/roles/platform_operations`, undefined, ownerToken);
 const afterRevoke = await signIn(demo.tenantCode, { email: demo.email, password: demo.password });
 const revokedMe = await get('/me', afterRevoke.token);

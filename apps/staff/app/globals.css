@@ -1293,3 +1293,22 @@ tr.opening td {
 .inbox li.read {
   opacity: 0.75;
 }
+
+/* P-C8 — لافتة الدخول المؤقّت: حاضرةٌ أعلى كل شاشة، بلونٍ لا يُخطئه أحد. */
+.imp-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid #b42318;
+  border-right: 6px solid #b42318;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #7a271a;
+}
+.imp-banner strong {
+  color: #b42318;
+}

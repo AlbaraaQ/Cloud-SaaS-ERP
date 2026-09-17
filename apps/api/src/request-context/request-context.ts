@@ -29,6 +29,11 @@ export type AuthContextValue = {
   isPlatformAdmin: boolean;
   /** Platform role codes carried by the token (`proles` claim, may be stale ≤ TTL). */
   platformRoles: string[];
+  /**
+   * P-C8 — معرّف جلسة الدعم إن كان الرمز رمزَ دخولٍ مؤقّت (`imp` claim). الحارس يستعمله
+   * ليرفض ما لا يُفعل بعين العميل، والتدقيق ليسمّي من كان خلف الشاشة فعلاً.
+   */
+  impersonationId?: string;
 };
 
 export type MembershipKind = 'staff' | 'portal';

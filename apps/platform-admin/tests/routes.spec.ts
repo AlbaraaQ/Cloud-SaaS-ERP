@@ -36,6 +36,10 @@ const CONSOLE_ROUTES = [
   '/email',
   // P-C7 — الإعلانات: كتابةٌ بنصّين، واستهداف، وجدولة، وقراءات.
   '/announcements',
+  // P-C8 — مكتب الدعم: الصندوق الوارد، وتذكرةٌ واحدة، وسجلّ الدخول المؤقّت.
+  '/tickets',
+  '/tickets/[id]',
+  '/impersonation',
 ];
 
 function pageFileFor(href: string): string {

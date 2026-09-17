@@ -8,6 +8,7 @@ import { useLang, type Lang } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { visibleModules, type ModuleNode, type ScreenItem } from '../lib/navigation';
 
+import { ImpersonationBanner } from './impersonation-banner';
 import { NotificationBell } from './notification-bell';
 
 const label = (lang: Lang, item: { labelAr: string; labelEn: string }): string =>
@@ -165,6 +166,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="main">
+        {/* P-C8: لافتةٌ حمراء تسبق كل شاشة ما دام الرمز رمزَ دخولٍ مؤقّت. */}
+        <ImpersonationBanner impersonation={me?.impersonation} lang={lang} />
         <header className="topbar">
           <div className="row" style={{ alignItems: 'center' }}>
             <button

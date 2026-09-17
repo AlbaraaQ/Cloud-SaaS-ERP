@@ -24,10 +24,11 @@ console work from any host without touching CORS.
   المنصة), each item carrying the `console.*` code that opens it. **This file is the single
   source of truth**: `tests/navigation.spec.ts` fails the build when an item claims `ready`
   without a page file, or names a code the registry does not declare.
-- `app/` — 21 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
+- `app/` — 24 pages: `overview` (`/`), `tenants`, `tenants/[id]` (customer card), `tenants/new`,
   `subscriptions`, `plans`, `activation-requests`, `users`, `users/[id]` (operator card),
   `roles`, `audit`, `health`, `jobs`, `settings`, `invoices`, `invoices/[id]/print`, `dunning`,
-  `revenue`, `usage`, `email`, `announcements`.
+  `revenue`, `usage`, `email`, `announcements`, `tickets`, `tickets/[id]` (one ticket),
+  `impersonation`.
 - `components/` — session auth gate, platform-only login screen (no signup path), the shell
   (`PlatformGuard`), and the shared screen kit.
 - `lib/` — API client (same origin, refresh-on-401), session provider (`can()` for tenant
@@ -187,6 +188,28 @@ The decisions the screen makes visible: **the audience is an snapshot taken at p
 (so «نشر الآن» twice only fills gaps), **published announcements are frozen** (`PATCH` → 422,
 what was said is not rewritten), and **the e-mail goes to the owner only** while the in-app
 notice reaches every active staff membership.
+
+## Screens added by P-C8 (2026-09-17)
+
+| Screen | Route | Permission | Endpoints |
+|---|---|---|---|
+| التذاكر | `/tickets` | `console.support.manage` | `GET/POST /platform/tickets` |
+| تذكرة واحدة | `/tickets/[id]` | `console.support.manage` | `GET/PATCH /platform/tickets/:id` · `POST …/:id/reply` |
+| الدخول المؤقّت | `/impersonation` | `console.support.manage` | `POST /platform/impersonate` · `GET …/sessions` · `DELETE …/:id` |
+
+`/tickets` is the inbox: filters (status · priority · **بلا إسناد**), the SLA remainder computed
+from the server's `slaDueAt` (a negative remainder is labelled, never hidden), and a
+«تذكرة جديدة» tab that opens a ticket on a tenant with the first message written as the
+customer. `/tickets/[id]` shows the thread with internal notes **marked**, four canned replies,
+a public-vs-internal reply box and the status/priority/assignment actions the API allows.
+`/impersonation` opens a break-glass session (tenant · 5–60 minutes · reason ≥10 chars), shows
+the token with a link that opens the customer workspace, and lists every session with its
+computed status and an end button.
+
+The two support items live in the **Operations** group: the four sidebar groups P-C1 froze stay
+four. And the limits the screen implies are enforced by the API, not here: the temporary token
+carries `imp`, every `DELETE` and every non-`GET` `/auth/*` is refused while it is in use, and
+ending the session in this screen drops the token **on the next request**.
 
 ## Security
 

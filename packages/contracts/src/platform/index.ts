@@ -8,6 +8,7 @@ export * from './billing.js';
 export * from './usage.js';
 export * from './email.js';
 export * from './announcements.js';
+export * from './support.js';
 export * from './files.js';
 export * from './jobs.js';
 export * from './notifications.js';

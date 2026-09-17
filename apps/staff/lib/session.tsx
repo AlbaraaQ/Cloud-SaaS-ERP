@@ -2,7 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { ApiError, fetchMe, login as apiLogin, logout as apiLogout, readSession, writeSession, type MePayload } from './api';
+import {
+  ApiError,
+  consumeSupportFragment,
+  fetchMe,
+  login as apiLogin,
+  logout as apiLogout,
+  readSession,
+  writeSession,
+  type MePayload,
+} from './api';
 
 export type SessionState = {
   status: 'loading' | 'anonymous' | 'authenticated';
@@ -53,6 +62,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
 
   const load = useCallback(async () => {
+    // P-C8: رمز الدخول المؤقّت يصل في جزء العنوان من شاشة اللوحة — يُلتقط قبل أول نداء.
+    consumeSupportFragment();
     if (!readSession()) {
       setState({ status: 'anonymous' });
       return;

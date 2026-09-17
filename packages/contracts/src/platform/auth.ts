@@ -139,6 +139,22 @@ export const meResponseSchema = z.object({
    * without ever mixing the two namespaces into one set.
    */
   platformPermissions: z.array(z.string()).default([]),
+  /**
+   * P-C8 — إن كان الرمز رمزَ دخولٍ مؤقّت (يدّعاء `imp`)، فهذا وصفُ الجلسة: من دخل، ولماذا،
+   * وإلى متى. `null` في الحالة العادية. الشاشة تُظهر لافتةً حمراء من هذا الحقل وحده، فلا
+   * تحتاج قراءةً ثانية ولا تعرف «الدخول المؤقّت» إلا من الرمز نفسه.
+   */
+  impersonation: z
+    .object({
+      sessionId: z.string(),
+      operatorUserId: z.string(),
+      operatorLabel: z.string().nullable(),
+      reason: z.string(),
+      startedAt: z.string(),
+      expiresAt: z.string(),
+    })
+    .nullable()
+    .default(null),
   branchScope: z.array(uuidSchema).nullable(),
 });
 

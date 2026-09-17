@@ -591,8 +591,13 @@ describe('platform billing (P-C4)', () => {
       expect(document.total).toBe('208.95');
 
       const issued = await asOwner('post', `${INVOICES}/${document.id}/issue`, {});
-      const dueInDays = (Date.parse((issued.body.data as PlatformInvoice).dueDate!) - Date.now()) / 86_400_000;
-      expect(Math.round(dueInDays)).toBe(30);
+      const documentIssued = issued.body.data as PlatformInvoice;
+      // P-C8 (استدراك على P-C4): كان القياس `dueDate − Date.now()`، وهو يقيس جزءاً من يومٍ
+      // لا عدد أيامٍ — فيسقط بعد الظهر بتوقيت UTC (‎29.4‎ يوماً تُقرَّب إلى 29). القياس
+      // الصحيح هو الفرق بين تاريخين، كما في اختبار الإصدار أعلاه تماماً.
+      const dueInDays =
+        (Date.parse(documentIssued.dueDate!) - Date.parse(documentIssued.issueDate!)) / 86_400_000;
+      expect(dueInDays).toBe(30);
     } finally {
       const restored = await asOwner('put', '/api/v1/platform/settings', {
         values: { 'billing.tax_rate': 15, 'billing.payment_terms_days': 14 },
