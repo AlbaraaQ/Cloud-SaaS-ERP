@@ -29,6 +29,7 @@
     "db:up": "docker compose -f infrastructure/docker-compose.yml up -d postgres redis",
     "verify": "pnpm run typegen && pnpm exec tsc --project tsconfig.base.json --noEmit && pnpm -r run lint && pnpm run build && pnpm --dir apps/api run test:smoke && pnpm -r run test && pnpm run openapi:export",
     "db:local": "node ./scripts/local-db.mjs",
+    "start:erp:local": "bash scripts/local-start.sh",
     "db:seed:coa": "pnpm --dir packages/database run seed:coa"
   },
   "devDependencies": {

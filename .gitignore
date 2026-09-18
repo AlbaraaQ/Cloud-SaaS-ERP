@@ -14,3 +14,8 @@ coverage/
 
 # TypeScript incremental build metadata
 *.tsbuildinfo
+
+# نشر: نموذج البيئة يُودَع، والقيم الحقيقية لا
+!deploy/.env.example
+logs/
+deploy/jwt-*.pem
