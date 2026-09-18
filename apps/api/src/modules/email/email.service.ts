@@ -88,7 +88,17 @@ export class EmailService {
    * تُنادى من معالج الطابور ومن أي وحدةٍ أخرى تحتاج بريداً (دعوة · فاتورة · تنبيه).
    */
   async send(
-    input: EmailSendInput & { tenantId: string | null; isTest?: boolean },
+    input: EmailSendInput & {
+      tenantId: string | null;
+      isTest?: boolean;
+      /**
+       * P-M7 — نسخة HTML وترويسات امتثال. لا تُقبل من مسارٍ عامّ (المخطّط العلني
+       * `emailSendInputSchema` لم يتغيّر): من يحتاجهما هو مُرسِل داخليّ يعرف ما يفعل —
+       * اليوم حملةٌ تحتاج بكسلَ فتحٍ و`List-Unsubscribe`.
+       */
+      html?: string;
+      headers?: Record<string, string>;
+    },
   ): Promise<EmailMessage> {
     const definition = emailEventDefinition(input.event);
     const locale: EmailLocale = input.locale ?? 'ar';
@@ -110,6 +120,8 @@ export class EmailService {
       body,
       templateId: template.templateId,
       templateSource: template.source,
+      html: input.html ?? null,
+      headers: input.headers ?? null,
       isTest,
       // يُحتسب على حصّة العميل إلا إن كان اختباراً أو حدثاً منصّياً (بلا عميل أصلاً).
       charged: definition.scope === 'tenant' && !isTest && input.tenantId !== null,
@@ -139,6 +151,9 @@ export class EmailService {
         from: settings.fromEmail,
         fromName: settings.fromName,
         replyTo: settings.replyTo,
+        // P-M7: نسخة HTML وترويسات الامتثال تُسلَّم كما خُزِّنت مع الرسالة.
+        ...(row.html ? { html: row.html } : {}),
+        ...(row.headers ? { headers: row.headers } : {}),
       });
       const updated = await this.markSent(row, settings.provider, mode, attempt);
       if (row.charged && row.tenantId) {
@@ -518,6 +533,9 @@ export class EmailService {
     body: string;
     templateId: string | null;
     templateSource: 'seed' | 'platform' | 'tenant';
+    /** P-M7 — نسخة HTML وترويسات امتثال: تُحفظ مع الرسالة وتُسلَّم كما ذهبت. */
+    html?: string | null;
+    headers?: Record<string, string> | null;
     isTest: boolean;
     charged: boolean;
     sendAt?: Date;
@@ -594,6 +612,8 @@ export class EmailService {
     body: string;
     templateId: string | null;
     templateSource: 'seed' | 'platform' | 'tenant';
+    html?: string | null;
+    headers?: Record<string, string> | null;
     isTest: boolean;
     sendAt?: Date;
     suppressedReason: EmailSuppressionReason | null;
@@ -607,11 +627,13 @@ export class EmailService {
       await tx.execute(sql`
         INSERT INTO email_messages (
           id, tenant_id, event, locale, template_id, template_source, to_email, to_name,
-          subject, body, status, provider, delivery_mode, attempts, max_attempts, queued_at, is_test
+          subject, body, html, headers, status, provider, delivery_mode, attempts, max_attempts,
+          queued_at, is_test
         ) VALUES (
           ${id}, ${input.tenantId}, ${input.event}, ${input.locale}, ${input.templateId},
           ${input.templateSource}, ${input.to.trim().toLowerCase()}, ${input.toName},
-          ${input.subject}, ${input.body}, ${status}, ${settings.provider}::text,
+          ${input.subject}, ${input.body}, ${input.html ?? null},
+          ${input.headers ? JSON.stringify(input.headers) : null}::jsonb, ${status}, ${settings.provider}::text,
           ${isDeferred(input.sendAt) ? 'queue' : 'inline'}, 0, 3, now(), ${input.isTest}
         )
       `);
@@ -665,7 +687,7 @@ export class EmailService {
     const row = await withPlatformAdminTx(this.database.db, async (tx) => {
       const rows = await tx.execute(sql`
         SELECT m.id, m.tenant_id, t.code AS tenant_code, m.event, m.locale, m.to_email, m.to_name,
-               m.subject, m.body, m.status, m.provider, m.delivery_mode, m.attempts,
+               m.subject, m.body, m.html, m.headers, m.status, m.provider, m.delivery_mode, m.attempts,
                m.max_attempts, m.last_error, m.provider_message_id, m.queued_at, m.sent_at,
                m.next_attempt_at, m.created_at, m.is_test
           FROM email_messages m
@@ -818,6 +840,11 @@ export class EmailService {
     return {
       ...this.toDto(row),
       body: row.body === undefined ? '' : String(row.body),
+      html: row.html === null || row.html === undefined ? null : String(row.html),
+      headers:
+        row.headers === null || row.headers === undefined
+          ? null
+          : (row.headers as Record<string, string>),
       maxAttempts: Number(row.max_attempts ?? 3),
       nextAttemptAt: row.next_attempt_at ? new Date(row.next_attempt_at as string).toISOString() : null,
       // يُحتسب على حصّة العميل فقط إن كان بريد عميلٍ حقيقيّاً (لا اختباراً) وحدثُه حدث عميل.
@@ -867,6 +894,9 @@ function isDeferred(sendAt?: Date): boolean {
 /** صفّ الرسالة داخلياً — حقول العقد مضافاً إليها الجسم وما يخصّ المحاولة والحصّة. */
 type EmailMessageDetail = EmailMessage & {
   body: string;
+  /** P-M7 — نسخة HTML (قد تكون `null`)، وترويسات الامتثال التي خرجت مع الرسالة. */
+  html: string | null;
+  headers: Record<string, string> | null;
   maxAttempts: number;
   nextAttemptAt: string | null;
   charged: boolean;

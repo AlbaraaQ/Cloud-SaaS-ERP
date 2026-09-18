@@ -374,6 +374,14 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
     'console.leads.manage',
     'Assign leads, change their status, write notes, convert a lead into a tenant, and manage subscribers.',
   ),
+  // P-M7 — الحملات البريدية: رمزٌ واحد لأن **مَن يقرأ لوحة الحملات يقرأ قائمةَ أشخاصٍ
+  // حقيقيين بعناوينهم وتقارير فتحهم**، ولا معنى لقراءةٍ بلا قرار إرسال: الشاشتان واحدة،
+  // والمشغّل إمّا يكتب حملةً ويرسلها أو ليس له في الأمر شيء. ومن لا يحمله لا يرى `/campaigns`
+  // في القائمة ولا يفتح مساراً منها — والحاكم الـAPI لا الشاشة.
+  perm(
+    'console.campaigns.manage',
+    'Write, schedule, send and cancel marketing campaigns, and read their delivery and engagement reports.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

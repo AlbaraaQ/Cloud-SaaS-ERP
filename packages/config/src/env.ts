@@ -72,6 +72,10 @@ const envSchema = z.object({
    * نُرسلها باسم المنصّة** إلى عناوين لا نملكها — وهو ما يجعل الرقم منخفضاً عن قصد.
    */
   RATE_LIMIT_PUBLIC_FORM_PER_MINUTE: z.coerce.number().int().positive().default(10),
+  // P-M7 — دلوُ الزحف (`/public/track/*` و`/public/unsubscribe/*`): عملاء البريد تحمّل
+  // بكسل الفتح آليّاً، فسقفُ الاستمارات (١٠/دقيقة) يقطع حملةً حقيقية. والسقف هنا أعلى
+  // لأن الكتابة محدودة أصلاً بالفهارس الفريدة (فتحٌ واحد لكل رسالة).
+  RATE_LIMIT_CAMPAIGN_TRACK_PER_MINUTE: z.coerce.number().int().positive().default(120),
 
   /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
   SIGNUP_ENABLED: booleanish.default(true),

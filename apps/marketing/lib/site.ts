@@ -61,6 +61,9 @@ export const SITE_PATHS = {
   onboarding: '/onboarding',
   login: '/login',
   verify: '/verify',
+  // P-M7: صفحة الخروج من القائمة — مسارٌ حقيقي يُفتح من كل رسالة حملة. **وخارج خريطة
+  // الموقع عن قصد**: صفحةُ إجراءٍ لا صفحةُ محتوى، وتُعلَن `noindex` في `metadata`.
+  unsubscribe: '/unsubscribe',
   maintenance: '/maintenance',
 } as const;
 

@@ -102,6 +102,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-M6: العميل المتوقَّع مالٌ لم يصل بعد — وتحويله يُنشئ منشأةً كاملة، فالرمزان للمالك.
       'console.leads.view',
       'console.leads.manage',
+      // P-M7: الحملة تكتب في بريد أشخاصٍ حقيقيين باسم المنصة — والمالك وحده يحمل رمزها.
+      'console.campaigns.manage',
     ],
   },
   {

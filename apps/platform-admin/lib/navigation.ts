@@ -87,6 +87,16 @@ export const consoleGroups: readonly ConsoleGroup[] = [
         'console.leads.view',
         'GET /platform/leads',
       ),
+      // P-M7 — «الحملات البريدية»: رعاية من وصل حتى يشترك. محلها مجموعة العملاء لا المال:
+      // الحملة تخاطب مَن ليس عميلاً بعد، وقارئها كاتبها برمزٍ واحد (`console.campaigns.manage`).
+      item(
+        'campaigns',
+        'الحملات البريدية',
+        'E-mail campaigns',
+        '/campaigns',
+        'console.campaigns.manage',
+        'GET /platform/campaigns',
+      ),
     ],
   },
   {

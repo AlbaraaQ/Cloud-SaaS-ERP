@@ -56,6 +56,15 @@ export const errorCodes = {
   // P-M6 — انتقال حالةٍ غير مسموح (من `won`/`rejected` مثلاً). 422: الطلب سليم والمنع
   // قاعدةُ حالةٍ معلنة في العقد، لا خطأ خادم.
   LEAD_STATUS_LOCKED: 'LEAD_STATUS_LOCKED',
+  // P-M7 — حملةٌ بدأ إرسالها لا تُعدَّل ولا تُلغى: صفوفُ رسائلها شواهدُ على ما خرج فعلاً،
+  // ونسخةٌ أُرسلت لا تُعاد كتابتها. 422 لأن الصراع على **حالة** الكيان لا على وجوده.
+  CAMPAIGN_LOCKED: 'CAMPAIGN_LOCKED',
+  // P-M7 — الشريحة فارغة: لا أحد يطابق تعريفها الآن. 422 لا 404 — الحملة موجودة، والمُرسل
+  // إليهم هم الغائبون. وإرسالُ حملةٍ إلى صفرٍ يُسجَّل «أُرسلت» في التقارير وهو لم يخرج شيء.
+  CAMPAIGN_SEGMENT_EMPTY: 'CAMPAIGN_SEGMENT_EMPTY',
+  // P-M7 — نصّ الحملة فيه `{{متغيّر}}` غير معروف. 422: النصّ يُكتب ثم يُراجَع، والمنع عند
+  // الجدولة لا عند الحفظ — فلا تُقطَع مسوّدةٌ في منتصف كتابتها.
+  CAMPAIGN_BODY_INVALID: 'CAMPAIGN_BODY_INVALID',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -99,6 +108,9 @@ export const errorStatus: Record<ErrorCode, number> = {
   LEAD_NOT_FOUND: 404,
   LEAD_ALREADY_CONVERTED: 409,
   LEAD_STATUS_LOCKED: 422,
+  CAMPAIGN_LOCKED: 422,
+  CAMPAIGN_SEGMENT_EMPTY: 422,
+  CAMPAIGN_BODY_INVALID: 422,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -136,6 +148,9 @@ export const errorTitle: Record<ErrorCode, string> = {
   LEAD_NOT_FOUND: 'Lead not found',
   LEAD_ALREADY_CONVERTED: 'Lead already converted',
   LEAD_STATUS_LOCKED: 'Lead status locked',
+  CAMPAIGN_LOCKED: 'Campaign locked',
+  CAMPAIGN_SEGMENT_EMPTY: 'Campaign segment is empty',
+  CAMPAIGN_BODY_INVALID: 'Campaign body invalid',
 };
 
 export function statusForCode(code: string): number {

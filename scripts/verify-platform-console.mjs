@@ -231,17 +231,18 @@ const operationsRole = roles.find((role) => role.code === 'platform_operations')
 // بلا أن يظهر على الدور يعني أن أحداً لن يستطيع استخدام الشاشة، وهو ما يجب أن يسقط هنا لا في
 // يد المشغّل.
 check(
-  // ٢٣ منذ P-M5 (رمزا المحتوى)، و**٢٥ منذ P-M6**: رمزا العملاء المتوقّعين
-  // (`console.leads.view` و`console.leads.manage`) — والتحويل قرارُ فوترةٍ يملكه المالك.
-  'مالك المنصة يحمل الرموز الخمسة والعشرين',
-  ownerRole.permissions.length === 25,
+  // ٢٣ منذ P-M5 (رمزا المحتوى)، و٢٥ منذ P-M6 (رمزا العملاء المتوقّعين)، و**٢٦ منذ P-M7**:
+  // `console.campaigns.manage` — رمزٌ واحد لا رمزان: من يقرأ لوحة الحملات يقرأ قائمةَ
+  // أشخاصٍ حقيقيين بعناوينهم وتقارير فتحهم، ولا معنى لقراءةٍ بلا قرار إرسال.
+  'مالك المنصة يحمل الرموز الستة والعشرين',
+  ownerRole.permissions.length === 26,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 25, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 26, `${registry.length} رمزاً`);
 check(
   'ورموز المحتوى بينها (ترحيل 0078)',
   registry.some((entry) => entry.code === 'console.content.view') &&

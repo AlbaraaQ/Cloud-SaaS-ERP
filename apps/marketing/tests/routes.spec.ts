@@ -24,6 +24,8 @@ describe('marketing route groups', () => {
     }
     expect(existsSync(join(appDir, 'onboarding/page.tsx')), '/onboarding').toBe(true);
     expect(existsSync(join(appDir, 'demo/page.tsx')), '/demo').toBe(true);
+    // P-M7: صفحة إلغاء الاشتراك — يُفتح رابطها من كل رسالة حملة، فهي مسارٌ حقيقيّ يُقاس.
+    expect(existsSync(join(appDir, 'unsubscribe/page.tsx')), '/unsubscribe').toBe(true);
     expect(existsSync(join(appDir, 'login/page.tsx')), '/login').toBe(true);
   });
 

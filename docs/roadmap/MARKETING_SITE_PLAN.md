@@ -173,19 +173,19 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **اختبار** | ✅ `public-leads.spec.ts` **16** (≥ 12): حفظ + إسناد + تحويل إلى مستأجر فعلي + منع التكرار + رفض المصيدة + `LEAD_STATUS_LOCKED` + النشرة بتأكيدها المزدوج + فصل الصلاحيتين |
 | **تحقّق حيّ** | ✅ `scripts/verify-leads.mjs` **58/58 في 6 أقسام** (≈ 30 نقطة) |
 
-### P-M7 — الحملات البريدية 🟡
+### P-M7 — الحملات البريدية 🟠 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | رعاية العملاء المتوقّعين والتجريبيين حتى يشتركوا |
-| **الشاشات** | `/campaigns` (إنشاء · قالب · شريحة · جدولة) · الشرائح (متوقّعون · تجريبيون · نشطون · متأخّرون · متسربون) · تقرير الحملة (مُرسَل · مُسلَّم · مفتوح · ناقر · مُلغٍ) · إلغاء اشتراك بنقرة |
-| **نقاط نهاية** | `GET/POST/PATCH /platform/campaigns` · `POST /platform/campaigns/:id/schedule` · `POST /platform/campaigns/:id/send-test` · `GET /platform/campaigns/:id/report` · `GET /public/unsubscribe/:token` |
-| **القياس** | بكسل فتح + توجيه نقر (`/public/track/open/:id` · `/public/track/click/:id`) مع توقيع يمنع التزوير |
-| **الامتثال** | ترويستا `List-Unsubscribe` و`List-Unsubscribe-Post` · احترام `email_suppressions` (P-C6) · عنوان المُرسِل واسمه بالعربية |
-| **صلاحيات** | **`console.campaigns.manage`** (جديد) |
-| **ترحيل** | `0076_campaigns.sql` — `email_campaigns` · `campaign_messages` · `campaign_events` |
-| **اختبار** | `platform-campaigns.spec.ts` (≥ 12): الشريحة، الإلغاء يمنع، التتبّع، التقرير، منع الإرسال بلا قالب |
-| **تحقّق حيّ** | `scripts/verify-campaigns.mjs` (≈ 30 نقطة، لا إرسال حقيقي) |
+| **الشاشات** | ✅ `/campaigns` (إنشاء · قالب · شريحة · جدولة · إرسال الآن · نسخة اختبار · إلغاء بسبب · تقرير) · الشرائح **الستّ** (متوقّعون · مشتركو النشرة · تجريبيون · نشطون · متأخّرون · متسربون) — أُضيفت `subscribers` لأن مشترك النشرة ليس متوقَّعاً · تقرير الحملة (أُرسل · مُسلَّم · مفتوح · ناقر · مُلغٍ) · صفحة `/unsubscribe` في الموقع بأربع حالات |
+| **نقاط نهاية** | ✅ `GET/POST/PATCH /platform/campaigns` · `GET …/segments` · `GET …/:id` · `POST …/:id/schedule` · `POST …/:id/send-test` · `POST …/:id/cancel` · `POST …/:id/dispatch` · `GET …/:id/report` · `GET` **و**`POST /public/unsubscribe/:token` (النقرة الواحدة RFC 8058) — **١١ مساراً و١٤ عملية** |
+| **القياس** | ✅ بكسل فتح + توجيه نقر (`/public/track/open/:token` · `/public/track/click/:token/:index`) — **ورقة الوصول في العقد منفَّذة بالرمز السري المُجزَّأ** لا بالتوقيع المشتقّ: الوجهة تُقرأ من صفّ الرسالة، فلا تحويلَ مفتوحاً (انظر التقرير §2.2–2.3) |
+| **الامتثال** | ✅ ترويستا `List-Unsubscribe` و`List-Unsubscribe-Post` (RFC 8058) **تُحفظ مع الرسالة** · احترام `email_suppressions` قبل الإرسال فتُسجَّل «لم تُرسل» بسببه · الإلغاء يكتب حجراً **عامّاً** (`tenant_id NULL`) لا خاصّاً بالحملة · عنوان المُرسِل واسمه بالعربية |
+| **صلاحيات** | ✅ **`console.campaigns.manage`** (رمزٌ واحد: من يقرأ الحملات يقرأ قائمةَ أشخاصٍ حقيقيين وتقاريرَ فتحهم) — وعدّادات `verify-platform-console` **26/26/7** |
+| **ترحيل** | ✅ **`0082_campaigns.sql`** (لا `0076`: الرقم شُغل بـ`email_service` في P-C6) — `email_campaigns` · `campaign_messages` · `campaign_events` + عمودا `email_messages.html`/`headers` |
+| **اختبار** | ✅ `platform-campaigns.spec.ts` **19** (≥ 12): الشريحة وأعدادها · متغيّرٌ غير معروف يُرفض · رسالة الاختبار لا تُحتسب · التتبّع والتحويل · الإلغاء يمنع الحملة التالية · القفل بعد الإرسال |
+| **تحقّق حيّ** | ✅ `scripts/verify-campaigns.mjs` **59/59 في 7 أقسام** (≈ 30 نقطة) — بلا بريدٍ يخرج من المساحة (`provider = console`) |
 
 ### P-M8 — التحقق والثقة والقطاعات 🟢
 
@@ -271,27 +271,27 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | `0070_announcements.sql` | الإعلانات (من اللوحة) | P-C7 |
 | `0074_content.sql` | `content_pages` · `content_blocks` · `content_menus` · `content_banners` · `content_versions` | P-M5 |
 | `0080_leads.sql` (+ `0081_leads_permissions.sql`) | `leads` · `lead_notes` · `lead_events` · `email_subscribers` | P-M6 ✅ |
-| `0076_campaigns.sql` | `email_campaigns` · `campaign_messages` · `campaign_events` | P-M7 |
+| `0082_campaigns.sql` | `email_campaigns` · `campaign_messages` · `campaign_events` (+ `email_messages.html`/`headers`) | P-M7 ✅ |
 
 | الرمز الجديد | الجزء |
 |---|---|
 | `console.content.manage` · `console.content.view` | P-M5 |
 | `console.leads.view` · `console.leads.manage` | P-M6 |
-| `console.campaigns.manage` | P-M7 |
+| `console.campaigns.manage` | P-M7 ✅ |
 
 | الاختبارات | العدد المقدَّر |
 |---|---:|
 | `public-content.spec.ts` + `platform-content.spec.ts` | 16 |
 | `public-leads.spec.ts` (P-M6 ✅: **16** أُنجزت) | 12 |
-| `platform-campaigns.spec.ts` | 12 |
+| `platform-campaigns.spec.ts` (P-M7 ✅: **19** أُنجزت) | 12 |
 | `signup-flow.spec.ts` (P-M4 ✅: **16** أُنجزت) + `apps/marketing/tests/signup.spec.ts` (**12**) | 12 |
 | `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/{site,pricing}.spec.ts` (✅ **25** أُنجزت) | 30 |
 | **المجموع** | **≈ 82** |
 
 السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (**54** أُنجزت في P-M4) ·
-`verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (✅ **58** أُنجزت في P-M6) · `verify-campaigns.mjs` (30) ·
+`verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (✅ **58** أُنجزت في P-M6) · `verify-campaigns.mjs` (✅ **59** أُنجزت في P-M7) ·
 `verify-pricing.mjs` (**53** أُنجزت في P-M3)
-— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **264** نقطة في خمسة سكربتات.
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **323** نقطة في ستة سكربتات.
 
 ---
 
@@ -338,7 +338,9 @@ P-M1 ── P-M2 ── P-M3 ── P-M4 ── P-M6
 المحتوى — بدونه كل نصّ تعديلُ كود) — ✅. والثالثة: **P-M3 + P-M4** (الباقات والاشتراك) —
 **P-M3 ✅ · P-M4 ✅**.
 الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية) — **P-M6 ✅**. والخامسة: **P-M7** (الحملات
-البريدية) — التالي.
+البريدية ورعاية من وصل حتى يشترك) — **P-M7 ✅** بتقريره
+`docs/MARKETING_CAMPAIGNS_P_M7_IMPLEMENTATION_REPORT.md`. والسادسة: **P-M8 + P-M9** (الثقة
+وحالة الخدمة) ثم **P-M10** (اللغات) — التالي.
 
 ---
 

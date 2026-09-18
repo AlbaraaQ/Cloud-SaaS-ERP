@@ -2801,144 +2801,16 @@
         ]
       }
     },
-    "/api/v1/public/site": {
+    "/api/v1/public/track/open/{token}": {
       "get": {
-        "operationId": "PublicContentController_site",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Site identity, menus and the live banner"
-          }
-        },
-        "summary": "هوية الموقع وقوائمه ولافتته المعروضة (نداءٌ واحد للقشرة)",
-        "tags": [
-          "public-content"
-        ]
-      }
-    },
-    "/api/v1/public/sitemap": {
-      "get": {
-        "operationId": "PublicContentController_sitemap",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "خريطة الموقع: مسارات المنشور فقط بلغاتها",
-        "tags": [
-          "public-content"
-        ]
-      }
-    },
-    "/api/v1/public/posts": {
-      "get": {
-        "operationId": "PublicContentController_posts",
+        "description": "يُسجَّل الفتح **الأوّل** مرّةً واحدة، وتُعاد الصورة في كل حال — ومنعُ الصور في عميل البريد يعني «لم يُعرف» لا «لم يُقرأ»، وهذا ما يقوله التقرير.",
+        "operationId": "PublicCampaignsController_open",
         "parameters": [
           {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "kind",
-            "required": false,
-            "in": "query",
-            "description": "post (default) · case_study · …",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "المحتوى المسرود المنشور: المدوّنة افتراضاً، ودراسات الحالة بترشيح النوع",
-        "tags": [
-          "public-content"
-        ]
-      }
-    },
-    "/api/v1/public/help": {
-      "get": {
-        "operationId": "PublicContentController_help",
-        "parameters": [
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "مقالات مركز المساعدة، مع بحثٍ في العنوان والملخّص",
-        "tags": [
-          "public-content"
-        ]
-      }
-    },
-    "/api/v1/public/faq": {
-      "get": {
-        "operationId": "PublicContentController_faq",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "الأسئلة الشائعة مسطَّحة من كتل الصفحات المنشورة (وJSON-LD منها)",
-        "tags": [
-          "public-content"
-        ]
-      }
-    },
-    "/api/v1/public/banners": {
-      "get": {
-        "operationId": "PublicContentController_banners",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "اللافتات المعروضة الآن",
-        "tags": [
-          "public-content"
-        ]
-      }
-    },
-    "/api/v1/public/content/{slug}": {
-      "get": {
-        "operationId": "PublicContentController_page",
-        "parameters": [
-          {
-            "name": "slug",
+            "name": "token",
             "required": true,
             "in": "path",
-            "description": "رابط الصفحة (المسوّدة والمجدولة تُردّ 404)",
+            "description": "رمز الرسالة (٣٢ بايتاً بصيغة base64url)",
             "schema": {
               "type": "string"
             }
@@ -2946,48 +2818,151 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "A 1×1 transparent GIF"
           }
         },
-        "summary": "صفحةٌ منشورة بكتلها",
+        "summary": "بكسل الفتح (يُعاد GIF شفّاف دائماً)",
         "tags": [
-          "public-content"
+          "public-campaigns"
         ]
       }
     },
-    "/api/v1/platform/content/pages": {
+    "/api/v1/public/track/click/{token}/{index}": {
       "get": {
-        "operationId": "PlatformContentController_list",
+        "description": "الوجهة تُقرأ من صفّ الرسالة لا من الرابط: لا تحويلَ مفتوحاً. ونقرةٌ إلى وجهةٍ ليست في الحملة، أو برمزٍ مجهول ⇒ 404.",
+        "operationId": "PublicCampaignsController_click",
         "parameters": [
           {
-            "name": "sort",
-            "required": false,
-            "in": "query",
-            "description": "updated | published | title",
-            "schema": {}
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "description": "رمز الرسالة",
+            "schema": {
+              "type": "string"
+            }
           },
+          {
+            "name": "index",
+            "required": true,
+            "in": "path",
+            "description": "ترتيب الوجهة داخل روابط الحملة",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the campaign link"
+          },
+          "404": {
+            "description": "رمزٌ أو وجهةٌ غير معروفة (NOT_FOUND)"
+          }
+        },
+        "summary": "تتبّع النقرة ثم التوجيه إلى الوجهة (302)",
+        "tags": [
+          "public-campaigns"
+        ]
+      }
+    },
+    "/api/v1/public/unsubscribe/{token}": {
+      "get": {
+        "description": "يُسجِّل حجراً في `email_suppressions` فيمنع **كل** بريدٍ لاحق لهذا العنوان لا هذه الحملة وحدها، ويُعلّم المشترك `unsubscribed` إن كان في النشرة. و idempotent: الفتحة الثانية لا تغيّر شيئاً.",
+        "operationId": "PublicCampaignsController_unsubscribe",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The address is suppressed"
+          },
+          "404": {
+            "description": "رابطٌ غير معروف (NOT_FOUND)"
+          }
+        },
+        "summary": "إلغاء الاشتراك من رابط البريد",
+        "tags": [
+          "public-campaigns"
+        ]
+      },
+      "post": {
+        "description": "عميل البريد يرسل POST إلى `List-Unsubscribe` مُصرَّحاً بالنقرة الواحدة، ويجب أن يُقبَل بلا صفحةٍ وسيطة ولا تأكيد. والجواب 200 بلا نصّ كما تطلب التوصية.",
+        "operationId": "PublicCampaignsController_oneClick",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One-click unsubscribe accepted"
+          }
+        },
+        "summary": "نقرة الإلغاء الواحدة (RFC 8058 — List-Unsubscribe-Post)",
+        "tags": [
+          "public-campaigns"
+        ]
+      }
+    },
+    "/api/v1/platform/campaigns": {
+      "get": {
+        "description": "مرتّبةً بالمُرسَل أوّلاً ثم المجدولة: سؤالُ المشغّل «ما الذي يخرج الآن؟». ومعها عدّادات كل حالة. **وقبل القراءة نبضةُ مسحٍ** للحملات المجدولة التي حان وقتها — فبيئةٌ بلا عامل تُرسل حملاتها المجدولة من هنا.",
+        "operationId": "PlatformCampaignsController_list",
+        "parameters": [
           {
             "name": "q",
             "required": false,
             "in": "query",
+            "description": "بحثٌ في اسم الحملة وعنوانها",
             "schema": {}
           },
           {
-            "name": "filter[status]",
+            "name": "segment",
             "required": false,
             "in": "query",
-            "schema": {}
+            "schema": {
+              "enum": [
+                "leads",
+                "subscribers",
+                "trialing",
+                "active",
+                "past_due",
+                "churned"
+              ],
+              "type": "string"
+            }
           },
           {
-            "name": "filter[kind]",
+            "name": "status",
             "required": false,
             "in": "query",
-            "schema": {}
+            "schema": {
+              "enum": [
+                "draft",
+                "scheduled",
+                "sending",
+                "sent",
+                "canceled"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Content page list"
+            "description": "Campaigns with per-status counts"
           }
         },
         "security": [
@@ -2995,17 +2970,21 @@
             "bearer": []
           }
         ],
-        "summary": "كل الصفحات — المسوّدات والمجدولة والمنشورة",
+        "summary": "الحملات وعدّاداتها",
         "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       },
       "post": {
-        "operationId": "PlatformContentController_create",
+        "description": "الحملة تُولد مسوّدة: تُكتب ثم تُراجَع ثم تُجدَّل. ومتغيّرٌ غير معروف في النصّ يُرفض من الآن (`CAMPAIGN_BODY_INVALID`) — فلا تُحفظ مسوّدةٌ لا يمكن إرسالها.",
+        "operationId": "PlatformCampaignsController_create",
         "parameters": [],
         "responses": {
           "201": {
-            "description": ""
+            "description": "The created draft"
+          },
+          "422": {
+            "description": "نصٌّ فيه متغيّرٌ غير معروف (CAMPAIGN_BODY_INVALID)"
           }
         },
         "security": [
@@ -3013,19 +2992,20 @@
             "bearer": []
           }
         ],
-        "summary": "إنشاء صفحة بكتلها — مسوّدةً أو مجدولةً أو منشورة",
+        "summary": "إنشاء حملة (مسوّدة)",
         "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       }
     },
-    "/api/v1/platform/content/categories": {
+    "/api/v1/platform/campaigns/segments": {
       "get": {
-        "operationId": "PlatformContentController_categories",
+        "description": "ستة شرائح بأعدادٍ تُقرأ من الجداول الآن — لا تقدير: الشاشة تقول كم سيصل. وكل شريحة معلومٌ فيها أهي «أشخاص» (تسويقٌ بموافقة) أم «حسابات» (رسالة خدمة).",
+        "operationId": "PlatformCampaignsController_segments",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Segments with live counts"
           }
         },
         "security": [
@@ -3033,19 +3013,19 @@
             "bearer": []
           }
         ],
-        "summary": "تصنيفات المدوّنة ومركز المساعدة المشتقّة من المحتوى",
+        "summary": "الشرائح وأعدادها الحقيقية",
         "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       }
     },
-    "/api/v1/platform/content/menus": {
+    "/api/v1/platform/campaigns/{id}": {
       "get": {
-        "operationId": "PlatformContentController_menus",
+        "operationId": "PlatformCampaignsController_detail",
         "parameters": [],
         "responses": {
-          "200": {
-            "description": ""
+          "404": {
+            "description": "الحملة غير موجودة (NOT_FOUND)"
           }
         },
         "security": [
@@ -3053,115 +3033,21 @@
             "bearer": []
           }
         ],
-        "summary": "القوائم الخمس بمواضعها",
+        "summary": "الحملة بنصّها وروابطها وأرقامها",
         "tags": [
-          "platform-content"
-        ]
-      }
-    },
-    "/api/v1/platform/content/menus/{position}": {
-      "put": {
-        "operationId": "PlatformContentController_updateMenu",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "كتابة قائمة: العناصر مرتّبة كما تُرسل",
-        "tags": [
-          "platform-content"
-        ]
-      }
-    },
-    "/api/v1/platform/content/banners": {
-      "get": {
-        "operationId": "PlatformContentController_banners",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "اللافتات كلها (ووسم `live` يقول أيّها معروض الآن)",
-        "tags": [
-          "platform-content"
-        ]
-      },
-      "post": {
-        "operationId": "PlatformContentController_createBanner",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "إنشاء لافتة بنافذة عرضٍ وجمهور",
-        "tags": [
-          "platform-content"
-        ]
-      }
-    },
-    "/api/v1/platform/content/banners/{id}": {
-      "patch": {
-        "operationId": "PlatformContentController_updateBanner",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "تعديل لافتة (الإيقاف بحقل `active`)",
-        "tags": [
-          "platform-content"
-        ]
-      }
-    },
-    "/api/v1/platform/content/pages/{id}": {
-      "get": {
-        "operationId": "PlatformContentController_get",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "صفحةٌ بكتلها (كما ستُعرض، مسوّدةً كانت أو منشورة)",
-        "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       },
       "patch": {
-        "operationId": "PlatformContentController_update",
+        "description": "من `sending` فصاعداً لا تعديل: النصّ الذي خرج نصٌّ خرج (CAMPAIGN_LOCKED).",
+        "operationId": "PlatformCampaignsController_update",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "The updated campaign"
+          },
+          "422": {
+            "description": "حملةٌ مقفلة أو نصٌّ غير صالح (CAMPAIGN_LOCKED · CAMPAIGN_BODY_INVALID)"
           }
         },
         "security": [
@@ -3169,19 +3055,65 @@
             "bearer": []
           }
         ],
-        "summary": "تعديل صفحة — والكتل إن أُرسلت فهي البديل الكامل",
+        "summary": "تعديل حملةٍ لم يبدأ إرسالها",
         "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       }
     },
-    "/api/v1/platform/content/pages/{id}/publish": {
+    "/api/v1/platform/campaigns/{id}/schedule": {
       "post": {
-        "operationId": "PlatformContentController_publish",
+        "description": "`scheduledAt` وقتٌ صريح (بتوقيت الخادم)، و`null` يعني **الإرسال الآن**. وقبل أي كتابة: النصّ صالح والشريحة فيها أحد — وإلا فـ422 لا حملةٌ إلى صفر.",
+        "operationId": "PlatformCampaignsController_schedule",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The scheduled (or now-sending) campaign"
+          },
+          "422": {
+            "description": "شريحةٌ فارغة أو نصٌّ غير صالح أو حملةٌ مقفلة"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "جدولة الإرسال أو إرساله الآن",
+        "tags": [
+          "platform-campaigns"
+        ]
+      }
+    },
+    "/api/v1/platform/campaigns/{id}/cancel": {
+      "post": {
+        "description": "ما لم يخرج بعد يُوسَم «لم تُرسل» بسبب الإلغاء؛ وما خرج لا يُستدعى. والحملة المُرسلة لا تُلغى (`CAMPAIGN_LOCKED`): الإلغاء قرارٌ قبل النهاية لا بعدها.",
+        "operationId": "PlatformCampaignsController_cancel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The canceled campaign"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "إلغاء حملة (بسببٍ مكتوب)",
+        "tags": [
+          "platform-campaigns"
+        ]
+      }
+    },
+    "/api/v1/platform/campaigns/{id}/send-test": {
+      "post": {
+        "description": "برمزٍ غير مسجَّل: **لا صفَّ في تقرير الحملة ولا حدث**، والرسالة موسومة تجربةً فلا تُحتسب على حصّة أحد. ومن جرّب نصّه لا يُفسد أرقام حملته.",
+        "operationId": "PlatformCampaignsController_sendTest",
         "parameters": [],
         "responses": {
           "201": {
-            "description": ""
+            "description": "The queued test message"
           }
         },
         "security": [
@@ -3189,19 +3121,20 @@
             "bearer": []
           }
         ],
-        "summary": "نشرٌ فوري، أو جدولةٌ إلى وقتٍ قادم بحقل `at`",
+        "summary": "إرسال نسخة اختبار إلى عنوانٍ واحد",
         "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       }
     },
-    "/api/v1/platform/content/pages/{id}/retract": {
+    "/api/v1/platform/campaigns/{id}/dispatch": {
       "post": {
-        "operationId": "PlatformContentController_retract",
+        "description": "لحملةٍ توقّفت في المنتصف (خادمٌ أُعيد تشغيله بلا عامل). تُعاد بعدها المهمّة تلقائياً إن بقيت بقيّة، والقائمة تقرأ البقية من نفس تعريف الشريحة.",
+        "operationId": "PlatformCampaignsController_dispatch",
         "parameters": [],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "What this batch did"
           }
         },
         "security": [
@@ -3209,19 +3142,20 @@
             "bearer": []
           }
         ],
-        "summary": "سحب صفحةٍ من النشر إلى مسوّدة بسببٍ مكتوب (لا حذف)",
+        "summary": "دفعُ دفعةِ إرسالٍ يدوياً (استئناف)",
         "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       }
     },
-    "/api/v1/platform/content/pages/{id}/versions": {
+    "/api/v1/platform/campaigns/{id}/report": {
       "get": {
-        "operationId": "PlatformContentController_versions",
+        "description": "أربعة أقسام: المجاميع (أُرسل · مُسلَّم · مفتوح · منقور · ملغٍ)، والروابط بترتيب نقراتها، وصفٌّ لكل مستلم بحالته، والأحداث الزمنية. وكلها من الصفوف لا من عدّادٍ في الذاكرة.",
+        "operationId": "PlatformCampaignsController_report",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "The campaign report"
           }
         },
         "security": [
@@ -3229,29 +3163,9 @@
             "bearer": []
           }
         ],
-        "summary": "تاريخ الصفحة — أحدث خمسين نسخة",
+        "summary": "تقرير الحملة: الأرقام والروابط والناس والأحداث",
         "tags": [
-          "platform-content"
-        ]
-      }
-    },
-    "/api/v1/platform/content/pages/{id}/versions/{version}/restore": {
-      "post": {
-        "operationId": "PlatformContentController_restore",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "استعادة نسخة — وتُحفظ الحالة القائمة نسخةً جديدة قبلها",
-        "tags": [
-          "platform-content"
+          "platform-campaigns"
         ]
       }
     },
@@ -3787,6 +3701,460 @@
         "summary": "Queue driver state and this tenant outbox backlog",
         "tags": [
           "platform-services"
+        ]
+      }
+    },
+    "/api/v1/public/site": {
+      "get": {
+        "operationId": "PublicContentController_site",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Site identity, menus and the live banner"
+          }
+        },
+        "summary": "هوية الموقع وقوائمه ولافتته المعروضة (نداءٌ واحد للقشرة)",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/sitemap": {
+      "get": {
+        "operationId": "PublicContentController_sitemap",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "خريطة الموقع: مسارات المنشور فقط بلغاتها",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/posts": {
+      "get": {
+        "operationId": "PublicContentController_posts",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "post (default) · case_study · …",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "المحتوى المسرود المنشور: المدوّنة افتراضاً، ودراسات الحالة بترشيح النوع",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/help": {
+      "get": {
+        "operationId": "PublicContentController_help",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مقالات مركز المساعدة، مع بحثٍ في العنوان والملخّص",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/faq": {
+      "get": {
+        "operationId": "PublicContentController_faq",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "الأسئلة الشائعة مسطَّحة من كتل الصفحات المنشورة (وJSON-LD منها)",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/banners": {
+      "get": {
+        "operationId": "PublicContentController_banners",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اللافتات المعروضة الآن",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/content/{slug}": {
+      "get": {
+        "operationId": "PublicContentController_page",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "description": "رابط الصفحة (المسوّدة والمجدولة تُردّ 404)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "صفحةٌ منشورة بكتلها",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/pages": {
+      "get": {
+        "operationId": "PlatformContentController_list",
+        "parameters": [
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "updated | published | title",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[status]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[kind]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Content page list"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "كل الصفحات — المسوّدات والمجدولة والمنشورة",
+        "tags": [
+          "platform-content"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformContentController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "إنشاء صفحة بكتلها — مسوّدةً أو مجدولةً أو منشورة",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/categories": {
+      "get": {
+        "operationId": "PlatformContentController_categories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تصنيفات المدوّنة ومركز المساعدة المشتقّة من المحتوى",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/menus": {
+      "get": {
+        "operationId": "PlatformContentController_menus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "القوائم الخمس بمواضعها",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/menus/{position}": {
+      "put": {
+        "operationId": "PlatformContentController_updateMenu",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "كتابة قائمة: العناصر مرتّبة كما تُرسل",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/banners": {
+      "get": {
+        "operationId": "PlatformContentController_banners",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "اللافتات كلها (ووسم `live` يقول أيّها معروض الآن)",
+        "tags": [
+          "platform-content"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformContentController_createBanner",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "إنشاء لافتة بنافذة عرضٍ وجمهور",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/banners/{id}": {
+      "patch": {
+        "operationId": "PlatformContentController_updateBanner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تعديل لافتة (الإيقاف بحقل `active`)",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/pages/{id}": {
+      "get": {
+        "operationId": "PlatformContentController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "صفحةٌ بكتلها (كما ستُعرض، مسوّدةً كانت أو منشورة)",
+        "tags": [
+          "platform-content"
+        ]
+      },
+      "patch": {
+        "operationId": "PlatformContentController_update",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تعديل صفحة — والكتل إن أُرسلت فهي البديل الكامل",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/pages/{id}/publish": {
+      "post": {
+        "operationId": "PlatformContentController_publish",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "نشرٌ فوري، أو جدولةٌ إلى وقتٍ قادم بحقل `at`",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/pages/{id}/retract": {
+      "post": {
+        "operationId": "PlatformContentController_retract",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "سحب صفحةٍ من النشر إلى مسوّدة بسببٍ مكتوب (لا حذف)",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/pages/{id}/versions": {
+      "get": {
+        "operationId": "PlatformContentController_versions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تاريخ الصفحة — أحدث خمسين نسخة",
+        "tags": [
+          "platform-content"
+        ]
+      }
+    },
+    "/api/v1/platform/content/pages/{id}/versions/{version}/restore": {
+      "post": {
+        "operationId": "PlatformContentController_restore",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "استعادة نسخة — وتُحفظ الحالة القائمة نسخةً جديدة قبلها",
+        "tags": [
+          "platform-content"
         ]
       }
     },

@@ -77,6 +77,10 @@ export const jobTypes = {
   // P-C12 المؤجَّل — التقرير الأسبوعي (بقالب P-C6): تقريرُ المنصة إلى بريد المشغّلين،
   // فلا يخصّ عميلاً واحداً. وطابور «الصيانة» لأن تسليمه ليس رسالة عميلٍ عاجلة.
   REPORT_WEEKLY: 'report.weekly',
+  // P-M7 — دفعةُ إرسال حملة: تفتح صفوف الرسائل دفعةً بعد دفعة فلا يقف طلبٌ طويلاً على
+  // آلاف المستلمين، وتُعيد جدولة نفسها للبقيّة. وطابور «الصيانة» لأن الإرسال المجدول
+  // ليس رسالةَ عميلٍ عاجلة (تماماً كما `content.publish` و`report.weekly`).
+  CAMPAIGN_SEND: 'campaign.send',
   FILES_ORPHAN_GC: 'files.orphan-gc',
   IDEMPOTENCY_GC: 'idempotency.gc',
 } as const;

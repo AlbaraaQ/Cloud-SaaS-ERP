@@ -20,13 +20,15 @@ import {
  * أما السلوك (حجرٌ يمنع، حصةٌ ترفض، إعادة إرسال) ففي `apps/api/test/platform-email.spec.ts`.
  */
 describe('email event registry (P-C6)', () => {
-  it('freezes the twenty-one events the plan lists', () => {
+  it('freezes the twenty-two events the plan lists', () => {
     // ثمانية عشر نصّاً في خطة P-C6، وتاسعَ عشرَ أضافه P-M4: `signup.verify` — رمز تحقّق
     // التسجيل الذاتي، ولا سبيل لإنشاء حسابٍ من الموقع بلا حدثٍ يحمل الرمز.
     // وعشرونَ وحادي وعشرونَ أضافهما P-M6: `lead.received` (وصلنا طلبك) و`subscriber.confirm`
     // (رابط التأكيد المزدوج) — فاستمارةُ تواصلٍ لا تُجيب ولا نشرةٌ تُشترط بلا حدثَين.
-    expect(emailEvents).toHaveLength(21);
-    expect(new Set(emailEvents).size).toBe(21);
+    // والثاني والعشرون أضافه P-M7: `campaign.message` — نصُّ الحملة ظرفٌ لا محتوى
+    // (المحتوى في صفّ الحملة)، وهو حدثُ منصّةٍ كسابقَيه.
+    expect(emailEvents).toHaveLength(22);
+    expect(new Set(emailEvents).size).toBe(22);
     expect(emailEvents).toContain('portal.access.grant');
     expect(emailEvents).toContain('subscription.payment_failed');
     expect(emailEvents).toContain('announcement');
@@ -47,9 +49,13 @@ describe('email event registry (P-C6)', () => {
     for (const entry of emailEventRegistry) {
       expect(entry.labelAr.length).toBeGreaterThan(1);
       expect(entry.variables.length).toBeGreaterThan(0);
-      // كل حدثٍ يخاطب إنساناً باسمه — إلا التقرير الأسبوعي: وجهتُه عناوين مشغّلين بلا أسماء
-      // معروفة، فلا يُطلب `name` ولا يُصيَّر به.
-      if (entry.event !== 'report.weekly') expect(entry.variables).toContain('name');
+      // كل حدثٍ يخاطب إنساناً باسمه — إلا اثنين، ولكلٍّ سببه:
+      //   * التقرير الأسبوعي: وجهتُه عناوين مشغّلين بلا أسماء معروفة.
+      //   * رسالة الحملة: التحية في **متن الحملة** (`{{name}}` في نصّ المشغّل)، والقالب
+      //     ظرفٌ يضيف رابط إلغاء الاشتراك — ولو خاطب باسمه لَظهرت التحية مرّتين.
+      if (entry.event !== 'report.weekly' && entry.event !== 'campaign.message') {
+        expect(entry.variables).toContain('name');
+      }
       // المتغيّرات لاتينية صغيرة: `{{invoiceNo}}` يُقرأ بشكلين ويُكتب بشكلين.
       for (const variable of entry.variables) expect(variable).toMatch(/^[a-z0-9_]+$/);
     }

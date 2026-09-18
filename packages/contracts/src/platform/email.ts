@@ -45,6 +45,10 @@ export const emailEvents = [
   // وكلاهما `platform` لأن كليهما يُرسل إلى من ليس له منشأة — فلا يُحتسب على حصّة أحد.
   'lead.received',
   'subscriber.confirm',
+  // P-M7 — رسالة حملة: النصّ يكتبه المشغّل في اللوحة، والقالب هنا **ظرفٌ لا محتوى**
+  // (`{{subject}}` و`{{body}}`)، لأن نصّ الحملة محتوى تحريري يُحفظ في صفّ الحملة نفسه.
+  // ونطاقه `platform` كما حدثا P-M6: لا يُحتسب على حصّة عميل، والمرسل إليه قد لا يكون عميلاً.
+  'campaign.message',
 ] as const;
 
 export type EmailEvent = (typeof emailEvents)[number];
@@ -252,6 +256,17 @@ export const emailEventRegistry: readonly EmailEventDefinition[] = [
     descriptionAr: 'تقريرٌ أسبوعي بأرقام المنصة يُرسل إلى عناوين المشغّلين من شاشة الإعدادات.',
   },
 
+  {
+    event: 'campaign.message',
+    labelAr: 'رسالة حملة بريدية',
+    labelEn: 'Marketing campaign message',
+    scope: 'platform',
+    // بلا `name`: التحية تُبنى في **متن الحملة نفسه** (`{{name}}` في نصّ المشغّل)، والقالب
+    // هنا ظرفٌ لا يخاطب أحداً باسمه — ولو أضاف تحيةً لَظهرت مرّتين (كشفه الاختبار الحيّ).
+    variables: ['subject', 'body', 'unsubscribe_url'],
+    descriptionAr:
+      'رسالة حملةٍ بريدية (P-M7): النصوص تأتي من صفّ الحملة، والقالب ظرفٌ يضيف رابط إلغاء الاشتراك.',
+  },
   {
     event: 'lead.received',
     labelAr: 'تأكيد استلام طلب',
@@ -598,6 +613,18 @@ export const emailTemplateSeeds: readonly EmailTemplateSeed[] = [
     body: 'Hello {{name}},\n\n{{body}}\n\n{{link}}',
   },
 
+  {
+    event: 'campaign.message',
+    locale: 'ar',
+    subject: '{{subject}}',
+    body: '{{body}}\n\n—\nلإلغاء الاشتراك بنقرة واحدة: {{unsubscribe_url}}',
+  },
+  {
+    event: 'campaign.message',
+    locale: 'en',
+    subject: '{{subject}}',
+    body: '{{body}}\n\n—\nUnsubscribe with one click: {{unsubscribe_url}}',
+  },
   {
     event: 'report.weekly',
     locale: 'ar',
