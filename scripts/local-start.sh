@@ -54,17 +54,10 @@ if [[ ! -f "$ROOT/.env" ]]; then
   echo "✗ لا يوجد .env — شغّل أولاً: pnpm env:setup" >&2
   exit 1
 fi
-# قراءة KEY=VALUE سطراً سطراً (ملفٌّ يولّده `scripts/setup-env.mjs`: بلا أسطر متعدّدة).
-while IFS= read -r line; do
-  [[ "$line" =~ ^[[:space:]]*# ]] && continue
-  [[ "$line" =~ ^[[:space:]]*$ ]] && continue
-  [[ "$line" != *"="* ]] && continue
-  key="${line%%=*}"
-  value="${line#*=}"
-  value="${value%$'\r'}"
-  if [[ "$value" == \"*\" && "$value" == *\" ]]; then value="${value:1:${#value}-2}"; fi
-  export "$key=$value"
-done < "$ROOT/.env"
+# القراءة بمُحلِّل التطبيق نفسه (`scripts/dotenv.mjs` عبر `scripts/env-exports.mjs`): `.env`
+# يحمل مفاتيح PEM بـ`\n` حرفية في سطرٍ واحد، وقراءةٌ ساذجة تُبقيها سطراً واحداً فيفشل توقيع
+# الجلسات (`asn1 encoding routines::header too long`) ويظهر الخطأ كأنه «فشل تسجيل دخول».
+eval "$(node "$ROOT/scripts/env-exports.mjs")"
 
 API_PORT="${PORT:-3000}"
 STAFF_PORT="${STAFF_PORT:-3001}"
@@ -74,6 +67,22 @@ DB_PORT="$(node -e "try{const u=new URL(process.env.DATABASE_URL);console.log(u.
 DB_HOST="$(node -e "try{const u=new URL(process.env.DATABASE_URL);console.log(u.hostname)}catch(e){console.log('localhost')}")"
 
 port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0 || return 1; }
+# إيقاف مجموعة العملية التي تشغل منفذاً (بلا اعتمادٍ على ملفّ PID).
+kill_port() {
+  local port="$1" pids=""
+  if command -v ss >/dev/null 2>&1; then
+    pids="$(ss -ltnpH "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u || true)"
+  fi
+  if [[ -z "$pids" ]] && command -v fuser >/dev/null 2>&1; then
+    pids="$(fuser "$port/tcp" 2>/dev/null | tr -s ' ' '\n' || true)"
+  fi
+  if [[ -z "$pids" ]] && command -v lsof >/dev/null 2>&1; then
+    pids="$(lsof -ti "tcp:$port" 2>/dev/null || true)"
+  fi
+  for pid in $pids; do
+    kill -TERM "-$(ps -o pgid= "$pid" 2>/dev/null | tr -d ' ')" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+  done
+}
 http_code() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:$1$2" 2>/dev/null || echo "000"; }
 pidfile() { echo "$LOGS/$1.pid"; }
 alive() { [[ -f "$(pidfile "$1")" ]] && kill -0 "$(cat "$(pidfile "$1")")" 2>/dev/null; }
@@ -115,6 +124,10 @@ stop_all() {
       fi
       rm -f "$file"
     fi
+  done
+  # شبكة أمان: عمليةٌ بلا ملفّ PID (أو ملفٌّ تالف) تُقتل بما يشغل منفذها.
+  for port in "$API_PORT" "$STAFF_PORT" "$MARKETING_PORT" "$ADMIN_PORT"; do
+    port_open "$port" && { kill_port "$port"; sleep 1; }
   done
   echo "   (السجلّات باقية في logs/ — قاعدتك لم تُمسّ)"
 }
@@ -160,12 +173,7 @@ if (( ${#busy[@]} > 0 )); then
   if [[ "$FORCE" == "1" ]]; then
     echo "◆ منافذ مشغولة (${busy[*]}) — أُوقف ما يشغلها (--force)…"
     for port in "${busy[@]}"; do
-      pids="$(ss -ltnpH "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u || true)"
-      [[ -z "$pids" ]] && command -v fuser >/dev/null 2>&1 && pids="$(fuser "$port/tcp" 2>/dev/null | tr -s ' ' '\n' || true)"
-      [[ -z "$pids" ]] && command -v lsof >/dev/null 2>&1 && pids="$(lsof -ti "tcp:$port" 2>/dev/null || true)"
-      for pid in $pids; do
-        kill -TERM "-$(ps -o pgid= "$pid" | tr -d ' ')" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
-      done
+      kill_port "$port"
       sleep 1
     done
   else
@@ -196,7 +204,10 @@ if [[ "$DO_BUILD" == "1" ]]; then
       built=0
       for attempt in 1 2; do
         rm -rf "apps/$app/.next"
-        if ( unset NEXT_DIST_DIR; NODE_ENV=production pnpm --filter "@erp/$app" build ) >"$LOGS/build-$app.log" 2>&1; then
+        # `MARKETING_REVALIDATE_SECONDS=0`: نشرٌ محليّ للعرض ⇒ بلا ذاكرة بيانات، فيظهر
+        # تعديل المشغّل في الموقع فوراً (وإلا فالنافذة الافتراضية 30 ثانية في الإنتاج).
+        if ( unset NEXT_DIST_DIR; NODE_ENV=production MARKETING_REVALIDATE_SECONDS="${MARKETING_REVALIDATE_SECONDS:-0}" \
+             pnpm --filter "@erp/$app" build ) >"$LOGS/build-$app.log" 2>&1; then
           built=1; break
         fi
         if [[ "$attempt" == "1" ]]; then
@@ -228,7 +239,11 @@ fi
 start_service() { # name root_dir command...
   local name="$1"; shift
   local dir="$1"; shift
-  ( cd "$ROOT/$dir" && setsid "$@" >"$LOGS/$name.log" 2>&1 & echo $! >"$(pidfile "$name")" )
+  # `setsid` **يتفرّع** إن كان المُشغِّل زعيم مجموعة، فيصير `$!` أَباً عابراً يموت فوراً
+  # (ويلتبس الأمر: «الخدمة تعمل والملفّ يقول ميتة»). لذلك القشرة نفسها تكتب `$$` ثم
+  # تُستبدل بالخدمة (`exec` يحفظ الـPID) — فيصير الملفّ هو زعيم المجموعة وقاتله.
+  ( cd "$ROOT/$dir" && setsid bash -c 'echo "$$" > "$1"; shift; exec "$@"' _ "$(pidfile "$name")" "$@" \
+      >"$LOGS/$name.log" 2>&1 & )
   sleep 0.3
 }
 
@@ -241,7 +256,9 @@ for pair in "staff:$STAFF_PORT" "marketing:$MARKETING_PORT" "platform-admin:$ADM
   if [[ "$MODE" == "dev" ]]; then
     start_service "$name" . env "NODE_ENV=$RUN_ENV" "PORT=$port" node scripts/next-run.mjs "$name" dev
   else
-    start_service "$name" . env "NODE_ENV=$RUN_ENV" node scripts/next-run.mjs "$name" start
+    start_service "$name" . env "NODE_ENV=$RUN_ENV" \
+      "MARKETING_REVALIDATE_SECONDS=${MARKETING_REVALIDATE_SECONDS:-0}" \
+      node scripts/next-run.mjs "$name" start
   fi
 done
 

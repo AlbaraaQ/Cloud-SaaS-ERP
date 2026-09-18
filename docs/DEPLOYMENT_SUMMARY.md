@@ -18,7 +18,9 @@
 **مزالق أُصلحت (حقيقية)**: `NODE_ENV=development` القادم من `.env` كان يُسقط `next build` برسالةٍ مضلّلة
 (`<Html> should not be imported…`) ⇒ تُثبَّت `NODE_ENV=production` في البناء. · مسار الفحص الصحيح
 `/health/live` و`/health/ready` لا `/health`. · `standalone` يجمّد `rewrites` ⇒ `API_PROXY_TARGET` وسيطُ بناء.
-· لا مجلّد `public/` في التطبيقات ⇒ حُذف `COPY` من صورة الواجهات. · العامل = `dist/main.js` مع `WORKER=1`.
+· لا مجلّد `public/` في التطبيقات ⇒ حُذف `COPY` من صورة الواجهات. · العامل = `dist/main.js` مع `WORKER=1`. · قراءة `.env` بمُحلِّل التطبيق (`scripts/env-exports.mjs`) لأن مفاتيح PEM في سطرٍ واحد
+بـ`\n` حرفية (وإلا: فشل تسجيل دخول 500). · `setsid` يتفرّع فلا يُسجَّل PID من `$!` (الخدمة تكتبه بنفسها).
+· نافذة صلاحية المحتوى في الإنتاج 30 ثانية (`MARKETING_REVALIDATE_SECONDS`، و`0` في النشر المحلي للعرض الفوري).
 
 **حدّ صريح**: لا متصفّح في بيئة العمل (وشبكة تنزيله محجوبة)، فلم تُنتَج لقطات PNG؛ البديل المستندي:
 `docs/deployment-evidence/` — ٤ لقطات HTML مكتفية بذاتها + جدول الحالات ونصوص استجابات الـAPI.

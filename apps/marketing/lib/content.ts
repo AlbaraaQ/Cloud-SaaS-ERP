@@ -89,7 +89,14 @@ export type ShellData = {
  * فكاشٌ نصف دقيقةٍ يجعل التحقّق الحيّ يقول «لم تظهر» وهو مخطئ. وفي الإنتاج لا يجوز أن يدفع
  * كل زائر ثمن قراءة الخادم، فالثلاثون ثانية حدٌّ معقول بين «نُشر» و«ظهر».
  */
-const REVALIDATE_SECONDS = process.env.NODE_ENV === 'production' ? 30 : 0;
+/**
+ * مدّة صلاحية ذاكرة البيانات (ثوانٍ) — **قابلةٌ للضبط** بـ`MARKETING_REVALIDATE_SECONDS`:
+ * الافتراضي 30 ثانية في الإنتاج و0 في التطوير (بلا تخزين)، ونشرٌ محليٌّ للعرض يضبطها 0
+ * فيظهر تعديل المشغّل في الصفحة فوراً (وهو الوعد المُقاس في `verify-*.mjs`).
+ */
+export const REVALIDATE_SECONDS = Number(
+  process.env.MARKETING_REVALIDATE_SECONDS ?? (process.env.NODE_ENV === 'production' ? 30 : 0),
+);
 
 async function getJson<T>(path: string, fallback: T, revalidate = REVALIDATE_SECONDS): Promise<T> {
   try {

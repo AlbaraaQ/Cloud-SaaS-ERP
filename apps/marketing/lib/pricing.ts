@@ -15,6 +15,7 @@
 import { Decimal } from 'decimal.js';
 
 import type { Locale } from './i18n';
+import { REVALIDATE_SECONDS } from './content';
 
 const apiBase = (
   process.env.API_INTERNAL_BASE ??
@@ -53,7 +54,7 @@ export type PricingData = {
 const fallbackPricing: PricingData = { plans: [], vatRatePercent: 15 };
 
 /** زمن إعادة التحقّق كما في `lib/content.ts`: صفر في التطوير كي يظهر تعديل السعر فوراً. */
-const REVALIDATE_SECONDS = process.env.NODE_ENV === 'production' ? 30 : 0;
+
 
 /**
  * الباقات العامة — وإن لم يقم الـAPI أو لم تكن هناك باقة، تُعاد قائمةٌ فارغة والصفحة تقول
