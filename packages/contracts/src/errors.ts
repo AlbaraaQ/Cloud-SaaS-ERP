@@ -39,6 +39,15 @@ export const errorCodes = {
   // P-M5 — رابط محتوى مكرَّر: الرابط العام هو هويّة الصفحة في نظر محرّك البحث، وتكراره يعني
   // أن صفحةً ستُظلّل الأخرى بصمت. 409 لأن الطلب سليم والصراع على موردٍ قائم.
   CONTENT_SLUG_TAKEN: 'CONTENT_SLUG_TAKEN',
+  // P-M4 — البريد الذي بدأ التسجيل يملك منشأةً بالفعل. 409 لأن الطلب سليم والصراع على هويّةٍ
+  // قائمة: البدء من جديد لن يُنشئ مالكاً ثانياً، بل سيُعيد لصاحب البريد منشأةً لا يطلبها.
+  SIGNUP_EMAIL_TAKEN: 'SIGNUP_EMAIL_TAKEN',
+  // P-M4 — الرمز غير صحيح أو منتهٍ أو محاولاته استُهلكت. 422 لأن الطلب سليم الشكل ومرفوض
+  // المعنى، ولأن الشاشة تعرضه بجانب الحقل لا كخطأ خادم.
+  SIGNUP_CODE_INVALID: 'SIGNUP_CODE_INVALID',
+  // P-M4 — رمز المعالج (`token`) غير معروف أو لا يخصّ هذا البريد. **404** عن قصد: الجواب
+  // نفسه للعنوان المجهول وللرمز الخاطئ، فلا يتحوّل المسار العام إلى أداة سرد بريد.
+  SIGNUP_TOKEN_INVALID: 'SIGNUP_TOKEN_INVALID',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -76,6 +85,9 @@ export const errorStatus: Record<ErrorCode, number> = {
   USAGE_LIMIT_REACHED: 409,
   INVALID_STATE: 409,
   CONTENT_SLUG_TAKEN: 409,
+  SIGNUP_EMAIL_TAKEN: 409,
+  SIGNUP_CODE_INVALID: 422,
+  SIGNUP_TOKEN_INVALID: 404,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -107,6 +119,9 @@ export const errorTitle: Record<ErrorCode, string> = {
   USAGE_LIMIT_REACHED: 'Usage limit reached',
   INVALID_STATE: 'Invalid state transition',
   CONTENT_SLUG_TAKEN: 'Content slug already taken',
+  SIGNUP_EMAIL_TAKEN: 'Email already has an account',
+  SIGNUP_CODE_INVALID: 'Verification code rejected',
+  SIGNUP_TOKEN_INVALID: 'Signup not found',
 };
 
 export function statusForCode(code: string): number {

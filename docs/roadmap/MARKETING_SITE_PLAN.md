@@ -126,13 +126,29 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **نقاط نهاية** | `GET /billing/plans` (قائم) + `GET /public/plans` (يضيف الحقوق من P-C4 بلغتين) |
 | **اختبار** | `public-plans.spec.ts` (≥ 6): الباقات النشطة فقط، الحقوق تظهر، العملة SAR |
 
-### P-M4 — الاشتراك والتفعيل 🔴
+### P-M4 — الاشتراك والتفعيل 🔴 (يعتمد P-C6) — ✅ **مُنجَز** (2026-09-18)
+
+> الرمان مفصولان بقرار: `code` (٦ أرقام، يُخزَّن sha256 وحده، يُرسل بالبريد، ٣٠ دقيقة و٥
+> محاولات وسقفُ ٥ إرسالات ومهلة دقيقة) و`token` (٤٨ حرفاً، يُعاد مرّةً، يحرس الحالة في
+> verify/resend/status). **والجواب واحد (404) للعنوان المجهول والرمز الخاطئ معاً** فلا يتحوّل
+> مسارٌ عامّ إلى أداة سردِ عناوين؛ والتحقّق idempotent، والإغلاق على الطلب لا على الرمز.
+> **ولا رخصة تُمنح ذاتياً**: الطلب `pending` في طابور المشغّل. **وفترة التجربة إعدادٌ** لا رقم
+> (`billing.trial_days` = 14 ⇒ كتالوج الإعدادات 32). **وحدث بريد منصّيّ** `signup.verify`
+> (الزائر ليس عميلاً بعد فلا حصّة تُحتسب عليه)، وفشل البريد لا يُسقط التسجيل.
+> **وأخطاءٌ حقيقية أُصلحت**: (أ) `ALTER ROLE … PASSWORD $1` كان يُسقط `pnpm db:roles`
+> بـ`syntax error at or near "$1"` (جملةُ تعريفٍ لا تقبل معاملاتٍ مُعاملة) ⇒ `quoteLiteral`؛
+> (ب) `setupTasks` كان يسأل `branches.status` والعمود `is_active` ⇒ 500 في
+> `GET /signup/status`؛ (ج) `tx.execute` الخام يُعيد `timestamptz` نصّاً لا `Date`؛
+> (د) فحص الباقة كان بعد إنشاء المنشأة فيترك ملفّاً يتيماً وطلبَ تفعيلٍ معلَّقاً ⇒ نُقل قبل
+> الإنشاء. الدليل: `signup-flow.spec.ts` **16** · `apps/marketing/tests/signup.spec.ts` **12**
+> · `verify-signup.mjs` **54/54** ·
+> [`../MARKETING_SIGNUP_P_M4_IMPLEMENTATION_REPORT.md`](../MARKETING_SIGNUP_P_M4_IMPLEMENTATION_REPORT.md).
 
 | | |
 |---|---|
 | **الهدف** | من زائر إلى منشأة عاملة في جلسة واحدة |
 | **الشاشات** | معالج 4 خطوات: **الباقة** ← **المنشأة** (الاسم · الرمز · الدولة · العملة · المنطقة) ← **المدير** (الاسم · البريد · كلمة المرور · الهاتف) ← **التحقق** (رمز بالبريد) ثم لوحة ترحيب بمهام الإعداد (الشركة · الفرع · دليل الحسابات · أول فاتورة) |
-| **نقاط نهاية** | `POST /signup` (قائم، يُوسَّع بالحقوق والفترة التجريبية) · `POST /signup/verify` · `POST /signup/resend` · `GET /signup/status/:email` |
+| **نقاط نهاية** | `GET /signup/plans` (✅ **موحَّد** مع `/public/plans`: الاثنان يقرآن `PublicPlansService` نفسه) · `POST /signup` · `POST /signup/verify` · `POST /signup/resend` · `GET /signup/status/:email` |
 | **الاعتماد** | **خدمة البريد (P-C6 في اللوحة)** — التحقق والتذكير لا يعملان بلا قوالب |
 | **اختبار** | `signup-flow.spec.ts` (≥ 12): رمز خاطئ، إعادة إرسال، بريد مكرَّر، فترة تجريبية، إنشاء الفرع والمدير فعلياً، عزل المستأجر الجديد |
 | **تحقّق حيّ** | `scripts/verify-signup.mjs` (≈ 30 نقطة، كل البريد على `console`/MailHog) |
@@ -268,14 +284,14 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | `public-content.spec.ts` + `platform-content.spec.ts` | 16 |
 | `public-leads.spec.ts` | 12 |
 | `platform-campaigns.spec.ts` | 12 |
-| `signup-flow.spec.ts` | 12 |
-| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/site.spec.ts` | 30 |
+| `signup-flow.spec.ts` (P-M4 ✅: **16** أُنجزت) + `apps/marketing/tests/signup.spec.ts` (**12**) | 12 |
+| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/{site,pricing}.spec.ts` (✅ **25** أُنجزت) | 30 |
 | **المجموع** | **≈ 82** |
 
-السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (30) ·
+السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (**54** أُنجزت في P-M4) ·
 `verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (30) · `verify-campaigns.mjs` (30) ·
 `verify-pricing.mjs` (**53** أُنجزت في P-M3)
-— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **152** نقطة في ثلاثة سكربتات.
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **206** نقطة في أربعة سكربتات.
 
 ---
 
@@ -320,8 +336,8 @@ P-M1 ── P-M2 ── P-M3 ── P-M4 ── P-M6
 
 الجلسة الأولى: **P-M1 + P-M2** (موقع يبدو احترافياً بسرعة) — ✅. الثانية: **P-M5** (نظام
 المحتوى — بدونه كل نصّ تعديلُ كود) — ✅. والثالثة: **P-M3 + P-M4** (الباقات والاشتراك) —
-**P-M3 ✅ · P-M4 التالي**.
-الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية). وما بعدها تحسين.
+**P-M3 ✅ · P-M4 ✅**.
+الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية) — **P-M6 التالي**. وما بعدها تحسين.
 
 ---
 

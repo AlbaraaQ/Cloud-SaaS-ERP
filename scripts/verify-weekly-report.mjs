@@ -196,7 +196,8 @@ check('وعنوانٌ غير صالح يُرفض 400 في المدقّقة', inv
 
 // ═══════════════════════════════════════════════ 5. ⚙️ الإعدادات
 console.log('\n■ 5. ⚙️ المفاتيح الأربعة في كتالوج الإعدادات');
-check('الكتالوج صار واحداً وثلاثين مفتاحاً', settings.settings.length === 31, `${settings.settings.length}`);
+// واحدٌ وثلاثون بعد P-C12، و`billing.trial_days` أضافه P-M4 (فترة التجربة في التسجيل) ⇒ 32.
+check('الكتالوج صار اثنين وثلاثين مفتاحاً', settings.settings.length === 32, `${settings.settings.length}`);
 const own = Object.fromEntries(settings.settings.map((setting) => [setting.key, setting]));
 check('والمفاتيح الأربعة كلها معرَّفة', SETTING_KEYS.every((key) => Boolean(own[key])));
 check('`report.weekly_enabled` منطقيّ افتراضه الإيقاف', own['report.weekly_enabled']?.kind === 'boolean' && own['report.weekly_enabled']?.value === false);

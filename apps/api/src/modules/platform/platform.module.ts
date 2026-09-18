@@ -68,6 +68,9 @@ import { TenantService } from './tenancy/tenant.service.js';
     TokenService,
     RateLimiterService,
     BillingService,
+    // P-M4: التسجيل الذاتي يسكن `PlatformAdminModule` (يحتاج التجهيز والتفعيل)، وهو يقرأ
+    // الباقات من هنا فلا تُنسخ الخدمة مرّتين ولا تفترق قائمةُ الباقات عن صفحة الأسعار.
+    PublicPlansService,
   ],
 })
 export class PlatformModule {}

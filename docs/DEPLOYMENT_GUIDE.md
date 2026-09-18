@@ -206,14 +206,18 @@ curl -s localhost:3000/health/ready     # checks.database = connected
 curl -s localhost:3000/api/v1/public/plans | head -c 200
 curl -s -o /dev/null -w '%{http_code}\n' localhost:3002/pricing   # 200
 ```
-وللفحص الوظيفي الكامل (٢٥ سكربتاً حيّاً):
+وللفحص الوظيفي الكامل (`ls scripts/verify-*.mjs` = **42** سكربتاً حيّاً، وسكربتات الموقع والاشتراك):
 ```bash
 node scripts/verify-marketing-site.mjs   # 37/37
 node scripts/verify-pricing.mjs          # 53/53
+node scripts/verify-signup.mjs           # 54/54 — الاشتراك والتفعيل (P-M4)
 node scripts/verify-platform-console.mjs # 225/225
 node scripts/verify-content.mjs          # 62/62
 node scripts/verify-weekly-report.mjs    # 35/35
 ```
+> و`verify-signup.mjs` يحتاج خدمة الـAPI وقاعدة البيانات **وخدمة الموقع على `:3002`** (القسم
+> الخامس يقرأ HTML صفحة `/onboarding`)، ويقرأ الرمز المُرسل من جدول `email_messages` باتصال
+> المشغّل — لأنه لا يُعاد في أي استجابة **عن قصد**.
 > هذه السكربتات تعمل بعد النشر بـ`pnpm start:erp:local` (تقرأ `.env` وتضرب `127.0.0.1`).
 
 ---

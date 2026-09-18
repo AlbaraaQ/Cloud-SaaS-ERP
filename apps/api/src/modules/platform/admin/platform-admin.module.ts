@@ -5,6 +5,9 @@ import { SupportModule } from '../../support/support.module.js';
 import { OrganizationModule } from '../../organization/organization.module.js';
 import { PlatformModule } from '../platform.module.js';
 import { DeveloperModule } from '../../developer/developer.module.js';
+import { EmailModule } from '../../email/email.module.js';
+import { SignupVerificationController } from '../signup/signup-verification.controller.js';
+import { SignupService } from '../signup/signup.service.js';
 
 import { PlatformAdminController } from './platform-admin.controller.js';
 import { PlatformAnalyticsController } from './platform-analytics.controller.js';
@@ -19,7 +22,6 @@ import { PlatformConsoleService } from './platform-console.service.js';
 import { PlatformTenantsController } from './platform-tenants.controller.js';
 import { PlatformUsageController } from './platform-usage.controller.js';
 import { PlatformTenantsService } from './platform-tenants.service.js';
-import { SignupController } from './signup.controller.js';
 
 /**
  * The SaaS control plane lives in its own module rather than inside `PlatformModule`
@@ -28,7 +30,7 @@ import { SignupController } from './signup.controller.js';
  * one-directional here avoids a module cycle.
  */
 @Module({
-  imports: [PlatformModule, OrganizationModule, AnnouncementsModule, SupportModule, DeveloperModule],
+  imports: [PlatformModule, OrganizationModule, EmailModule, AnnouncementsModule, SupportModule, DeveloperModule],
   controllers: [
     PlatformAdminController,
     PlatformAnalyticsController,
@@ -37,7 +39,7 @@ import { SignupController } from './signup.controller.js';
     PlatformIdentityController,
     PlatformTenantsController,
     PlatformUsageController,
-    SignupController,
+    SignupVerificationController,
   ],
   providers: [
     PlatformAdminService,
@@ -46,6 +48,7 @@ import { SignupController } from './signup.controller.js';
     PlatformConsoleService,
     PlatformIdentityService,
     PlatformTenantsService,
+    SignupService,
   ],
   exports: [
     PlatformAdminService,

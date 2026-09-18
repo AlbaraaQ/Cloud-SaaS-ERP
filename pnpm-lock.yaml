@@ -199,6 +199,9 @@ importers:
 
   apps/marketing:
     dependencies:
+      '@erp/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       decimal.js:
         specifier: ^10.6.0
         version: 10.6.0

@@ -313,6 +313,20 @@ export const platformSettingDefinitions: readonly PlatformSettingDefinition[] = 
     max: 100,
   },
   {
+    // P-M4 — الفترة التجريبية التي تُعرض على من يسجّل ذاتياً. الرقم **إعدادٌ لا ثابت**:
+    // التسجيل الذاتي يقرؤه فيُخبر الزائر بما سيجده، ويُكتب في طلب التفعيل ليقرأه المشغّل
+    // عند المنح (`POST /platform/subscriptions` يقبل `trialDays` صراحةً). والقيمة التي
+    // يُمنحها العميل فعلاً تبقى قرار المُشغّل وقت الموافقة — والتجربة ليست التزاماً آلياً.
+    key: 'billing.trial_days',
+    labelAr: 'الفترة التجريبية (أيام)',
+    labelEn: 'Trial period (days)',
+    kind: 'integer',
+    helpAr: 'الأيام التي تُعرض على من يسجّل ذاتياً والتي تُكتب في طلب التفعيل. صفر = بلا تجربة.',
+    defaultValue: 14,
+    min: 0,
+    max: 90,
+  },
+  {
     key: 'billing.payment_terms_days',
     labelAr: 'مهلة السداد (أيام)',
     labelEn: 'Payment terms (days)',

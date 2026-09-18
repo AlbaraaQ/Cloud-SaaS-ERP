@@ -38,6 +38,9 @@ export const emailEvents = [
   // P-C6 المؤجَّل — التقرير الأسبوعي: الحدث الوحيد الذي **لا يخصّ عميلاً**، ووجهته مشغّلو
   // المنصة. ولذلك نطاقه `platform` فلا يُحتسب على حصّة أي منشأة.
   'report.weekly',
+  // P-M4 — رمز تحقّق التسجيل: يُرسل إلى زائرٍ **لا عميلَ له** بعد (لا منشأة ولا حصّة)،
+  // ونطاقه `platform` لذلك. ومتغيّره `code` سرٌّ لا يُخزَّن في أي جدول.
+  'signup.verify',
 ] as const;
 
 export type EmailEvent = (typeof emailEvents)[number];
@@ -215,6 +218,15 @@ export const emailEventRegistry: readonly EmailEventDefinition[] = [
   },
 
   {
+    event: 'signup.verify',
+    labelAr: 'رمز تحقّق التسجيل',
+    labelEn: 'Signup verification code',
+    scope: 'platform',
+    variables: ['name', 'company', 'code', 'expires'],
+    descriptionAr: 'رمزٌ بالبريد يُثبت أن من بدأ التسجيل يملك العنوان (P-M4).',
+  },
+
+  {
     event: 'report.weekly',
     labelAr: 'التقرير الأسبوعي للمنصة',
     labelEn: 'Weekly platform report',
@@ -319,6 +331,18 @@ export type EmailTemplateSeed = {
  * غاب الصفّ، فلا تُرسل رسالةٌ بلا نصّ أبداً.
  */
 export const emailTemplateSeeds: readonly EmailTemplateSeed[] = [
+  {
+    event: 'signup.verify',
+    locale: 'ar',
+    subject: 'رمز التحقّق لتسجيل {{company}}',
+    body: 'مرحباً {{name}},\n\nرمز التحقّق الخاص بك:\n{{code}}\n\nأدخله في صفحة التسجيل لإكمال إنشاء منشأة «{{company}}». الرمز صالح حتى {{expires}}.\n\nإن لم تبدأ تسجيلاً فتجاهل هذه الرسالة — لا يوجد حسابٌ بلا هذا الرمز.',
+  },
+  {
+    event: 'signup.verify',
+    locale: 'en',
+    subject: 'Verification code for {{company}}',
+    body: 'Hello {{name}},\n\nYour verification code:\n{{code}}\n\nEnter it on the signup page to finish creating “{{company}}”. The code is valid until {{expires}}.\n\nIf you did not start a signup, ignore this message — no account exists without this code.',
+  },
   {
     event: 'user.invite',
     locale: 'ar',

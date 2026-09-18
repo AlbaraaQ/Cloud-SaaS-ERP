@@ -5650,14 +5650,15 @@
     },
     "/api/v1/signup/plans": {
       "get": {
-        "operationId": "SignupController_plans",
+        "description": "نفس ما تعرضه صفحة `/pricing` بالضبط: النشطة وحدها، بحقوقها بلغتين، ومعها نسبة الضريبة في `meta` — فلا تفترق قائمةُ الباقات بين صفحة الأسعار وخطوة الاشتراك.",
+        "operationId": "SignupVerificationController_planChoices",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
-        "summary": "Plans a prospect can pick while signing up",
+        "summary": "الباقات التي يختار منها المُلتحق",
         "tags": [
           "signup"
         ]
@@ -5665,20 +5666,88 @@
     },
     "/api/v1/signup": {
       "post": {
-        "operationId": "SignupController_signup",
+        "description": "يُعاد **الرمز المميّز** (`token`) مرّةً واحدة، ولا يُعاد رمز التحقّق أبداً: يُرسل بالبريد وحده. والرخصة لا تُمنح هنا — الطلب في طابور التفعيل.",
+        "operationId": "SignupVerificationController_start",
         "parameters": [],
         "responses": {
           "201": {
-            "description": "Tenant created; owner can log in immediately"
+            "description": "أُنشئت المنشأة، والبريد في الطريق"
+          },
+          "403": {
+            "description": "التسجيل الذاتي معطّل على هذا الخادم"
           },
           "409": {
-            "description": "Tenant code already taken (VERSION_CONFLICT)"
+            "description": "البريد يملك منشأةً بالفعل (SIGNUP_EMAIL_TAKEN)"
           },
           "422": {
-            "description": "Invalid payload or weak password (VALIDATION_FAILED)"
+            "description": "بياناتٌ غير صالحة أو باقةٌ غير معروضة"
           }
         },
-        "summary": "Create a new tenant, its owner account and a pending activation request",
+        "summary": "إنشاء منشأة ومدير وطلب تفعيل، ثم إرسال رمز تحقّق إلى بريد المدير",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/verify": {
+      "post": {
+        "operationId": "SignupVerificationController_verify",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "الحالة ومهامّ الإعداد المتبقية"
+          },
+          "404": {
+            "description": "تسجيلٌ غير موجود (SIGNUP_TOKEN_INVALID)"
+          },
+          "422": {
+            "description": "رمزٌ خاطئ أو منتهٍ أو مستهلَك (SIGNUP_CODE_INVALID)"
+          }
+        },
+        "summary": "تأكيد رمز التحقّق المرسل بالبريد",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/resend": {
+      "post": {
+        "operationId": "SignupVerificationController_resend",
+        "parameters": [],
+        "responses": {
+          "429": {
+            "description": "قبل انقضاء المهلة أو بعد استهلاك السقف"
+          }
+        },
+        "summary": "إرسال رمزٍ جديد (مهلة دقيقة، وسقف خمس إرسالات)",
+        "tags": [
+          "signup"
+        ]
+      }
+    },
+    "/api/v1/signup/status/{email}": {
+      "get": {
+        "description": "يُطلب مع `?token=` — وهو ما يجعل الجواب عن عنوانٍ مجهول وعن رمزٍ خاطئ واحداً (404)، فلا يتحوّل المسار العام إلى أداة سردِ عناوين.",
+        "operationId": "SignupVerificationController_status",
+        "parameters": [
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "الحالة + مهامّ الإعداد المقيسة من القاعدة"
+          },
+          "404": {
+            "description": "تسجيلٌ غير موجود أو رمزٌ لا يخصّ هذا البريد"
+          }
+        },
+        "summary": "حالة التسجيل ومهامّ الإعداد المتبقية",
         "tags": [
           "signup"
         ]
