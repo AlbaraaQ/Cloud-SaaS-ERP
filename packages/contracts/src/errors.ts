@@ -48,6 +48,14 @@ export const errorCodes = {
   // P-M4 — رمز المعالج (`token`) غير معروف أو لا يخصّ هذا البريد. **404** عن قصد: الجواب
   // نفسه للعنوان المجهول وللرمز الخاطئ، فلا يتحوّل المسار العام إلى أداة سرد بريد.
   SIGNUP_TOKEN_INVALID: 'SIGNUP_TOKEN_INVALID',
+  // P-M6 — طلب عميلٍ متوقَّع غير موجود. 404 هو الجواب الصحيح لا 403: المعرّف مجهول.
+  LEAD_NOT_FOUND: 'LEAD_NOT_FOUND',
+  // P-M6 — الطلب حُوّل من قبل إلى منشأة. 409 لأن الصراع على موردٍ قائم، وإعادة التحويل
+  // تُنشئ منشأةً ثانية لعنوانٍ واحد — وهو ما يمنعه هذا الرمز.
+  LEAD_ALREADY_CONVERTED: 'LEAD_ALREADY_CONVERTED',
+  // P-M6 — انتقال حالةٍ غير مسموح (من `won`/`rejected` مثلاً). 422: الطلب سليم والمنع
+  // قاعدةُ حالةٍ معلنة في العقد، لا خطأ خادم.
+  LEAD_STATUS_LOCKED: 'LEAD_STATUS_LOCKED',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -88,6 +96,9 @@ export const errorStatus: Record<ErrorCode, number> = {
   SIGNUP_EMAIL_TAKEN: 409,
   SIGNUP_CODE_INVALID: 422,
   SIGNUP_TOKEN_INVALID: 404,
+  LEAD_NOT_FOUND: 404,
+  LEAD_ALREADY_CONVERTED: 409,
+  LEAD_STATUS_LOCKED: 422,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -122,6 +133,9 @@ export const errorTitle: Record<ErrorCode, string> = {
   SIGNUP_EMAIL_TAKEN: 'Email already has an account',
   SIGNUP_CODE_INVALID: 'Verification code rejected',
   SIGNUP_TOKEN_INVALID: 'Signup not found',
+  LEAD_NOT_FOUND: 'Lead not found',
+  LEAD_ALREADY_CONVERTED: 'Lead already converted',
+  LEAD_STATUS_LOCKED: 'Lead status locked',
 };
 
 export function statusForCode(code: string): number {

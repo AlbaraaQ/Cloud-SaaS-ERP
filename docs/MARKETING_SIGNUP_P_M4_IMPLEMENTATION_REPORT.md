@@ -157,7 +157,14 @@
 | `verify-signup.mjs` | — | **54/54** في 5 أقسام |
 | سكربتات التحقّق الحيّ | 41 ملفاً | **42** (والمجموع **1052** نقطة في **122** قسماً) |
 | `pnpm db:roles` | ❌ `syntax error at or near "$1"` | ✅ يضبط الدورين |
-| `tsc` / `eslint` / بناء api · marketing الإنتاجي | Exit 0 | Exit 0 (‏`/onboarding` 56.3 kB) |
+| `eslint` (المستودع كلّه) | نظيف | **نظيف** |
+| `tsc` لِما بُني في هذا الجزء — `pnpm --filter @erp/api build` · `pnpm --filter @erp/marketing …` · `pnpm -r --filter "./packages/*" build` | Exit 0 | **Exit 0** (‏`/onboarding` 56.3 kB في بناء الإنتاج) |
+| `tsc -p tsconfig.base.json` (المستودع كلّه في نداءٍ واحد) | Exit 2 · 357 سطر خطأ **سابق** | Exit 2 · العدد نفسه: لا خطأ **جديد** من ملفات P-M4 (‏`platform-email.spec` «locale» ×17 · marketing 26 · `staff` `error: unknown` · whatsapp import ext…) |
+
+> **دقّةٌ لازمة**: «Exit 0» في السطر الثاني تعني **بناء كل سطحٍ وحزمةٍ لمسها الجزء**، لا
+> `tsc -p tsconfig.base.json` على المستودع كلّه — فالأخير غير نظيفٍ منذ ما قبل P-M4 (٣٥٧ سطراً
+> في حزمٍ خارج نطاق هذا الجزء)، ومقارنةُ ما قبل/بعد فيه هي **ثباتُ العدد** لا صفرُ الأخطاء.
+> وهذا هو المعيار الذي يُقاس به كل جزءٍ لاحق: «لا خطأ جديد من ملفاته».
 
 **وسكربتات التحقّق كلها أُعيد تشغيلها على الخادم الجديد**: `verify-signup` 54/54 ·
 `verify-pricing` 53/53 · `verify-marketing-site` 37/37 · `verify-content` 62/62 ·

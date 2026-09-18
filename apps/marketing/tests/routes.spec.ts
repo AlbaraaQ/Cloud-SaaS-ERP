@@ -10,7 +10,9 @@ const appDir = fileURLToPath(new URL('../app', import.meta.url));
 
 describe('marketing route groups', () => {
   it('advertises public pages only', () => {
-    expect(publicRoutes.map((route) => route.key)).toEqual(['home', 'pricing', 'contact', 'verify']);
+    // P-M6 أضاف «اطلب عرضاً» إلى المسارات المعلَنة: الاستمارة صارت مساراً حقيقياً بمصدرٍ
+    // موسوم (`demo`) في طابور العملاء المتوقّعين، لا زرّاً يُعيد الزائر إلى `/contact`.
+    expect(publicRoutes.map((route) => route.key)).toEqual(['home', 'pricing', 'demo', 'contact', 'verify']);
     expect(publicRoutes.every((route) => !route.href.startsWith('/portal') && !route.href.startsWith('/auth'))).toBe(true);
   });
 
@@ -21,6 +23,7 @@ describe('marketing route groups', () => {
       expect(existsSync(join(appDir, relative)), route.href).toBe(true);
     }
     expect(existsSync(join(appDir, 'onboarding/page.tsx')), '/onboarding').toBe(true);
+    expect(existsSync(join(appDir, 'demo/page.tsx')), '/demo').toBe(true);
     expect(existsSync(join(appDir, 'login/page.tsx')), '/login').toBe(true);
   });
 

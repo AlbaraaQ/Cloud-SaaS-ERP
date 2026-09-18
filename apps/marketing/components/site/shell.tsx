@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import type { MenuItem, SiteShell } from '../../lib/content';
 import { dir, t, type Locale } from '../../lib/i18n';
 import { siteFooterLinks, siteNavLinks } from '../../lib/navigation';
+import { NewsletterForm } from '../newsletter-form';
 
 import { LocaleSwitch } from './locale-switch';
 
@@ -130,6 +131,9 @@ export function SiteFooter({ shell, locale }: { shell: SiteShell; locale: Locale
             ))}
           </nav>
         ))}
+
+        {/* P-M6 — النشرة في التذييل: مكانها المعتاد، وبلا مسارٍ جديد يضيع من خريطة الموقع. */}
+        <NewsletterForm locale={locale} compact />
 
         {legalItems.length > 0 ? (
           <nav className="footer-group" aria-label={t(locale, 'footer.legal')}>

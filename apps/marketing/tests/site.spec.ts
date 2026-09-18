@@ -206,6 +206,10 @@ describe('marketing SEO (P-M1)', () => {
 
     const urls = entries.map((entry) => entry.url);
     expect(urls).toContain('https://erp.example.sa/');
+    // P-M6: مسارا التحويل (`/demo` و`/onboarding`) في الخريطة — صدرٌ يُبحث عنه، وشاشةٌ
+    // لا تُعلن في الخريطة شاشةٌ لا يجدها من يبحث عنها.
+    expect(urls).toContain('https://erp.example.sa/demo');
+    expect(urls).toContain('https://erp.example.sa/onboarding');
     expect(urls).toContain('https://erp.example.sa/blog/kayfa-tabdaa');
     // النظير الإنجليزي **لا يُكرَّر صفّاً**: يُعلَن بديلاً بالـ`hreflang` داخل الصفّ نفسه
     // (`alternates.languages`) — وهذا ما يقرؤه محرّك البحث كصفحتين لمعنًى واحد.

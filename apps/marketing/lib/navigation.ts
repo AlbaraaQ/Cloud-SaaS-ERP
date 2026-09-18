@@ -12,6 +12,9 @@ export type PortalRoute = { key: string; href: string; labelAr: string; labelEn:
 export const publicRoutes: PortalRoute[] = [
   { key: 'home', href: '/', labelAr: 'الرئيسية', labelEn: 'Home' },
   { key: 'pricing', href: '/pricing', labelAr: 'الأسعار', labelEn: 'Pricing' },
+  // P-M6: طلب العرض صار مساراً (كان زرّاً يشير إلى `/contact`) — ومصدره `demo` في طابور
+  // العملاء المتوقّعين، فلا يجب أن يعيش خارج خريطة الموقع.
+  { key: 'demo', href: '/demo', labelAr: 'اطلب عرضاً', labelEn: 'Book a demo' },
   { key: 'contact', href: '/contact', labelAr: 'تواصل', labelEn: 'Contact' },
   { key: 'verify', href: '/verify', labelAr: 'تحقق من فاتورة', labelEn: 'Verify' },
 ];
@@ -50,6 +53,9 @@ export const siteRoutes: SiteRoute[] = [
   { key: 'help', href: '/help', labelAr: 'مركز المساعدة', labelEn: 'Help center', bilingual: true, nav: true },
   { key: 'pricing', href: '/pricing', labelAr: 'الباقات', labelEn: 'Pricing', bilingual: false, nav: true },
   { key: 'contact', href: '/contact', labelAr: 'تواصل معنا', labelEn: 'Contact', bilingual: false, nav: true },
+  // P-M6: «اطلب عرضاً» مسارٌ عربيٌّ وحده (ترجمته مع `/en/*` في P-M10)، ويظهر في الرأس
+  // لأنّه أوّل ما يطلبه زائرٌ يريد أن يرى النظام قبل أن يدفع.
+  { key: 'demo', href: '/demo', labelAr: 'اطلب عرضاً', labelEn: 'Book a demo', bilingual: false, nav: true },
   { key: 'verify', href: '/verify', labelAr: 'تحقّق من فاتورة', labelEn: 'Verify invoice', bilingual: false, nav: false },
   { key: 'onboarding', href: '/onboarding', labelAr: 'اشترك', labelEn: 'Subscribe', bilingual: false, nav: false },
   { key: 'login', href: '/login', labelAr: 'دخول', labelEn: 'Sign in', bilingual: false, nav: false },

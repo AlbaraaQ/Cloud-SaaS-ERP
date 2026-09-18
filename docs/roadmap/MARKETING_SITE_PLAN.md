@@ -159,19 +159,19 @@ SEO، ولا التقاط عملاء، ولا قياس.
 > تُكتب مع صفحتها بديلاً كاملاً). والدليل: `public-content.spec.ts` 10 + `platform-content.spec.ts` 16
 > و`verify-content.mjs` **62/62** وشاشة `/content` في اللوحة.
 
-### P-M6 — التقاط العملاء المتوقّعين وإدارتهم 🟠
+### P-M6 — التقاط العملاء المتوقّعين وإدارتهم 🟠 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | لا يضيع زائر مهتم، ولا يُكتب طلب على ورق |
 | **الشاشات (عامة)** | نموذج تواصل حقيقي (الاسم · الشركة · البريد · الهاتف · عدد الفروع · الرسالة) + نموذج «اطلب عرضاً» + اشتراك في النشرة |
 | **الشاشات (لوحة)** | صندوق العملاء المتوقّعين: حالات (جديد · قيد التواصل · مؤهَّل · تحوّل · مرفوض) · إسناد · ملاحظات · مصدر (نموذج · حملة · مباشر) · **UTM** كاملة · تحويل إلى عميل بضغطة (ينشئ المستأجر والمدير ويمنحه فترة تجريبية) |
-| **نقاط نهاية** | `POST /public/leads` · `GET/PATCH /platform/leads` · `POST /platform/leads/:id/notes` · `POST /platform/leads/:id/convert` · `POST /public/subscribe` · `GET /platform/subscribers` |
+| **نقاط نهاية** | ✅ `POST /public/leads` · `POST /public/subscribe` · `GET /public/subscribe/confirm/:token` · `GET/PATCH /platform/leads` · `GET /platform/leads/:id` · `POST /platform/leads/:id/notes` · `POST /platform/leads/:id/convert` · `GET/PATCH /platform/leads/subscribers[/:id]` (**النشرة تحت `/platform/leads`** — خلافاً لما كتبته هذه الخطة: النشرة صندوقٌ من الصندوق، وتفريقهما في مسارين يعني قراءةً من مكانٍ وكتابةً في آخر) |
 | **حماية البريد المزعج** | حقل مصيدة (honeypot) + محدّد معدل (يصير مشتركاً بين الأسطح بعد نقل محدّد المعدل إلى Redis — انظر `INCOMPLETE_INVENTORY.md` §5) + تحقّق اختياري من البريد برسالة تأكيد |
 | **صلاحيات** | **`console.leads.manage`** و**`console.leads.view`** (جديدان) |
-| **ترحيل** | `0075_leads.sql` — `leads` · `lead_notes` · `lead_events` · `email_subscribers` |
-| **اختبار** | `public-leads.spec.ts` (≥ 12): حفظ + إسناد + تحويل إلى مستأجر فعلي + منع التكرار + رفض المصيدة |
-| **تحقّق حيّ** | `scripts/verify-leads.mjs` (≈ 30 نقطة) |
+| **ترحيل** | ✅ **`0080_leads.sql`** (لا 0075: الرقم شُغل بـ`content` في P-M5) — `leads` · `lead_notes` · `lead_events` · `email_subscribers` — ومعها `0081_leads_permissions.sql` لرمزَي الصلاحية |
+| **اختبار** | ✅ `public-leads.spec.ts` **16** (≥ 12): حفظ + إسناد + تحويل إلى مستأجر فعلي + منع التكرار + رفض المصيدة + `LEAD_STATUS_LOCKED` + النشرة بتأكيدها المزدوج + فصل الصلاحيتين |
+| **تحقّق حيّ** | ✅ `scripts/verify-leads.mjs` **58/58 في 6 أقسام** (≈ 30 نقطة) |
 
 ### P-M7 — الحملات البريدية 🟡
 
@@ -270,7 +270,7 @@ SEO، ولا التقاط عملاء، ولا قياس.
 |---|---|---|
 | `0070_announcements.sql` | الإعلانات (من اللوحة) | P-C7 |
 | `0074_content.sql` | `content_pages` · `content_blocks` · `content_menus` · `content_banners` · `content_versions` | P-M5 |
-| `0075_leads.sql` | `leads` · `lead_notes` · `lead_events` · `email_subscribers` | P-M6 |
+| `0080_leads.sql` (+ `0081_leads_permissions.sql`) | `leads` · `lead_notes` · `lead_events` · `email_subscribers` | P-M6 ✅ |
 | `0076_campaigns.sql` | `email_campaigns` · `campaign_messages` · `campaign_events` | P-M7 |
 
 | الرمز الجديد | الجزء |
@@ -282,16 +282,16 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | الاختبارات | العدد المقدَّر |
 |---|---:|
 | `public-content.spec.ts` + `platform-content.spec.ts` | 16 |
-| `public-leads.spec.ts` | 12 |
+| `public-leads.spec.ts` (P-M6 ✅: **16** أُنجزت) | 12 |
 | `platform-campaigns.spec.ts` | 12 |
 | `signup-flow.spec.ts` (P-M4 ✅: **16** أُنجزت) + `apps/marketing/tests/signup.spec.ts` (**12**) | 12 |
 | `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/{site,pricing}.spec.ts` (✅ **25** أُنجزت) | 30 |
 | **المجموع** | **≈ 82** |
 
 السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (**54** أُنجزت في P-M4) ·
-`verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (30) · `verify-campaigns.mjs` (30) ·
+`verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (✅ **58** أُنجزت في P-M6) · `verify-campaigns.mjs` (30) ·
 `verify-pricing.mjs` (**53** أُنجزت في P-M3)
-— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **206** نقطة في أربعة سكربتات.
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **264** نقطة في خمسة سكربتات.
 
 ---
 
@@ -337,7 +337,8 @@ P-M1 ── P-M2 ── P-M3 ── P-M4 ── P-M6
 الجلسة الأولى: **P-M1 + P-M2** (موقع يبدو احترافياً بسرعة) — ✅. الثانية: **P-M5** (نظام
 المحتوى — بدونه كل نصّ تعديلُ كود) — ✅. والثالثة: **P-M3 + P-M4** (الباقات والاشتراك) —
 **P-M3 ✅ · P-M4 ✅**.
-الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية) — **P-M6 التالي**. وما بعدها تحسين.
+الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية) — **P-M6 ✅**. والخامسة: **P-M7** (الحملات
+البريدية) — التالي.
 
 ---
 

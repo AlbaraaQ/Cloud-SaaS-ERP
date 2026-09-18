@@ -231,16 +231,17 @@ const operationsRole = roles.find((role) => role.code === 'platform_operations')
 // بلا أن يظهر على الدور يعني أن أحداً لن يستطيع استخدام الشاشة، وهو ما يجب أن يسقط هنا لا في
 // يد المشغّل.
 check(
-  // ٢٣ منذ P-M5: رمزا نظام إدارة المحتوى (`console.content.view` و`console.content.manage`).
-  'مالك المنصة يحمل الرموز الثلاثة والعشرين',
-  ownerRole.permissions.length === 23,
+  // ٢٣ منذ P-M5 (رمزا المحتوى)، و**٢٥ منذ P-M6**: رمزا العملاء المتوقّعين
+  // (`console.leads.view` و`console.leads.manage`) — والتحويل قرارُ فوترةٍ يملكه المالك.
+  'مالك المنصة يحمل الرموز الخمسة والعشرين',
+  ownerRole.permissions.length === 25,
   `${ownerRole.permissions.length}`,
 );
 check('والعمليات لا تملك إيقاف منشأة', !operationsRole.permissions.includes('console.tenants.manage'));
 check('ولا تملك كتابة الإعدادات', !operationsRole.permissions.includes('console.settings.manage'));
 
 const registry = await get('/platform/permissions');
-check('سجل رموز اللوحة يعرضها كلها', registry.length === 23, `${registry.length} رمزاً`);
+check('سجل رموز اللوحة يعرضها كلها', registry.length === 25, `${registry.length} رمزاً`);
 check(
   'ورموز المحتوى بينها (ترحيل 0078)',
   registry.some((entry) => entry.code === 'console.content.view') &&
@@ -1002,9 +1003,10 @@ const auditorCatalog = [
   ...(matrix.find((role) => role.code === 'platform_auditor')?.catalogPermissions ?? []),
 ];
 check(
-  // P-C12: صار ستّةً — أُضيفت `console.analytics.view`، وهي `.view` كذلك: المدقّق يقرأ ولا يكتب.
+  // P-C12: صار ستّةً (`console.analytics.view`)؛ و**سبعةً في P-M6** بإضافة `console.leads.view`
+  // — وهي `.view` كذلك: الرقابة تقرأ بيانات من وصل من الموقع ولا تُبدّلها.
   'والمدقّق يحمل رموز القراءة وحدها',
-  auditorCatalog.length === 6 && auditorCatalog.every((code) => code.endsWith('.view')),
+  auditorCatalog.length === 7 && auditorCatalog.every((code) => code.endsWith('.view')),
   auditorCatalog.join(' · '),
 );
 const ownerRoleRow = matrix.find((role) => role.code === 'platform_owner');

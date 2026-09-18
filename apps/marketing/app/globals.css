@@ -885,3 +885,107 @@ table.compare tbody tr:last-child td {
     border: 0;
   }
 }
+
+/* ------------------------------------------------------------------ P-M6: استمارات الالتقاط */
+
+/*
+ * حقول الاستمارة: صفٌّ من حقلين على الشاشات الواسعة وعمودٌ واحد على الجوال — والاستمارة
+ * العربية تبدأ من اليمين، فالشبكة تكفي ولا حاجة إلى `direction`.
+ */
+.lead-form .field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.field .input,
+.field textarea {
+  width: 100%;
+  font: inherit;
+}
+
+/* الخطأ يقع تحت حقله لا في رأس الصفحة: من أخطأ في البريد يجد السبب عنده. */
+.field-error,
+.form-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.form-error {
+  background: var(--danger-soft);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 680px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.small {
+  font-size: 13px;
+}
+
+.lead-reference {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+}
+
+.lead-reference .reference {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+}
+
+/*
+ * حقل المصيدة: مخفيٌّ عن الإنسان بـ`display:none` على **الحاوية** لا بـ`hidden` على الحقل،
+ * فبعض الماسحات تتجاهل ما هو `hidden` وتملأ ما سواه. ولا يصل إليه قارئ الشاشة (الحاوية
+ * مُخفاة كاملة) ولا ترتيب التنقّل (كل حقلٍ `tabIndex=-1`).
+ */
+.hp-field {
+  display: none;
+}
+
+.footer-newsletter {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+}
+
+.footer-newsletter h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.newsletter-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.newsletter-form .input {
+  min-width: 180px;
+  flex: 1;
+}

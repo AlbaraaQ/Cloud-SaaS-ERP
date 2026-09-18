@@ -56,6 +56,8 @@ export const SITE_PATHS = {
   help: '/help',
   pricing: '/pricing',
   contact: '/contact',
+  // P-M6: طلب العرض مسارٌ حقيقي بمصدره الخاص (`demo`) — ومسارٌ حقيقي لا يُستثنى من الخريطة.
+  demo: '/demo',
   onboarding: '/onboarding',
   login: '/login',
   verify: '/verify',
@@ -268,6 +270,10 @@ export function sitemapEntries(
     // الصفحات أحادية اللغة: عربيةٌ وحدها، فلا تُعلَن نظائرُ لها.
     { path: SITE_PATHS.pricing, locales: ['ar'] },
     { path: SITE_PATHS.contact, locales: ['ar'] },
+    // P-M6: مساران كانا خارج الخريطة (`/demo` وُلد في P-M6، و`/onboarding` وُلد في P-M4
+    // ولم يُدرَج) — ومسارُ تحويلٍ حقيقيّ لا يُخفى عن محرّكات البحث.
+    { path: SITE_PATHS.demo, locales: ['ar'] },
+    { path: SITE_PATHS.onboarding, locales: ['ar'] },
     { path: SITE_PATHS.verify, locales: ['ar'] },
   ];
 

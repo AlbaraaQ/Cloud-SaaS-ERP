@@ -7,6 +7,7 @@ export * from './identity.js';
 export * from './billing.js';
 export * from './usage.js';
 export * from './signup.js';
+export * from './leads.js';
 export * from './email.js';
 export * from './announcements.js';
 export * from './support.js';

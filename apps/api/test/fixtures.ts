@@ -48,6 +48,18 @@ export type ActorOptions = {
   password?: string;
   permissions?: readonly string[];
   roleNames?: readonly string[];
+  /**
+   * أدوار المنصّة (`platform_owner` · `platform_support` · …) — تُمنح في `platform_memberships`
+   * وحدها فيصير للفاعل `pam` ورموز `console.*`. وكانت تُستعمل في أجنحة اللوحة بلا تعريفٍ في
+   * هذا النوع ⇒ `tsc` يشتكي من كل نداءٍ يمرّرها (P-M6).
+   */
+  platformRoles?: readonly string[];
+  /**
+   * نوع العضويّة (`memberships.kind`، افتراضه `staff`) — يُستعمل في `createActor` منذ
+   * RBAC-REORG لتوليد عضويّات البوابة (بوّابة العميل تصل بـ`portal`)، ولم يكن معلناً في هذا
+   * النوع. يُعلَن هنا فيسكت `tsc` عن استعمالٍ مشروع.
+   */
+  kind?: 'staff' | 'portal';
   tenantStatus?: 'active' | 'suspended' | 'archived';
   membershipStatus?: 'active' | 'invited' | 'suspended';
   branchScope?: string[] | null;

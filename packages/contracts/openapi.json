@@ -5753,6 +5753,291 @@
         ]
       }
     },
+    "/api/v1/platform/leads": {
+      "get": {
+        "description": "مرتّبٌ بالمفتوح أوّلاً ثم بالأحدث، ومعه عدّادات كل حالة وعدد غير المُسنَد — فسؤال «كم طلباً جديداً لم يُتابع؟» يُجاب من الصفحة الأولى بلا نداءٍ ثانٍ.",
+        "operationId": "PlatformLeadsController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "بحثٌ في الاسم والشركة والبريد والمرجع",
+            "schema": {}
+          },
+          {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "true = المُسنَد إليّ",
+            "schema": {}
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "description": "true = غير المُسنَد وحده",
+            "schema": {}
+          },
+          {
+            "name": "assignedTo",
+            "required": false,
+            "in": "query",
+            "description": "معرّف مشغّل",
+            "schema": {}
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "form | demo | newsletter | campaign | manual",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "new",
+                "contacted",
+                "qualified",
+                "won",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lead queue"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "طابور العملاء المتوقّعين",
+        "tags": [
+          "platform-leads"
+        ]
+      }
+    },
+    "/api/v1/platform/leads/subscribers": {
+      "get": {
+        "operationId": "PlatformLeadsController_subscribers",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "confirmed",
+                "unsubscribed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newsletter subscribers"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "المشتركون في النشرة البريدية",
+        "tags": [
+          "platform-leads"
+        ]
+      }
+    },
+    "/api/v1/platform/leads/subscribers/{id}": {
+      "patch": {
+        "description": "لا يُحذف صفّ: الحالة تتغيّر (`confirmed` · `unsubscribed`) واللحظة تُسجَّل.",
+        "operationId": "PlatformLeadsController_updateSubscriber",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The updated subscriber"
+          },
+          "404": {
+            "description": "المشترك غير موجود (NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تأكيد مشتركٍ يدوياً أو إلغاء اشتراكه",
+        "tags": [
+          "platform-leads"
+        ]
+      }
+    },
+    "/api/v1/platform/leads/{id}": {
+      "get": {
+        "operationId": "PlatformLeadsController_detail",
+        "parameters": [],
+        "responses": {
+          "404": {
+            "description": "الطلب غير موجود (LEAD_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "الطلب وملاحظاته وأثره",
+        "tags": [
+          "platform-leads"
+        ]
+      },
+      "patch": {
+        "description": "الانتقالات محدودة كما في العقد: من `won` أو `rejected` لا رجوع — الحالة النهائية قرارٌ يبقى، والرجوع عنه ملاحظةٌ أو طلبٌ جديد.",
+        "operationId": "PlatformLeadsController_update",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The updated lead"
+          },
+          "422": {
+            "description": "انتقالٌ غير مسموح (LEAD_STATUS_LOCKED)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تغيير الحالة أو الإسناد",
+        "tags": [
+          "platform-leads"
+        ]
+      }
+    },
+    "/api/v1/platform/leads/{id}/notes": {
+      "post": {
+        "operationId": "PlatformLeadsController_note",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The stored note"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "إضافة ملاحظة إلى الطلب",
+        "tags": [
+          "platform-leads"
+        ]
+      }
+    },
+    "/api/v1/platform/leads/{id}/convert": {
+      "post": {
+        "description": "ينشئ المنشأة والمدير ودليل الحسابات، ويمنح ترخيصاً بحالة `trialing` مدّته من إعداد `billing.trial_days`، ويُغلق الطلب `won`. وكلمة المرور المؤقتة تُعاد **مرّةً واحدة** ولا تُخزَّن خاماً ولا تُرسل بالبريد.",
+        "operationId": "PlatformLeadsController_convert",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Tenant, licence and the one-time temporary password"
+          },
+          "409": {
+            "description": "الطلب حُوّل من قبل (LEAD_ALREADY_CONVERTED)"
+          },
+          "422": {
+            "description": "رمز منشأةٍ مأخوذ أو باقةٌ مجهولة (VALIDATION_FAILED)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "تحويل الطلب إلى منشأة (ومنحها فترة تجريبية)",
+        "tags": [
+          "platform-leads"
+        ]
+      }
+    },
+    "/api/v1/public/leads": {
+      "post": {
+        "description": "يُقبَل الطلب بـ202 ويُعاد مرجعٌ قصير يُقال للزائر. والحقل المخفيّ `website` مصيدة: من يملؤه لا يُكتب له صفّ. والعنوان المكرَّر لا يُنشئ طلباً ثانياً — تُلحَق رسالته ملاحظةً على الطلب القائم.",
+        "operationId": "PublicLeadsController_create",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "Lead accepted (or silently discarded as automated)"
+          },
+          "422": {
+            "description": "حقلٌ ناقص أو غير صالح (VALIDATION_FAILED)"
+          },
+          "429": {
+            "description": "تجاوز حدّ المعدّل (RATE_LIMITED)"
+          }
+        },
+        "summary": "استمارة تواصل أو طلب عرض (بلا جلسة)",
+        "tags": [
+          "public-leads"
+        ]
+      }
+    },
+    "/api/v1/public/subscribe": {
+      "post": {
+        "description": "يُرسل رابطُ تأكيدٍ إلى العنوان، ولا يُضاف أحدٌ إلى القائمة قبل فتحه. والجواب واحد للمشترك الجديد والمؤكَّد من قبل — فلا يصير الحقل أداةَ تحقّقٍ من العناوين.",
+        "operationId": "PublicLeadsController_subscribe",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "طلب اشتراكٍ مسجَّل (أو تأكيدٌ سابق)"
+          }
+        },
+        "summary": "الاشتراك في النشرة البريدية (تأكيدٌ مزدوج)",
+        "tags": [
+          "public-leads"
+        ]
+      }
+    },
+    "/api/v1/public/subscribe/confirm/{token}": {
+      "get": {
+        "description": "يُفتح الرابط من الرسالة فيُؤكَّد العنوان. والتأكيد idempotent: الفتحة الثانية لا تغيّر شيئاً.",
+        "operationId": "PublicLeadsController_confirm",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription confirmed"
+          },
+          "404": {
+            "description": "رابطٌ غير معروف أو استُبدل بغيره (NOT_FOUND)"
+          }
+        },
+        "summary": "تأكيد الاشتراك من رابط البريد",
+        "tags": [
+          "public-leads"
+        ]
+      }
+    },
     "/api/v1/company-profile": {
       "get": {
         "operationId": "CompanyProfileController_read",

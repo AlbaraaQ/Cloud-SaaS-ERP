@@ -41,6 +41,10 @@ export const emailEvents = [
   // P-M4 — رمز تحقّق التسجيل: يُرسل إلى زائرٍ **لا عميلَ له** بعد (لا منشأة ولا حصّة)،
   // ونطاقه `platform` لذلك. ومتغيّره `code` سرٌّ لا يُخزَّن في أي جدول.
   'signup.verify',
+  // P-M6 — حدثان لزائرَين لا عميلَين: تأكيد استلام طلبٍ من الموقع، ورابطُ تأكيد النشرة.
+  // وكلاهما `platform` لأن كليهما يُرسل إلى من ليس له منشأة — فلا يُحتسب على حصّة أحد.
+  'lead.received',
+  'subscriber.confirm',
 ] as const;
 
 export type EmailEvent = (typeof emailEvents)[number];
@@ -246,6 +250,28 @@ export const emailEventRegistry: readonly EmailEventDefinition[] = [
       'link',
     ],
     descriptionAr: 'تقريرٌ أسبوعي بأرقام المنصة يُرسل إلى عناوين المشغّلين من شاشة الإعدادات.',
+  },
+
+  {
+    event: 'lead.received',
+    labelAr: 'تأكيد استلام طلب',
+    labelEn: 'Lead acknowledgement',
+    scope: 'platform',
+    variables: ['name', 'company', 'reference'],
+    descriptionAr:
+      'رسالةٌ إلى من ملأ استمارة التواصل أو طلب العرض: وصلنا طلبك، وهذا رقمه (P-M6).',
+  },
+
+  {
+    event: 'subscriber.confirm',
+    labelAr: 'تأكيد الاشتراك في النشرة',
+    labelEn: 'Newsletter confirmation',
+    scope: 'platform',
+    // `name` مطلوبة كغيرها من الأحداث: هذا الفهرس عقدُ «كل حدثٍ يخاطب إنساناً باسمه»،
+    // والنشرة تُخاطب مشتركاً بلا اسمٍ معلوم — فيُصيَّر بالبريد نفسه (`toName`).
+    variables: ['name', 'email', 'link'],
+    descriptionAr:
+      'رابطُ التأكيد المزدوج للاشتراك في النشرة: لا يُضاف عنوانٌ إلى القائمة قبل أن يفتحه صاحبه (P-M6).',
   },] as const;
 
 const eventByKey = new Map(emailEventRegistry.map((entry) => [entry.event, entry]));
@@ -342,6 +368,30 @@ export const emailTemplateSeeds: readonly EmailTemplateSeed[] = [
     locale: 'en',
     subject: 'Verification code for {{company}}',
     body: 'Hello {{name}},\n\nYour verification code:\n{{code}}\n\nEnter it on the signup page to finish creating “{{company}}”. The code is valid until {{expires}}.\n\nIf you did not start a signup, ignore this message — no account exists without this code.',
+  },
+  {
+    event: 'lead.received',
+    locale: 'ar',
+    subject: 'وصلنا طلبك — {{reference}}',
+    body: 'مرحباً {{name}},\n\nوصلنا طلبك من {{company}} وسيتواصل معك فريقنا في أقرب وقت.\nرقم الطلب: {{reference}}\n\nإن لم ترسل هذا الطلب فتجاهل الرسالة — لا حساب يُنشأ بلا موافقتك.',
+  },
+  {
+    event: 'lead.received',
+    locale: 'en',
+    subject: 'We received your request — {{reference}}',
+    body: 'Hello {{name}},\n\nWe received your request from {{company}} and our team will get back to you shortly.\nReference: {{reference}}\n\nIf you did not send this request, ignore this message — no account is created without you.',
+  },
+  {
+    event: 'subscriber.confirm',
+    locale: 'ar',
+    subject: 'أكّد اشتراكك في النشرة',
+    body: 'مرحباً {{name}},\n\nلتأكيد اشتراك {{email}} في نشرة المنصة افتح الرابط:\n{{link}}\n\nوإن لم تطلب الاشتراك فتجاهل الرسالة — لن نُرسل شيئاً إلى هذا العنوان بلا هذه الخطوة.',
+  },
+  {
+    event: 'subscriber.confirm',
+    locale: 'en',
+    subject: 'Confirm your newsletter subscription',
+    body: 'Hello {{name}},\n\nTo confirm {{email}} on the platform newsletter, open:\n{{link}}\n\nIf you did not ask to subscribe, ignore this message — nothing is sent to this address without this step.',
   },
   {
     event: 'user.invite',

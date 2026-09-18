@@ -99,6 +99,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-M5: كلمات الموقع التسويقي قرارُ المنصّة على السوق — للمالك وحده فعلُ نشرها.
       'console.content.view',
       'console.content.manage',
+      // P-M6: العميل المتوقَّع مالٌ لم يصل بعد — وتحويله يُنشئ منشأةً كاملة، فالرمزان للمالك.
+      'console.leads.view',
+      'console.leads.manage',
     ],
   },
   {
@@ -130,6 +133,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       // P-M5: **قراءةٌ لا كتابة**: التشغيل يرى ما سيُنشر ليبلغه في التذكرة، ولا يحرّر هوية
       // المنصّة على السوق — وهذا ما يجعل رمزين لا رمزاً.
       'console.content.view',
+      // P-M6: التشغيل يرى ما وصل من الموقع ليوجّهه، ولا يحوّل طلباً إلى منشأة (فعلُ فوترة).
+      'console.leads.view',
     ],
   },
   {
@@ -147,6 +152,9 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.email.view',
       // P-C12: التسرّب والتحصيل والقيمة الشهرية أرقامُ فوترةٍ قبل أن تكون رسوماً.
       'console.analytics.view',
+      // P-M6: التحويل إلى منشأة قرارُ فوترة (باقةٌ وتجربةٌ وترخيص) — ومعها القراءة.
+      'console.leads.view',
+      'console.leads.manage',
     ],
   },
   {
@@ -162,6 +170,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.email.view',
       // P-M5: الدعم يقرأ مقال المساعدة الذي يرسله للعميل في تذكرته.
       'console.content.view',
+      // P-M6: من يجيب على الاستفسار يقرأ الطلب — **قراءةً لا تصرّفاً**.
+      'console.leads.view',
     ],
   },
   {
@@ -178,6 +188,8 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.email.view',
       // P-C12: الأرقام المجمّعة تقرأها الرقابة بلا صلاحية تغييرٍ واحدة — قراءةٌ خالصة.
       'console.analytics.view',
+      // P-M6: بياناتُ أشخاصٍ حقيقيين وصلت من الموقع — الرقابة تقرؤها ولا تُبدّلها.
+      'console.leads.view',
     ],
   },
 ] as const;

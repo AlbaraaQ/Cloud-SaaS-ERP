@@ -366,6 +366,14 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
     'console.content.manage',
     'Write, publish, schedule, retract and restore marketing content pages, menus and banners.',
   ),
+  // P-M6 — العميل المتوقَّع: رمزان لا رمز، ولنفس منطق المحتوى: **من يقرأ الطابور ليس من
+  // يتصرّف فيه**. الدعم يرى الطلب ليجيب عنه، وqualification والتحويل قرارُ من يملك التصرّف —
+  // والتحويل يُنشئ منشأةً كاملة، فهو أخطر فعلٍ في هذه الشاشة.
+  perm('console.leads.view', 'Read leads, their notes, their timeline and newsletter subscribers.'),
+  perm(
+    'console.leads.manage',
+    'Assign leads, change their status, write notes, convert a lead into a tenant, and manage subscribers.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

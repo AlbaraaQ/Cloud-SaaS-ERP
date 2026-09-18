@@ -76,6 +76,17 @@ export const consoleGroups: readonly ConsoleGroup[] = [
         'console.tenants.manage',
         'POST /platform/tenants',
       ),
+      // P-M6 — «العملاء المتوقّعون»: من وصل من الموقع التسويقي قبل أن يصير عميلاً. محله
+      // مجموعة العملاء لا المال: الطابور يُقرأ كلَّ صباح، والتحويل قرارُ فوترة. وقارئه
+      // (`console.leads.view`) غير كاتبه (`console.leads.manage`) — فالدعم يجيب ولا يُنشئ منشأة.
+      item(
+        'leads',
+        'العملاء المتوقّعون',
+        'Leads',
+        '/leads',
+        'console.leads.view',
+        'GET /platform/leads',
+      ),
     ],
   },
   {

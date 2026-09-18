@@ -8,6 +8,9 @@ import { DeveloperModule } from '../../developer/developer.module.js';
 import { EmailModule } from '../../email/email.module.js';
 import { SignupVerificationController } from '../signup/signup-verification.controller.js';
 import { SignupService } from '../signup/signup.service.js';
+import { LeadsService } from '../leads/leads.service.js';
+import { PlatformLeadsController } from '../leads/platform-leads.controller.js';
+import { PublicLeadsController } from '../leads/public-leads.controller.js';
 
 import { PlatformAdminController } from './platform-admin.controller.js';
 import { PlatformAnalyticsController } from './platform-analytics.controller.js';
@@ -40,6 +43,10 @@ import { PlatformTenantsService } from './platform-tenants.service.js';
     PlatformTenantsController,
     PlatformUsageController,
     SignupVerificationController,
+    // P-M6: صندوق العملاء المتوقّعين (لوحة) واستمارات الموقع (عامّ) — والخدمة واحدة:
+    // قاعدةُ التحويل هي قاعدةُ الالتقاط، وقرارُ «من يُسنَد إليه» لا يفترق بين البابين.
+    PlatformLeadsController,
+    PublicLeadsController,
   ],
   providers: [
     PlatformAdminService,
@@ -49,6 +56,7 @@ import { PlatformTenantsService } from './platform-tenants.service.js';
     PlatformIdentityService,
     PlatformTenantsService,
     SignupService,
+    LeadsService,
   ],
   exports: [
     PlatformAdminService,

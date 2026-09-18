@@ -66,6 +66,12 @@ const envSchema = z.object({
   RATE_LIMIT_DEFAULT_PER_MINUTE: z.coerce.number().int().positive().default(600),
   RATE_LIMIT_LOGIN_PER_MINUTE: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_REGISTER_PER_MINUTE: z.coerce.number().int().positive().default(5),
+  /**
+   * P-M6 — استمارات الموقع العامّة (تواصل · طلب عرض · نشرة). دلوٌ خاصٌّ بها لا دلو الدخول:
+   * حدُّ الدخول (١٠/دقيقة) يخصّ محاولات كلمة المرور، وحدُّ الاستمارة يخصّ **عدد الرسائل التي
+   * نُرسلها باسم المنصّة** إلى عناوين لا نملكها — وهو ما يجعل الرقم منخفضاً عن قصد.
+   */
+  RATE_LIMIT_PUBLIC_FORM_PER_MINUTE: z.coerce.number().int().positive().default(10),
 
   /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
   SIGNUP_ENABLED: booleanish.default(true),
