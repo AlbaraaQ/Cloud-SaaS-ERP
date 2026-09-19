@@ -1,0 +1,125 @@
+name: Release
+
+# ---------------------------------------------------------------------------
+# البناء والتسليم (CI/CD):
+#   • على كل وسم `v*` (وأيضاً يدوياً): يبني أربع صور Docker ويدفعها إلى GHCR.
+#   • ثم ينشرها على Kubernetes إن كان السرّ `KUBE_CONFIG` مضبوطاً (وإلا يتخطّى بسلامة).
+#
+# الصور: ghcr.io/<owner>/cloud-saas-erp-{api,marketing,staff,platform-admin}:<tag>
+#   <tag> = اسم الوسم (v1.2.3) + `latest` + `sha-<7>` — و`deploy/k8s/kustomization.yaml`
+#   يقرأ الاسم نفسه، فيكفي تبديل `images:` هناك (أو `kustomize edit set image`) للنشر.
+#
+# ويدوياً لبيئة العرض: Actions → Release → Run workflow.
+# ---------------------------------------------------------------------------
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'وسم الصور (افتراضي: latest)'
+        required: false
+        default: 'latest'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    name: build & push (4 صور)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: api, dockerfile: deploy/Dockerfile.api, app: '' }
+          - { name: marketing, dockerfile: deploy/Dockerfile.web, app: marketing }
+          - { name: staff, dockerfile: deploy/Dockerfile.web, app: staff }
+          - { name: platform-admin, dockerfile: deploy/Dockerfile.web, app: platform-admin }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: تسجيل الدخول إلى GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: وسوم الصورة
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/cloud-saas-erp-${{ matrix.name }}
+          tags: |
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+
+      - name: بناء ودفع
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # بناء الواجهات يحتاج هدف الـAPI وقت البناء (يُخبَز في `rewrites` مع standalone).
+          build-args: |
+            APP=${{ matrix.app }}
+            API_PROXY_TARGET=${{ vars.API_PROXY_TARGET }}
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  deploy:
+    name: نشرٌ على Kubernetes (إن توفّر السرّ)
+    needs: images
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: هل إعدادات النشر متاحة؟
+        id: check
+        run: |
+          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: ضبط kubectl
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: تثبيت الوسم على الملف ثم التطبيق
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          TAG="${{ inputs.tag }}"
+          OWNER="${{ github.repository_owner }}"
+          kubectl apply -k deploy/k8s
+          # تثبيت الإصدار بعد التطبيق — بلا اعتماد على أداة kustomize المنفصلة.
+          for app in api marketing staff platform-admin worker; do
+            kubectl -n erp set image "deployment/$app" "$app=ghcr.io/$OWNER/cloud-saas-erp-$app:$TAG"
+          done
+          kubectl -n erp delete job erp-migrate --ignore-not-found
+          kubectl apply -f deploy/k8s/migrate-job.yaml
+          kubectl -n erp rollout status deployment/api --timeout=5m
+          kubectl -n erp rollout status deployment/marketing --timeout=5m
+          kubectl -n erp rollout status deployment/staff --timeout=5m
+          kubectl -n erp rollout status deployment/platform-admin --timeout=5m
+
+      - name: لا إعدادات — تخطٍّ معلن
+        if: steps.check.outputs.ready != 'true'
+        run: echo "KUBE_CONFIG غير مضبوط — بُنيت الصور ورُفعت إلى GHCR، والنشر مؤجَّل (انظر docs/DEPLOYMENT_GUIDE.md §4)."

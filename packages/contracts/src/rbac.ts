@@ -28,19 +28,10 @@
  */
 
 export type PlatformRoleCode =
-  | 'platform_owner'
-  | 'platform_operations'
-  | 'platform_billing'
-  | 'platform_support'
-  | 'platform_auditor';
+  'platform_owner' | 'platform_operations' | 'platform_billing' | 'platform_support' | 'platform_auditor';
 
 export type TenantAdminRoleCode =
-  | 'tenant_owner'
-  | 'tenant_admin'
-  | 'branch_manager'
-  | 'device_manager'
-  | 'security_admin'
-  | 'tenant_auditor';
+  'tenant_owner' | 'tenant_admin' | 'branch_manager' | 'device_manager' | 'security_admin' | 'tenant_auditor';
 
 export type ErpFunctionalRoleCode =
   | 'accountant'
@@ -84,8 +75,35 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C9: مالك المنصة يعيد ويُلغي كمثل ما يقرأ.
+      'console.jobs.manage',
       'console.billing.manage',
       'console.support.manage',
+      // P-C1: the platform's own configuration belongs to the owner of the platform.
+      // Operations reads it under `console.tenants.view`; nobody else writes it.
+      'console.settings.manage',
+      // P-C6: the mail service is operated daily — the owner holds it like everything else.
+      'console.email.view',
+      'console.email.manage',
+      // P-C7: announcements are the platform speaking to its customers — owner and operations.
+      'console.notifications.manage',
+      // P-C10: the backups, the retention windows and a data-subject request are the
+      // platform's own obligations — the owner answers for them.
+      'console.backups.manage',
+      // P-C11: an integration credential and an outbound webhook are the platform's
+      // standing promises to a customer — the owner answers for both.
+      'console.apikeys.manage',
+      'console.webhooks.manage',
+      // P-C12: أرقام المنصة هي ما يُقرأ قبل أي قرار — والمالك أوّل من يقرؤها.
+      'console.analytics.view',
+      // P-M5: كلمات الموقع التسويقي قرارُ المنصّة على السوق — للمالك وحده فعلُ نشرها.
+      'console.content.view',
+      'console.content.manage',
+      // P-M6: العميل المتوقَّع مالٌ لم يصل بعد — وتحويله يُنشئ منشأةً كاملة، فالرمزان للمالك.
+      'console.leads.view',
+      'console.leads.manage',
+      // P-M7: الحملة تكتب في بريد أشخاصٍ حقيقيين باسم المنصة — والمالك وحده يحمل رمزها.
+      'console.campaigns.manage',
     ],
   },
   {
@@ -98,6 +116,27 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C9: تشغيل الطابور عملُ التشغيل اليومي — يعيد المحاولة ويُلغي بسببه.
+      'console.jobs.manage',
+      // P-C6: queued mail is production queue health, so operations can act on it.
+      'console.email.view',
+      'console.email.manage',
+      // P-C7: operations owns the maintenance window, so it owns the notice about it.
+      'console.notifications.manage',
+      // P-C10: running tonight's backup and keeping the retention windows are ops work.
+      // The auditor and the billing/support desks do not get it: it erases bytes and identities.
+      'console.backups.manage',
+      // P-C11: تكاملُ العميل عملُ تشغيلٍ يوميّ (مفتاحٌ تعطّل، أو عنوانٌ توقّف عن الإجابة).
+      // ولا يُعطى للدعم: الدعم يتكلّم مع العميل في التذكرة، لا يُنشئ له اعتماداً.
+      'console.apikeys.manage',
+      'console.webhooks.manage',
+      // P-C12: التشغيل يرى القمع والتنبيهات و«من صمت» — وهي عملُه اليوميّ قبل أن تكون تقريراً.
+      'console.analytics.view',
+      // P-M5: **قراءةٌ لا كتابة**: التشغيل يرى ما سيُنشر ليبلغه في التذكرة، ولا يحرّر هوية
+      // المنصّة على السوق — وهذا ما يجعل رمزين لا رمزاً.
+      'console.content.view',
+      // P-M6: التشغيل يرى ما وصل من الموقع ليوجّهه، ولا يحوّل طلباً إلى منشأة (فعلُ فوترة).
+      'console.leads.view',
     ],
   },
   {
@@ -111,6 +150,13 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.plans.manage',
       'console.activation.review',
       'console.billing.manage',
+      // P-C6: invoices are sent by mail — billing reads the log, never sends.
+      'console.email.view',
+      // P-C12: التسرّب والتحصيل والقيمة الشهرية أرقامُ فوترةٍ قبل أن تكون رسوماً.
+      'console.analytics.view',
+      // P-M6: التحويل إلى منشأة قرارُ فوترة (باقةٌ وتجربةٌ وترخيص) — ومعها القراءة.
+      'console.leads.view',
+      'console.leads.manage',
     ],
   },
   {
@@ -118,7 +164,17 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
     nameAr: 'دعم المنصة',
     nameEn: 'Platform support',
     description: 'Customer support with read-only tenant visibility and ticket handling.',
-    permissions: ['console.tenants.view', 'console.health.view', 'console.support.manage'],
+    permissions: [
+      'console.tenants.view',
+      'console.health.view',
+      'console.support.manage',
+      // P-C6: support answers «لم يصلني البريد» — needs the log, not the templates.
+      'console.email.view',
+      // P-M5: الدعم يقرأ مقال المساعدة الذي يرسله للعميل في تذكرته.
+      'console.content.view',
+      // P-M6: من يجيب على الاستفسار يقرأ الطلب — **قراءةً لا تصرّفاً**.
+      'console.leads.view',
+    ],
   },
   {
     code: 'platform_auditor',
@@ -130,6 +186,12 @@ export const platformRoleCatalog: readonly RoleCatalogEntry[] = [
       'console.audit.view',
       'console.health.view',
       'console.jobs.view',
+      // P-C6: reading what the platform sent is oversight.
+      'console.email.view',
+      // P-C12: الأرقام المجمّعة تقرأها الرقابة بلا صلاحية تغييرٍ واحدة — قراءةٌ خالصة.
+      'console.analytics.view',
+      // P-M6: بياناتُ أشخاصٍ حقيقيين وصلت من الموقع — الرقابة تقرؤها ولا تُبدّلها.
+      'console.leads.view',
     ],
   },
 ] as const;
@@ -177,6 +239,9 @@ export const tenantAdminRoleCatalog: readonly RoleCatalogEntry[] = [
       'einvoice.manage',
       'einvoice.credentials.manage',
       'reporting.view',
+      // P-C6: the tenant administrator owns the wording of its own mail and reads its log.
+      'tenant.email.template.manage',
+      'tenant.email.log.view',
     ],
   },
   {
@@ -248,6 +313,8 @@ export const tenantAdminRoleCatalog: readonly RoleCatalogEntry[] = [
       'purchase.view',
       'treasury.view',
       'reporting.view',
+      // P-C6: an auditor may see what left the tenant in its name.
+      'tenant.email.log.view',
     ],
   },
 ] as const;
@@ -582,11 +649,24 @@ export function isPlatformRoleCode(code: string): boolean {
 /**
  * Effective platform permissions of a set of platform roles (UNION semantics,
  * mirroring tenant roles in DATABASE_DESIGN §2).
+ *
+ * P-C3 added the second argument: `overrides` maps a role code to the exact set of
+ * `console.*` codes it carries **instead of** the catalogue. A role absent from the map
+ * follows the catalogue, so an empty map reproduces the pre-P-C3 behaviour exactly —
+ * which is what every existing caller gets when it omits the argument. The platform guard
+ * and `/me` both pass the stored overrides, so the console and the API answer with one
+ * voice (see `platformRolePermissionOverridesSchema`).
  */
-export function platformPermissionsForRoles(codes: readonly string[]): string[] {
+export function platformPermissionsForRoles(
+  codes: readonly string[],
+  overrides?: Readonly<Record<string, readonly string[]>>,
+): string[] {
   const out = new Set<string>();
   for (const code of codes) {
-    for (const permission of platformByCode.get(code)?.permissions ?? []) out.add(permission);
+    const override =
+      overrides && Object.prototype.hasOwnProperty.call(overrides, code) ? overrides[code] : undefined;
+    const granted = override ?? platformByCode.get(code)?.permissions ?? [];
+    for (const permission of granted) out.add(permission);
   }
   return [...out];
 }

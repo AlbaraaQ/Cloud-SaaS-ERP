@@ -40,6 +40,36 @@ const AUTH_AUDIT_ACTIONS: Record<string, string> = {
 /** Never audited: health probes and the audit log's own (read-only) surface. */
 const IGNORED_RESOURCES = new Set(['health', 'audit-log']);
 
+/**
+ * **P-M8 — `POST` that is a read.** `POST /public/verify` يستقبل حِمل رمز فاتورة في الجسم
+ * لا في الرابط (الرابط يُسجَّل في `Referer` وفي سجلّات الوسائط)، وهو مع ذلك **قراءةٌ محضة**:
+ * لا صفَّ يُكتب ولا حالةً تتغيّر. وتدقيقه يكتب عكس المطلوب: `after` يحمل الحِمل الملصوق،
+ * أي **بيانات فاتورة زائرٍ مجهول تُحفظ في سجلّ التدقيق** — والوعد المكتوب على الصفحة أن ما
+ * يُلصق لا يُحفظ. فالمسار مستثنى هنا، في المكان الذي تُقرأ فيه القاعدة، لا في الخدمة.
+ *
+ * والاستثناء بالاسم الكامل (`METHOD resource/entity`) لا بالمصدر: مسارٌ عامٌّ آخر لا يُعفى
+ * لأنه جاء من الوحدة نفسها.
+ */
+const READ_ONLY_POSTS = new Set(['POST public/verify']);
+
+/**
+ * **P-M9 — فعلٌ عامّ لا يُنسب إلى فاعل.** `POST public/help/:slug/feedback` هو الكتابة
+ * العامة الوحيدة في الموقع التسويقي: زائرٌ مجهول يقول «أفادني هذا» أو «لم يفدني».
+ *
+ * **ولماذا لا يُدقَّق وهو فعلٌ لا قراءة؟** لأن صفّ التدقيق في هذا المستودع يحمل **عنوان
+ * الزائر ووسيط متصفّحه** (`meta.ip` · `meta.userAgent`) بجانب الفعل — أي أن تدقيق صوتٍ
+ * مجهول يحوّل «رأيٌ مجموع» إلى «ملفٍّ عن قارئ» مقابل فائدةٍ صفر: لا فاعلَ يُسأل، ولا قرارَ
+ * تشغيليّ يُبنى على الصف. والمكتوب الفعلي (الحكم وصاحبه المجهول) محفوظٌ في `content_feedback`
+ * للعدّ، والصفحة تقول للزائر عن حقّ: لا يُحفظ ما لصقت. فالمسار مستثنى **بالاسم الكامل**
+ * (`METHOD resource/entity`) كي لا يُعفى مسارٌ عامٌّ آخر جاء من الوحدة نفسها.
+ *
+ * **وP-M10 أضاف الثاني: `POST public/events`** (أحداث الموقع). والسبب هو السبب نفسه بحرفيّته:
+ * الحدث مجهولُ الهوية في جدوله (لا عمود لعنوانٍ ولا وسيط)، وتدقيقه كان سيحفظ في `audit_log`
+ * ما رفضنا حفظه في مكانه — **وهو أسوأ من عدم القياس**: القيد في الجدول يصير كذبةً يُكذّبها
+ * صفُّ التدقيق المجاور.
+ */
+const ANONYMOUS_POSTS = new Set(['POST public/help', 'POST public/events']);
+
 export type RouteDescriptor = {
   resource: string;
   entityId: string | null;
@@ -94,6 +124,8 @@ export class AuditInterceptor implements NestInterceptor {
 
     const route = describeRoute(request.originalUrl ?? request.url ?? '');
     if (IGNORED_RESOURCES.has(route.resource)) return next.handle();
+    if (READ_ONLY_POSTS.has(`${method} ${route.resource}/${route.entityId ?? ''}`)) return next.handle();
+    if (ANONYMOUS_POSTS.has(`${method} ${route.resource}/${route.entityId ?? ''}`)) return next.handle();
 
     const authAction = AUTH_AUDIT_ACTIONS[`${method} ${route.resource}/${route.entityId ?? ''}`];
 

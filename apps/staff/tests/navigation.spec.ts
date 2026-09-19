@@ -185,6 +185,24 @@ describe('staff navigation tree', () => {
     }
   });
 
+  it('wires the tenant usage & quotas screen (P-C5) at /settings/usage', () => {
+    // الشاشة التي يطلبها P-C5 للمستأجر: مقاييس ثمانية يقرأها العميل، وحدودٌ يضعها المشغّل —
+    // فالصلاحية `tenant.view` (قراءة منشأته) لا صلاحية إدارة منصّة.
+    const item = allScreens.find((screen) => screen.key === 'usage');
+    expect(item).toBeDefined();
+    expect(item?.status).toBe('ready');
+    expect(item?.href).toBe('/settings/usage');
+    expect(item?.permission).toBe('tenant.view');
+    expect(item?.endpoint).toBe('GET /usage');
+
+    // P-C6 — البريد في سطح العميل: القوالب والسجلّ وهوِيّة المُرسِل على مسارٍ واحد.
+    const mail = allScreens.find((screen) => screen.key === 'email');
+    expect(mail?.status).toBe('ready');
+    expect(mail?.href).toBe('/settings/email');
+    expect(mail?.permission).toBe('tenant.email.log.view');
+    expect(mail?.endpoint).toContain('PUT /email/templates/:event');
+  });
+
   it('resolves a screen from its href, ignoring the query string', () => {
     expect(findScreenByHref('/accounting/accounts')?.key).toBe('coa');
     expect(findScreenByHref('/accounting/journal-entries/new?kind=opening')?.key).toBe('opening-entry');

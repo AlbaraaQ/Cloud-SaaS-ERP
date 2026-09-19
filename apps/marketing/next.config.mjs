@@ -2,11 +2,31 @@ import { loadEnvFiles } from '../../scripts/dotenv.mjs';
 
 loadEnvFiles(process.cwd());
 
+/**
+ * Hosts allowed to talk to the dev server.
+ *
+ * The site is opened through a tunnel host (`https://3002-<sandbox>.e2b.app`) and Next 15
+ * treats any `/_next/*` request whose Host is not localhost as a cross-origin dev request:
+ * it warns today and refuses in a future major — which leaves the preview a blank page.
+ * Listed here once, together with `apps/staff`/`apps/platform-admin`.
+ */
+const allowedDevOrigins = [
+  'localhost',
+  '127.0.0.1',
+  '*.e2b.app',
+  '*.e2b.dev',
+  '*.arena.ai',
+];
+
 const apiTarget = (process.env.API_PROXY_TARGET ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(/\/+$/, '');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // مخرج بناءٍ بديل عند الطلب (`NEXT_DIST_DIR`): يسمح ببناءٍ إنتاجيّ للتحقّق **بينما**
+  // خادم التطوير يعمل على `.next` — بلا أن يدوس أحدهما الآخر.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
+  allowedDevOrigins,
   poweredByHeader: false,
   env: {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? '',

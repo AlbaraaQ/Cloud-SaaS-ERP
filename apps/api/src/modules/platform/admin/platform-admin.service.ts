@@ -6,13 +6,9 @@ import {
   canonicalizePermissionCode,
   errorCodes,
   findPermission,
-  isPlatformRoleCode,
   permissionRegistry,
-  platformPermissionRegistry,
-  platformRoleCatalog,
-  type PermissionDto,
 } from '@erp/contracts';
-import { newId, withPlatformAdminTx, withTx, type DatabaseHandle } from '@erp/database';
+import { newId, withPlatformAdminTx, type DatabaseHandle } from '@erp/database';
 import { baselineRoles } from '@erp/config';
 
 import { DATABASE_HANDLE } from '../../../database/database.tokens.js';
@@ -69,23 +65,6 @@ export type SignupInput = {
   countryCode?: string;
   baseCurrency?: string;
   timezone?: string;
-};
-
-export type PlanInput = {
-  code: string;
-  name: string;
-  interval: 'month' | 'year';
-  amount: string;
-  currency?: string;
-  stripePriceId?: string | null;
-  active?: boolean;
-};
-
-export type GrantSubscriptionInput = {
-  tenantId: string;
-  planId: string;
-  months?: number;
-  notes?: string;
 };
 
 /**
@@ -371,127 +350,12 @@ export class PlatformAdminService {
     });
   }
 
-  async setTenantStatus(tenantId: string, status: 'active' | 'suspended' | 'archived') {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        UPDATE tenants SET status = ${status}, updated_at = now() WHERE id = ${tenantId}
-        RETURNING id, code, name, status
-      `);
-      if (result.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'Tenant not found', 404);
-      return result.rows[0];
-    });
-  }
+  // `setTenantStatus` was removed with its route: P-C2's `POST /platform/tenants/:id/status`
+  // (`PlatformTenantsService.setStatus`) supersedes it — it demands a reason, refuses a
+  // no-op transition, and writes an audit row in the customer's own trail.
 
-  // ----------------------------------------------------------------- plans
-
-  async listPlans() {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        SELECT p.id, p.code, p.name, p.interval, p.amount::text, p.currency, p.stripe_price_id, p.active, p.created_at,
-               (SELECT COUNT(*) FROM tenant_subscriptions s WHERE s.plan_id = p.id AND s.status = 'active')::int AS active_subscriptions
-        FROM billing_plans p
-        ORDER BY p.active DESC, p.amount ASC
-      `);
-      return result.rows;
-    });
-  }
-
-  async createPlan(input: PlanInput) {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        INSERT INTO billing_plans (id, code, name, interval, amount, currency, stripe_price_id, active)
-        VALUES (${newId()}, ${input.code.trim()}, ${input.name.trim()}, ${input.interval}, ${input.amount},
-                ${input.currency ?? 'SAR'}, ${input.stripePriceId ?? null}, ${input.active ?? true})
-        ON CONFLICT (code) DO UPDATE
-          SET name = EXCLUDED.name, interval = EXCLUDED.interval, amount = EXCLUDED.amount,
-              currency = EXCLUDED.currency, stripe_price_id = EXCLUDED.stripe_price_id,
-              active = EXCLUDED.active, updated_at = now()
-        RETURNING id, code, name, interval, amount::text, currency, active
-      `);
-      return result.rows[0];
-    });
-  }
-
-  async setPlanActive(planId: string, active: boolean) {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        UPDATE billing_plans SET active = ${active}, updated_at = now() WHERE id = ${planId}
-        RETURNING id, code, active
-      `);
-      if (result.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'Plan not found', 404);
-      return result.rows[0];
-    });
-  }
-
-  // ----------------------------------------------------------------- subscriptions
-
-  async listSubscriptions(status?: string) {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        SELECT s.id, s.status, s.provider, s.current_period_start, s.current_period_end,
-               s.activated_at, s.canceled_at, s.created_at,
-               t.id AS tenant_id, t.code AS tenant_code, t.name AS tenant_name, t.status AS tenant_status,
-               p.id AS plan_id, p.name AS plan_name, p.code AS plan_code, p.amount::text, p.currency, p.interval
-        FROM tenant_subscriptions s
-        JOIN tenants t ON t.id = s.tenant_id
-        JOIN billing_plans p ON p.id = s.plan_id
-        WHERE (${status ?? null}::text IS NULL OR s.status = ${status ?? null})
-        ORDER BY s.created_at DESC
-        LIMIT 500
-      `);
-      return result.rows;
-    });
-  }
-
-  /** Issues or extends a licence by hand — the manual counterpart of Stripe checkout. */
-  async grantSubscription(input: GrantSubscriptionInput) {
-    assertPlatformAdmin();
-    const months = Math.min(Math.max(input.months ?? 12, 1), 120);
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const plan = await tx.execute(sql`SELECT id FROM billing_plans WHERE id = ${input.planId}`);
-      if (plan.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'Plan not found', 404);
-
-      const tenant = await tx.execute(sql`SELECT id FROM tenants WHERE id = ${input.tenantId}`);
-      if (tenant.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'Tenant not found', 404);
-
-      // Retire whatever is currently active so a tenant never has two live licences.
-      await tx.execute(sql`
-        UPDATE tenant_subscriptions SET status = 'canceled', canceled_at = now(), updated_at = now()
-        WHERE tenant_id = ${input.tenantId} AND status IN ('active', 'past_due', 'pending', 'incomplete')
-      `);
-
-      const result = await tx.execute(sql`
-        INSERT INTO tenant_subscriptions
-          (id, tenant_id, plan_id, status, provider, activated_at, current_period_start, current_period_end)
-        VALUES (${newId()}, ${input.tenantId}, ${input.planId}, 'active', 'manual', now(), now(),
-                now() + (${months} || ' months')::interval)
-        RETURNING id, tenant_id, plan_id, status, current_period_end
-      `);
-
-      // A suspended customer that just paid should be usable again immediately.
-      await tx.execute(sql`UPDATE tenants SET status = 'active', updated_at = now() WHERE id = ${input.tenantId} AND status = 'suspended'`);
-
-      return result.rows[0];
-    });
-  }
-
-  async cancelSubscription(subscriptionId: string) {
-    assertPlatformAdmin();
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        UPDATE tenant_subscriptions SET status = 'canceled', canceled_at = now(), updated_at = now()
-        WHERE id = ${subscriptionId}
-        RETURNING id, tenant_id, status
-      `);
-      if (result.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'Subscription not found', 404);
-      return result.rows[0];
-    });
-  }
+  // Plans and licences (P-C4) moved to `PlatformBillingService`. What stayed here is the
+  // activation queue: a *request* a customer made, which is a conversation, not a document.
 
   // ----------------------------------------------------------------- activation queue
 
@@ -530,9 +394,16 @@ export class PlatformAdminService {
       if (!request) throw new DomainError(errorCodes.NOT_FOUND, 'Pending activation request was not found', 404);
 
       if (approve && request.plan_id) {
+        // Approving is what P-C4's `POST /platform/subscriptions` does by hand, so it obeys the
+        // same rule: **one live licence per customer**. The predicate is the live set of 0068
+        // (`trialing` · `active` · `past_due` · `paused`) — without `trialing` and `paused` the
+        // partial unique index would turn a second approval into a database error.
         await tx.execute(sql`
-          UPDATE tenant_subscriptions SET status = 'canceled', canceled_at = now(), updated_at = now()
-          WHERE tenant_id = ${String(request.tenant_id)} AND status IN ('active', 'past_due', 'pending', 'incomplete')
+          UPDATE tenant_subscriptions
+             SET status = 'canceled', canceled_at = now(),
+                 canceled_reason = 'استُبدل بترخيص جديد', updated_at = now()
+           WHERE tenant_id = ${String(request.tenant_id)}
+             AND status = ANY(ARRAY['trialing', 'active', 'past_due', 'paused'])
         `);
         await tx.execute(sql`
           INSERT INTO tenant_subscriptions
@@ -544,107 +415,6 @@ export class PlatformAdminService {
       }
 
       return request;
-    });
-  }
-
-  // ----------------------------------------------------------------- users
-
-  async listUsers(search?: string) {
-    assertPlatformAdmin();
-    const like = search && search.trim().length > 0 ? `%${search.trim().toLowerCase()}%` : null;
-    return withPlatformAdminTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        SELECT u.id, u.email, u.full_name, u.status, u.is_platform_admin, u.must_change_password,
-               u.last_login_at, u.created_at,
-               (SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id AND m.deleted_at IS NULL)::int AS membership_count,
-               COALESCE(
-                 (SELECT jsonb_agg(pm.role_code ORDER BY pm.role_code)
-                  FROM platform_memberships pm
-                  WHERE pm.user_id = u.id AND pm.revoked_at IS NULL),
-                 '[]'::jsonb
-               ) AS platform_roles
-        FROM users u
-        WHERE (${like}::text IS NULL OR lower(u.email) LIKE ${like} OR lower(u.full_name) LIKE ${like})
-        ORDER BY u.created_at DESC
-        LIMIT 500
-      `);
-      return result.rows;
-    });
-  }
-
-  // ----------------------------------------------------------------- platform roles
-
-  /** Family-A catalogue with live holder counts (2026-09 RBAC reorganisation). */
-  async listPlatformRoles() {
-    assertPlatformAdmin();
-    return withTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        SELECT pr.code, pr.name, pr.description,
-               (SELECT COUNT(*) FROM platform_memberships pm
-                WHERE pm.role_code = pr.code AND pm.revoked_at IS NULL)::int AS holder_count
-        FROM platform_roles pr
-        ORDER BY pr.code
-      `);
-      const holders = new Map<string, number>(
-        result.rows.map((row) => [String(row.code), Number(row.holder_count ?? 0)]),
-      );
-      // The code catalogue is authoritative; the table only proves the seed ran.
-      return platformRoleCatalog.map((role) => ({
-        code: role.code,
-        name: role.nameEn,
-        nameAr: role.nameAr,
-        description: role.description,
-        permissions: [...role.permissions],
-        holderCount: holders.get(role.code) ?? 0,
-      }));
-    });
-  }
-
-  /** Platform-console permission registry served to apps/platform-admin. */
-  listPlatformPermissions(): PermissionDto[] {
-    assertPlatformAdmin();
-    return platformPermissionRegistry.map((entry) => ({
-      code: entry.code,
-      module: entry.module,
-      description: entry.description,
-    }));
-  }
-
-  async grantPlatformRole(userId: string, roleCode: string) {
-    assertPlatformAdmin();
-    if (!isPlatformRoleCode(roleCode)) {
-      throw new DomainError(errorCodes.VALIDATION_FAILED, `Unknown platform role: ${roleCode}`, 422, {
-        field: 'roleCode',
-      });
-    }
-    const auth = getAuthContext();
-    return withTx(this.database.db, async (tx) => {
-      const user = await tx.execute(sql`SELECT id FROM users WHERE id = ${userId}`);
-      if (user.rows.length === 0) throw new DomainError(errorCodes.NOT_FOUND, 'User not found', 404);
-      // Re-granting revives a revoked row instead of duplicating it.
-      const result = await tx.execute(sql`
-        INSERT INTO platform_memberships (id, user_id, role_code, granted_by)
-        VALUES (${newId()}, ${userId}, ${roleCode}, ${auth.userId})
-        ON CONFLICT (user_id, role_code)
-          DO UPDATE SET revoked_at = NULL, granted_at = now(), granted_by = ${auth.userId}
-        RETURNING id, user_id, role_code, granted_at
-      `);
-      return result.rows[0];
-    });
-  }
-
-  async revokePlatformRole(userId: string, roleCode: string) {
-    assertPlatformAdmin();
-    return withTx(this.database.db, async (tx) => {
-      const result = await tx.execute(sql`
-        UPDATE platform_memberships SET revoked_at = now()
-        WHERE user_id = ${userId} AND role_code = ${roleCode} AND revoked_at IS NULL
-        RETURNING id, user_id, role_code, revoked_at
-      `);
-      if (result.rows.length === 0) {
-        throw new DomainError(errorCodes.NOT_FOUND, 'Active platform role grant was not found', 404);
-      }
-      return result.rows[0];
     });
   }
 }

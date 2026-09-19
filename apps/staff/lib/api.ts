@@ -44,12 +44,19 @@ export class ApiError extends Error {
 const ACCESS_KEY = 'erp.admin.access';
 const REFRESH_KEY = 'erp.admin.refresh';
 const TENANT_KEY = 'erp.admin.tenant';
+/**
+ * P-C8 — رمز الدخول المؤقّت الذي يسلّمه مكتب الدعم في اللوحة. يُحفظ وحده، ويُقرأ على أنه
+ * «جلسة نظر»: **لا رمز تحديث معه** (لا يُجدَّد)، ويُرفض من الخادم فور إنهاء المشغّل للجلسة.
+ */
+const SUPPORT_KEY = 'erp.admin.imp';
 
 export type StoredSession = {
   accessToken: string;
   refreshToken: string;
   tenantCode: string;
   expiresAt: number;
+  /** جلسةُ دعمٍ بعين العميل — بلا تجديد وبلا رمزٍ ثانٍ. */
+  impersonation?: boolean;
 };
 
 let memory: StoredSession | undefined;
@@ -63,6 +70,11 @@ export function readSession(): StoredSession | undefined {
   if (memory) return memory;
   if (!browser()) return undefined;
   try {
+    const support = localStorage.getItem(SUPPORT_KEY);
+    if (support) {
+      memory = { accessToken: support, refreshToken: '', tenantCode: '', expiresAt: 0, impersonation: true };
+      return memory;
+    }
     const accessToken = localStorage.getItem(ACCESS_KEY);
     const refreshToken = localStorage.getItem(REFRESH_KEY);
     const tenantCode = localStorage.getItem(TENANT_KEY);
@@ -82,7 +94,10 @@ export function writeSession(session: StoredSession | undefined): void {
       localStorage.removeItem(ACCESS_KEY);
       localStorage.removeItem(REFRESH_KEY);
       localStorage.removeItem(TENANT_KEY);
+      localStorage.removeItem(SUPPORT_KEY);
     } else {
+      // تسجيل الدخول العادي يُنهي «جلسة النظر»: هويةُ المستخدم لا تجتمع مع رمز الدعم.
+      localStorage.removeItem(SUPPORT_KEY);
       localStorage.setItem(ACCESS_KEY, session.accessToken);
       localStorage.setItem(REFRESH_KEY, session.refreshToken);
       localStorage.setItem(TENANT_KEY, session.tenantCode);
@@ -96,6 +111,51 @@ export function writeSession(session: StoredSession | undefined): void {
 export function onSessionChange(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+// ---------------------------------------------------- P-C8: الدخول المؤقّت
+
+/**
+ * يستقبل الرمز الذي يسلّمه مكتب الدعم. يصل في **جزء العنوان** (`#support=…`) لا في
+ * الاستعلام: الجزء لا يُرسل إلى أي خادم ولا يُكتب في سجلّات الوسيط، والرمز نفسه قصير العمر
+ * (≤60 دقيقة) ومقيَّد بحارس الخادم.
+ */
+export function adoptSupportToken(token: string): void {
+  if (!browser() || token.length === 0) return;
+  try {
+    localStorage.setItem(SUPPORT_KEY, token);
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    localStorage.removeItem(TENANT_KEY);
+  } catch {
+    /* private mode — الرمز في الذاكرة يكفي لهذه الجلسة */
+  }
+  memory = { accessToken: token, refreshToken: '', tenantCode: '', expiresAt: 0, impersonation: true };
+  for (const listener of listeners) listener();
+}
+
+/** يقرأ `#support=<token>` ويُنظّف العنوان بعد قراءته. */
+export function consumeSupportFragment(): boolean {
+  if (!browser()) return false;
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const token = params.get('support');
+  if (!token) return false;
+  adoptSupportToken(token);
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+  return true;
+}
+
+/** يخرج من «جلسة النظر» محلياً. الجلسة نفسها تُنهى من اللوحة (أو تنتهي بوقتها). */
+export function leaveSupportSession(): void {
+  if (browser()) {
+    try {
+      localStorage.removeItem(SUPPORT_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  memory = undefined;
+  for (const listener of listeners) listener();
 }
 
 // --------------------------------------------------------------------------- fetching
@@ -112,8 +172,11 @@ async function toError(response: Response): Promise<ApiError> {
       problem = { detail: text.slice(0, 400) };
     }
   }
-  const code = problem.code ?? (response.status === 401 ? 'UNAUTHENTICATED' : response.status === 403 ? 'FORBIDDEN' : 'HTTP_ERROR');
-  const message = problem.title ?? problem.message ?? problem.detail ?? `${response.status} ${response.statusText}`;
+  const code =
+    problem.code ??
+    (response.status === 401 ? 'UNAUTHENTICATED' : response.status === 403 ? 'FORBIDDEN' : 'HTTP_ERROR');
+  const message =
+    problem.title ?? problem.message ?? problem.detail ?? `${response.status} ${response.statusText}`;
   return new ApiError(response.status, code, message, problem.detail);
 }
 
@@ -122,6 +185,11 @@ let refreshInFlight: Promise<StoredSession | undefined> | undefined;
 async function refreshSession(): Promise<StoredSession | undefined> {
   const current = readSession();
   if (!current) return undefined;
+  // رمز الدعم لا يُجدَّد: انتهاؤه أو إنهاؤه يعني أن الباب أُغلق، والتجديد يُبقيه مفتوحاً.
+  if (current.impersonation) {
+    writeSession(undefined);
+    return undefined;
+  }
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
@@ -135,7 +203,9 @@ async function refreshSession(): Promise<StoredSession | undefined> {
         writeSession(undefined);
         return undefined;
       }
-      const payload = (await response.json()) as { data: { accessToken: string; refreshToken: string; expiresIn: number } };
+      const payload = (await response.json()) as {
+        data: { accessToken: string; refreshToken: string; expiresIn: number };
+      };
       const next: StoredSession = {
         accessToken: payload.data.accessToken,
         refreshToken: payload.data.refreshToken,
@@ -166,7 +236,8 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
 
   const call = async (token?: string): Promise<Response> => {
     const headers = new Headers(init.headers ?? {});
-    if (!headers.has('content-type') && init.body !== undefined) headers.set('content-type', 'application/json');
+    if (!headers.has('content-type') && init.body !== undefined)
+      headers.set('content-type', 'application/json');
     headers.set('accept', 'application/json');
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (branchId) headers.set('x-branch-id', branchId);
@@ -195,7 +266,12 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
  * one client instead of each page knowing which convention its endpoint follows.
  */
 function unwrap<T>(payload: unknown): T {
-  if (payload !== null && typeof payload === 'object' && !Array.isArray(payload) && 'data' in (payload as Record<string, unknown>)) {
+  if (
+    payload !== null &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    'data' in (payload as Record<string, unknown>)
+  ) {
     return (payload as { data: T }).data;
   }
   return payload as T;
@@ -209,7 +285,11 @@ export async function apiData<T>(path: string, options: ApiOptions = {}): Promis
 export async function apiList<T>(path: string, options: ApiOptions = {}): Promise<T[]> {
   const payload = unwrap<unknown>(await apiFetch<unknown>(path, options));
   if (Array.isArray(payload)) return payload as T[];
-  if (payload !== null && typeof payload === 'object' && Array.isArray((payload as { items?: unknown }).items)) {
+  if (
+    payload !== null &&
+    typeof payload === 'object' &&
+    Array.isArray((payload as { items?: unknown }).items)
+  ) {
     return (payload as { items: T[] }).items;
   }
   return [];
@@ -245,7 +325,14 @@ export type LoginPayload = {
     platformRoles: string[];
     mustChangePassword: boolean;
   };
-  memberships: Array<{ id: string; tenantId: string; tenantCode: string; tenantName: string; isOwner: boolean; status: string }>;
+  memberships: Array<{
+    id: string;
+    tenantId: string;
+    tenantCode: string;
+    tenantName: string;
+    isOwner: boolean;
+    status: string;
+  }>;
 };
 
 export async function login(
@@ -286,9 +373,25 @@ export type MePayload = {
     platformRoles: string[];
     mustChangePassword: boolean;
   };
-  membership: { id: string; tenantId: string; tenantCode: string; tenantName: string; displayName: string; isOwner: boolean };
+  membership: {
+    id: string;
+    tenantId: string;
+    tenantCode: string;
+    tenantName: string;
+    displayName: string;
+    isOwner: boolean;
+  };
   permissions: string[];
   branchScope: string[] | null;
+  /** P-C8 — يُملأ حين يكون الرمز رمزَ دخولٍ مؤقّت: من دخل، ولماذا، وإلى متى. */
+  impersonation?: {
+    sessionId: string;
+    operatorUserId: string;
+    operatorLabel: string | null;
+    reason: string;
+    startedAt: string;
+    expiresAt: string;
+  } | null;
 };
 
 export function fetchMe(): Promise<MePayload> {

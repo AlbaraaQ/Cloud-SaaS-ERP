@@ -53,18 +53,18 @@
 ```
 المنصة
 ├─ 1  الأساس والقشرة            P-C1   (RBAC حقيقي + إعدادات المنصة + تدقيق عابر)
-├─ 2  العملاء (المستأجرون)      P-C2
-├─ 3  الهوية والوصول            P-C3
-├─ 4  الباقات والتراخيص         P-C4
-├─ 5  الفوترة والتحصيل          P-C4
-├─ 6  الاستخدام والحصص          P-C5
-├─ 7  البريد                    P-C6   ← خدمة احترافية مقترحة (§7)
-├─ 8  الإعلانات والإشعارات      P-C7
-├─ 9  مكتب الدعم + دخول مؤقّت   P-C8
-├─ 10 العمليات (مهام · صحة · رايات · ملفات) P-C9
-├─ 11 البيانات والاسترجاع       P-C10
-├─ 12 المطوّرون (مفاتيح · ويب هوكس) P-C11
-└─ 13 التحليلات                 P-C12
+├─ 2  العملاء (المستأجرون)      P-C2 ✅
+├─ 3  الهوية والوصول            P-C3 ✅
+├─ 4  الباقات والتراخيص         P-C4 ✅
+├─ 5  الفوترة والتحصيل          P-C4 ✅
+├─ 6  الاستخدام والحصص          P-C5 ✅
+├─ 7  البريد                    P-C6 ✅ (خدمة احترافية مقترحة — §7)
+├─ 8  الإعلانات والإشعارات      P-C7 ✅
+├─ 9  مكتب الدعم + دخول مؤقّت   P-C8 ✅
+├─ 10 العمليات (مهام · صحة · رايات · ملفات) P-C9 ✅
+├─ 11 البيانات والاسترجاع       P-C10 ✅
+├─ 12 المطوّرون (مفاتيح · ويب هوكس) P-C11 ✅
+└─ 13 التحليلات                 P-C12 ✅
 ```
 
 ---
@@ -72,6 +72,11 @@
 ## 4. الأجزاء (كل جزء = جلسة عمل، ببوابات `README.md` §4)
 
 ### P-C1 — الأساس والقشرة، وترميم الصلاحيات 🔴 (يبدأ به كل ما بعده)
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C1_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API 975 اختباراً · platform-admin 12 · الترحيل 0066 · `scripts/verify-platform-console.mjs` = 70 نقطة في 10 أقسام (70/70 مرتين).
+> ملاحظتان للجلسة التالية (P-C2): قراءة الباقات/التراخيص/الطابور مسندة إلى رموز الإدارة (لا توأم قراءة في السجل)،
+> و`platform_settings` يحمل `tenant_id` قابلاً للعدم — فهو جاهز لتجاوز المستأجر مباشرةً.
 
 | | |
 |---|---|
@@ -84,7 +89,18 @@
 | **تحقّق حيّ** | `scripts/verify-platform-console.mjs` (≈ 45 نقطة في 8 أقسام) |
 | **القبول** | صفر مسار `/platform/*` بلا رمز `console.*` (يُثبته اختبار يمسح الكود) |
 
-### P-C2 — العملاء في العمق 🔴
+### P-C2 — العملاء في العمق ✅
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C2_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **998** اختباراً (128 ملفاً) · platform-admin **16** · `platform-tenants.spec.ts` **23**
+> (الخطة طلبت ≥ 12) · `scripts/verify-platform-console.mjs` = **121** نقطة في **16** قسماً (كان 70/10) · الشاشة `/tenants/[id]` بثمانية تبويبات.
+> **مخالفة مقصودة واحدة:** الترحيب بـ`0067_tenant_card.sql` رغم قول هذا القسم «يُكتفى بـ0066» — السبب
+> ثلاثة أمور مقيسة: جدول `tenant_notes` غير موجود، وسياسات `platform_admin_plane` ناقصة على
+> `tenant_settings`/`sales_invoices`/`outbox_jobs` (وبلا `WITH CHECK` على `audit_log`)، و**155 سياسة**
+> تكتب `current_setting('app.tenant_id', true)::uuid` بلا `nullif` — فتُفشل أي قراءة من مستوى المنصة على
+> اتصالٍ سبقته معاملة مستأجر. التفصيل في §1 و§5.1 من تقرير الجزء.
+> ثلاث نقاط نهاية أُضيفت فوق ما في الجدول أدناه: `GET …/:id/health` (يحتاجه تبويب «الصحة») و`DELETE …/:id/notes/:noteId`
+> (ملاحظةٌ خاطئة يجب أن تُحذف) و`DELETE` غير موجود — أي أن العدد الفعلي **15** مساراً لا 12.
 
 | | |
 |---|---|
@@ -96,7 +112,19 @@
 | **اختبار** | `platform-tenants.spec.ts` (≥ 12): تعليق/إعادة تنشيط بسبب، نقل الملكية، راية تُقفل وحدة، إعداد يُكتب ويُقرأ، منع تعديل مستأجر آخر، والتدقيق يسجّل الفعل |
 | **تحقّق حيّ** | توسيع `verify-platform-console.mjs` |
 
-### P-C3 — الهوية والوصول على المنصة 🟠
+### P-C3 — الهوية والوصول على المنصة ✅
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C3_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C3_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **1020** اختباراً (129 ملفاً) · platform-admin **20** (كان 16) ·
+> `platform-identity.spec.ts` **21** (طُلِب ≥ 10) · `scripts/verify-platform-console.mjs` =
+> **159** نقطة في **17** قسماً (كان 121/16) · **بلا ترحيل** كما قالت الخطة.
+> ثلاثة أمور تستحقّ الانتباه في الجدول أدناه: (1) **`console.users.view` و`console.users.manage`
+> مُعلنان من P-C1** ولم يُضَف رمز جديد — هذا الجزء يفصل بينهما على عشرة مسارات ويمارسهما؛
+> (2) «دعوة مشغّل» صارت تربط الحساب بمنشأة المشغّلين (`PLATFORM_TENANT_CODE`) وإلّا لم يستطع
+> المدعوّ الحصول على رمز أصلاً (`POST /auth/login` يدخل **إلى منشأة** دائماً)، وبكلمة مرور مؤقّتة
+> تُكتب `must_change_password = true`؛ (3) `GET /platform/users` تغيّر شكل صفّه من صفّ SQL خام
+> (`platform_roles`) إلى عرضٍ موصوف (`platformRoles` · `tenants` · `lastLoginAt` · `mfaEnabled` ·
+> `activeSessionCount`) — وهو ما تتطلّبه الخطة نفسها، وأثره محدود بـ`test/surface-isolation.spec.ts`.
 
 | | |
 |---|---|
@@ -108,7 +136,19 @@
 | **اختبار** | `platform-identity.spec.ts` (≥ 10) |
 | **امتداد لاحق** | SSO/SAML لكل مستأجر + فرض 2FA على مستأجر بعينه (يبني على `apps/api/src/modules/platform/auth/mfa`) |
 
-### P-C4 — الباقات والتراخيص والفوترة 🟠
+### P-C4 — الباقات والتراخيص والفوترة ✅
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C4_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C4_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **1043** اختباراً (130 ملفاً) · platform-admin **24** (كان 20) ·
+> contracts **81** (كان 71) · `platform-billing.spec.ts` **23** (طُلِب ≥ 14) ·
+> `scripts/verify-platform-billing.mjs` = **147** نقطة في **12** قسماً (طُلِب ≈ 50) ·
+> مسارات `/platform/*` **57** (كانت 40) · شاشات اللوحة **18** (كانت 14).
+> ثلاثة فروق عن نصّ الخطة، كلٌّ بسبب مكتوب: (1) **الترحيل `0068` لا `0067`** — رقم `0067`
+> صار لبطاقة العميل في P-C2، و§6 من هذه الخطة يجعل إعادة الترقيم من حقّ المنفّذ؛
+> (2) **`GET /platform/invoices/:id` أُضيف** ولم تذكره القائمة: شاشة الفواتير تحتاج سطور
+> المستند ودفعاته، ووعدُ الشاشة بلا مسار يغذّيها هو نفس الخطأ الذي وثّقته §1؛
+> (3) **البطاقة (geidea/neoleap) لم تُوصل بالاشتراك** — الدفع يدوي كما طلبت الخطة، وبوابتا
+> السعودية تخصّان دفع عملاء العميل لا اشتراك العميل في المنصة (تفصيله في §4 من التقرير).
 
 | | |
 |---|---|
@@ -118,11 +158,23 @@
 | **الدفع** | يبدأ **يدوياً** (تحويل بنكي + إيصال مرفوع) ثم يُوسَّع: بطاقة عبر **المهايئات القائمة أصلاً** (`modules/payments/gateways/geidea.ts` · `neoleap.ts` — بوابتان سعوديتان مُنفَّذتان ومُختبَرتان) بدل إضافة بوابة أجنبية |
 | **الضريبة** | ضريبة قيمة مضافة 15٪ على الاشتراك، وحقل الرقم الضريبي، ورقم الفاتورة المتسلسل (بناءً على `SequencesService`) |
 | **صلاحيات** | `console.plans.manage` · `console.subscriptions.manage` · `console.billing.manage` |
-| **ترحيل** | `0067_platform_billing.sql` — `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` (كلها RLS) |
+| **ترحيل** | **`0068_platform_billing.sql`** — `billing_plan_entitlements` · `platform_invoice_sequences` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` (كلها RLS+FORCE) + توسعة دورة حياة على `tenant_subscriptions` وفهرسٌ فريد جزئي يمنع ترخيصين حيّين لعميلٍ واحد |
 | **اختبار** | `platform-billing.spec.ts` (≥ 14): proration، فاتورة ضريبية متوازنة، إلغاء اشتراك، متابعة، منع تكرار التحصيل |
 | **تحقّق حيّ** | `scripts/verify-platform-billing.mjs` (≈ 50 نقطة) |
 
-### P-C5 — الاستخدام والحصص 🟠
+### P-C5 — الاستخدام والحصص ✅
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C5_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C5_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **1056** اختباراً (131 ملفاً) · `platform-usage.spec.ts` **13** (طُلِب ≥ 8) ·
+> platform-admin **24** (المسارات 19) · staff **37** (كان 36) · contracts **88** (كان 81) ·
+> `scripts/verify-platform-usage.mjs` = **85** نقطة في **11** قسماً (الخطة لم تسمِّ سكربتاً؛ بُني القياس).
+> أربعة أمور تستحقّ الانتباه في الجدول أدناه: (1) **الترحيل صار `0069`** — `0068` صار لفوترة
+> المنصة في P-C4، والرقم 0069 هو المسجَّل سلفاً في جدول الترحيلات (§6)؛ (2) **الحدود الافتراضية
+> تُبلَّغ ولا تُطبَّق** — التطبيق لا يبدأ إلا على حدٍّ مصدره `tenant` أو `platform`، وكل مقياس
+> يحمل `enforced`، وإلا لمنع الافتراضي (`max_branches=1`) كل عميل من فرعٍ ثانٍ لحظة النشر؛
+> (3) `api_calls_per_day` بالزيادة-ثم-الفحص (ذرّي) والبقية فحص-ثم-كتابة بتفاوت ±1؛ (4) قراءة
+> الحدّ تعبر إلى مستوى المنصة بـ`withPlatformAdminTx` **قراءةً فقط** لأن RLS 0066 يخفي
+> `tenant_id IS NULL` عن جلسة المستأجر — وهو الموضع الوحيد الذي يعبر فيه سطح العميل.
 
 | | |
 |---|---|
@@ -132,12 +184,25 @@
 | **نقاط نهاية** | `GET /platform/usage?tenantId=&period=` · `GET /platform/usage/export.csv` · `GET /usage` (للمستأجر) |
 | **السلوك** | ناعم عند 80٪ (إشعار + راية)، صلب عند 100٪ (رفض برمز خطأ صريح) — ويُبلَّغ عنه في التدقيق |
 | **صلاحيات** | `console.tenants.view` + `console.billing.manage` |
-| **ترحيل** | `0068_usage_metering.sql` — `usage_counters(tenant_id, metric, period, value)` فريد `(tenant, metric, period)` |
+| **ترحيل** | `0069_usage_metering.sql` — `usage_counters(tenant_id, metric, period, value)` فريد `(tenant, metric, period)`، و§3 ترميم `platform_admin_plane` على `items`/`files`/`whatsapp_messages` |
 | **اختبار** | `platform-usage.spec.ts` (≥ 8): العدّاد يزيد، الحدّ يمنع، التصدير، عزل |
 
-### P-C6 — خدمة البريد 🔴 (أكبر خدمة احترافية مقترحة — تفصيلها في §7)
+### P-C6 — خدمة البريد ✅ (أكبر خدمة احترافية مقترحة — تفصيلها في §7)
 
-### P-C7 — الإعلانات والإشعارات 🟡
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C6_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C6_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **1077** اختباراً (132 ملفاً، كان 1056) · `platform-email.spec.ts`
+> **21** (طُلِب ≥ 16) · contracts **104** (كان 88) · platform-admin **24** (المسارات 20) ·
+> staff **37** (الشاشات 231) · `scripts/verify-platform-email.mjs` = **73** نقطة في **9** أقسام
+> (طُلب ≈ 55؛ ولا يُرسل بريداً حقيقياً أبداً — الإعدادات تُصوَّر وتُعاد).
+> **ثلاثة أمور تستحقّ الانتباه:** (1) **التسليم `inline` بعد الالتزام** والطابور شبكة أمان
+> (مهمّة `email.send` في نفس معاملة صفّ الرسالة) — لأن انتظار العامل يعني ألّا يخرج بريد في
+> تثبيتٍ بلا Redis أو `WORKER=0`، ورسالةٌ **مؤجَّلة** (`sendAt` مستقبلي) تبقى `queue` وحدها؛
+> (2) **حصّتان لا واحدة** — حدّ P-C5 المطبَّق يرفض **409** ويُدقَّق، وسقفا `email_settings`
+> يرفضان **429**، ورسائل الاختبار (`is_test`) لا تُحتسب على العميل؛ (3) **الحجر قبل الطابور**
+> ويُسجَّل `suppressed` بسببه — فالصمت غير مقبول، والشاشة تقول «محجوبة» لا «لم تُرسَل».
+> نصّ الخطة (§7) لم يسمِّ سكربت تحقّق، فبُني القياس كما في P-C5.
+
+### P-C7 — الإعلانات والإشعارات ✅
 
 | | |
 |---|---|
@@ -145,22 +210,47 @@
 | **الشاشات** | `/announcements` (إنشاء · استهداف بالباقة أو الحالة · جدولة · معاينة عربية/إنجليزية · قراءات) · **مركز الإشعارات في staff** (جرس + شاشة؛ الخلفية قائمة: `GET/POST /notifications` · `POST /:id/read`) |
 | **نقاط نهاية** | `GET/POST/PATCH /platform/announcements` · `POST /platform/announcements/:id/publish` · `GET /platform/announcements/:id/reads` · (staff) لا جديد: الاستهلاك من `/notifications` |
 | **صلاحيات** | **`console.notifications.manage`** (جديد) · `tenant.notification.view` (قائم) |
-| **ترحيل** | `0070_announcements.sql` — `announcements` · `announcement_reads` |
-| **اختبار** | `platform-announcements.spec.ts` (≥ 8) |
+| **ترحيل** | `0071_announcements.sql` — `announcements` · `announcement_reads` (صُحِّح الرقم: كان 0070، وقد أخذه بريد P-C6) |
+| **اختبار** | `platform-announcements.spec.ts` (≥ 8) — **11** منفَّذاً + 7 في عقود الإعلانات |
 
-### P-C8 — مكتب الدعم والدخول المؤقّت 🟡
+> **نُفِّذ (2026-09-17) — أربعة قرارات مصرَّح بها** (تفصيلها في
+> [`../PLATFORM_CONSOLE_P_C7_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C7_IMPLEMENTATION_REPORT.md)):
+> (1) **الجمهور snapshot لحظة النشر** — من دخل بعدها لا يُشمل، فصفُّ المتابعة يعدّ من استُهدف
+> فعلاً، وإعادة النشر تُكمل الناقص ولا تُضاعف (حجزٌ بـ`INSERT … ON CONFLICT … RETURNING`)؛
+> (2) **الجدولة زمنيّة والنشر idempotent** — مهمّة `announcement.publish` بوقتها في نفس معاملة
+> الكتابة، **ومسحٌ من `GET /platform/announcements`** لا يعتمد على العامل (هذا المستودع يعمل
+> بـ`WORKER=0`، فلو كان النشر مربوطاً بالطابور لتوقّف عند أول بيئةٍ بلا Redis)؛
+> (3) **بريدُ المالك وحده وإشعارُ كل عضو نشط** — التطبيق إبلاغٌ لمن يعمل، والبريد تمثيلٌ لمن
+> يملك، ومنشأة المشغّلين تُستثنى فلا تُعلن لنفسها؛ (4) **القراءة مصدرٌ واحد** — وسم الإشعار
+> مقروءاً (كما كان) يوسم صفّ التسليم في نفس المعاملة، فلا عدّادٌ ثانٍ ولا رقمان لسؤالٍ واحد.
+> **واستدراكٌ على P-C6**: تجاوز نصّ العميل كان مفتوحاً لكل حدث، فأُقفل على أحداث النطاق
+> `tenant` — إعلان المنصة ليس كلام العميل (حدثٌ بلا مُنتِج لا يُظهر الخلل، وأول إعلانٍ يُظهره).
+> والشاشتان: `/announcements` في اللوحة (`GET` · `POST` · `PATCH /:id` · `POST /:id/publish` ·
+> `GET /:id/reads`) و`/notifications` في staff بجرسٍ في الشريط — بلا نقاط نهاية جديدة كما نصّت §4.
+
+### P-C8 — مكتب الدعم والدخول المؤقّت ✅
+
+> ✅ **مُنجَز** (2026-09-17) — [`../PLATFORM_CONSOLE_P_C8_IMPLEMENTATION_REPORT.md`](../PLATFORM_CONSOLE_P_C8_IMPLEMENTATION_REPORT.md).
+> الأرقام بعد التنفيذ: API **1102** اختباراً (134 ملفاً) · contracts **120** (كان 111) · platform-admin **24** · staff **37**
+> · `platform-support.spec.ts` **14** (الخطة طلبت ≥ 10) · `scripts/verify-platform-support.mjs` **63/63** في **9** أقسام (سكربت جديد)
+> · `verify-platform-console.mjs` = **176** نقطة في **19** قسماً (كان 169/18).
+> **ثلاث مخالفات مقصودة، كلٌّ منها بسبب:** (1) الترحيل `0072_support_desk.sql` لا `0071` — رقم الخطة أخذه
+> الإعلان في P-C7؛ (2) الحارس **عالميّ** (`APP_GUARD` بعد `AuthGuard` مباشرةً) لا على وحدة الدعم وحدها —
+> رمز `imp` قد يصل إلى أي مسار في التطبيق، فحدوده يجب أن تُفرض عليه في كل مسار؛ (3) مسارٌ عاشر لم تذكره
+> الخطة، `GET /platform/tenants/:tenantId/tickets`، يحتاجه سطح العميل ومرشّح بطاقة المنشأة. وأمران مؤجَّلان
+> صراحةً: **المرفقات** عبر وحدة `files` (وحدتها في P-C9) و**الردود الجاهزة** محتوى واجهةٍ لا عقدُ API.
 
 | | |
 |---|---|
 | **الهدف** | تذكرة واحدة لكل مشكلة، ودخول مؤقّت مضبوط حين يلزم النظر بعين العميل |
-| **الشاشات** | `/tickets` (صندوق وارد · حالات · أولوية وSLA · إسناد · رودود جاهزة · ملاحظات داخلية · مرفقات عبر وحدة `files`) · `/tickets/[id]` · شاشة **الدخول المؤقّت** (سبب + مدّة + سجلّ) ولافتة حمراء ظاهرة أثناء الجلسة |
+| **الشاشات** | `/tickets` (صندوق وارد · حالات · أولوية وSLA · إسناد · رودود جاهزة · ملاحظات داخلية · مرفقات عبر وحدة `files`) · `/tickets/[id]` · شاشة **الدخول المؤقّت** (سبب + مدّة + سجلّ) ولافتة حمراء ظاهرة أثناء الجلسة — **المرفقات مؤجَّلة إلى P-C9** |
 | **نقاط نهاية** | `GET/POST/PATCH /platform/tickets` · `POST /platform/tickets/:id/reply` · `POST /platform/impersonate` (سبب + مدّة) · `GET /platform/impersonate/sessions` · `DELETE /platform/impersonate/:id` |
 | **الضوابط** | الدخول المؤقّت: سبب إلزامي، مدّة قصوى 60 دقيقة، رمز قصير العمر، يُسجَّل في التدقيق العابر، ويظهر للمستأجر في سجله؛ لا قدرة على تغيير كلمة مرور ولا على حذف |
 | **صلاحيات** | `console.support.manage` |
-| **ترحيل** | `0071_support_desk.sql` — `support_tickets` · `ticket_messages` · `support_sessions` |
+| **ترحيل** | `0072_support_desk.sql` — `support_tickets` · `ticket_messages` · `support_sessions` (رقم الخطة `0071` كان قد أُخذ في P-C7) |
 | **اختبار** | `platform-support.spec.ts` (≥ 10): الدخول المؤقّت ينتهي بوقته، ويُسجَّل، ولا يسمح بالحذف |
 
-### P-C9 — العمليات 🟠
+### P-C9 — العمليات ✅
 
 | | |
 |---|---|
@@ -171,7 +261,7 @@
 | **ترحيل** | — |
 | **اختبار** | `platform-operations.spec.ts` (≥ 10) |
 
-### P-C10 — البيانات والاسترجاع 🟠
+### P-C10 — البيانات والاسترجاع ✅
 
 | | |
 |---|---|
@@ -180,10 +270,10 @@
 | **نقاط نهاية** | `POST /platform/backups/run` · `GET /platform/backups` · `GET /platform/backups/:id/download` (رابط موقّت قصير العمر) · `POST /platform/backups/:id/verify` · `GET/PUT /platform/retention` |
 | **التخزين** | MinIO/S3 عبر `platform-services/files/object-storage.ts` (قائم) + تشفير + سياسة احتفاظ + سجلّ |
 | **صلاحيات** | **`console.backups.manage`** (جديد) |
-| **ترحيل** | `0072_platform_backups.sql` — `backup_jobs` · `backup_artifacts` |
+| **ترحيل** | `0074_platform_backups.sql` — `backup_jobs` · `backup_artifacts` · `data_requests` (الرقم صُحِّح: 0072 لـP-C8 و0073 لـP-C9) |
 | **اختبار** | `platform-backups.spec.ts` (≥ 8)؛ والتحقّق الحيّ بـ`scripts/verify-platform-backups.mjs` |
 
-### P-C11 — بوابة المطوّر 🟢
+### P-C11 — بوابة المطوّر ✅
 
 | | |
 |---|---|
@@ -195,15 +285,15 @@
 | **ترحيل** | `0073_developer_platform.sql` — `api_keys` (المفتاح مُجزَّأ، لا يُخزَّن نصّاً) · `webhook_endpoints` · `webhook_deliveries` |
 | **اختبار** | `platform-developer.spec.ts` (≥ 10): توقيع صالح، إعادة إرسال، إبطال مفتاح، عزل |
 
-### P-C12 — التحليلات 🟢
+### P-C12 — التحليلات ✅
 
 | | |
 |---|---|
 | **الهدف** | أن ترى المنصة نفسها كما ترى عملاءها |
-| **الشاشات** | `/analytics` (MRR · ARR · التسرب «شعاراتي ومالي» · قمع التفعيل: تسجيل → تفعيل → أول فاتورة → أول إرسال زاتكا · أفواج الاحتفاظ · التحويل من التجربة · الاستخدام لكل باقة · تنبيهات) + تصدير CSV + تقرير أسبوعي بالبريد (يبني على P-C6) |
-| **نقاط نهاية** | `GET /platform/analytics/overview` · `GET /platform/analytics/funnel` · `GET /platform/analytics/cohorts` · `GET /platform/analytics/export.csv` |
+| **الشاشات** | `/analytics` (MRR · ARR · التسرب «شعاراتي ومالي» · قمع التفعيل: تسجيل → تفعيل → أول فاتورة → أول إرسال زاتكا · أفواج الاحتفاظ · التحويل من التجربة · الاستخدام لكل باقة · تنبيهات) + تصدير CSV + ✅ **تقرير أسبوعي بالبريد (بُني على P-C6 — 2026-09-18)** |
+| **نقاط نهاية** | `GET /platform/analytics/overview` · `GET /platform/analytics/funnel` · `GET /platform/analytics/cohorts` · `GET /platform/analytics/export.csv` · ✅ **التسليم الدوري (2026-09-18)**: `GET /platform/reports/weekly` · `POST /platform/reports/weekly/run` |
 | **صلاحيات** | **`console.analytics.view`** (جديد) |
-| **ترحيل** | — (يقرأ القائم + عدّادات P-C5) |
+| **ترحيل** | — (يقرأ القائم + عدّادات P-C5؛ والتقرير الأسبوعي كذلك: مفاتيحه من كتالوج الإعدادات وحدثه نصٌّ لا enum) |
 | **اختبار** | `platform-analytics.spec.ts` (≥ 8) |
 
 ---
@@ -212,35 +302,55 @@
 
 | الجزء | الأولوية | يعتمد على | اختبارات | نقاط التحقّق |
 |---|:--:|---|---:|---:|
-| P-C1 الأساس والصلاحيات | 🔴 | — | 14 | 45 |
-| P-C2 العملاء في العمق | 🔴 | P-C1 | 12 | +25 |
-| P-C3 الهوية والوصول | 🟠 | P-C1 | 10 | +20 |
-| P-C4 الباقات والفوترة | 🟠 | P-C2 | 14 | 50 |
-| P-C5 الاستخدام والحصص | 🟠 | P-C4 | 8 | +20 |
-| P-C6 البريد | 🔴 | P-C1 | 16 | 55 |
-| P-C7 الإعلانات والإشعارات | 🟡 | P-C6 | 8 | +20 |
-| P-C8 الدعم والدخول المؤقّت | 🟡 | P-C1 | 10 | +25 |
-| P-C9 العمليات | 🟠 | P-C1 | 10 | +25 |
-| P-C10 البيانات والاسترجاع | 🟠 | P-C1 | 8 | 30 |
-| P-C11 بوابة المطوّر | 🟢 | P-C1 | 10 | +25 |
-| P-C12 التحليلات | 🟢 | P-C4 · P-C5 | 8 | +20 |
+| P-C1 الأساس والصلاحيات ✅ | 🔴 | — | 20 منفَّذ | 70 منفَّذ |
+| P-C2 العملاء في العمق ✅ | 🔴 | P-C1 | 23 منفَّذ | 121 منفَّذ (تراكمي) |
+| P-C3 الهوية والوصول ✅ | 🟠 | P-C1 | 21 منفَّذ | 159 منفَّذ (تراكمي) |
+| P-C4 الباقات والفوترة ✅ | 🟠 | P-C2 | 23 منفَّذ | 307 منفَّذ (تراكمي) |
+| P-C5 الاستخدام والحصص ✅ | 🟠 | P-C4 | 13 منفَّذ | 394 منفَّذ (تراكمي) |
+| P-C6 البريد ✅ | 🔴 | P-C1 | 21 منفَّذ | 467 منفَّذ (تراكمي) |
+| P-C7 الإعلانات والإشعارات ✅ | 🟡 | P-C6 | 11 منفَّذ | 521 منفَّذ (تراكمي) |
+| P-C8 الدعم والدخول المؤقّت ✅ | 🟡 | P-C1 | 14 منفَّذ | 591 منفَّذ (تراكمي) |
+| P-C9 العمليات ✅ | 🟠 | P-C1 | 12 منفَّذ | 678 منفَّذ (تراكمي) |
+| P-C10 البيانات والاسترجاع ✅ | 🟠 | P-C1 | 25 منفَّذ | 780 منفَّذ (تراكمي) |
+| P-C11 بوابة المطوّر ✅ | 🟢 | P-C1 | 16 منفَّذ | 861 منفَّذ (تراكمي) |
+| P-C12 التحليلات ✅ | 🟢 | P-C4 · P-C5 | 10 منفَّذ | 910 منفَّذ (تراكمي) |
 
-**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة.
+**المجموع المقدَّر:** ≈ 128 اختباراً و≈ 360 نقطة تحقّق حيّة — وقد **تجاوزه المنفَّذ** بعد الأجزاء
+الاثني عشر **كلها**: رقم `verify` التراكمي صار **910** نقطة في **106** أقسام (218/22 من
+`verify-platform-console.mjs` · **49/9 من `verify-platform-analytics.mjs` (جديد)** · 63/9 من
+`verify-platform-developer.mjs` · 87/9 من
+`verify-platform-backups.mjs` · 76/9 من
+`verify-platform-operations.mjs` · 148/12 من
+`verify-platform-billing.mjs` · 85/11 من `verify-platform-usage.mjs` · 74/9 من
+`verify-platform-email.mjs` · 47/7 من `verify-platform-announcements.mjs` · 63/9 من
+`verify-platform-support.mjs`) والمجموع المنفَّذ من الاختبارات المخصّصة للأجزاء 209 اختبارات
+(20+23+21+23+13+21+11+14+12+25+16+**10**). **ولا جزء يتبقّى**: الخطّة كلها منفَّذة، ويبقى المؤجَّل
+صراحةً أدناه.
 
 ---
 
-## 6. الترحيلات المقترحة (من 0066)
+## 6. الترحيلات (من 0066)
+
+> **تنبيه ترقيم (2026-09-17):** الأرقام أدناه كانت مُدَّخرة في الخطة، وقد أخذ P-C2 الرقم
+> **`0067`** لترحيل البطاقة (السبب في §P-C2 أعلاه) — فانتقلت أرقام الأجزاء الباقية واحداً
+> واحداً. وقد أخذ P-C8 الرقم `0072` (رقم الخطة `0071` كان قد أُخذ في P-C7)، وأخذ **P-C9**
+> الرقم `0073` — وهو **ترحيلُ صلاحيةٍ لا جدول** لأن رمز `console.jobs.manage` جديد والقاعدة
+> الملزمة أن كل رمز `console.*` يُدرَج في ترحيل. **والرقم التالي الحر الآن `0075`** (0074 أخذه
+> P-C10 بجداوله الثلاثة)، وهو رقم ترحيل P-C11 في الجدول أدناه.
 
 | الترحيل | الجداول | الجزء |
 |---|---|---|
-| `0066_platform_settings.sql` | `platform_settings` | P-C1 |
-| `0067_platform_billing.sql` | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
-| `0068_usage_metering.sql` | `usage_counters` | P-C5 |
-| `0069_email_service.sql` | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
-| `0070_announcements.sql` | `announcements` · `announcement_reads` | P-C7 |
-| `0071_support_desk.sql` | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
-| `0072_platform_backups.sql` | `backup_jobs` · `backup_artifacts` | P-C10 |
-| `0073_developer_platform.sql` | `api_keys` · `webhook_endpoints` · `webhook_deliveries` | P-C11 |
+| `0066_platform_settings.sql` ✅ | `platform_settings` | P-C1 |
+| `0067_tenant_card.sql` ✅ | `tenant_notes` + سياسات المنصة الناقصة + ترميم `nullif` | P-C2 |
+| `0068_platform_billing.sql` ✅ | `billing_plan_entitlements` · `platform_invoices` · `platform_invoice_lines` · `platform_payments` · `dunning_attempts` | P-C4 |
+| `0069_usage_metering.sql` ✅ | `usage_counters` | P-C5 |
+| `0070_email_service.sql` ✅ | `email_templates` · `email_messages` · `email_suppressions` · `email_settings` | P-C6 |
+| `0071_announcements.sql` ✅ | `announcements` · `announcement_reads` | P-C7 |
+| `0072_support_desk.sql` ✅ | `support_tickets` · `ticket_messages` · `support_sessions` | P-C8 |
+| `0073_jobs_manage_permission.sql` ✅ | **لا جدول** — صفُّ `console.jobs.manage` في `permissions` + `NOBYPASSRLS` | P-C9 |
+| `0074_platform_backups.sql` ✅ | `backup_jobs` · `backup_artifacts` · `data_requests` + RLS على `data_requests` + `REVOKE UPDATE, DELETE ON audit_log FROM erp_api` | P-C10 |
+| `0076_analytics_permission.sql` ✅ | **لا جدول** — صفُّ `console.analytics.view` في `permissions` + `NOBYPASSRLS` | P-C12 |
+| `0075_developer_platform.sql` ✅ | `api_keys` (بلا نصٍّ صريح) · `webhook_endpoints` (سرٌّ مشفَّر) · `webhook_deliveries` · `api_key_uses` + RLS الأربعة + `GRANT … ON SEQUENCE api_key_uses_id_seq` + صفّا `console.apikeys.manage`/`console.webhooks.manage` + `NOBYPASSRLS` | P-C11 |
 
 كل جدول: `tenant_id` حيث يلزم + `RLS` بـ`ENABLE` و`FORCE` وسياسة `tenant_id` + فهارس
 `(tenant_id, created_at DESC)` + ملف `down/` مقابل (اتّباعاً لمنهج المراحل 1–23).
@@ -313,7 +423,7 @@
 | تقارير مجدولة تُرسل بالبريد | قيمة يومية للعميل | 🟢 | P-C6 · P-C12 |
 | إدارة الشهادات الضريبية (زاتكا) كخدمة مُدارة | حين يتوفّر الاعتماد | 🟢 | P-C2 |
 | فحص الفيروسات على المرفقات (إظهار النتائج) | `virus-scanner.ts` قائم بلا شاشة | 🟢 | P-C9 |
-| حذف/تصدير البيانات الشخصية (طلبات) | امتثال | 🟡 | P-C10 |
+| حذف/تصدير البيانات الشخصية (طلبات) | امتثال | ✅ | P-C10 |
 | مخزن أسرار لكل مستأجر (مثل بوابات الدفع) | قائم أصلاً (`secret-box`)؛ واجهة موحّدة | 🟢 | P-C2 |
 
 ---
@@ -350,4 +460,11 @@ P-C1 ──┬─ P-C2 ── P-C4 ── P-C5 ──┐
 
 الجلسة الأولى: **P-C1 كاملاً** (لا شيء بعده آمن بدونه). الثانية: **P-C6** (البريد) لأن
 التسويق والمتابعة والتنبيهات كلها تتفرّع عنه. الثالثة: **P-C2 + P-C4** (العملاء
-والمال). ثم الباقي بالأولوية.
+والمال). ثم الباقي بالأولوية — ومنه **P-C8** و**P-C9** اللذان اكتملا بعد P-C7 (يظهران في
+الشجرة أعلاه مستقلّين عن P-C7 لأن الخطّة جعلتهما يعتمدان P-C1 وحده، ولذلك لم يُسلسلا بعده).
+**وبإتمام `P-C12` «التحليلات» (اعتمد P-C4 وP-C5، وبلا ترحيل)** اكتملت الخطّة بأجزائها الاثني عشر
+كلها. و**أُكمل تسليمُ P-C12 الدوري في 2026-09-18**: التقرير الأسبوعي بالبريد — قالبُ P-C6
+وحدثُه (`report.weekly`) ومجدولٌ في العامل (نبضة كل دقيقة + لحاقُ إقلاع) وأربعةُ مفاتيح إعداد،
+وقراراته الأربعة مكتوبةٌ في `docs/WEEKLY_REPORT_IMPLEMENTATION_REPORT.md`.
+ويبقى **مؤجَّلاً صراحةً**: المستأجر التجريبي (sandbox) الذي ذكرته الخطّة في شاشات P-C11 بلا
+نقاط نهاية · وأفواج الإيراد وتصدير Excel/PDF.

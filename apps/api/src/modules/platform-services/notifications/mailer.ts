@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { connect as netConnect, type Socket } from 'node:net';
 import { connect as tlsConnect } from 'node:tls';
 
@@ -21,8 +22,26 @@ export type MailMessage = {
   to: string;
   subject: string;
   text: string;
+  /**
+   * P-M7 — النسخة المرئية (HTML) من النصّ نفسه. تُطلب من **حملة** لأن بكسل الفتح لا يُحمَّل
+   * في نصٍّ مجرّد، فتصير الرسالة `multipart/alternative`: النصّ أوّلاً (من يقرأ نصّاً يقرأ نصّاً)
+   * وHTML ثانياً. والفارغ يعني رسالةٌ نصّية كاملة كسابقتها — فلا يتغيّر سلوك بلا سبب.
+   */
+  html?: string;
+  /**
+   * P-M7 — ترويسات يضيفها المرسل: `List-Unsubscribe` و`List-Unsubscribe-Post` (RFC 8058).
+   * تُنقّى من محارف السطر الجديد قبل الكتابة، فلا تُحقن ترويسةٌ من محتوى.
+   */
+  headers?: Record<string, string>;
   /** Tenant the message belongs to; used for per-tenant templates later. */
   tenantId?: string | null;
+  /**
+   * P-C6 — هوية المُرسِل من `email_settings` (اسمٌ عربيّ وعنوانٌ لكل عميل). غيابها يعني
+   * `MAIL_FROM` من البيئة، وهو ما كان قبل خدمة البريد.
+   */
+  from?: string;
+  fromName?: string;
+  replyTo?: string | null;
 };
 
 export interface MailerPort {
@@ -46,6 +65,9 @@ export class ConsoleMailer implements MailerPort {
         to: message.to,
         subject: message.subject,
         tenantId: message.tenantId ?? null,
+        // P-M7: وجود HTML وترويسات الامتثال يُقاس من السجلّ بلا قراءة القاعدة.
+        htmlChars: message.html?.length ?? 0,
+        headers: message.headers ? Object.keys(message.headers) : [],
       },
       'outbound mail (console transport)',
     );
@@ -86,6 +108,9 @@ export function smtpOptionsFromEnv(): SmtpOptions {
 
 type Reply = { code: number; lines: string[] };
 
+/** ترويسةٌ آمنة: بلا CR/LF وبلا طولٍ يشقّ الرسالة. */
+const safe = (value: string): boolean => value.length <= 998 && !/[\r\n]/.test(value);
+
 const encodedWord = (text: string): string => `=?UTF-8?B?${Buffer.from(text, 'utf8').toString('base64')}?=`;
 
 export class SmtpMailer implements MailerPort {
@@ -97,10 +122,13 @@ export class SmtpMailer implements MailerPort {
     const session = await SmtpSession.open(this.options);
     try {
       await session.deliver({
-        from: this.options.from,
+        from: formatFrom(message.fromName, message.from) ?? this.options.from,
         to: message.to,
         subject: message.subject,
         text: message.text,
+        ...(message.html ? { html: message.html } : {}),
+        ...(message.headers ? { headers: message.headers } : {}),
+        ...(message.replyTo ? { replyTo: message.replyTo } : {}),
       });
     } finally {
       await session.quit().catch(() => undefined);
@@ -151,24 +179,57 @@ class SmtpSession {
     return session;
   }
 
-  async deliver(message: { from: string; to: string; subject: string; text: string }): Promise<void> {
+  async deliver(message: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    html?: string;
+    headers?: Record<string, string>;
+    replyTo?: string;
+  }): Promise<void> {
     await this.command(`MAIL FROM:<${message.from}>`, [250]);
     await this.command(`RCPT TO:<${message.to}>`, [250, 251]);
     await this.command('DATA', [354]);
 
-    const headers = [
+    const boundary = `erp-${randomBytes(12).toString('hex')}`;
+    const lines = [
       `From: ${message.from}`,
       `To: ${message.to}`,
       `Subject: ${encodedWord(message.subject)}`,
       'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=utf-8',
-      'Content-Transfer-Encoding: 8bit',
+      // ترويسات المرسل (P-M7): تُنقّى من CR/LF — ترويسةٌ مبنيةٌ من محتوى تُحقَن بلا ذلك.
+      ...Object.entries(message.headers ?? {})
+        .filter(([name, value]) => /^[A-Za-z][A-Za-z0-9-]{1,60}$/.test(name) && safe(value))
+        .map(([name, value]) => `${name}: ${value.replace(/[\r\n]+/g, ' ').trim()}`),
+      ...(message.replyTo ? [`Reply-To: ${message.replyTo}`] : []),
+      // نسختان حين يوجد HTML (النصّ أوّلٌ لمن لا يعرض HTML)، ونسخةٌ واحدة حين لا يوجد.
+      ...(message.html
+        ? [`Content-Type: multipart/alternative; boundary="${boundary}"`]
+        : ['Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit']),
       `Date: ${new Date().toUTCString()}`,
-    ].join('\r\n');
+    ];
+
+    const body = message.html
+      ? [
+          `--${boundary}`,
+          'Content-Type: text/plain; charset=utf-8',
+          'Content-Transfer-Encoding: 8bit',
+          '',
+          message.text,
+          `--${boundary}`,
+          'Content-Type: text/html; charset=utf-8',
+          'Content-Transfer-Encoding: 8bit',
+          '',
+          message.html,
+          `--${boundary}--`,
+          '',
+        ].join('\r\n')
+      : message.text;
 
     // Dot-stuffing (RFC 5321 §4.5.2): a line starting with '.' gets one extra '.'.
-    const body = message.text.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
-    this.socket.write(`${headers}\r\n\r\n${body}\r\n.\r\n`, 'utf8');
+    const stuffed = body.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+    this.socket.write(`${lines.join('\r\n')}\r\n\r\n${stuffed}\r\n.\r\n`, 'utf8');
     await this.expect([250]);
   }
 
@@ -297,8 +358,28 @@ function clientHostname(): string {
   return env.SMTP_CLIENT_HOSTNAME || 'erp-saas.local';
 }
 
+/**
+ * `اسم عربي <address@domain>` — وصيغة `from` في الرسالة تبقى العنوان وحده إن لم يُضبط اسم.
+ * الاسم يُرمَّز (`=?UTF-8?B?…?=`) كما تُرمَّز العناوين، لا كبايتات خام.
+ */
+export function formatFrom(fromName?: string, from?: string): string | undefined {
+  if (!from) return undefined;
+  if (!fromName) return from;
+  return `${encodedWord(fromName)} <${from}>`;
+}
+
 /** Chooses the wired implementation from `MAIL_TRANSPORT` (read live — see `live`). */
 export function createMailer(): MailerPort {
   if (live('MAIL_TRANSPORT', env.MAIL_TRANSPORT) === 'smtp') return new SmtpMailer(smtpOptionsFromEnv());
+  return new ConsoleMailer();
+}
+
+/**
+ * P-C6 — المزوّد المختار من `email_settings` لحظة الإرسال، لا من البيئة وحدها: المشغّل يبدّل
+ * `console` ↔ `smtp` من الشاشة بلا إعادة نشر (نصّ الخطة §7.2). واعتمادات SMTP تبقى في
+ * البيئة ولا تُخزَّن في جدول. و`MAIL_TRANSPORT` يظلّ الافتراضيّ حين لا صفَّ إعدادات.
+ */
+export function createMailerFor(provider: 'console' | 'smtp'): MailerPort {
+  if (provider === 'smtp') return new SmtpMailer(smtpOptionsFromEnv());
   return new ConsoleMailer();
 }

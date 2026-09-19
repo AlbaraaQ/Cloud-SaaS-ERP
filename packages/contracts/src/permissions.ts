@@ -82,18 +82,41 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('tenant.notification.view', 'Read own in-app notifications and mark them read.'),
   perm('tenant.notification.manage', 'Create notifications for other memberships of the tenant.'),
   perm('tenant.job.view', 'Read the transactional outbox and background-queue health.'),
+  // P-C6 — خدمة البريد: تجاوز نصّ قالب، وقراءة سجلّ ما أُرسل باسم المنشأة.
+  perm('tenant.email.template.manage', 'Override the text of e-mail templates for the own tenant.'),
+  perm('tenant.email.log.view', 'Read the outbound e-mail log of the own tenant.'),
   // tenant device registry (2026-09) — canonical Device entity, see `devices` table.
   perm('tenant.device.view', 'List and read registered tenant devices.'),
   perm('tenant.device.manage', 'Register, activate, suspend and rotate credentials of tenant devices.'),
 
   // tenant self-administration — legacy `platform.*` spelling (deprecated, still honoured).
   legacy('platform.tenant.view', 'tenant.view', 'Read the own tenant record and its effective settings.'),
-  legacy('platform.tenant.manage', 'tenant.manage', 'Update the own tenant record and typed settings in bulk.'),
-  legacy('platform.membership.manage', 'tenant.membership.manage', 'Invite, update and remove tenant memberships.'),
-  legacy('platform.role.manage', 'tenant.role.manage', 'Create and maintain roles and their permission sets.'),
-  legacy('platform.settings.manage', 'tenant.settings.manage', 'Read and write individual typed tenant settings.'),
+  legacy(
+    'platform.tenant.manage',
+    'tenant.manage',
+    'Update the own tenant record and typed settings in bulk.',
+  ),
+  legacy(
+    'platform.membership.manage',
+    'tenant.membership.manage',
+    'Invite, update and remove tenant memberships.',
+  ),
+  legacy(
+    'platform.role.manage',
+    'tenant.role.manage',
+    'Create and maintain roles and their permission sets.',
+  ),
+  legacy(
+    'platform.settings.manage',
+    'tenant.settings.manage',
+    'Read and write individual typed tenant settings.',
+  ),
   legacy('platform.audit.view', 'tenant.audit.view', 'Read the tenant audit log.'),
-  legacy('platform.file.upload', 'tenant.file.upload', 'Request pre-signed uploads, attach and download files.'),
+  legacy(
+    'platform.file.upload',
+    'tenant.file.upload',
+    'Request pre-signed uploads, attach and download files.',
+  ),
   legacy(
     'platform.notification.view',
     'tenant.notification.view',
@@ -169,7 +192,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('inventory.request.approve', 'Approve, reject or fulfil goods requests.'),
   perm('inventory.delivery.manage', 'Record stock deliveries against posted sales invoices.'),
   perm('inventory.production.manage', 'Create, edit and cancel production orders.'),
-  perm('inventory.production.complete', 'Complete production orders: consume components and receive the finished item.'),
+  perm(
+    'inventory.production.complete',
+    'Complete production orders: consume components and receive the finished item.',
+  ),
   perm('inventory.negative.override', 'Allow negative stock movements.'),
 
   // sales / purchases (PHASE_13)
@@ -247,7 +273,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('installments.manage', 'Create and maintain installment contracts and schedule templates.'),
   perm('installments.collect', 'Collect installment receipts and allocate them to due schedule rows.'),
   perm('projects.view', 'Read projects, stages, BOQ terms, progress bills and requirements.'),
-  perm('projects.manage', 'Create and maintain projects, stage templates, BOQ terms and requirement registers.'),
+  perm(
+    'projects.manage',
+    'Create and maintain projects, stage templates, BOQ terms and requirement registers.',
+  ),
   perm('projects.bill.post', 'Post progress bills and release retention invoices.'),
   perm('projects.contractor.pay', 'Approve and pay contractor payment certificates.'),
   perm('projects.stage.accredit', 'Accredit or reject project stages assigned to a user.'),
@@ -258,7 +287,10 @@ export const permissionRegistry: readonly PermissionDefinition[] = [
   perm('tailoring.view', 'Read customer measurement cards and latest measurements.'),
   perm('tailoring.manage', 'Create and maintain customer measurements.'),
   perm('marina.view', 'Read marina groups, vessels, bookings and operation plans.'),
-  perm('marina.manage', 'Create and maintain marina vessels, owners, bookings, pricing, violations and plans.'),
+  perm(
+    'marina.manage',
+    'Create and maintain marina vessels, owners, bookings, pricing, violations and plans.',
+  ),
   perm('marina.invoice', 'Create rental invoices from marina bookings.'),
   perm('fitment.view', 'Read vehicle compatibility lookups.'),
   perm('fitment.manage', 'Maintain vehicle makes, models and item fitment rows.'),
@@ -282,10 +314,74 @@ export const platformPermissionRegistry: readonly PermissionDefinition[] = [
   perm('console.users.view', 'List platform users.'),
   perm('console.users.manage', 'Grant and revoke platform roles.'),
   perm('console.audit.view', 'Read the cross-tenant audit trail.'),
+  perm(
+    'console.settings.manage',
+    'Read and write the platform settings (support contacts, service domains, default limits, maintenance switch).',
+  ),
   perm('console.health.view', 'Read system health and readiness.'),
   perm('console.jobs.view', 'Read background-queue and outbox health.'),
+  //
+  // P-C9: القراءة والكتابة مفصولتان — «إعادة محاولة مهمّة» أو «إلغاء مهمّة» فعلٌ يغيّر
+  // ما سيراه العميل، ومدقّق المنصة يقرأ الطابور ولا يعيد تشغيله.
+  perm(
+    'console.jobs.manage',
+    'Retry or cancel background jobs in the platform outbox, and act on the file manager (scan, quarantine).',
+  ),
   perm('console.billing.manage', 'Manage billing operations and dunning.'),
   perm('console.support.manage', 'Handle platform support tickets and break-glass access.'),
+  // P-C6 — خدمة البريد: قراءة السجلّ بلا قدرة إرسال، وإدارة القوالب والإعدادات وإعادة الإرسال.
+  perm('console.email.view', 'Read the outbound e-mail log across tenants.'),
+  perm('console.email.manage', 'Manage e-mail templates, sender settings and suppressions.'),
+  // P-C7 — الإعلانات: كتابة الإعلان واستهدافه ونشره، ومتابعة قراءاته.
+  perm(
+    'console.notifications.manage',
+    'Write, target and publish platform announcements, and read their delivery.',
+  ),
+  // P-C10 — البيانات والاسترجاع: تشغيل النسخ والتحقّق منها، وكتابة سياسة الاحتفاظ،
+  // وتنفيذ طلبات تصدير/محو البيانات الشخصية. رمزٌ واحد للثلاثة لأنها عملٌ واحد:
+  // «من يملك النسخة يملك ما فيها»، ولا معنى لفصل قراءة النسخة عن إعادة كتابة السياسة.
+  perm(
+    'console.backups.manage',
+    'Run and verify platform backups, set the retention policy, and execute data export or erasure requests.',
+  ),
+  // P-C11 — بوابة المطوّر: مفتاح الـAPI هو **هويّة** تُنشأ لمستأجر، وويب هوك هو **وعدٌ
+  // بتسليم**. رمزان لا رمز، لأن الأول يمنح وصولاً والثاني يُرسل بياناتٍ خارج المنصة —
+  // ومن يملك الثاني لا يلزمه الأول (فريقٌ يضبط التكامل ثم يسلّم المفتاح لغيره).
+  perm('console.apikeys.manage', 'Issue, rotate and revoke tenant API keys, and read their last use.'),
+  perm(
+    'console.webhooks.manage',
+    'Create and edit tenant webhook endpoints, send a test event, and retry a failed delivery.',
+  ),
+  // P-C12 — التحليلات: **قراءةٌ لا فعل**، ولذلك رمزٌ واحد بصيغة `view` لا `manage` — ولا
+  // مسار في هذه الوحدة يكتب شيئاً. ويمنحه كل من يقرأ أرقام المنصة أصلاً (المالك · التشغيل ·
+  // الفوترة · المدقّق)، ولا يُمنح للدعم: مقاييس الإيراد ليست جزءاً من ردّ تذكرة.
+  perm(
+    'console.analytics.view',
+    'Read platform analytics: MRR, churn, activation funnel, cohorts, trial conversion and usage per plan.',
+  ),
+  // P-M5 — نظام إدارة المحتوى: رمزان لا رمز، لأن **قراءة المسوّدة ليست كتابتها**. مراجعةٌ
+  // لغوية تقرأ ما كُتب قبل النشر بلا أن تملك ما يُنشر، ومن ينشر ليس بالضرورة من يحرّر.
+  perm('console.content.view', 'Read marketing content pages, drafts, menus and banners.'),
+  perm(
+    'console.content.manage',
+    'Write, publish, schedule, retract and restore marketing content pages, menus and banners.',
+  ),
+  // P-M6 — العميل المتوقَّع: رمزان لا رمز، ولنفس منطق المحتوى: **من يقرأ الطابور ليس من
+  // يتصرّف فيه**. الدعم يرى الطلب ليجيب عنه، وqualification والتحويل قرارُ من يملك التصرّف —
+  // والتحويل يُنشئ منشأةً كاملة، فهو أخطر فعلٍ في هذه الشاشة.
+  perm('console.leads.view', 'Read leads, their notes, their timeline and newsletter subscribers.'),
+  perm(
+    'console.leads.manage',
+    'Assign leads, change their status, write notes, convert a lead into a tenant, and manage subscribers.',
+  ),
+  // P-M7 — الحملات البريدية: رمزٌ واحد لأن **مَن يقرأ لوحة الحملات يقرأ قائمةَ أشخاصٍ
+  // حقيقيين بعناوينهم وتقارير فتحهم**، ولا معنى لقراءةٍ بلا قرار إرسال: الشاشتان واحدة،
+  // والمشغّل إمّا يكتب حملةً ويرسلها أو ليس له في الأمر شيء. ومن لا يحمله لا يرى `/campaigns`
+  // في القائمة ولا يفتح مساراً منها — والحاكم الـAPI لا الشاشة.
+  perm(
+    'console.campaigns.manage',
+    'Write, schedule, send and cancel marketing campaigns, and read their delivery and engagement reports.',
+  ),
 ] as const;
 
 const registryByCode = new Map(permissionRegistry.map((entry) => [entry.code, entry]));

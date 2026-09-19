@@ -11,7 +11,13 @@ import { paginationQuerySchema } from '../pagination.js';
  * than string literals so a typo is a compile error.
  */
 
-export const QUEUE_NAMES = ['einvoice', 'notifications', 'reports-export', 'migration', 'maintenance'] as const;
+export const QUEUE_NAMES = [
+  'einvoice',
+  'notifications',
+  'reports-export',
+  'migration',
+  'maintenance',
+] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
@@ -61,6 +67,20 @@ export type QueueHealthDto = z.infer<typeof queueHealthDtoSchema>;
 /** Job types Phase 04 owns. Later phases add their own under their queue. */
 export const jobTypes = {
   NOTIFICATION_EMAIL: 'notification.email',
+  // P-C6 — تسليم رسالة من `email_messages`: يُخزَّن في الطابور، ويُعاد بتراجعٍ أسّي.
+  EMAIL_SEND: 'email.send',
+  // P-C7 — نشر إعلانٍ مجدول في وقته: يبقى المسح في `list` شبكةَ أمانٍ لمن لا عامل له.
+  ANNOUNCEMENT_PUBLISH: 'announcement.publish',
+  // P-M5 — نشر صفحةٍ مجدولة في وقتها. وُضع في طابور «الصيانة» لا «الإشعارات»: أسماء
+  // الطوابير الخمسة مجمّدة في TARGET_ARCHITECTURE §6، ونشر صفحةٍ ليس تسليم رسالة.
+  CONTENT_PUBLISH: 'content.publish',
+  // P-C12 المؤجَّل — التقرير الأسبوعي (بقالب P-C6): تقريرُ المنصة إلى بريد المشغّلين،
+  // فلا يخصّ عميلاً واحداً. وطابور «الصيانة» لأن تسليمه ليس رسالة عميلٍ عاجلة.
+  REPORT_WEEKLY: 'report.weekly',
+  // P-M7 — دفعةُ إرسال حملة: تفتح صفوف الرسائل دفعةً بعد دفعة فلا يقف طلبٌ طويلاً على
+  // آلاف المستلمين، وتُعيد جدولة نفسها للبقيّة. وطابور «الصيانة» لأن الإرسال المجدول
+  // ليس رسالةَ عميلٍ عاجلة (تماماً كما `content.publish` و`report.weekly`).
+  CAMPAIGN_SEND: 'campaign.send',
   FILES_ORPHAN_GC: 'files.orphan-gc',
   IDEMPOTENCY_GC: 'idempotency.gc',
 } as const;

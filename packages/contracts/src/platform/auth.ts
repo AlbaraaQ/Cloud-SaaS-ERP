@@ -130,6 +130,31 @@ export const meResponseSchema = z.object({
   user: userDtoSchema,
   membership: membershipDtoSchema,
   permissions: z.array(z.string()),
+  /**
+   * Effective `console.*` permissions of the platform roles in the token (P-C1).
+   *
+   * Kept as a **separate list** from `permissions` on purpose: tenant codes and console
+   * codes are disjoint by construction (`permissionGrants` never lets `*` satisfy a
+   * `console.*` code), and the console sidebar has to hide what the operator cannot open
+   * without ever mixing the two namespaces into one set.
+   */
+  platformPermissions: z.array(z.string()).default([]),
+  /**
+   * P-C8 — إن كان الرمز رمزَ دخولٍ مؤقّت (يدّعاء `imp`)، فهذا وصفُ الجلسة: من دخل، ولماذا،
+   * وإلى متى. `null` في الحالة العادية. الشاشة تُظهر لافتةً حمراء من هذا الحقل وحده، فلا
+   * تحتاج قراءةً ثانية ولا تعرف «الدخول المؤقّت» إلا من الرمز نفسه.
+   */
+  impersonation: z
+    .object({
+      sessionId: z.string(),
+      operatorUserId: z.string(),
+      operatorLabel: z.string().nullable(),
+      reason: z.string(),
+      startedAt: z.string(),
+      expiresAt: z.string(),
+    })
+    .nullable()
+    .default(null),
   branchScope: z.array(uuidSchema).nullable(),
 });
 

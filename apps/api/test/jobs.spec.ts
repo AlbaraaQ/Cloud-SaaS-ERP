@@ -33,6 +33,10 @@ class RecordingQueue implements QueuePort {
     return true;
   }
 
+  async ping(): Promise<boolean> {
+    return true;
+  }
+
   async publish(job: QueueJob): Promise<void> {
     if (this.failOnType && job.type === this.failOnType) {
       throw new Error('redis unavailable');

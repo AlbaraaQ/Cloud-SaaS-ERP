@@ -4,6 +4,7 @@ import { DomainError, newId } from '@erp/contracts';
 import { companyProfiles, parties, whatsappMessages, whatsappSettings, withTenantTx, type DatabaseHandle } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { UsageService } from '../../usage/index.js';
 import { openSecret, sealSecret } from '../../platform/auth/secret-box.js';
 import { getRequestContext } from '../../../request-context/request-context.js';
 import { SalesService } from '../../sales/sales.service.js';
@@ -87,6 +88,7 @@ export class WhatsappService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly sales: SalesService,
+    private readonly usage: UsageService,
   ) {}
 
   // ── ⚙️ الإعدادات ──────────────────────────────────────────────────────────────────
@@ -157,6 +159,8 @@ export class WhatsappService {
    * down — because «هل وصلت الفاتورة؟» is a question a server has to be able to answer.
    */
   async send(tenantId: string, input: SendInput) {
+    // P-C5: رسائل واتساب مقياسٌ محدود — الحدّ أولاً، ثم إعدادات البوابة.
+    await this.usage.assertWithinLimit(tenantId, 'whatsapp_per_month');
     const row = await this.row(tenantId);
     if (!row) throw new DomainError('WHATSAPP_NOT_CONFIGURED', 'لم تُضبط بوابة واتساب — افتح «💬 واتساب» واحفظ الإعدادات.', 404);
     if (!row.active) throw new DomainError('WHATSAPP_DISABLED', DISABLED_MESSAGE, 409);

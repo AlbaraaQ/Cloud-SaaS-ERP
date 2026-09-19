@@ -387,9 +387,13 @@ describe('surface isolation', () => {
       token: platformOwner.token,
     });
     expect(users.status).toBe(200);
-    const row = ((users.body.data ?? []) as Array<{ platform_roles: string[] }>)[0];
-    expect(row?.platform_roles).toContain('platform_support');
-    expect(row?.platform_roles ?? []).not.toContain('platform_billing');
+    // P-C3 rewrote this view: the row is the typed directory entry (`platformRoles`,
+    // `tenants`, `activeSessionCount`) instead of the raw SQL snapshot (`platform_roles`).
+    // The assertion is the same one: support is granted, billing is not.
+    const rows = (users.body.data ?? []) as Array<{ email: string; platformRoles: string[] }>;
+    const row = rows.find((entry) => entry.email === 'support@platform.test');
+    expect(row?.platformRoles).toContain('platform_support');
+    expect(row?.platformRoles ?? []).not.toContain('platform_billing');
   });
 
   it('manages membership scopes and surfaces them on /me', async () => {

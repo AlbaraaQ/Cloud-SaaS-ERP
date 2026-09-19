@@ -27,6 +27,7 @@ import {
 } from '@erp/database';
 
 import { DATABASE_HANDLE } from '../../../database/database.module.js';
+import { UsageService } from '../../usage/index.js';
 import { toMembershipDto } from '../mappers.js';
 
 export type MembershipListQuery = PaginationQuery & {
@@ -38,7 +39,10 @@ export type MembershipListQuery = PaginationQuery & {
 /** `GET/POST /memberships`, `PATCH/DELETE /memberships/{id}` — API_CONTRACT §2. */
 @Injectable()
 export class MembershipsService {
-  constructor(@Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle) {}
+  constructor(
+    @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
+    private readonly usage: UsageService,
+  ) {}
 
   async list(tenantId: string, query: MembershipListQuery): Promise<ListEnvelope<MembershipDto>> {
     const filters = parseFilters(query.filter, MEMBERSHIP_FILTERS);
@@ -136,6 +140,8 @@ export class MembershipsService {
    * activated immediately.
    */
   async create(tenantId: string, actorUserId: string, input: MembershipCreate): Promise<MembershipDto> {
+    // P-C5: المستخدمون مقياسٌ محدود.
+    await this.usage.assertWithinLimit(tenantId, 'users');
     return withTenantTx(this.database.db, tenantId, async (tx) => {
       const existingUsers = await tx
         .select({ id: users.id, fullName: users.fullName, passwordHash: users.passwordHash })

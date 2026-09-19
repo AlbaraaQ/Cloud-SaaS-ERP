@@ -23,6 +23,12 @@ export type AccessTokenClaims = {
   pam?: boolean;
   /** Platform role codes (2026-09). Optional: tokens issued before the reorganisation lack it. */
   proles?: string[];
+  /**
+   * P-C8 — معرّف جلسة دعم: رمزٌ مُصدر لمشغّلٍ يدخل مؤقّتاً إلى منشأة عميل. وجوده يعني أن
+   * الرمز **ليس** رمز العميل: مَن يحمله مشغّلٌ، ويُمنع عليه ما تمنعه `ImpersonationGuard`،
+   * ويُرفض فور إنهاء الجلسة لا عند انتهاء صلاحيته.
+   */
+  imp?: string;
 };
 
 const ISSUER = 'erp-saas';
@@ -63,14 +69,25 @@ export class TokenService {
     return env.JWT_REFRESH_TTL_SECONDS;
   }
 
-  async signAccessToken(claims: Omit<AccessTokenClaims, 'jti'>): Promise<{ token: string; jti: string }> {
+  /**
+   * `options.ttlSeconds` للدخول المؤقّت خاصةً: الرمز لا يعيش أطول من الجلسة التي أُصدر لها
+   * (`min(عمر الرمز المعتاد, ما تبقّى من الجلسة)`) — فلا رمزَ يبقى صالحاً بعد إغلاق الباب.
+   */
+  async signAccessToken(
+    claims: Omit<AccessTokenClaims, 'jti'>,
+    options?: { ttlSeconds?: number },
+  ): Promise<{ token: string; jti: string }> {
     const jti = newId();
+    const ttl = options?.ttlSeconds
+      ? Math.max(30, Math.min(options.ttlSeconds, this.accessTtlSeconds))
+      : this.accessTtlSeconds;
     const token = await new SignJWT({
       scope: claims.scope,
       tid: claims.tid,
       mid: claims.mid,
       ...(claims.pam ? { pam: true } : {}),
       ...(claims.proles && claims.proles.length > 0 ? { proles: claims.proles } : {}),
+      ...(claims.imp ? { imp: claims.imp } : {}),
     })
       .setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: env.JWT_KEY_ID })
       .setSubject(claims.sub)
@@ -78,7 +95,7 @@ export class TokenService {
       .setIssuer(ISSUER)
       .setAudience(AUDIENCE)
       .setJti(jti)
-      .setExpirationTime(`${this.accessTtlSeconds}s`)
+      .setExpirationTime(`${ttl}s`)
       .setNotBefore('0s')
       .sign(await this.privateKey());
 
@@ -116,6 +133,7 @@ export class TokenService {
     }
 
     const proles = payload.proles;
+    const imp = payload.imp;
 
     return {
       sub,
@@ -127,6 +145,7 @@ export class TokenService {
       proles: Array.isArray(proles)
         ? proles.filter((entry): entry is string => typeof entry === 'string')
         : [],
+      ...(typeof imp === 'string' && imp.length > 0 ? { imp } : {}),
     };
   }
 

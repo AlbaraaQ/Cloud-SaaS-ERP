@@ -15,6 +15,7 @@ import {
   TenantGuard,
 } from './modules/platform/index.js';
 import { AuditInterceptor } from './modules/platform-services/index.js';
+import { ImpersonationGuard } from './modules/support/impersonation.guard.js';
 // The metrics interceptor lives in the ops slice, not in platform-services; importing it
 // from the barrel silently yielded `undefined` and made this assertion pass vacuously.
 import { MetricsInterceptor } from './ops/metrics.interceptor.js';
@@ -34,9 +35,14 @@ describe('AppModule', () => {
     const providers = providersOf(AppModule);
 
     // rate limit → AuthGuard → TenantGuard (+RLS GUC) → BranchScopeGuard → PermissionsGuard
+    //
+    // P-C8: `ImpersonationGuard` sits immediately after `AuthGuard` — the `imp` claim is only
+    // readable once authentication has published the context, and a break-glass token must be
+    // limited on **every** route it can reach. The five guards above keep their frozen order.
     expect(orderedTokens(providers, APP_GUARD)).toEqual([
       RateLimitGuard,
       AuthGuard,
+      ImpersonationGuard,
       TenantGuard,
       BranchScopeGuard,
       PermissionsGuard,

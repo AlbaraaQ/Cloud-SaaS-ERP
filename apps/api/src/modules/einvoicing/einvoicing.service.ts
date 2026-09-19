@@ -7,6 +7,7 @@ import { branches, einvoiceChain, einvoiceCredentials, einvoiceSettings, einvoic
 
 import { DATABASE_HANDLE } from '../../database/database.module.js';
 import { getRequestContext } from '../../request-context/request-context.js';
+import { WebhookPublisher } from '../developer/webhook-publisher.service.js';
 
 import { ZatcaOnboardingService, type FilingContext } from './zatca-onboarding.service.js';
 import { fileInvoice } from './zatca/filing.js';
@@ -91,6 +92,8 @@ export class EinvoicingService {
   constructor(
     @Inject(DATABASE_HANDLE) private readonly database: DatabaseHandle,
     private readonly onboarding: ZatcaOnboardingService,
+    // P-C11 — فشل الإرسال إلى زاتكا خبرٌ عاجل: يُعلَن ليُعالَج، لا ليُكتشف في تقرير الشهر.
+    private readonly webhooks: WebhookPublisher,
   ) {}
 
   async upsertCredentials(tenantId: string, input: CredentialInput) {
@@ -364,7 +367,7 @@ export class EinvoicingService {
     });
 
     const accepted = outcome.status !== 'failed';
-    return this.recordOutcome(tenantId, submission.id, submission.invoiceId, {
+    const recorded = await this.recordOutcome(tenantId, submission.id, submission.invoiceId, {
       status: outcome.status,
       authorityStatus: outcome.authorityStatus || null,
       clearedInvoice: outcome.clearedInvoice,
@@ -384,6 +387,18 @@ export class EinvoicingService {
       },
       error: accepted ? null : (outcome.errors[0] ?? outcome.authorityStatus ?? 'FAILED'),
     });
+    if (!accepted) {
+      // P-C11 — `einvoice.submission_failed`: رفضٌ يحتاج تدخّلاً، فيُعلَن ولا يُنتظر تقرير.
+      void this.webhooks.emit('einvoice.submission_failed', tenantId, {
+        invoiceId: submission.invoiceId,
+        submissionId: submission.id,
+        authority: 'zatca',
+        environment: context.environment,
+        status: outcome.status,
+        error: outcome.errors[0] ?? outcome.authorityStatus ?? 'FAILED',
+      });
+    }
+    return recorded;
   }
 
   /** A filing that never left: the document keeps the status it earned and says why it stopped. */

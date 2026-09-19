@@ -39,6 +39,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run verify
+      - name: marketing performance budget (P-M10)
+        # سطرٌ مستقلّ رغم أن `pnpm run verify` يشغّل السبيك نفسه بعد البناء: ميزانيةٌ حمراء
+        # يجب أن تُقرأ كسطر CI بنفسها لا أن تُدفن داخل مخرج الحزمة كلها. والسبيك يفشل في CI
+        # إن غاب مخرج `next build` (`productionBuild === true`) — فلا يمرّ «تخطٍّ» بصمت.
+        run: pnpm --filter @erp/marketing test -- tests/perf.spec.ts
       - name: OpenAPI breaking-change check (oasdiff)
         if: github.event_name == 'pull_request'
         continue-on-error: true

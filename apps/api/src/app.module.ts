@@ -18,6 +18,16 @@ import {
   RateLimitGuard,
   TenantGuard,
 } from './modules/platform/index.js';
+import { PlatformBackupsModule } from './modules/backups/platform-backups.module.js';
+import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
+import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module.js';
+import { StatusModule } from './modules/status/status.module.js';
+import { ContentModule } from './modules/content/content.module.js';
+import { VerifyModule } from './modules/verify/verify.module.js';
+import { WeeklyReportModule } from './modules/weekly-report/weekly-report.module.js';
+import { DeveloperModule } from './modules/developer/developer.module.js';
+import { PlatformOperationsModule } from './modules/operations/platform-operations.module.js';
+import { ImpersonationGuard } from './modules/support/impersonation.guard.js';
 import { PlatformAdminModule } from './modules/platform/admin/platform-admin.module.js';
 import { AccountingModule } from './modules/accounting/accounting.module.js';
 import { OrganizationModule } from './modules/organization/index.js';
@@ -46,6 +56,7 @@ import { TailoringModule } from './modules/tailoring/tailoring.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { WhatsappModule } from './modules/integrations/whatsapp/whatsapp.module.js';
 import { AuditInterceptor, PlatformServicesModule } from './modules/platform-services/index.js';
+import { UsageModule } from './modules/usage/index.js';
 import { MetricsInterceptor } from './ops/metrics.interceptor.js';
 import { OpsModule } from './ops/ops.module.js';
 
@@ -79,9 +90,19 @@ import { OpsModule } from './ops/ops.module.js';
     }),
     DatabaseModule,
     OpsModule,
+    PlatformBackupsModule,
+    DeveloperModule,
+    CampaignsModule,
+    ContentModule,
+    VerifyModule,
+    StatusModule,
+    SiteAnalyticsModule,
+    WeeklyReportModule,
+    PlatformOperationsModule,
     DomainEventsModule,
     PlatformModule,
     PlatformServicesModule,
+    UsageModule,
     OrganizationModule,
     PlatformAdminModule,
     CatalogModule,
@@ -119,6 +140,12 @@ import { OpsModule } from './ops/ops.module.js';
     { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
+    // P-C8: the break-glass guard sits *immediately after* authentication on purpose. The
+    // `imp` claim is only known once AuthGuard has published the context, and a token that
+    // came from `POST /platform/impersonate` must be limited on **every** route it can
+    // reach, not only on the console's own. It returns at once for ordinary tokens, so the
+    // frozen pipeline above keeps its meaning and its cost.
+    { provide: APP_GUARD, useClass: ImpersonationGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
     { provide: APP_GUARD, useClass: BranchScopeGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

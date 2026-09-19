@@ -204,15 +204,21 @@ export async function configureDatabaseRoles(
   const client = await pool.connect();
   try {
     await client.query(`ALTER ROLE ${quoteIdent(appRole)} NOBYPASSRLS`);
+    // ⚠️ كلمة المرور **حرفٌ في الجملة لا وسيط** (`$1`): `ALTER ROLE` جملةُ تعريفٍ لا يقبل
+    // فيها PostgreSQL معاملاتٍ مُعاملة — و`PASSWORD $1` تُرفض بسyntax error، فيبدو الأمر
+    // كأنه «فشل صلاحيات». ولهذا تُقتبس الكلمة اقتباساً حرفياً (بمضاعفة الفاصلة المفردة)،
+    // ويبقى الحقل مقتبساً لا مُدرَجاً كما هو (SECURITY_ARCHITECTURE §6).
     if (options.appPassword) {
-      await client.query(`ALTER ROLE ${quoteIdent(appRole)} LOGIN PASSWORD $1`, [options.appPassword]);
+      await client.query(
+        `ALTER ROLE ${quoteIdent(appRole)} LOGIN PASSWORD ${quoteLiteral(options.appPassword)}`,
+      );
       touched.push(appRole);
       log(`role  ${appRole}: LOGIN, NOBYPASSRLS`);
     }
     if (options.migratorPassword) {
-      await client.query(`ALTER ROLE ${quoteIdent(migratorRole)} LOGIN BYPASSRLS PASSWORD $1`, [
-        options.migratorPassword,
-      ]);
+      await client.query(
+        `ALTER ROLE ${quoteIdent(migratorRole)} LOGIN BYPASSRLS PASSWORD ${quoteLiteral(options.migratorPassword)}`,
+      );
       touched.push(migratorRole);
       log(`role  ${migratorRole}: LOGIN, BYPASSRLS`);
     }
@@ -230,4 +236,17 @@ export function quoteIdent(identifier: string): string {
     throw new Error(`Refusing to use '${identifier}' as a role name: not a plain SQL identifier.`);
   }
   return `"${identifier}"`;
+}
+
+/**
+ * اقتباس نصٍّ حرفياً لكلمة مرور: مضاعفة الفاصلة المفردة هي طريقة PostgreSQL الوحيدة
+ * للهروب داخل `'…'`. وكلمة المرور تأتي من `.env` (بيئةُ المشغّل لا مدخلات المستخدم)،
+ * ومع ذلك تُقتبس — لأن «المصدر موثوق» ليست قاعدةً في كتابة SQL.
+ *
+ * ولماذا لا وسيطاً مُعاملَاً (`$1`)؟ لأن `ALTER ROLE … PASSWORD` جملةُ تعريفٍ لا يقبل
+ * فيها PostgreSQL المعاملات، فيصل `$1` حرفياً ويُرفض بسyntax error — ويبدو الخطأ كأنه
+ * «صلاحيات» لا «اقتباس».
+ */
+export function quoteLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }

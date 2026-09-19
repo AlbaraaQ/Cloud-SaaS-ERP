@@ -46,6 +46,7 @@ export class AuthGuard implements CanActivate {
       // OR the role model) or any platform role carried by the token.
       isPlatformAdmin: claims.pam === true || platformRoles.length > 0,
       platformRoles,
+      ...(claims.imp ? { impersonationId: claims.imp } : {}),
     };
 
     request.auth = auth;

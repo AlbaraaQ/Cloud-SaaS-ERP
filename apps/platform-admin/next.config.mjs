@@ -6,10 +6,22 @@ loadEnvFiles(process.cwd());
 
 const apiTarget = (process.env.API_PROXY_TARGET ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(/\/+$/, '');
 
+/**
+ * Which hosts may talk to the dev server.
+ *
+ * Carried over from the staff surface (`apps/staff/next.config.mjs` L11–28), which learned
+ * it first: the console is opened through a tunnel host (`https://3003-<sandbox>.e2b.app`),
+ * and Next 15 treats every `/_next/*` request whose Host is not localhost as cross-origin —
+ * it warns today and in a future major version refuses to serve the chunks, which leaves the
+ * preview a blank page. The wildcard is dev-only: `next start` ignores the option.
+ */
+const allowedDevOrigins = ['localhost', '127.0.0.1', '*.e2b.app', '*.e2b.dev', '*.arena.ai'];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  allowedDevOrigins,
   env: {
     // Exposed to the browser. Empty means "same origin" — requests go to /api/v1/* on
     // this server and the rewrite below forwards them to the API. That is what makes
@@ -20,6 +32,9 @@ const nextConfig = {
     return [
       { source: '/api/v1/:path*', destination: `${apiTarget}/api/v1/:path*` },
       { source: '/api/health/:path*', destination: `${apiTarget}/health/:path*` },
+      // P-C11 — مستكشف الـAPI يقرأ وثيقة OpenAPI وواجهة Swagger من نفس الأصل، فلا حاجة
+      // لفتح منفذ الـAPI في المتصفّح ولا لضبط CORS على مسارٍ للتوثيق.
+      { source: '/api/docs/:path*', destination: `${apiTarget}/api/docs/:path*` },
     ];
   },
   async headers() {

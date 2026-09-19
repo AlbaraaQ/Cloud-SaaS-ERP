@@ -1,1 +1,1158 @@
-:root{--bg:#f8fafc;--surface:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--brand:#2563eb;--brand2:#06b6d4;--ok:#047857;--warn:#b45309;--danger:#b91c1c;--radius:20px}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,"Noto Sans Arabic",sans-serif}a{text-decoration:none;color:inherit}button,input,select,textarea{font:inherit}.wrap{max-width:1180px;margin:auto;padding:18px}.hero{border:1px solid var(--line);border-radius:30px;padding:42px;background:linear-gradient(135deg,#eff6ff,#ecfeff)}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{display:flex;align-items:center;gap:10px;font-weight:900}.logo{width:38px;height:38px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a,.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:10px 14px}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.grid{display:grid;gap:16px}.cols{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:0 1px 2px #0000000a}.muted{color:var(--muted)}.kpi{font-size:28px;font-weight:900}.portal{display:grid;grid-template-columns:250px 1fr;gap:18px}.side{position:sticky;top:18px;height:max-content}.side a{display:block;padding:10px;border-radius:12px;color:var(--muted)}.side a:hover{background:#eff6ff;color:var(--brand)}.toolbar,.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.input{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff;min-width:180px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:start}th{font-size:12px;color:var(--muted)}.badge{border-radius:999px;padding:4px 9px;background:#e2e8f0;font-size:12px}.badge.paid,.badge.pass,.badge.ready{background:#dcfce7;color:var(--ok)}.badge.open,.badge.pending{background:#fef3c7;color:var(--warn)}.badge.failed,.badge.overdue{background:#fee2e2;color:var(--danger)}.form{display:grid;gap:12px;max-width:680px}.qr{width:100px;height:100px;border:8px solid #111;background:repeating-linear-gradient(45deg,#111 0 8px,#fff 8px 16px)}@media(max-width:800px){.portal{grid-template-columns:1fr}.top{align-items:flex-start}.hero{padding:24px}.wrap{padding:12px}}@media print{.nav,.side,.toolbar,.top{display:none}.portal{display:block}.card{box-shadow:none;border:0}}
+/*
+ * P-M1 — نظام تصميم الموقع التسويقي.
+ *
+ * كُتب هنا مكتوباً لا مكدَّساً في سطرٍ واحد، وبأقسامٍ مرقّمة، لأن هذه القشرة يرثها كل ما
+ * بعده: الصفحة، والمدوّنة، ومركز المساعدة، وكل ما سيكتبه نظام إدارة المحتوى.
+ *
+ * ثلاث قواعد حاكمة:
+ *   1. **الاتجاه من الحالة**: `[dir="ltr"]` يعكس كل ما هو طرفيّ (الهوامش، الأسهم، محاذاة
+ *      النصّ) — فلا نكتب ملفاً ثانياً للإنجليزية.
+ *   2 **التباين قبل الجمال**: النصوص الرمادية `--muted` فوق `--surface` بنسبةٍ مقروءة،
+ *      والتركيز (`:focus-visible`) ظاهرٌ دائماً.
+ *   3. **بلا مكتبة**: لا Tailwind ولا CSS-in-JS. أنماطٌ مكتوبة تُقرأ في المراجعة، وحجمٌ
+ *      يُقاس، وميزانية أداء (الخطّة §3.6).
+ */
+
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-alt: #f1f5f9;
+  --ink: #0f172a;
+  --ink-soft: #334155;
+  --muted: #55637a;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --brand: #1d4ed8;
+  --brand-ink: #ffffff;
+  --brand-soft: #e8efff;
+  --accent: #0e7490;
+  --ok: #047857;
+  --ok-soft: #dcfce7;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --radius: 18px;
+  --radius-lg: 28px;
+  --shadow: 0 1px 2px rgb(15 23 42 / 6%), 0 12px 30px -20px rgb(15 23 42 / 25%);
+  --measure: 68ch;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", Arial, "Noto Sans Arabic", system-ui, sans-serif;
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--brand);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.3;
+  margin: 0 0 10px;
+}
+
+h1 {
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+h2 {
+  font-size: clamp(22px, 3vw, 28px);
+}
+
+h3 {
+  font-size: 18px;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---------------------------------------------------------------- أدوات */
+
+.wrap {
+  max-width: 1180px;
+  margin: auto;
+  padding: 18px;
+}
+
+.sr-only,
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link:focus {
+  position: fixed;
+  inset-inline-start: 12px;
+  top: 12px;
+  width: auto;
+  height: auto;
+  clip: auto;
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  border-radius: 999px;
+  z-index: 50;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.text-link {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  margin-inline-start: 6px;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: var(--line);
+  font-size: 12px;
+}
+
+.badge.paid,
+.badge.pass,
+.badge.ready {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.badge.open,
+.badge.pending {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge.failed,
+.badge.overdue {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------------------- الأزرار */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.btn:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+
+.btn.primary:hover {
+  color: var(--brand-ink);
+}
+
+.toolbar,
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------------- الشبكة والبطاقات */
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.cols {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.card h3 {
+  margin-bottom: 6px;
+}
+
+.card-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--surface-alt);
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.module-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.source-line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.kpi {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.empty-state {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  padding: 22px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- القشرة */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgb(248 250 252 / 92%);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 900;
+}
+
+.logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  color: #fff;
+  font-size: 13px;
+}
+
+.brand-name {
+  white-space: nowrap;
+}
+
+.site-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.site-nav a {
+  padding: 8px 10px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.site-nav a:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lang-switch {
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.site-banner {
+  border-bottom: 1px solid var(--line);
+  background: var(--brand-soft);
+  font-size: 14px;
+}
+
+.site-banner.tone-ok {
+  background: var(--ok-soft);
+}
+
+.site-banner.tone-warn {
+  background: var(--warn-soft);
+}
+
+.site-banner.tone-danger {
+  background: var(--danger-soft);
+}
+
+.banner-inner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 8px;
+}
+
+.banner-link {
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.site-main {
+  padding-block: 26px 48px;
+  min-height: 60vh;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  margin-top: 40px;
+}
+
+.footer-inner {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(220px, 1.2fr) repeat(auto-fit, minmax(150px, 1fr));
+  padding-block: 30px;
+}
+
+.footer-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footer-group h2 {
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.footer-brand p {
+  margin: 0 0 8px;
+}
+
+.footer-follow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footer-tagline,
+.footer-contact {
+  color: var(--muted);
+}
+
+.footer-social {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.footer-legal {
+  border-top: 1px solid var(--line);
+  padding-block: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- الصفحات */
+
+.hero {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: clamp(24px, 4vw, 48px);
+  background: linear-gradient(135deg, #eef4ff, #ecfeff);
+  margin-bottom: 26px;
+}
+
+.hero-lead {
+  max-width: var(--measure);
+  color: var(--ink-soft);
+  font-size: 18px;
+}
+
+.page-head {
+  margin-bottom: 22px;
+}
+
+.section {
+  margin-block: 34px;
+}
+
+.section-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.section-heading h2 {
+  margin-bottom: 2px;
+}
+
+.einvoicing-band {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  background: var(--surface);
+}
+
+.cta-final {
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  color: #fff;
+}
+
+nav.cta-final a,
+.cta-final .muted {
+  color: rgb(255 255 255 / 85%);
+}
+
+.cta-block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  background: var(--surface-alt);
+  text-align: center;
+}
+
+.not-found {
+  text-align: center;
+  padding-block: 60px;
+}
+
+.error-code {
+  font-size: 64px;
+  font-weight: 900;
+  color: var(--line-strong);
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------- المحتوى */
+
+.content-blocks {
+  display: grid;
+  gap: 18px;
+  margin-block: 18px;
+}
+
+.prose {
+  max-width: var(--measure);
+}
+
+.prose p {
+  color: var(--ink-soft);
+}
+
+.prose-list {
+  max-width: var(--measure);
+  color: var(--ink-soft);
+}
+
+.quote {
+  margin: 0;
+  border-inline-start: 4px solid var(--brand);
+  padding: 12px 18px;
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.figure {
+  margin: 0;
+}
+
+.figure figcaption {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.code-block {
+  background: #0b1220;
+  color: #e2e8f0;
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-x: auto;
+  direction: ltr;
+  text-align: start;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+
+caption {
+  text-align: start;
+  color: var(--muted);
+  padding-block: 6px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px;
+  text-align: start;
+}
+
+th {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+  counter-reset: step;
+}
+
+.steps li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.step-number {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 900;
+}
+
+.faq-list details {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+
+.faq-list summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.faq-list details[open] {
+  border-color: var(--line-strong);
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.chip {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.chip.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.search-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.input {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fff;
+  min-width: 220px;
+  color: var(--ink);
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  max-width: 680px;
+}
+
+.post-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.post-card h3 {
+  margin: 0;
+}
+
+.meta-line {
+  display: flex;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.article {
+  max-width: 820px;
+}
+
+.breadcrumbs {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.back-link {
+  margin-top: 22px;
+}
+
+.legal h2 {
+  margin-top: 26px;
+}
+
+/* ---------------------------------------------------------------- لوحة العمل (قائمة) */
+
+.portal {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 18px;
+}
+
+.side {
+  position: sticky;
+  top: 18px;
+  height: max-content;
+}
+
+.side a {
+  display: block;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.side a:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.qr {
+  width: 100px;
+  height: 100px;
+  border: 8px solid #111;
+  background: repeating-linear-gradient(45deg, #111 0 8px, #fff 8px 16px);
+}
+
+/* ---------------------------------------------------------------- الأسعار (P-M3) */
+
+.plan-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-bottom: 8px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.plan-card h3 {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- الاشتراك والتفعيل (P-M4) */
+
+/* الباقة المختارة في المعالج: إطارٌ ولون فقط — لا حركة ولا حجمٌ يتغيّر، فالزائر يقارن
+   بطاقاتٍ ثابتة الأبعاد لا بطاقةً تكبر عند الاختيار. */
+.plan-card.selected {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 2px var(--brand-soft);
+}
+
+/* خطوةٌ جارية في المعالج: تُعلَن بشريطٍ جانبي — والوصف النصّي عندها `aria-current`. */
+.steps li[aria-current='step'] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* السعر أكبر عنصرٍ في البطاقة: الزائر يقارن أرقاماً لا فقرات. */
+.plan-price {
+  margin: 0;
+  font-size: clamp(26px, 3.4vw, 34px);
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+
+.plan-card .btn {
+  margin-top: auto;
+  width: 100%;
+  text-align: center;
+}
+
+/* الجدول يُمرَّر أفقياً على الشاشة الصغيرة بدل أن يُقصّ — عمودٌ مقطوع يقرأ خطأ. */
+table.compare th[scope='row'] {
+  font-size: 14px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+table.compare td {
+  font-variant-numeric: tabular-nums;
+}
+
+table.compare tbody tr:last-child th[scope='row'],
+table.compare tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.plan-note {
+  border-inline-start: 4px solid var(--brand);
+  background: var(--brand-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 16px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- الاستجابة */
+
+@media (max-width: 860px) {
+  .header-inner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .site-nav {
+    order: 3;
+    width: 100%;
+  }
+
+  .portal {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-inner {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media print {
+  .nav,
+  .side,
+  .toolbar,
+  .top,
+  .site-header,
+  .site-footer,
+  .site-banner {
+    display: none;
+  }
+
+  .portal {
+    display: block;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ P-M6: استمارات الالتقاط */
+
+/*
+ * حقول الاستمارة: صفٌّ من حقلين على الشاشات الواسعة وعمودٌ واحد على الجوال — والاستمارة
+ * العربية تبدأ من اليمين، فالشبكة تكفي ولا حاجة إلى `direction`.
+ */
+.lead-form .field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.field .input,
+.field textarea {
+  width: 100%;
+  font: inherit;
+}
+
+/* الخطأ يقع تحت حقله لا في رأس الصفحة: من أخطأ في البريد يجد السبب عنده. */
+.field-error,
+.form-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.form-error {
+  background: var(--danger-soft);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 680px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.small {
+  font-size: 13px;
+}
+
+.lead-reference {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+}
+
+.lead-reference .reference {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+}
+
+/*
+ * حقل المصيدة: مخفيٌّ عن الإنسان بـ`display:none` على **الحاوية** لا بـ`hidden` على الحقل،
+ * فبعض الماسحات تتجاهل ما هو `hidden` وتملأ ما سواه. ولا يصل إليه قارئ الشاشة (الحاوية
+ * مُخفاة كاملة) ولا ترتيب التنقّل (كل حقلٍ `tabIndex=-1`).
+ */
+.hp-field {
+  display: none;
+}
+
+.footer-newsletter {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+}
+
+.footer-newsletter h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.newsletter-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.newsletter-form .input {
+  min-width: 180px;
+  flex: 1;
+}
+
+/*
+ * P-M8 — قوائم صفحة التحقّق: كل سطرٍ يبدأ بشارةٍ ثم تسميةٍ ثم شرح. القائمة عمداً `<ul>` لا
+ * شبكة بطاقات: الفحوص تُقرأ واحداً واحداً، والبصر يجب أن ينزل لا أن يتوزّع.
+ */
+.verify-checks,
+.verify-notes {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 18px;
+  max-width: 760px;
+}
+
+.verify-checks li,
+.verify-notes li {
+  line-height: 1.7;
+}
+
+/* بطاقة صنفٍ في صفحة القطاع: التسمية كما في تطبيق العمل، ومعها سببها ومسار شاشتها. */
+.industry-card .source-line {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  word-break: break-all;
+}
+
+.industry-pains {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-inline-start: 18px;
+  max-width: 760px;
+}
+
+/*
+ * P-M9 — مركز المساعدة وسجلّ التغييرات وحالة الخدمة.
+ *
+ * الشرائح والتصويت والسجلّ: كلها أنماطٌ صغيرة تُبنى على ما هو موجود (`.chip` · `.badge` ·
+ * `.table`)، ولا تُضاف مكتبة. والقاعدة التي تحكم الموقع كلّه: لا صنفَ بلا معنى — كل صنفٍ هنا
+ * يخدم عنصراً حقيقياً في `views.tsx`.
+ */
+.chip-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: 4px;
+}
+
+/* «هل أفادك هذا؟» — بعد المتن، وحدّها الأعلى يفصلها عن المجاورة. */
+.helpful {
+  margin-block: 28px 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  max-width: 620px;
+}
+
+.helpful-question {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.helpful-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* سجلّ التغييرات: خطٌّ زمنيّ بسيط — الشارة ثم العنوان ثم الملخّص. */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 12px;
+  align-items: start;
+  border-inline-start: 2px solid var(--line);
+  padding-inline-start: 14px;
+}
+
+.timeline-item .muted {
+  margin: 4px 0 0;
+}
+
+/* سطر حكم الحالة أعلى الجدول. */
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block: 4px 16px;
+}
+
+.status-line .small {
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   P-M10 — القياس والموافقة.
+
+   اللافتة **لا تحجب**: شريطٌ أسفل الشاشة بلا طبقةٍ معتمة ولا تعطيلٍ للتمرير، لأن القياس
+   اختيارٌ لا شرطُ استعمال. والسطر في التذييل يقول الحالة الحالية ويفتح اللافتة من جديد.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.consent-banner {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 40;
+  background: var(--surface, #fff);
+  border-block-start: 1px solid var(--line);
+  box-shadow: 0 -6px 20px rgb(15 23 42 / 8%);
+}
+
+.consent-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-block: 14px;
+  flex-wrap: wrap;
+}
+
+.consent-body {
+  margin: 0;
+  max-inline-size: 68ch;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.consent-body strong {
+  display: block;
+  margin-block-end: 2px;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.consent-line {
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* زرٌّ يبدو رابطاً: تغيير الاختيار فعلٌ صغير لا يستحق زرّاً كاملاً في التذييل. */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

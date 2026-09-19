@@ -89,11 +89,31 @@ tbody tr:hover { background: #f8fafc; }
 td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; font-family: "Consolas", monospace; }
 .table-wrap { overflow: auto; max-height: 65vh; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 
+/* عارض «قبل/بعد» في مستكشف التدقيق (P-C9): نصٌّ خام يبقى مقروءاً وبلا تمرير أفقي. */
+.code {
+  font-family: "Consolas", monospace;
+  font-size: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+}
+
 .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px; font-size: 11.5px; background: #e2e8f0; color: #334155; }
 .badge.posted, .badge.succeeded, .badge.active, .badge.pass, .badge.approved, .badge.ready { background: #dcfce7; color: var(--ok); }
 .badge.draft, .badge.running, .badge.pending, .badge.incomplete, .badge.api { background: #fef3c7; color: var(--warn); }
 .badge.failed, .badge.voided, .badge.revoked, .badge.suspended, .badge.rejected, .badge.canceled, .badge.past_due { background: #fee2e2; color: var(--danger); }
 .badge.planned, .badge.archived { background: #e2e8f0; color: #475569; }
+/* P-C4 — licence and invoice lifecycle states. */
+.badge.trialing, .badge.issued, .badge.scheduled { background: #e0f2fe; color: #075985; }
+.badge.paused { background: #ede9fe; color: #5b21b6; }
+.badge.paid, .badge.sent { background: #dcfce7; color: var(--ok); }
+.badge.void, .badge.expired, .badge.skipped, .badge.credit_note { background: #e2e8f0; color: #475569; }
 
 .alert { border-radius: 10px; padding: 9px 12px; margin: 0; font-size: 13px; }
 .alert.danger { background: #fee2e2; color: #7f1d1d; }
@@ -147,3 +167,45 @@ td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; font-famil
   .auth-page { grid-template-columns: 1fr; }
   .auth-brand { padding: 28px; }
 }
+
+/* Tabs and meters for the customer card (P-C2).
+   `.tabs`/`.tab` are copied from the staff surface (`apps/staff/app/globals.css` L820–841)
+   so both products render the same control; `.meter` and `.tag` carry no counterpart there
+   and are new — a usage bar has no desktop original. */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 12px; flex-wrap: wrap; }
+.tab { padding: 8px 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 600; font-family: inherit; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+.meter { height: 8px; border-radius: 99px; background: #e2e8f0; overflow: hidden; min-width: 90px; }
+.meter-fill { display: block; height: 100%; background: var(--brand); }
+.meter-fill.warn { background: #d97706; }
+.meter-fill.danger { background: #dc2626; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); }
+.tag.default { border-color: var(--line); color: var(--muted); }
+.tag.tenant { border-color: #a78bfa; color: #6d28d9; }
+.tag.platform { border-color: #7dd3fc; color: #0369a1; }
+.chip { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; }
+.chip.active { background: #dcfce7; color: #166534; }
+.chip.suspended { background: #fee2e2; color: #991b1b; }
+.chip.archived { background: #e2e8f0; color: #334155; }
+/* States of the eight metered metrics (P-C5). `.badge` already had a colour for every
+   licence and invoice state; a quota state is a different axis, so `ok`/`soft`/`hard`/
+   `unlimited` get their own — «بلا حدّ» included, because an unlimited metric is a fact an
+   operator must see, not an empty cell. */
+.badge.ok { background: #dcfce7; color: var(--ok); }
+.badge.soft { background: #fef3c7; color: var(--warn); }
+.badge.hard { background: #fee2e2; color: var(--danger); }
+.badge.unlimited { background: #e0f2fe; color: #075985; }
+.day-bars { display: flex; align-items: flex-end; gap: 2px; height: 64px; }
+.day-bar { flex: 1; background: var(--brand); border-radius: 2px 2px 0 0; min-height: 2px; }
+
+/* ---------------------------------------------------- P-M6: العملاء المتوقّعون */
+
+/* حالة الطلب الناجح والفاشل: لونان لا يلبسان معنى الحالة الافتراضية. */
+.tag.ok { border-color: #86efac; color: #047857; }
+.tag.danger { border-color: #fecaca; color: #b91c1c; }
+
+/* الأثر الزمني: قائمةٌ رأسية بخطٍّ خفيف — «ما جرى على هذا الطلب» بالترتيب. */
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.timeline li { border-inline-start: 2px solid var(--line); padding-inline-start: 10px; font-size: 13px; }
+.timeline li .muted { font-size: 12px; }

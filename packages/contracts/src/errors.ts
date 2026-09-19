@@ -30,6 +30,41 @@ export const errorCodes = {
   ACCOUNT_PROFILE_MISSING: 'ACCOUNT_PROFILE_MISSING',
   // Round 11 — credentials were valid but the user has TOTP enabled and sent no code.
   MFA_REQUIRED: 'MFA_REQUIRED',
+  // P-C5 — a tenant wrote past a limit that an operator had set (metric in the details).
+  USAGE_LIMIT_REACHED: 'USAGE_LIMIT_REACHED',
+  // P-C11 — a state transition the current state forbids: rotate a revoked API key,
+  // revoke one twice, or retry a delivery that already succeeded. 409, not 400: the
+  // request was well-formed and the resource exists — it is its state that refuses.
+  INVALID_STATE: 'INVALID_STATE',
+  // P-M5 — رابط محتوى مكرَّر: الرابط العام هو هويّة الصفحة في نظر محرّك البحث، وتكراره يعني
+  // أن صفحةً ستُظلّل الأخرى بصمت. 409 لأن الطلب سليم والصراع على موردٍ قائم.
+  CONTENT_SLUG_TAKEN: 'CONTENT_SLUG_TAKEN',
+  // P-M4 — البريد الذي بدأ التسجيل يملك منشأةً بالفعل. 409 لأن الطلب سليم والصراع على هويّةٍ
+  // قائمة: البدء من جديد لن يُنشئ مالكاً ثانياً، بل سيُعيد لصاحب البريد منشأةً لا يطلبها.
+  SIGNUP_EMAIL_TAKEN: 'SIGNUP_EMAIL_TAKEN',
+  // P-M4 — الرمز غير صحيح أو منتهٍ أو محاولاته استُهلكت. 422 لأن الطلب سليم الشكل ومرفوض
+  // المعنى، ولأن الشاشة تعرضه بجانب الحقل لا كخطأ خادم.
+  SIGNUP_CODE_INVALID: 'SIGNUP_CODE_INVALID',
+  // P-M4 — رمز المعالج (`token`) غير معروف أو لا يخصّ هذا البريد. **404** عن قصد: الجواب
+  // نفسه للعنوان المجهول وللرمز الخاطئ، فلا يتحوّل المسار العام إلى أداة سرد بريد.
+  SIGNUP_TOKEN_INVALID: 'SIGNUP_TOKEN_INVALID',
+  // P-M6 — طلب عميلٍ متوقَّع غير موجود. 404 هو الجواب الصحيح لا 403: المعرّف مجهول.
+  LEAD_NOT_FOUND: 'LEAD_NOT_FOUND',
+  // P-M6 — الطلب حُوّل من قبل إلى منشأة. 409 لأن الصراع على موردٍ قائم، وإعادة التحويل
+  // تُنشئ منشأةً ثانية لعنوانٍ واحد — وهو ما يمنعه هذا الرمز.
+  LEAD_ALREADY_CONVERTED: 'LEAD_ALREADY_CONVERTED',
+  // P-M6 — انتقال حالةٍ غير مسموح (من `won`/`rejected` مثلاً). 422: الطلب سليم والمنع
+  // قاعدةُ حالةٍ معلنة في العقد، لا خطأ خادم.
+  LEAD_STATUS_LOCKED: 'LEAD_STATUS_LOCKED',
+  // P-M7 — حملةٌ بدأ إرسالها لا تُعدَّل ولا تُلغى: صفوفُ رسائلها شواهدُ على ما خرج فعلاً،
+  // ونسخةٌ أُرسلت لا تُعاد كتابتها. 422 لأن الصراع على **حالة** الكيان لا على وجوده.
+  CAMPAIGN_LOCKED: 'CAMPAIGN_LOCKED',
+  // P-M7 — الشريحة فارغة: لا أحد يطابق تعريفها الآن. 422 لا 404 — الحملة موجودة، والمُرسل
+  // إليهم هم الغائبون. وإرسالُ حملةٍ إلى صفرٍ يُسجَّل «أُرسلت» في التقارير وهو لم يخرج شيء.
+  CAMPAIGN_SEGMENT_EMPTY: 'CAMPAIGN_SEGMENT_EMPTY',
+  // P-M7 — نصّ الحملة فيه `{{متغيّر}}` غير معروف. 422: النصّ يُكتب ثم يُراجَع، والمنع عند
+  // الجدولة لا عند الحفظ — فلا تُقطَع مسوّدةٌ في منتصف كتابتها.
+  CAMPAIGN_BODY_INVALID: 'CAMPAIGN_BODY_INVALID',
 } as const;
 
 export type ErrorCode = (typeof errorCodes)[keyof typeof errorCodes];
@@ -64,6 +99,18 @@ export const errorStatus: Record<ErrorCode, number> = {
   INTERNAL: 500,
   ACCOUNT_PROFILE_MISSING: 422,
   MFA_REQUIRED: 401,
+  USAGE_LIMIT_REACHED: 409,
+  INVALID_STATE: 409,
+  CONTENT_SLUG_TAKEN: 409,
+  SIGNUP_EMAIL_TAKEN: 409,
+  SIGNUP_CODE_INVALID: 422,
+  SIGNUP_TOKEN_INVALID: 404,
+  LEAD_NOT_FOUND: 404,
+  LEAD_ALREADY_CONVERTED: 409,
+  LEAD_STATUS_LOCKED: 422,
+  CAMPAIGN_LOCKED: 422,
+  CAMPAIGN_SEGMENT_EMPTY: 422,
+  CAMPAIGN_BODY_INVALID: 422,
 };
 
 /** RFC 9457 `title` member for each stable code. */
@@ -92,6 +139,18 @@ export const errorTitle: Record<ErrorCode, string> = {
   INTERNAL: 'Internal error',
   ACCOUNT_PROFILE_MISSING: 'Posting profile missing',
   MFA_REQUIRED: 'Verification code required',
+  USAGE_LIMIT_REACHED: 'Usage limit reached',
+  INVALID_STATE: 'Invalid state transition',
+  CONTENT_SLUG_TAKEN: 'Content slug already taken',
+  SIGNUP_EMAIL_TAKEN: 'Email already has an account',
+  SIGNUP_CODE_INVALID: 'Verification code rejected',
+  SIGNUP_TOKEN_INVALID: 'Signup not found',
+  LEAD_NOT_FOUND: 'Lead not found',
+  LEAD_ALREADY_CONVERTED: 'Lead already converted',
+  LEAD_STATUS_LOCKED: 'Lead status locked',
+  CAMPAIGN_LOCKED: 'Campaign locked',
+  CAMPAIGN_SEGMENT_EMPTY: 'Campaign segment is empty',
+  CAMPAIGN_BODY_INVALID: 'Campaign body invalid',
 };
 
 export function statusForCode(code: string): number {

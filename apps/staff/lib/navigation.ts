@@ -249,14 +249,10 @@ const accounting: ModuleNode = {
           { permission: 'reporting.view', endpoint: '/reports/vat-return-period' },
         ),
         // 💰 الجزء السادس — تقارير الخزينة والرواتب والمستخدمين
-        screen(
-          'cash-statement',
-          'حركة الصندوق (كشف)',
-          'Cash statement',
-          '/reports/cash-statement',
-          'ready',
-          { permission: 'reporting.view', endpoint: '/reports/cash-statement' },
-        ),
+        screen('cash-statement', 'حركة الصندوق (كشف)', 'Cash statement', '/reports/cash-statement', 'ready', {
+          permission: 'reporting.view',
+          endpoint: '/reports/cash-statement',
+        }),
         screen(
           'salary-statement',
           'تقرير الرواتب (سجل)',
@@ -473,14 +469,9 @@ const inventory: ModuleNode = {
           'ready',
           { permission: 'reporting.view' },
         ),
-        screen(
-          'expiry-report',
-          'صلاحية المواد',
-          'Expiry report',
-          '/reports/expiry-report',
-          'ready',
-          { permission: 'reporting.view' },
-        ),
+        screen('expiry-report', 'صلاحية المواد', 'Expiry report', '/reports/expiry-report', 'ready', {
+          permission: 'reporting.view',
+        }),
         screen(
           'serial-tracking',
           'تتبّع الأرقام التسلسلية',
@@ -871,14 +862,10 @@ const sales: ModuleNode = {
           'ready',
           { permission: 'reporting.view', endpoint: '/reports/sales-notifications' },
         ),
-        screen(
-          'daily-sales',
-          'تقرير مبيعات حسب اليوم',
-          'Daily sales',
-          '/reports/daily-sales',
-          'ready',
-          { permission: 'reporting.view', endpoint: '/reports/daily-sales' },
-        ),
+        screen('daily-sales', 'تقرير مبيعات حسب اليوم', 'Daily sales', '/reports/daily-sales', 'ready', {
+          permission: 'reporting.view',
+          endpoint: '/reports/daily-sales',
+        }),
         screen(
           'daily-process',
           'تقرير الحركة اليومية',
@@ -920,14 +907,10 @@ const sales: ModuleNode = {
           'ready',
           { permission: 'reporting.view', endpoint: '/reports/item-movement-details' },
         ),
-        screen(
-          'item-expiry',
-          'صلاحية المواد',
-          'Item expiry',
-          '/reports/item-expiry',
-          'ready',
-          { permission: 'reporting.view', endpoint: '/reports/item-expiry' },
-        ),
+        screen('item-expiry', 'صلاحية المواد', 'Item expiry', '/reports/item-expiry', 'ready', {
+          permission: 'reporting.view',
+          endpoint: '/reports/item-expiry',
+        }),
         screen(
           'serial-movements',
           'حركة الأرقام التسلسلية',
@@ -944,14 +927,10 @@ const sales: ModuleNode = {
           'ready',
           { permission: 'reporting.view', endpoint: '/reports/serial-balances' },
         ),
-        screen(
-          'produced-items',
-          'تقرير مواد المنتجة',
-          'Produced items',
-          '/reports/produced-items',
-          'ready',
-          { permission: 'reporting.view', endpoint: '/reports/produced-items' },
-        ),
+        screen('produced-items', 'تقرير مواد المنتجة', 'Produced items', '/reports/produced-items', 'ready', {
+          permission: 'reporting.view',
+          endpoint: '/reports/produced-items',
+        }),
         screen(
           'produced-components',
           'مكونات المواد المنتجة',
@@ -1183,10 +1162,17 @@ const tailoring: ModuleNode = {
       labelEn: 'Measurements',
       items: [
         // 📏 القياسات — `frmMeasurements.xaml` («إدارة قياسات العملاء»).
-        screen('tailoring-measurement', 'قياسات العملاء', 'Customer measurements', '/tailoring/measurements', 'ready', {
-          permission: 'tailoring.view',
-          endpoint: '/tailoring/measurements',
-        }),
+        screen(
+          'tailoring-measurement',
+          'قياسات العملاء',
+          'Customer measurements',
+          '/tailoring/measurements',
+          'ready',
+          {
+            permission: 'tailoring.view',
+            endpoint: '/tailoring/measurements',
+          },
+        ),
         // 📏 خصائص القياسات — `frmMeasurementAttributes.xaml` («إدارة خصائص القياسات»).
         screen(
           'tailoring-measurement-attribute',
@@ -1206,10 +1192,17 @@ const tailoring: ModuleNode = {
       labelAr: 'التعاريف',
       labelEn: 'Catalogue',
       items: [
-        screen('tailoring-options', 'إدارة الخيارات الجاهزة', 'Tailoring options', '/tailoring/options', 'ready', {
-          permission: 'tailoring.view',
-          endpoint: '/tailoring/option-categories',
-        }),
+        screen(
+          'tailoring-options',
+          'إدارة الخيارات الجاهزة',
+          'Tailoring options',
+          '/tailoring/options',
+          'ready',
+          {
+            permission: 'tailoring.view',
+            endpoint: '/tailoring/option-categories',
+          },
+        ),
         screen('tailoring-type', 'أنواع التفصيل', 'Tailoring types', '/s/tailoring/types', 'api', {
           permission: 'tailoring.view',
           endpoint: '/tailoring/types',
@@ -1242,10 +1235,17 @@ const optics: ModuleNode = {
       labelEn: 'Prescriptions',
       items: [
         // 👓 بيانات النظارات — `Glasses(InvGlobalID, ItemId, orientation, SPH, CYL, AX, ADD, IPD)`.
-        screen('optics-prescription', 'بيانات النظارات', 'Glasses prescriptions', '/optics/prescriptions', 'ready', {
-          permission: 'optics.view',
-          endpoint: '/optics/prescriptions',
-        }),
+        screen(
+          'optics-prescription',
+          'بيانات النظارات',
+          'Glasses prescriptions',
+          '/optics/prescriptions',
+          'ready',
+          {
+            permission: 'optics.view',
+            endpoint: '/optics/prescriptions',
+          },
+        ),
       ],
     },
     {
@@ -1334,17 +1334,31 @@ const hrm: ModuleNode = {
         // 📈 `Form_WPF/frmEmpInvs.xaml` «مبيعات ومشتريات موظف خلال الفترة» — what a
         // salesman sold, line by line. The row is named for what the cloud can actually
         // serve: a purchase invoice carries no employee, so the مشتريات half is not here.
-        screen('employee-movements', 'حركات الموظف', 'Employee movements', '/hrm/employee-movements', 'ready', {
-          permission: 'hrm.view',
-          endpoint: '/hrm/employee-movements',
-        }),
+        screen(
+          'employee-movements',
+          'حركات الموظف',
+          'Employee movements',
+          '/hrm/employee-movements',
+          'ready',
+          {
+            permission: 'hrm.view',
+            endpoint: '/hrm/employee-movements',
+          },
+        ),
         // 📄 `Form_WPF/frmEmpAccountGet.xaml` «كشف حساب موظف» — the employee's account
         // statement. It used to sit under `/reports/employee-account`, a route that was
         // never built; the screen lives with the employees it reports on.
-        screen('employee-account', 'كشف حساب موظف', 'Employee account statement', '/hrm/employee-statement', 'ready', {
-          permission: 'hrm.view',
-          endpoint: '/hrm/employee-statement',
-        }),
+        screen(
+          'employee-account',
+          'كشف حساب موظف',
+          'Employee account statement',
+          '/hrm/employee-statement',
+          'ready',
+          {
+            permission: 'hrm.view',
+            endpoint: '/hrm/employee-statement',
+          },
+        ),
         screen('user-logs', 'سجلات المستخدمين', 'User logs', '/settings/audit', 'ready', {
           permission: 'tenant.audit.view',
           endpoint: '/audit-log',
@@ -1390,14 +1404,9 @@ const marina: ModuleNode = {
         ),
         // 📋 إضافات — `frmAdditions.xaml` («📋 إضافات»): الرقم والاسم والقيمة، وهي ما
         // يملأ «🎁 الإضافات» في `frmBookingM` («الحجوزات»).
-        screen(
-          'marina-additions',
-          'الإضافات',
-          'Booking additions',
-          '/marina/additions',
-          'ready',
-          { endpoint: '/marina/additions' },
-        ),
+        screen('marina-additions', 'الإضافات', 'Booking additions', '/marina/additions', 'ready', {
+          endpoint: '/marina/additions',
+        }),
       ],
     },
     {
@@ -1592,17 +1601,19 @@ const settings: ModuleNode = {
             endpoint: 'GET /payment-gateways · PUT · POST /:provider/test · POST /:provider/sale',
           },
         ),
-        screen(
-          'whatsapp',
-          'واتساب — إرسال الفواتير',
-          'WhatsApp',
-          '/settings/whatsapp',
-          'ready',
-          {
-            permission: 'tenant.settings.manage',
-            endpoint: 'GET /whatsapp/settings · PUT · POST /whatsapp/test · POST /whatsapp/send · GET /whatsapp/messages',
-          },
-        ),
+        screen('whatsapp', 'واتساب — إرسال الفواتير', 'WhatsApp', '/settings/whatsapp', 'ready', {
+          permission: 'tenant.settings.manage',
+          endpoint:
+            'GET /whatsapp/settings · PUT · POST /whatsapp/test · POST /whatsapp/send · GET /whatsapp/messages',
+        }),
+        // P-C6 — البريد: نصّ رسائلنا، وسجلّ ما خرج باسمنا، وهوِيّة المُرسِل. الوصول إلى
+        // السجلّ `tenant.email.log.view` (مدقّق المنشأة يراه بلا قدرة على التعديل)، وتحرير
+        // النصّ `tenant.email.template.manage`. ولا شاشة إرسال: الإرسال فعلُ حدثٍ في النظام.
+        screen('email', 'البريد — القوالب والسجلّ', 'E-mail', '/settings/email', 'ready', {
+          permission: 'tenant.email.log.view',
+          endpoint:
+            'GET /email/messages · GET /email/templates · PUT /email/templates/:event · GET/PUT /email/settings',
+        }),
       ],
     },
     {
@@ -1683,6 +1694,25 @@ const settings: ModuleNode = {
           permission: 'tenant.settings.manage',
           endpoint: '/settings',
         }),
+        // 📊 الاستخدام والحصص — P-C5 (`PLATFORM_CONSOLE_PLAN.md` §4: «شاشة للمستأجر في
+        // staff (`/settings/usage`)»). لا مقابل لها في `Desktop_ERP`: النسخة المكتبية تخدم
+        // منشأةً واحدة على جهاز العميل، فلا حصص ولا حدود منصّة. القراءة `tenant.view` لأن
+        // الرقم يخصّ المنشأة نفسها؛ ولا كتابة هنا — الحدود يضعها المشغّل في لوحة المنصّة.
+        // 🔔 مركز الإشعارات — P-C7 (`PLATFORM_CONSOLE_PLAN.md` §4: «مركز إشعارات في staff:
+        // جرس + شاشة» بلا نقاط نهاية جديدة، يستهلك `/notifications` القائم). لا مقابل له في
+        // `Desktop_ERP`: المكتبي يعرض تنبيهاً عابراً ولا يُبقي صندوقاً دائماً لكل عضويّة.
+        screen('notifications', 'مركز الإشعارات', 'Notification centre', '/notifications', 'ready', {
+          permission: 'tenant.notification.view',
+          endpoint: 'GET /notifications · POST /notifications/:id/read',
+          description:
+            'PLATFORM_CONSOLE_PLAN.md §4 (P-C7) — كل ما وُجّه للعضويّة: إعلانات المنصة ونصوصها (ar/en) وإشعارات النظام، مع وسم المقروء وعدد غير المقروء نفسه الذي يعرضه الجرس.',
+        }),
+        screen('usage', 'الاستخدام والحصص', 'Usage & quotas', '/settings/usage', 'ready', {
+          permission: 'tenant.view',
+          endpoint: 'GET /usage',
+          description:
+            'PLATFORM_CONSOLE_PLAN.md §4 (P-C5) — ثمانية مقاييس: المستخدمون · الفروع · الأصناف · فواتير الشهر · التخزين · استدعاءات الـAPI · واتساب · البريد، مع ٨٠٪ ناعم و١٠٠٪ صلب.',
+        }),
         // 🖨️ إعدادات الطباعة — `SettingPrint` of the desktop (`frmSettings.xaml`
         // «خيارات الطباعة» + `frmInvRptType.xaml`). Reading them is part of viewing a
         // report; changing them is part of owning the report designer's surface, so the
@@ -1690,7 +1720,8 @@ const settings: ModuleNode = {
         screen('printing-settings', 'إعدادات الطباعة', 'Printing settings', '/settings/printing', 'ready', {
           permission: 'reporting.layout.manage',
           endpoint: 'GET·PUT·DELETE /reports/print-settings/:scope',
-          description: 'frmSettings.xaml «خيارات الطباعة» · frmInvRptType.xaml · Class/Print.cs — رأس · تذييل · ختم · عدد النسخ · الطابعة',
+          description:
+            'frmSettings.xaml «خيارات الطباعة» · frmInvRptType.xaml · Class/Print.cs — رأس · تذييل · ختم · عدد النسخ · الطابعة',
         }),
         screen('language', 'اللغة', 'Language', '/settings/language', 'ready', {
           endpoint: 'client-side preference (localStorage)',
@@ -1832,14 +1863,28 @@ const treasury: ModuleNode = {
       labelAr: 'العمليات',
       labelEn: 'Operations',
       items: [
-        screen('receipt-voucher', '📄 سند قبض', 'Receipt voucher', '/treasury/vouchers?kind=receipt', 'ready', {
-          permission: 'treasury.view',
-          endpoint: '/vouchers',
-        }),
-        screen('payment-voucher', '📄 سند صرف', 'Payment voucher', '/treasury/vouchers?kind=payment', 'ready', {
-          permission: 'treasury.view',
-          endpoint: '/vouchers',
-        }),
+        screen(
+          'receipt-voucher',
+          '📄 سند قبض',
+          'Receipt voucher',
+          '/treasury/vouchers?kind=receipt',
+          'ready',
+          {
+            permission: 'treasury.view',
+            endpoint: '/vouchers',
+          },
+        ),
+        screen(
+          'payment-voucher',
+          '📄 سند صرف',
+          'Payment voucher',
+          '/treasury/vouchers?kind=payment',
+          'ready',
+          {
+            permission: 'treasury.view',
+            endpoint: '/vouchers',
+          },
+        ),
         screen('day-close', '📊 إغلاق اليومية', 'Day close', '/treasury/day-close', 'ready', {
           permission: 'treasury.view',
           endpoint: '/shift-closes/day-closes',

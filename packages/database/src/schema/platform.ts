@@ -174,6 +174,70 @@ export const platformMemberships = pgTable(
   }),
 );
 
+/**
+ * `platform_settings` — P-C1 (migration 0066).
+ *
+ * The first platform table that carries a **nullable** `tenant_id`, and the reason is
+ * deliberate: one row shape serves two scopes. `tenant_id IS NULL` is a platform-wide
+ * setting (the eight rows the console's إعدادات المنصة screen writes); a non-null
+ * `tenant_id` is a per-customer override of the same key, which P-C2 reads when it opens a
+ * tenant card. Because the column exists, the table carries the canonical isolation policy
+ * (`ENABLE` + `FORCE` + `tenant_id`) instead of being exempted from the rule.
+ *
+ * `value` stays `jsonb` so a setting's type is a property of its definition
+ * (`platformSettingDefinitions` in `@erp/contracts`), not of the table.
+ */
+export const platformSettings = pgTable(
+  'platform_settings',
+  {
+    id: uuid('id').primaryKey(),
+    /** NULL = platform-wide · non-null = one customer's override of the same key. */
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    key: text('key').notNull(),
+    value: jsonb('value').notNull(),
+    ...baseAuditColumns(),
+    // No `baseLegacyColumns()`: this table has no desktop provenance to carry — the
+    // desktop had no platform to configure.
+  },
+  (table) => ({
+    // The unique index itself is declared in the migration with `NULLS NOT DISTINCT`,
+    // which Drizzle's builder cannot express yet (`platform_settings_scope_key`).
+    platformSettingsTenantIdx: index('platform_settings_tenant_idx').on(table.tenantId, table.key),
+  }),
+);
+
+/**
+ * Platform operators' notes about one customer (migration 0067, P-C2).
+ *
+ * The console's «الملاحظات» tab is the only reader. It is deliberately *not* tenant data:
+ * a note like "called about the unpaid invoice, asked for a 30-day extension" is written
+ * by the platform about the customer, so the table carries a `tenant_id` (for the cascade
+ * and for the isolation policy) but is visible only on the platform plane.
+ */
+export const tenantNotes = pgTable(
+  'tenant_notes',
+  {
+    id: uuid('id').primaryKey(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    authorUserId: uuid('author_user_id'),
+    /** The author's name as it must read in the console, even after the user is gone. */
+    authorLabel: text('author_label').notNull().default(''),
+    ...baseAuditColumns(),
+  },
+  (table) => ({
+    tenantNotesTenantIdx: index('tenant_notes_tenant_idx').on(table.tenantId, table.createdAt),
+  }),
+);
+
+export type TenantNote = typeof tenantNotes.$inferSelect;
+export type NewTenantNote = typeof tenantNotes.$inferInsert;
+
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+export type NewPlatformSetting = typeof platformSettings.$inferInsert;
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type User = typeof users.$inferSelect;

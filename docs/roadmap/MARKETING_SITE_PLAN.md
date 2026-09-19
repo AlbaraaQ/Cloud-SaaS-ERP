@@ -81,7 +81,11 @@ SEO، ولا التقاط عملاء، ولا قياس.
 
 ## 5. الأجزاء (كل جزء = جلسة عمل)
 
-### P-M1 — الأساس والتصميم وSEO 🔴 (يبدأ به كل ما بعده)
+### P-M1 — الأساس والتصميم وSEO 🔴 (يبدأ به كل ما بعده) — ✅ **مُنجَز** (2026-09-18)
+
+> سُلِّم كاملاً مع **زيادة**: صفحة 404 **بحالة 404 حقيقية** (الخطة لم تطلب الحالة، والوسيط يضمنها)
+> و`hreflang` ثلاثي و`canonical` من دالّةٍ واحدة. الدليل: `verify-marketing-site.mjs` 37/37 ·
+> `apps/marketing/tests/site.spec.ts` 12 · [`../MARKETING_SITE_CMS_P_M1_M2_M5_IMPLEMENTATION_REPORT.md`](../MARKETING_SITE_CMS_P_M1_M2_M5_IMPLEMENTATION_REPORT.md).
 
 | | |
 |---|---|
@@ -92,7 +96,10 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **اختبار** | `apps/marketing/tests/site.spec.ts`: كل طريق عام يُعيد 200، وكل صفحة تُنتج عنواناً ووصفاً و`hreflang`، و`dir` صحيح لكل لغة |
 | **تحقّق حيّ** | `scripts/verify-marketing-site.mjs` (≈ 20 نقطة) |
 
-### P-M2 — الصفحة الرئيسية والوحدات 🟠
+### P-M2 — الصفحة الرئيسية والوحدات 🟠 — ✅ **مُنجَز** (2026-09-18)
+
+> الشهادات تُقرأ من `/public/posts?kind=case_study` بدل نقطة `/public/testimonials` منفصلة
+> (مصدرٌ واحد لقصص العملاء والشهادات) — ووحدات الشبكة من `apps/staff/lib/navigation.ts` نفسها.
 
 | | |
 |---|---|
@@ -101,7 +108,16 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **نقاط نهاية** | `GET /public/content/:slug` (صفحة بالاسم) · `GET /public/testimonials` · `GET /public/faq` |
 | **اختبار** | `public-content.spec.ts` (≥ 10) + اختبار عرض في marketing |
 
-### P-M3 — الباقات والأسعار 🟠 (يعتمد P-C4 في لوحة المنصة)
+### P-M3 — الباقات والأسعار 🟠 (يعتمد P-C4 في لوحة المنصة) — ✅ **مُنجَز** (2026-09-18)
+
+> مسارٌ عامٌّ ثالث لا إعادة استعمال مسارٍ قائم (`/billing/plans` أسعارٌ بلا حقوق، و
+> `/platform/plans` بجلسة مشغّل ومعه ما لا يُعرض) · والحقوق بلغتين من سجلّ المنتج نفسه
+> (`labelEn` أُضيف إلى `tenantFlagLabels` وإلى فهرس الحقوق) · وملاحظة الضريبة رقمُها من
+> `billing.tax_rate` لا من نصّ في الصفحة · ومبدّل الدورة **رابطان** (`/pricing?interval=year`)
+> لا حالةٌ في المتصفح · و«بوابات الدفع» صفُّ قدرةٍ موثَّق المصدر لا مفتاحُ حقٍّ مُخترع.
+> **وبذرة العرض تحمل حقوق الباقات الثلاث** (32 حقًّا) لأن «باقةً بلا حقوقها سعرٌ بلا مقابل».
+> الدليل: `public-plans.spec.ts` **9** · `apps/marketing/tests/pricing.spec.ts` **11** ·
+> `verify-pricing.mjs` **53/53** · [`../MARKETING_PRICING_P_M3_IMPLEMENTATION_REPORT.md`](../MARKETING_PRICING_P_M3_IMPLEMENTATION_REPORT.md).
 
 | | |
 |---|---|
@@ -110,73 +126,105 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **نقاط نهاية** | `GET /billing/plans` (قائم) + `GET /public/plans` (يضيف الحقوق من P-C4 بلغتين) |
 | **اختبار** | `public-plans.spec.ts` (≥ 6): الباقات النشطة فقط، الحقوق تظهر، العملة SAR |
 
-### P-M4 — الاشتراك والتفعيل 🔴
+### P-M4 — الاشتراك والتفعيل 🔴 (يعتمد P-C6) — ✅ **مُنجَز** (2026-09-18)
+
+> الرمان مفصولان بقرار: `code` (٦ أرقام، يُخزَّن sha256 وحده، يُرسل بالبريد، ٣٠ دقيقة و٥
+> محاولات وسقفُ ٥ إرسالات ومهلة دقيقة) و`token` (٤٨ حرفاً، يُعاد مرّةً، يحرس الحالة في
+> verify/resend/status). **والجواب واحد (404) للعنوان المجهول والرمز الخاطئ معاً** فلا يتحوّل
+> مسارٌ عامّ إلى أداة سردِ عناوين؛ والتحقّق idempotent، والإغلاق على الطلب لا على الرمز.
+> **ولا رخصة تُمنح ذاتياً**: الطلب `pending` في طابور المشغّل. **وفترة التجربة إعدادٌ** لا رقم
+> (`billing.trial_days` = 14 ⇒ كتالوج الإعدادات 32). **وحدث بريد منصّيّ** `signup.verify`
+> (الزائر ليس عميلاً بعد فلا حصّة تُحتسب عليه)، وفشل البريد لا يُسقط التسجيل.
+> **وأخطاءٌ حقيقية أُصلحت**: (أ) `ALTER ROLE … PASSWORD $1` كان يُسقط `pnpm db:roles`
+> بـ`syntax error at or near "$1"` (جملةُ تعريفٍ لا تقبل معاملاتٍ مُعاملة) ⇒ `quoteLiteral`؛
+> (ب) `setupTasks` كان يسأل `branches.status` والعمود `is_active` ⇒ 500 في
+> `GET /signup/status`؛ (ج) `tx.execute` الخام يُعيد `timestamptz` نصّاً لا `Date`؛
+> (د) فحص الباقة كان بعد إنشاء المنشأة فيترك ملفّاً يتيماً وطلبَ تفعيلٍ معلَّقاً ⇒ نُقل قبل
+> الإنشاء. الدليل: `signup-flow.spec.ts` **16** · `apps/marketing/tests/signup.spec.ts` **12**
+> · `verify-signup.mjs` **54/54** ·
+> [`../MARKETING_SIGNUP_P_M4_IMPLEMENTATION_REPORT.md`](../MARKETING_SIGNUP_P_M4_IMPLEMENTATION_REPORT.md).
 
 | | |
 |---|---|
 | **الهدف** | من زائر إلى منشأة عاملة في جلسة واحدة |
 | **الشاشات** | معالج 4 خطوات: **الباقة** ← **المنشأة** (الاسم · الرمز · الدولة · العملة · المنطقة) ← **المدير** (الاسم · البريد · كلمة المرور · الهاتف) ← **التحقق** (رمز بالبريد) ثم لوحة ترحيب بمهام الإعداد (الشركة · الفرع · دليل الحسابات · أول فاتورة) |
-| **نقاط نهاية** | `POST /signup` (قائم، يُوسَّع بالحقوق والفترة التجريبية) · `POST /signup/verify` · `POST /signup/resend` · `GET /signup/status/:email` |
+| **نقاط نهاية** | `GET /signup/plans` (✅ **موحَّد** مع `/public/plans`: الاثنان يقرآن `PublicPlansService` نفسه) · `POST /signup` · `POST /signup/verify` · `POST /signup/resend` · `GET /signup/status/:email` |
 | **الاعتماد** | **خدمة البريد (P-C6 في اللوحة)** — التحقق والتذكير لا يعملان بلا قوالب |
 | **اختبار** | `signup-flow.spec.ts` (≥ 12): رمز خاطئ، إعادة إرسال، بريد مكرَّر، فترة تجريبية، إنشاء الفرع والمدير فعلياً، عزل المستأجر الجديد |
 | **تحقّق حيّ** | `scripts/verify-signup.mjs` (≈ 30 نقطة، كل البريد على `console`/MailHog) |
 
-### P-M5 — نظام إدارة المحتوى (CMS) 🔴 (أكبر جزء — تفصيله في §6)
+### P-M5 — نظام إدارة المحتوى (CMS) 🔴 (أكبر جزء — تفصيله في §6) — ✅ **مُنجَز** (2026-09-18)
 
-### P-M6 — التقاط العملاء المتوقّعين وإدارتهم 🟠
+> خُلاف تفصيل §6.2: لا مسارات `DELETE` (السحب لا الحذف) ولا مسارات `blocks` منفصلة (الكتل
+> تُكتب مع صفحتها بديلاً كاملاً). والدليل: `public-content.spec.ts` 10 + `platform-content.spec.ts` 16
+> و`verify-content.mjs` **62/62** وشاشة `/content` في اللوحة.
+
+### P-M6 — التقاط العملاء المتوقّعين وإدارتهم 🟠 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | لا يضيع زائر مهتم، ولا يُكتب طلب على ورق |
 | **الشاشات (عامة)** | نموذج تواصل حقيقي (الاسم · الشركة · البريد · الهاتف · عدد الفروع · الرسالة) + نموذج «اطلب عرضاً» + اشتراك في النشرة |
 | **الشاشات (لوحة)** | صندوق العملاء المتوقّعين: حالات (جديد · قيد التواصل · مؤهَّل · تحوّل · مرفوض) · إسناد · ملاحظات · مصدر (نموذج · حملة · مباشر) · **UTM** كاملة · تحويل إلى عميل بضغطة (ينشئ المستأجر والمدير ويمنحه فترة تجريبية) |
-| **نقاط نهاية** | `POST /public/leads` · `GET/PATCH /platform/leads` · `POST /platform/leads/:id/notes` · `POST /platform/leads/:id/convert` · `POST /public/subscribe` · `GET /platform/subscribers` |
+| **نقاط نهاية** | ✅ `POST /public/leads` · `POST /public/subscribe` · `GET /public/subscribe/confirm/:token` · `GET/PATCH /platform/leads` · `GET /platform/leads/:id` · `POST /platform/leads/:id/notes` · `POST /platform/leads/:id/convert` · `GET/PATCH /platform/leads/subscribers[/:id]` (**النشرة تحت `/platform/leads`** — خلافاً لما كتبته هذه الخطة: النشرة صندوقٌ من الصندوق، وتفريقهما في مسارين يعني قراءةً من مكانٍ وكتابةً في آخر) |
 | **حماية البريد المزعج** | حقل مصيدة (honeypot) + محدّد معدل (يصير مشتركاً بين الأسطح بعد نقل محدّد المعدل إلى Redis — انظر `INCOMPLETE_INVENTORY.md` §5) + تحقّق اختياري من البريد برسالة تأكيد |
 | **صلاحيات** | **`console.leads.manage`** و**`console.leads.view`** (جديدان) |
-| **ترحيل** | `0075_leads.sql` — `leads` · `lead_notes` · `lead_events` · `email_subscribers` |
-| **اختبار** | `public-leads.spec.ts` (≥ 12): حفظ + إسناد + تحويل إلى مستأجر فعلي + منع التكرار + رفض المصيدة |
-| **تحقّق حيّ** | `scripts/verify-leads.mjs` (≈ 30 نقطة) |
+| **ترحيل** | ✅ **`0080_leads.sql`** (لا 0075: الرقم شُغل بـ`content` في P-M5) — `leads` · `lead_notes` · `lead_events` · `email_subscribers` — ومعها `0081_leads_permissions.sql` لرمزَي الصلاحية |
+| **اختبار** | ✅ `public-leads.spec.ts` **16** (≥ 12): حفظ + إسناد + تحويل إلى مستأجر فعلي + منع التكرار + رفض المصيدة + `LEAD_STATUS_LOCKED` + النشرة بتأكيدها المزدوج + فصل الصلاحيتين |
+| **تحقّق حيّ** | ✅ `scripts/verify-leads.mjs` **58/58 في 6 أقسام** (≈ 30 نقطة) |
 
-### P-M7 — الحملات البريدية 🟡
+### P-M7 — الحملات البريدية 🟠 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | رعاية العملاء المتوقّعين والتجريبيين حتى يشتركوا |
-| **الشاشات** | `/campaigns` (إنشاء · قالب · شريحة · جدولة) · الشرائح (متوقّعون · تجريبيون · نشطون · متأخّرون · متسربون) · تقرير الحملة (مُرسَل · مُسلَّم · مفتوح · ناقر · مُلغٍ) · إلغاء اشتراك بنقرة |
-| **نقاط نهاية** | `GET/POST/PATCH /platform/campaigns` · `POST /platform/campaigns/:id/schedule` · `POST /platform/campaigns/:id/send-test` · `GET /platform/campaigns/:id/report` · `GET /public/unsubscribe/:token` |
-| **القياس** | بكسل فتح + توجيه نقر (`/public/track/open/:id` · `/public/track/click/:id`) مع توقيع يمنع التزوير |
-| **الامتثال** | ترويستا `List-Unsubscribe` و`List-Unsubscribe-Post` · احترام `email_suppressions` (P-C6) · عنوان المُرسِل واسمه بالعربية |
-| **صلاحيات** | **`console.campaigns.manage`** (جديد) |
-| **ترحيل** | `0076_campaigns.sql` — `email_campaigns` · `campaign_messages` · `campaign_events` |
-| **اختبار** | `platform-campaigns.spec.ts` (≥ 12): الشريحة، الإلغاء يمنع، التتبّع، التقرير، منع الإرسال بلا قالب |
-| **تحقّق حيّ** | `scripts/verify-campaigns.mjs` (≈ 30 نقطة، لا إرسال حقيقي) |
+| **الشاشات** | ✅ `/campaigns` (إنشاء · قالب · شريحة · جدولة · إرسال الآن · نسخة اختبار · إلغاء بسبب · تقرير) · الشرائح **الستّ** (متوقّعون · مشتركو النشرة · تجريبيون · نشطون · متأخّرون · متسربون) — أُضيفت `subscribers` لأن مشترك النشرة ليس متوقَّعاً · تقرير الحملة (أُرسل · مُسلَّم · مفتوح · ناقر · مُلغٍ) · صفحة `/unsubscribe` في الموقع بأربع حالات |
+| **نقاط نهاية** | ✅ `GET/POST/PATCH /platform/campaigns` · `GET …/segments` · `GET …/:id` · `POST …/:id/schedule` · `POST …/:id/send-test` · `POST …/:id/cancel` · `POST …/:id/dispatch` · `GET …/:id/report` · `GET` **و**`POST /public/unsubscribe/:token` (النقرة الواحدة RFC 8058) — **١١ مساراً و١٤ عملية** |
+| **القياس** | ✅ بكسل فتح + توجيه نقر (`/public/track/open/:token` · `/public/track/click/:token/:index`) — **ورقة الوصول في العقد منفَّذة بالرمز السري المُجزَّأ** لا بالتوقيع المشتقّ: الوجهة تُقرأ من صفّ الرسالة، فلا تحويلَ مفتوحاً (انظر التقرير §2.2–2.3) |
+| **الامتثال** | ✅ ترويستا `List-Unsubscribe` و`List-Unsubscribe-Post` (RFC 8058) **تُحفظ مع الرسالة** · احترام `email_suppressions` قبل الإرسال فتُسجَّل «لم تُرسل» بسببه · الإلغاء يكتب حجراً **عامّاً** (`tenant_id NULL`) لا خاصّاً بالحملة · عنوان المُرسِل واسمه بالعربية |
+| **صلاحيات** | ✅ **`console.campaigns.manage`** (رمزٌ واحد: من يقرأ الحملات يقرأ قائمةَ أشخاصٍ حقيقيين وتقاريرَ فتحهم) — وعدّادات `verify-platform-console` **26/26/7** |
+| **ترحيل** | ✅ **`0082_campaigns.sql`** (لا `0076`: الرقم شُغل بـ`email_service` في P-C6) — `email_campaigns` · `campaign_messages` · `campaign_events` + عمودا `email_messages.html`/`headers` |
+| **اختبار** | ✅ `platform-campaigns.spec.ts` **19** (≥ 12): الشريحة وأعدادها · متغيّرٌ غير معروف يُرفض · رسالة الاختبار لا تُحتسب · التتبّع والتحويل · الإلغاء يمنع الحملة التالية · القفل بعد الإرسال |
+| **تحقّق حيّ** | ✅ `scripts/verify-campaigns.mjs` **59/59 في 7 أقسام** (≈ 30 نقطة) — بلا بريدٍ يخرج من المساحة (`provider = console`) |
 
-### P-M8 — التحقق والثقة والقطاعات 🟢
+### P-M8 — التحقق والثقة والقطاعات 🟢 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | صفحة تُقنع شكّاكاً: الفاتورة صحيحة، والنظام آمن |
-| **الشاشات** | `/verify` محسّنة (لصق QR أو الرمز · نتيجة منسّقة: البائع · الرقم الضريبي · التاريخ · الإجمالي · الضريبة · الحالة لدى زاتكا · شرح الحالة) · `/trust` (الأمان: التشفير، العزل، النسخ، التوافق مع زاتكا) · `/industries` وصفحة لكل قطاع من الوحدات الرأسية القائمة (تفصيل · نظارات · مرسى · مقاولات · سلة) |
-| **نقاط نهاية** | `POST /public/verify` (اختياري، للتحقق بالخادم ببيانات دنيا) — و`qr.ts` يبقى في المتصفح افتراضياً (لا تُرسل بيانات الفاتورة لخادم إن لم يطلب المستخدم) |
-| **اختبار** | `public-verify.spec.ts` (≥ 6) |
+| **الشاشات** | ✅ `/verify` محسّنة (لصق QR أو الرمز · نتيجة منسّقة: البائع · الرقم الضريبي · التاريخ · الإجمالي · الضريبة · الحالة لدى زاتكا · شرح الحالة) · ✅ `/trust` (الأمان: التشفير، العزل، النسخ، التوافق مع زاتكا) · ✅ `/industries` وصفحة لكل قطاع من الوحدات الرأسية القائمة (تفصيل · نظارات · مرسى · مقاولات · سلة — خمسة قطاعات و٢٩ شاشة بتسمياتها الحرفية) |
+| **نقاط نهاية** | ✅ `POST /public/verify` (اختياري، للتحقق بالخادم ببيانات دنيا) — و`qr.ts` يبقى في المتصفح افتراضياً (لا تُرسل بيانات الفاتورة لخادم إن لم يطلب المستخدم) |
+| **اختبار** | ✅ `public-verify.spec.ts` **8** (≥ 6) — وأُضيف في العقود `zatca-qr.spec.ts` (**12**) و`platform/verify.spec.ts` (**5**) |
+| **تحقّق حيّ** | ✅ `scripts/verify-public-verify.mjs` **75/75 في 7 أقسام** |
 
-### P-M9 — مركز المساعدة والوثائق وحالة الخدمة 🟢
+### P-M9 — مركز المساعدة والوثائق وحالة الخدمة 🟢 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | تقليل تذاكر الدعم، وإظهار المصداقية |
-| **الشاشات** | `/help` (تصنيفات من نظام المحتوى + بحث) · `/help/[slug]` (مقال + «هل أفادك هذا؟») · `/changelog` (من `docs/change-log` أو من نظام المحتوى) · `/status` (مجسات الصحة من P-C9 في اللوحة، بحادث مفتوح ولافتة) |
-| **نقاط نهاية** | `GET /public/help?category=&q=` · `GET /public/help/:slug` · `GET /public/status` |
-| **اختبار** | `public-help.spec.ts` (≥ 6) |
+| **الشاشات** | ✅ `/help` (تصنيفات من نظام المحتوى + بحث — أُعيد بناؤه على الغلاف الجديد) · ✅ `/help/[slug]` (مقال + «هل أفادك هذا؟» بعدّادَي صوت) · ✅ `/changelog` **من نظام المحتوى** (نوعٌ سابع `changelog`) لا من `docs/change-log` + صفحةٌ لكل مدخل · ✅ `/status` (مجسات الصحة من P-C9 نفسها: خمسة مكوّنات علنية ولافتةُ حادثٍ من `platform.maintenance*`) |
+| **نقاط نهاية** | ✅ `GET /public/help?category=&q=` · ✅ `GET /public/help/:slug` · ✅ `POST /public/help/:slug/feedback` (الكتابة الوحيدة — صوتٌ واحد لكل متصفّح) · ✅ `GET /public/status` |
+| **اختبار** | ✅ `public-help.spec.ts` **7** (≥ 6) · `platform/status.spec.ts` **7** · `apps/marketing/tests/help.spec.ts` **11** |
+| **ترحيل** | ✅ **`0083_help_feedback.sql`** — توسيع `content_pages_kind_check` بـ`changelog` + جدول `content_feedback` (فهرسٌ فريد `(page_id, visitor)`، بلا `UPDATE`/`DELETE`) |
+| **تحقّق حيّ** | ✅ `scripts/verify-help.mjs` **68/68 في 7 أقسام** — وينتظر امتلاء دلو المعدّل إن كان شبه فارغٍ من تشغيلٍ سابق |
 
-### P-M10 — القياس والتحسين 🟢
+### P-M10 — القياس والتحسين 🟢 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | أن يُقاس أثر الموقع لا أن يُخمَّن |
-| **العمل** | لافتة موافقة + تحليلات (خدمة ذاتية الاستضافة من `docker-compose` بدل طرف ثالث) · أهداف: بدء الاشتراك · إتمامه · طلب عرض · اشتراك في النشرة · قمع بسيط في لوحة المنصة · اختبار أ/ب لعنوان البطل والدعوة (من نظام المحتوى، بلا كود) · ميزانية أداء في CI |
-| **نقاط نهاية** | `POST /public/events` (أحداث مجهولة الهوية، مجمَّعة) + `GET /platform/analytics/site` |
-| **اختبار** | `public-analytics.spec.ts` (≥ 6) |
+| **الموافقة** | ✅ لافتةٌ لا تحجب (`components/site/consent-banner.tsx`) + `lib/consent.ts`: القبول وحده يجيز · `DNT` يُلغي · وزرُّ تغيير القرار في التذييل |
+| **التحليلات** | ✅ **ذاتية بالكامل**: الجمع في قاعدتنا عبر `POST /public/events` (جدول `site_events`) — لا طرف ثالث ولا خدمةٌ خارجية، وحزمة الموقع تحمل `public/events` ولا تحمل وسم طرفٍ ثالث (يقيسه السكربت الحيّ) |
+| **الأهداف** | ✅ أربعة: `signup_start` · `signup_complete` · `request_demo` · `newsletter_subscribe` — بمفرداتٍ مغلقة في العقد، و**٩ مواضع** `data-goal` على الدعوات، وثلاثة نداءات `trackGoal` في فرح النجاح |
+| **القمع** | ✅ شاشة `/analytics/site` في لوحة المنصّة: نداءٌ واحد يرسم الزوّار والمشاهدات والأهداف والمنحنى والمصادر والمسارات وتجارب أ/ب وبطاقة الخصوصية وجدول التعريفات |
+| **أ/ب** | ✅ من نظام المحتوى بلا كود: `variant_of` + `variant_key` (0084) وكتلة `cta` داخل النسخة، والتوزيع في متصفّح الزائر بـ`pickContentVariant` (FNV-1a حتميّة) |
+| **ميزانية الأداء** | ✅ `apps/marketing/perf-budget.json` + `lib/perf.ts` من مخرج `next build` نفسه، وسطرٌ مستقلّ في `ci.yml` — **٤٠ مساراً · صفر تجاوز** (الأسوأ ٩٠٪ من السقف) |
+| **نقاط نهاية** | ✅ `POST /public/events` (دفعةٌ من ١ إلى ٢٠ حدثاً مجهول الهوية · `202` · دلو `public-events` ١٢٠/دقيقة) + `GET /platform/analytics/site` (رمز `console.analytics.view` القائم) |
+| **الخصوصية** | ✅ لا عمود لعنوان IP ولا بريد ولا وسيط · `visitor` عشوائيّ · صفر تدقيقٍ على الأحداث · احتفاظٌ ١٨٠ يوماً يُنفَّذ بعلامةٍ مائية · و«ما يُجمع/ما لا يُجمع» يُعرض في اللوحة ويُقاس |
+| **ترحيل** | ✅ **`0084_site_analytics.sql`** — جدول `site_events` (ثلاثة فهارس · RLS · `SELECT/INSERT/DELETE` و**`REVOKE UPDATE`**) + عمودا النسخ على `content_pages` |
+| **اختبار** | ✅ `public-analytics.spec.ts` **8** (≥ 6) · `site-analytics.spec.ts` **12** · `tests/analytics.spec.ts` **12** · `tests/perf.spec.ts` **5** |
+| **تحقّق حيّ** | ✅ `scripts/verify-site-analytics.mjs` **67/67 في 8 أقسام** — يقيس الفروق بين قراءتين، ويزرع زوّاراً ومساراتٍ جديدة في كل تشغيل داخل نطاق `/vsa-…` يُمحى في النهاية |
+| **التقرير** | `docs/MARKETING_ANALYTICS_P_M10_IMPLEMENTATION_REPORT.md` |
 
 ---
 
@@ -234,27 +282,30 @@ SEO، ولا التقاط عملاء، ولا قياس.
 |---|---|---|
 | `0070_announcements.sql` | الإعلانات (من اللوحة) | P-C7 |
 | `0074_content.sql` | `content_pages` · `content_blocks` · `content_menus` · `content_banners` · `content_versions` | P-M5 |
-| `0075_leads.sql` | `leads` · `lead_notes` · `lead_events` · `email_subscribers` | P-M6 |
-| `0076_campaigns.sql` | `email_campaigns` · `campaign_messages` · `campaign_events` | P-M7 |
+| `0080_leads.sql` (+ `0081_leads_permissions.sql`) | `leads` · `lead_notes` · `lead_events` · `email_subscribers` | P-M6 ✅ |
+| `0082_campaigns.sql` | `email_campaigns` · `campaign_messages` · `campaign_events` (+ `email_messages.html`/`headers`) | P-M7 ✅ |
+| `0083_help_feedback.sql` | نوعُ محتوى `changelog` + `content_feedback` | P-M9 ✅ |
 
 | الرمز الجديد | الجزء |
 |---|---|
 | `console.content.manage` · `console.content.view` | P-M5 |
 | `console.leads.view` · `console.leads.manage` | P-M6 |
-| `console.campaigns.manage` | P-M7 |
+| `console.campaigns.manage` | P-M7 ✅ |
 
 | الاختبارات | العدد المقدَّر |
 |---|---:|
 | `public-content.spec.ts` + `platform-content.spec.ts` | 16 |
-| `public-leads.spec.ts` | 12 |
-| `platform-campaigns.spec.ts` | 12 |
-| `signup-flow.spec.ts` | 12 |
-| `public-plans.spec.ts` · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/site.spec.ts` | 30 |
+| `public-help.spec.ts` (P-M9 ✅: **7** أُنجزت) + `packages/contracts/src/platform/status.spec.ts` (**7**) | 6 |
+| `public-leads.spec.ts` (P-M6 ✅: **16** أُنجزت) | 12 |
+| `platform-campaigns.spec.ts` (P-M7 ✅: **19** أُنجزت) | 12 |
+| `signup-flow.spec.ts` (P-M4 ✅: **16** أُنجزت) + `apps/marketing/tests/signup.spec.ts` (**12**) | 12 |
+| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` (✅ **8** أُنجزت) · `public-analytics.spec.ts` (✅ **8** أُنجزت في P-M10) · `apps/marketing/tests/{site,pricing,help}.spec.ts` (✅ **36** أُنجزت) | 30 |
 | **المجموع** | **≈ 82** |
 
-السكربتات: `verify-marketing-site.mjs` (20) · `verify-signup.mjs` (30) ·
-`verify-content.mjs` (35) · `verify-leads.mjs` (30) · `verify-campaigns.mjs` (30)
-— **≈ 145 نقطة تحقّق حيّة**.
+السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (**54** أُنجزت في P-M4) ·
+`verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (✅ **58** أُنجزت في P-M6) · `verify-campaigns.mjs` (✅ **59** أُنجزت في P-M7) ·
+`verify-pricing.mjs` (**53** أُنجزت في P-M3) · `verify-public-verify.mjs` (✅ **75** أُنجزت في P-M8) · `verify-help.mjs` (✅ **68** أُنجزت في P-M9) · `verify-site-analytics.mjs` (✅ **67** أُنجزت في P-M10)
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **533** نقطة في تسعة سكربتات.
 
 ---
 
@@ -297,9 +348,15 @@ P-M1 ── P-M2 ── P-M3 ── P-M4 ── P-M6
                  P-M8 ── P-M9
 ```
 
-الجلسة الأولى: **P-M1 + P-M2** (موقع يبدو احترافياً بسرعة). الثانية: **P-M5** (نظام
-المحتوى — بدونه كل نصّ تعديلُ كود). الثالثة: **P-M4 + P-M3** (الاشتراك والباقات).
-الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية). وما بعدها تحسين.
+الجلسة الأولى: **P-M1 + P-M2** (موقع يبدو احترافياً بسرعة) — ✅. الثانية: **P-M5** (نظام
+المحتوى — بدونه كل نصّ تعديلُ كود) — ✅. والثالثة: **P-M3 + P-M4** (الباقات والاشتراك) —
+**P-M3 ✅ · P-M4 ✅**.
+الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية) — **P-M6 ✅**. والخامسة: **P-M7** (الحملات
+البريدية ورعاية من وصل حتى يشترك) — **P-M7 ✅** بتقريره
+`docs/MARKETING_CAMPAIGNS_P_M7_IMPLEMENTATION_REPORT.md`. والسادسة: **P-M8 + P-M9** (الثقة
+وحالة الخدمة) — **P-M8 ✅ · P-M9 ✅**. والسابعة: **P-M10** (القياس والتحسين) — **✅ مُنجَز**
+بتقريره `docs/MARKETING_ANALYTICS_P_M10_IMPLEMENTATION_REPORT.md`، وهي آخر مراحل الموقع
+التسويقي في هذه الخطّة.
 
 ---
 

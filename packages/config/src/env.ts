@@ -1,3 +1,6 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { z } from 'zod';
 
 import { describeEnvSources, loadEnvFiles } from './load-env.js';
@@ -63,6 +66,28 @@ const envSchema = z.object({
   RATE_LIMIT_DEFAULT_PER_MINUTE: z.coerce.number().int().positive().default(600),
   RATE_LIMIT_LOGIN_PER_MINUTE: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_REGISTER_PER_MINUTE: z.coerce.number().int().positive().default(5),
+  /**
+   * P-M6 — استمارات الموقع العامّة (تواصل · طلب عرض · نشرة). دلوٌ خاصٌّ بها لا دلو الدخول:
+   * حدُّ الدخول (١٠/دقيقة) يخصّ محاولات كلمة المرور، وحدُّ الاستمارة يخصّ **عدد الرسائل التي
+   * نُرسلها باسم المنصّة** إلى عناوين لا نملكها — وهو ما يجعل الرقم منخفضاً عن قصد.
+   */
+  RATE_LIMIT_PUBLIC_FORM_PER_MINUTE: z.coerce.number().int().positive().default(10),
+  // P-M7 — دلوُ الزحف (`/public/track/*` و`/public/unsubscribe/*`): عملاء البريد تحمّل
+  // بكسل الفتح آليّاً، فسقفُ الاستمارات (١٠/دقيقة) يقطع حملةً حقيقية. والسقف هنا أعلى
+  // لأن الكتابة محدودة أصلاً بالفهارس الفريدة (فتحٌ واحد لكل رسالة).
+  RATE_LIMIT_CAMPAIGN_TRACK_PER_MINUTE: z.coerce.number().int().positive().default(120),
+  // P-M8 — دلوُ التحقّق العام (`POST /public/verify`): قراءةٌ لا كتابة، ودلوٌ مستقلّ عن
+  // الاستمارات لأن سيلَ استماراتٍ لا يجوز أن يُغلق بابَ التحقّق (والعكس). والسقف متوسّط
+  // لأنه يخدم لصقاً يدوياً يتكرّر فيه الخطأ.
+  RATE_LIMIT_PUBLIC_VERIFY_PER_MINUTE: z.coerce.number().int().positive().default(30),
+  // P-M9 — دلوُ حالة الخدمة العامة (`GET /public/status`): كل نداءٍ يقرأ مجسّات المنصّة
+  // نفسها (قاعدة · طابور · بريد · تخزين)، فالسقف يمنع تحويل صفحة الحالة إلى حملة استنزاف،
+  // وفوقه ذاكرةُ عشر ثوانٍ في الخدمة فالسقف الفعليّ أوسع للزائر العادي.
+  RATE_LIMIT_PUBLIC_STATUS_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  // P-M10 — دلوُ أحداث الموقع (`POST /public/events`): الموقع يرسل دفعاتٍ صغيرة، والسقف
+  // يمنع تحويل نقطة القياس إلى قناة كتابةٍ مفتوحة — ودلوٌ مستقلّ عن الاستمارات والتحقّق
+  // لأن سيلَ أحداثٍ لا يجوز أن يُغلق بابَ التعاقد.
+  RATE_LIMIT_PUBLIC_EVENTS_PER_MINUTE: z.coerce.number().int().positive().default(120),
 
   /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
   SIGNUP_ENABLED: booleanish.default(true),
@@ -98,6 +123,19 @@ const envSchema = z.object({
   /** A `pending` file older than this is an abandoned upload and is collected. */
   FILES_ORPHAN_GC_HOURS: z.coerce.number().int().positive().default(24),
 
+  /**
+   * P-C10 — أين تُكتب نسخة المنصّة حين لا اعتمادات تخزين كائنات. النسخة تُكتب دائماً إلى
+   * ملفٍّ يُقرأ من مكانه (التحقّق يعيد قراءته ويحسب بصمته)، و`ObjectStoragePort` هو الوجهة
+   * الأولى متى كان مُهيّأً؛ وهذا المسار هو البديل المُعلَن لا الصامت.
+   */
+  BACKUP_ARTIFACT_DIR: z.string().default(join(tmpdir(), 'erp-backups')),
+  /**
+   * وجهة النسخة: `auto` (التخزين إن كان مُهيّأً، وإلا نظام الملفات) · `s3` · `filesystem`.
+   * `auto` هي الصواب في النشر، والاختيار الصريح لمن يعرف أنّ تخزينه غير متاحٍ في بيئته —
+   * ولا يُحوَّل فشلُ الرفع إلى نجاحٍ على القرص بصمت في أي حال.
+   */
+  BACKUP_STORE: z.enum(['auto', 's3', 'filesystem']).default('auto'),
+
   /** PHASE_04 jobs — BullMQ is only wired up when a Redis URL is present. */
   WORKER: booleanish.default(false),
   JOBS_ENABLED: booleanish.default(true),
@@ -128,6 +166,18 @@ const envSchema = z.object({
   SMTP_CLIENT_HOSTNAME: z.string().optional(),
   /** Public URL of the customer portal, used inside outbound e-mails. */
   CUSTOMER_PUBLIC_URL: z.string().default(''),
+  /**
+   * P-C7 — Public URL of the staff workspace, used inside outbound e-mails
+   * (the announcement template's `{{link}}` points at its notification centre).
+   * Empty means the link stays a relative path rather than a dead absolute one.
+   */
+  STAFF_PUBLIC_URL: z.string().default(''),
+  /**
+   * P-C12 (التقرير الأسبوعي) — Public URL of the platform console, used as the link inside
+   * the weekly report. Empty means the e-mail carries the relative path (`/analytics`) rather
+   * than a dead absolute URL — the same rule as `STAFF_PUBLIC_URL`.
+   */
+  CONSOLE_PUBLIC_URL: z.string().default(''),
 
   /** AES-256-GCM data-encryption key, base64 (SECURITY_ARCHITECTURE §9). */
   DATA_ENC_KEY: z.string().optional(),
