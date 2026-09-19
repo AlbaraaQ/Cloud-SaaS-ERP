@@ -19,7 +19,9 @@ import {
   type FaqItem,
 } from '../../lib/content';
 import { t, type Locale } from '../../lib/i18n';
+import { industries, industryPath, INDUSTRIES_PATH, type Industry } from '../../lib/industries';
 import { einvoicingPoints, onboardingSteps, siteModules } from '../../lib/modules';
+import { trustAxes, trustLimitsAr } from '../../lib/trust';
 import { hrefFor, SITE_PATHS } from '../../lib/site';
 
 import { ContentBlocks } from './blocks';
@@ -357,6 +359,182 @@ export function CasesIndexView({ locale, cases }: { locale: Locale; cases: Conte
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+/**
+ * P-M8 — `/trust`: كل بندٍ ومعه مصدره.
+ *
+ * والشكل تابعٌ للقرار: البطاقة تحمل **الدليل** في سطرٍ صغير (`source-line`) لا في حاشية، لأن
+ * صفحةَ ثقةٍ بلا دليلٍ صفحةُ إعلان. و«ما لا ندّعيه» قسمٌ كامل في آخرها، لا حاشيةً صغيرة: حدُّ
+ * المنتج جزءٌ من وصفه.
+ *
+ * وصفحةُ المحتوى (من نظام إدارة المحتوى) تُعرض **فوق** الأقسام الثابتة إن وُجدت: من كتب نصّاً
+ * تحريرياً في اللوحة لا يُنازع الأرقام الثابتة، بل يقدّم لها مقدّمة.
+ */
+export function TrustView({ locale, page }: { locale: Locale; page: ContentPageDetail | null }) {
+  return (
+    <>
+      <header className="page-head">
+        <h1>{page ? titleFor(page, locale) : t(locale, 'trust.title')}</h1>
+        <p className="muted">{page ? summaryFor(page, locale) : t(locale, 'trust.subtitle')}</p>
+      </header>
+      {page && page.blocks.length > 0 ? <ContentBlocks blocks={page.blocks} locale={locale} /> : null}
+
+      {trustAxes.map((axis) => (
+        <section className="section" key={axis.key}>
+          <SectionHeading title={`${axis.icon} ${axis.titleAr}`} subtitle={axis.leadAr} />
+          <div className="grid cols">
+            {axis.points.map((point) => (
+              <article className="card" key={point.titleAr}>
+                <h3>{point.titleAr}</h3>
+                <p className="muted">{point.bodyAr}</p>
+                <p className="source-line" dir="ltr">
+                  {point.source}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <section className="section">
+        <SectionHeading title={t(locale, 'trust.limits.title')} subtitle={t(locale, 'trust.limits.subtitle')} />
+        <ul className="verify-notes">
+          {trustLimitsAr.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="section cta-final">
+        <h2>{t(locale, 'trust.final.title')}</h2>
+        <p className="muted">{t(locale, 'trust.final.body')}</p>
+        <div className="toolbar">
+          <Link className="btn primary" href={hrefFor(SITE_PATHS.verify, locale)}>
+            {t(locale, 'nav.verify')}
+          </Link>
+          <Link className="btn" href={hrefFor(SITE_PATHS.contact, locale)}>
+            {t(locale, 'nav.contact')}
+          </Link>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/** P-M8 — `/industries`: البطاقة تقول **الوحدة التي تُباع**، لا شعاراً عن «حلولٍ متكاملة». */
+export function IndustriesView({ locale, page }: { locale: Locale; page: ContentPageDetail | null }) {
+  return (
+    <>
+      <header className="page-head">
+        <h1>{page ? titleFor(page, locale) : t(locale, 'industries.title')}</h1>
+        <p className="muted">{page ? summaryFor(page, locale) : t(locale, 'industries.subtitle')}</p>
+      </header>
+      {page && page.blocks.length > 0 ? <ContentBlocks blocks={page.blocks} locale={locale} /> : null}
+      <div className="grid cols">
+        {industries.map((industry) => (
+          <article className="card module-card" key={industry.slug}>
+            <span className="card-icon" aria-hidden="true">
+              {industry.icon}
+            </span>
+            <h3>{industry.labelAr}</h3>
+            <p className="muted">{industry.summaryAr}</p>
+            <p>
+              <Link className="text-link" href={industryPath(industry.slug)}>
+                {t(locale, 'industries.open')}
+              </Link>
+            </p>
+            <p className="source-line" dir="ltr">
+              {industry.module.source}
+            </p>
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/**
+ * P-M8 — صفحة قطاع: **لا وعدَ بلا شاشة**.
+ *
+ * كل سطرٍ في «الشاشات» مقابله شاشةٌ في تطبيق العمل بتسميتها الحرفية ومسارها وملفّها وسطرها؛
+ * ومن قرأ سطراً ولم يجد شاشةً وراءه، فذلك خطأٌ في هذه الصفحة لا في المنتج. وهذا هو الفرق بين
+ * صفحة قطاعٍ حقيقية وصفحةٍ تُنقل من موقعٍ آخر بأسماءٍ أخرى.
+ */
+export function IndustryView({ locale, industry }: { locale: Locale; industry: Industry }) {
+  return (
+    <>
+      <Breadcrumbs
+        trail={[
+          { href: hrefFor('/', locale), label: t(locale, 'nav.home') },
+          { href: hrefFor(INDUSTRIES_PATH, locale), label: t(locale, 'industries.title') },
+          { href: industryPath(industry.slug), label: industry.labelAr },
+        ]}
+      />
+
+      <header className="page-head">
+        <h1>
+          <span aria-hidden="true">{industry.icon}</span> {industry.labelAr}
+        </h1>
+        <p className="muted">{industry.summaryAr}</p>
+        <p className="source-line" dir="ltr">
+          {industry.module.label} — {industry.module.source}
+        </p>
+      </header>
+
+      <section className="section">
+        <SectionHeading title={t(locale, 'industries.pains.title')} />
+        <ul className="industry-pains">
+          {industry.pictureAr.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="section">
+        <SectionHeading
+          title={t(locale, 'industries.screens.title')}
+          subtitle={t(locale, 'industries.screens.subtitle')}
+        />
+        <div className="grid cols">
+          {industry.screens.map((screen) => (
+            <article className="card industry-card" key={screen.label}>
+              <h3>{screen.label}</h3>
+              <p className="muted">{screen.whatAr}</p>
+              <p className="source-line" dir="ltr">
+                {screen.href} · {screen.source}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <SectionHeading title={t(locale, 'industries.loop.title')} />
+        <ol className="verify-notes">
+          {industry.loopAr.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="section cta-final">
+        <h2>{t(locale, 'industries.final.title')}</h2>
+        <p className="muted">{t(locale, 'industries.final.body')}</p>
+        <div className="toolbar">
+          <Link className="btn primary" href={hrefFor(SITE_PATHS.demo, locale)}>
+            {t(locale, 'nav.demo')}
+          </Link>
+          <Link className="btn" href={hrefFor(SITE_PATHS.trust, locale)}>
+            {t(locale, 'nav.trust')}
+          </Link>
+          <Link className="btn" href={hrefFor(SITE_PATHS.verify, locale)}>
+            {t(locale, 'nav.verify')}
+          </Link>
+        </div>
+      </section>
     </>
   );
 }

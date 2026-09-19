@@ -989,3 +989,37 @@ table.compare tbody tr:last-child td {
   min-width: 180px;
   flex: 1;
 }
+
+/*
+ * P-M8 — قوائم صفحة التحقّق: كل سطرٍ يبدأ بشارةٍ ثم تسميةٍ ثم شرح. القائمة عمداً `<ul>` لا
+ * شبكة بطاقات: الفحوص تُقرأ واحداً واحداً، والبصر يجب أن ينزل لا أن يتوزّع.
+ */
+.verify-checks,
+.verify-notes {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 18px;
+  max-width: 760px;
+}
+
+.verify-checks li,
+.verify-notes li {
+  line-height: 1.7;
+}
+
+/* بطاقة صنفٍ في صفحة القطاع: التسمية كما في تطبيق العمل، ومعها سببها ومسار شاشتها. */
+.industry-card .source-line {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  word-break: break-all;
+}
+
+.industry-pains {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-inline-start: 18px;
+  max-width: 760px;
+}

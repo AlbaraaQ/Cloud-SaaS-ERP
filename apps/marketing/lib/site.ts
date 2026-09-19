@@ -15,6 +15,7 @@
 
 import type { Metadata } from 'next';
 
+import { industrySlugs } from './industries';
 import { DEFAULT_LOCALE, LOCALES, localePath, type Locale } from './i18n';
 
 /** هوية الموقع كما يعيدها `GET /public/site` (نطاقٌ مقصود: ما تحتاجه القشرة وSEO). */
@@ -64,6 +65,10 @@ export const SITE_PATHS = {
   // P-M7: صفحة الخروج من القائمة — مسارٌ حقيقي يُفتح من كل رسالة حملة. **وخارج خريطة
   // الموقع عن قصد**: صفحةُ إجراءٍ لا صفحةُ محتوى، وتُعلَن `noindex` في `metadata`.
   unsubscribe: '/unsubscribe',
+  // P-M8: القطاعات وصفحة الثقة — عربيّان وحدهما اليوم (`bilingual: false` في `navigation.ts`)،
+  // فالترجمة لا تُعلَن قبل أن توجد.
+  industries: '/industries',
+  trust: '/trust',
   maintenance: '/maintenance',
 } as const;
 
@@ -278,6 +283,11 @@ export function sitemapEntries(
     { path: SITE_PATHS.demo, locales: ['ar'] },
     { path: SITE_PATHS.onboarding, locales: ['ar'] },
     { path: SITE_PATHS.verify, locales: ['ar'] },
+    // P-M8: `/trust` و`/industries` مساراتُ محتوى تُفهرَس، وصفحاتُ القطاعات الخمس تُضاف لكلٍّ
+    // بحسب قطاعه (لا نظير لها بالإنجليزية بعد).
+    { path: SITE_PATHS.trust, locales: ['ar'] },
+    { path: SITE_PATHS.industries, locales: ['ar'] },
+    ...industrySlugs.map((slug: string): SitemapRow => ({ path: `${SITE_PATHS.industries}/${slug}`, locales: ['ar'] })),
   ];
 
   const rows = [...staticPaths, ...contentRows];

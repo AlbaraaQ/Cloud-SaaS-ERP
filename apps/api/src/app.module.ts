@@ -21,6 +21,7 @@ import {
 import { PlatformBackupsModule } from './modules/backups/platform-backups.module.js';
 import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
 import { ContentModule } from './modules/content/content.module.js';
+import { VerifyModule } from './modules/verify/verify.module.js';
 import { WeeklyReportModule } from './modules/weekly-report/weekly-report.module.js';
 import { DeveloperModule } from './modules/developer/developer.module.js';
 import { PlatformOperationsModule } from './modules/operations/platform-operations.module.js';
@@ -91,6 +92,7 @@ import { OpsModule } from './ops/ops.module.js';
     DeveloperModule,
     CampaignsModule,
     ContentModule,
+    VerifyModule,
     WeeklyReportModule,
     PlatformOperationsModule,
     DomainEventsModule,

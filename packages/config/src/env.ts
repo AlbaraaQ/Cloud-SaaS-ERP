@@ -76,6 +76,10 @@ const envSchema = z.object({
   // بكسل الفتح آليّاً، فسقفُ الاستمارات (١٠/دقيقة) يقطع حملةً حقيقية. والسقف هنا أعلى
   // لأن الكتابة محدودة أصلاً بالفهارس الفريدة (فتحٌ واحد لكل رسالة).
   RATE_LIMIT_CAMPAIGN_TRACK_PER_MINUTE: z.coerce.number().int().positive().default(120),
+  // P-M8 — دلوُ التحقّق العام (`POST /public/verify`): قراءةٌ لا كتابة، ودلوٌ مستقلّ عن
+  // الاستمارات لأن سيلَ استماراتٍ لا يجوز أن يُغلق بابَ التحقّق (والعكس). والسقف متوسّط
+  // لأنه يخدم لصقاً يدوياً يتكرّر فيه الخطأ.
+  RATE_LIMIT_PUBLIC_VERIFY_PER_MINUTE: z.coerce.number().int().positive().default(30),
 
   /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
   SIGNUP_ENABLED: booleanish.default(true),

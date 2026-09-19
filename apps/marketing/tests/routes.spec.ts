@@ -26,6 +26,11 @@ describe('marketing route groups', () => {
     expect(existsSync(join(appDir, 'demo/page.tsx')), '/demo').toBe(true);
     // P-M7: صفحة إلغاء الاشتراك — يُفتح رابطها من كل رسالة حملة، فهي مسارٌ حقيقيّ يُقاس.
     expect(existsSync(join(appDir, 'unsubscribe/page.tsx')), '/unsubscribe').toBe(true);
+    // P-M8: صفحة الثقة وفهرس القطاعات، وصفحةٌ لكل قطاع — ومسارٌ يُعلَن في الرأس ولا صفحةَ
+    // تحته أسوأ من مسارٍ غائب، فيُقاس هنا لا في الإنتاج.
+    expect(existsSync(join(appDir, 'trust/page.tsx')), '/trust').toBe(true);
+    expect(existsSync(join(appDir, 'industries/page.tsx')), '/industries').toBe(true);
+    expect(existsSync(join(appDir, 'industries/[slug]/page.tsx')), '/industries/[slug]').toBe(true);
     expect(existsSync(join(appDir, 'login/page.tsx')), '/login').toBe(true);
   });
 

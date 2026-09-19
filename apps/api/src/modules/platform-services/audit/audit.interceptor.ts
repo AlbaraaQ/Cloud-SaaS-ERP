@@ -40,6 +40,18 @@ const AUTH_AUDIT_ACTIONS: Record<string, string> = {
 /** Never audited: health probes and the audit log's own (read-only) surface. */
 const IGNORED_RESOURCES = new Set(['health', 'audit-log']);
 
+/**
+ * **P-M8 — `POST` that is a read.** `POST /public/verify` يستقبل حِمل رمز فاتورة في الجسم
+ * لا في الرابط (الرابط يُسجَّل في `Referer` وفي سجلّات الوسائط)، وهو مع ذلك **قراءةٌ محضة**:
+ * لا صفَّ يُكتب ولا حالةً تتغيّر. وتدقيقه يكتب عكس المطلوب: `after` يحمل الحِمل الملصوق،
+ * أي **بيانات فاتورة زائرٍ مجهول تُحفظ في سجلّ التدقيق** — والوعد المكتوب على الصفحة أن ما
+ * يُلصق لا يُحفظ. فالمسار مستثنى هنا، في المكان الذي تُقرأ فيه القاعدة، لا في الخدمة.
+ *
+ * والاستثناء بالاسم الكامل (`METHOD resource/entity`) لا بالمصدر: مسارٌ عامٌّ آخر لا يُعفى
+ * لأنه جاء من الوحدة نفسها.
+ */
+const READ_ONLY_POSTS = new Set(['POST public/verify']);
+
 export type RouteDescriptor = {
   resource: string;
   entityId: string | null;
@@ -94,6 +106,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     const route = describeRoute(request.originalUrl ?? request.url ?? '');
     if (IGNORED_RESOURCES.has(route.resource)) return next.handle();
+    if (READ_ONLY_POSTS.has(`${method} ${route.resource}/${route.entityId ?? ''}`)) return next.handle();
 
     const authAction = AUTH_AUDIT_ACTIONS[`${method} ${route.resource}/${route.entityId ?? ''}`];
 

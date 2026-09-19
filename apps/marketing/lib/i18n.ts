@@ -72,6 +72,27 @@ const ar: Dictionary = {
   'pricing.empty': 'لا توجد باقات معلنة الآن — تواصل معنا لنرتّب لك عرضاً.',
   'nav.contact': 'تواصل',
   'nav.verify': 'تحقق من فاتورة',
+  // P-M8 — القطاعات وصفحة الثقة: مساران حقيقيّان بمحتواهما من `lib/industries.ts` و
+  // `lib/trust.ts`، والعناوين هنا لأنها تُستعمل في القشرة وخريطة الموقع وقائمة التذييل.
+  'nav.industries': 'القطاعات',
+  'nav.trust': 'الأمان والثقة',
+  'industries.title': 'القطاعات',
+  'industries.subtitle':
+    'خمسة أنشطةٍ لها وحداتٌ رأسيةٌ قائمة في النظام نفسه: التفصيل · النظارات · إدارة المراسي · المقاولات · متجر سلة.',
+  'industries.open': 'تفاصيل القطاع',
+  'industries.pains.title': 'ما يشتكي منه أصحاب هذا النشاط',
+  'industries.screens.title': 'الشاشات التي تحلّها',
+  'industries.screens.subtitle': 'كل سطرٍ بتسميته في تطبيق العمل ومساره وملفّه — للتحقّق لا للتزيين.',
+  'industries.loop.title': 'دورة العمل في النظام',
+  'industries.final.title': 'أتحبّ أن تراها على بياناتك؟',
+  'industries.final.body': 'اطلب عرضاً ونجعل النشاط الأقرب إليك هو ما تُعرض عليه الشاشات.',
+  'trust.title': 'الأمان والثقة',
+  'trust.subtitle':
+    'أربعة أسئلةٍ يسألها كل مشترٍ جدّيّ — التشفير · العزل · النسخ · الفاتورة الإلكترونية — ولكل بندٍ مصدرٌ يمكن فتحه.',
+  'trust.limits.title': 'ما لا ندّعيه',
+  'trust.limits.subtitle': 'الحدّ جزءٌ من الوصف: هذه ليست على القائمة اليوم، ولن تُكتب هنا كأنها كذلك.',
+  'trust.final.title': 'اسألنا عن التفصيل الذي يهمّك',
+  'trust.final.body': 'نقول ما هو مُنفَّذ، وما هو في خطة العمل، وما لن نفعله — ولن نُجيب بجملةٍ عامّة.',
   'cta.start': 'ابدأ مجاناً',
   'cta.explore': 'شاهد الوحدات',
   'cta.talk': 'تحدّث إلى المبيعات',
@@ -154,6 +175,28 @@ const en: Dictionary = {
   'pricing.empty': 'No plans are published right now — talk to us and we will put an offer together.',
   'nav.contact': 'Contact',
   'nav.verify': 'Verify invoice',
+  // P-M8 — the two Arabic-first routes. Their content (`lib/industries.ts`, `lib/trust.ts`) is
+  // Arabic by decision; the English labels exist so the shell, the footer and the sitemap never
+  // print a raw key when `/en/*` arrives in P-M10.
+  'nav.industries': 'Industries',
+  'nav.trust': 'Trust and security',
+  'industries.title': 'Industries',
+  'industries.subtitle':
+    'Five trades with vertical modules already shipping: tailoring, optics, marina, contracting and Salla.',
+  'industries.open': 'Industry detail',
+  'industries.pains.title': 'What this trade complains about',
+  'industries.screens.title': 'The screens that answer it',
+  'industries.screens.subtitle': 'Every line carries its Staff app label, route and source file.',
+  'industries.loop.title': 'The loop in the system',
+  'industries.final.title': 'See it on your own data',
+  'industries.final.body': 'Book a demo and we show the trade closest to yours.',
+  'trust.title': 'Trust and security',
+  'trust.subtitle':
+    'Four questions every serious buyer asks — encryption, isolation, backups, e-invoicing — each with a source you can open.',
+  'trust.limits.title': 'What we do not claim',
+  'trust.limits.subtitle': 'Limits are part of the description.',
+  'trust.final.title': 'Ask about the detail you care about',
+  'trust.final.body': 'We answer what is shipped, what is planned, and what we will not do.',
   'cta.start': 'Start free',
   'cta.explore': 'Explore modules',
   'cta.talk': 'Talk to sales',

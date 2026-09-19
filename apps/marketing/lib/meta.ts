@@ -78,3 +78,23 @@ export async function contentMetadata(input: {
     publishedTime: page.publishedAt,
   });
 }
+
+/**
+ * P-M8 — ميتاداتا صفحة قطاع: العنوان والوصف من `lib/industries.ts` لا من قاعدة البيانات،
+ * فالصفحةُ ومحتواها من مصدرٍ واحد. و`canonical` هو مسارها نفسه (`/industries/<slug>`) —
+ * وليس لها نظيرٌ إنجليزي بعد، فلا يُعلَن `hreflang` لها (`hasEnglishTwin` تعرف ذلك).
+ */
+export async function industryMetadata(input: {
+  slug: string;
+  label: string;
+  summary: string;
+}): Promise<Metadata> {
+  const site = await siteInfo();
+  return buildMetadata({
+    locale: 'ar',
+    path: `/industries/${input.slug}`,
+    title: `${input.label} — وحدةٌ قائمة في النظام`,
+    description: clampDescription(input.summary),
+    site,
+  });
+}

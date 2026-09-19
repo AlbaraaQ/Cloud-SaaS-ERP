@@ -4158,6 +4158,28 @@
         ]
       }
     },
+    "/api/v1/public/verify": {
+      "post": {
+        "description": "يفكّ الحِمل بقواعد العقد المشتركة مع المتصفّح، ثم يقرأ **حالة الفاتورة وحدها** من سجلّ المنصّة إن كانت من إصدارها. ولا يُعاد إجماليٌ ولا رقمُ فاتورةٍ ولا هوية منشأة، ولا يُخزَّن الطلب. الافتراض أن الفحص يقع في المتصفّح، وهذا المسار اختياري.",
+        "operationId": "PublicVerifyController_verifyInvoice",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "الحُكم: حُكمُ شكلٍ على الرمز + حالةُ الفاتورة في المنصّة إن وُجدت"
+          },
+          "400": {
+            "description": "مدخلٌ لا يصلح للفحص (VALIDATION_FAILED)"
+          },
+          "429": {
+            "description": "تجاوز حدّ المعدّل (RATE_LIMITED)"
+          }
+        },
+        "summary": "التحقّق من فاتورة بحِمل رمز QR أو برمز الفاتورة (بلا جلسة)",
+        "tags": [
+          "public-verify"
+        ]
+      }
+    },
     "/api/v1/platform/reports/weekly": {
       "get": {
         "operationId": "PlatformReportsController_preview",

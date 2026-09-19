@@ -56,6 +56,19 @@ export const siteRoutes: SiteRoute[] = [
   // P-M6: «اطلب عرضاً» مسارٌ عربيٌّ وحده (ترجمته مع `/en/*` في P-M10)، ويظهر في الرأس
   // لأنّه أوّل ما يطلبه زائرٌ يريد أن يرى النظام قبل أن يدفع.
   { key: 'demo', href: '/demo', labelAr: 'اطلب عرضاً', labelEn: 'Book a demo', bilingual: false, nav: true },
+  // P-M8: القطاعات وصفحة الثقة في الرأس — وهما السؤالان اللذان يسألهما المشتري قبل الشراء
+  // («هل يناسب نشاطي؟» و«أين بياناتي؟»)، فلا يُخفيان في التذييل وحده.
+  {
+    key: 'industries',
+    href: '/industries',
+    labelAr: 'القطاعات',
+    labelEn: 'Industries',
+    // arabic-only today: القطاعات تُسمّي شاشات الموظّفين بتسمياتها العربية، والترجمة تأتي مع
+    // `/en/*` في P-M10 — فإعلان نظيرٍ غير موجود أسوأ من غياب الوسم.
+    bilingual: false,
+    nav: true,
+  },
+  { key: 'trust', href: '/trust', labelAr: 'الأمان والثقة', labelEn: 'Trust and security', bilingual: false, nav: true },
   { key: 'verify', href: '/verify', labelAr: 'تحقّق من فاتورة', labelEn: 'Verify invoice', bilingual: false, nav: false },
   { key: 'onboarding', href: '/onboarding', labelAr: 'اشترك', labelEn: 'Subscribe', bilingual: false, nav: false },
   { key: 'login', href: '/login', labelAr: 'دخول', labelEn: 'Sign in', bilingual: false, nav: false },
@@ -97,7 +110,7 @@ export function siteFooterLinks(locale: Locale): Array<{ key: string; label: str
     {
       key: 'product',
       label: t(locale, 'footer.product'),
-      links: [link('features'), link('einvoicing'), link('pricing'), link('verify')],
+      links: [link('features'), link('einvoicing'), link('industries'), link('pricing'), link('verify'), link('trust')],
     },
     {
       key: 'content',
