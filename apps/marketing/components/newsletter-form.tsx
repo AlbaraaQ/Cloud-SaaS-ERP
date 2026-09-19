@@ -15,6 +15,7 @@ import { useState } from 'react';
 import type { SubscriberAccepted } from '@erp/contracts';
 
 import { PortalError, portalFetch } from '../lib/api';
+import { trackGoal } from '../lib/track';
 import {
   LEAD_HONEYPOT_FIELD,
   leadProblemMessage,
@@ -51,6 +52,8 @@ export function NewsletterForm({ locale = 'ar', compact = false }: { locale?: 'a
         }),
       });
       setState('done');
+      // P-M10 — الهدف يُقاس عند **الاشتراك الفعلي** لا عند الضغط: النجاح شرطُ الحدث.
+      trackGoal('newsletter_subscribe', { source: 'footer' });
     } catch (failure) {
       const status = failure instanceof PortalError ? failure.status : 0;
       setError(leadProblemMessage(status, failure instanceof PortalError ? failure.code : undefined));

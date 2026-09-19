@@ -4592,6 +4592,68 @@
         ]
       }
     },
+    "/api/v1/public/events": {
+      "post": {
+        "operationId": "PublicEventsController_events",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "{ events: [{ name, path, locale, visitor, meta? }] } — دفعةٌ من ١ إلى ٢٠ حدثاً",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "قُبلت الأحداث (بلا إرجاع ما كُتب)"
+          },
+          "400": {
+            "description": "حدثٌ خارج العقد (VALIDATION_FAILED)"
+          },
+          "429": {
+            "description": "تجاوز حدّ المعدّل (RATE_LIMITED)"
+          }
+        },
+        "summary": "تسجيل دفعة أحداثٍ مجهولة من الموقع التسويقي",
+        "tags": [
+          "public-events"
+        ]
+      }
+    },
+    "/api/v1/platform/analytics/site": {
+      "get": {
+        "operationId": "PlatformSiteAnalyticsController_site",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "نافذة القياس بالأيام (7..365، والافتراضي 30)",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Anonymous, aggregated marketing-site analytics (definitions travel with the numbers)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "قياس الموقع: الزوّار · الأهداف والقمع · المنحنى · المصادر · المسارات · تجارب أ/ب",
+        "tags": [
+          "platform-site-analytics"
+        ]
+      }
+    },
     "/api/v1/platform/reports/weekly": {
       "get": {
         "operationId": "PlatformReportsController_preview",

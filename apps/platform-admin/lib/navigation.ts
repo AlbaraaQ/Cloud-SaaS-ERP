@@ -233,6 +233,17 @@ export const consoleGroups: readonly ConsoleGroup[] = [
         'console.analytics.view',
         'GET /platform/analytics/overview',
       ),
+      // P-M10 — «تحليلات الموقع»: قمعُ الموقع التسويقي ونتائج أ/ب. رمزها رمز التحليلات نفسه
+      // (`console.analytics.view`) لأنها القراءة نفسها لسطحٍ آخر — ورمزٌ ثانٍ يعني مدقّقاً يرى
+      // إيراد المنصّة ولا يرى قمع موقعها.
+      item(
+        'analytics-site',
+        'تحليلات الموقع',
+        'Site analytics',
+        '/analytics/site',
+        'console.analytics.view',
+        'GET /platform/analytics/site',
+      ),
       // P-C11 — «بوابة المطوّر»: مفاتيحُ لكل منشأة، وعناوين ويب هوك بأحداثها وسجلّ تسليمها،
       // ومستكشف OpenAPI. موضعها في مجموعة «المنصة» لا «التشغيل»: هذه عقودُ تكاملٍ تُمنح
       // وتُسحب، لا حادثةٌ تشغيلية تُتابع. والرمز لكل شاشةٍ رمزُها: من يُصدر مفتاحاً ليس

@@ -208,14 +208,23 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **ترحيل** | ✅ **`0083_help_feedback.sql`** — توسيع `content_pages_kind_check` بـ`changelog` + جدول `content_feedback` (فهرسٌ فريد `(page_id, visitor)`، بلا `UPDATE`/`DELETE`) |
 | **تحقّق حيّ** | ✅ `scripts/verify-help.mjs` **68/68 في 7 أقسام** — وينتظر امتلاء دلو المعدّل إن كان شبه فارغٍ من تشغيلٍ سابق |
 
-### P-M10 — القياس والتحسين 🟢
+### P-M10 — القياس والتحسين 🟢 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | أن يُقاس أثر الموقع لا أن يُخمَّن |
-| **العمل** | لافتة موافقة + تحليلات (خدمة ذاتية الاستضافة من `docker-compose` بدل طرف ثالث) · أهداف: بدء الاشتراك · إتمامه · طلب عرض · اشتراك في النشرة · قمع بسيط في لوحة المنصة · اختبار أ/ب لعنوان البطل والدعوة (من نظام المحتوى، بلا كود) · ميزانية أداء في CI |
-| **نقاط نهاية** | `POST /public/events` (أحداث مجهولة الهوية، مجمَّعة) + `GET /platform/analytics/site` |
-| **اختبار** | `public-analytics.spec.ts` (≥ 6) |
+| **الموافقة** | ✅ لافتةٌ لا تحجب (`components/site/consent-banner.tsx`) + `lib/consent.ts`: القبول وحده يجيز · `DNT` يُلغي · وزرُّ تغيير القرار في التذييل |
+| **التحليلات** | ✅ **ذاتية بالكامل**: الجمع في قاعدتنا عبر `POST /public/events` (جدول `site_events`) — لا طرف ثالث ولا خدمةٌ خارجية، وحزمة الموقع تحمل `public/events` ولا تحمل وسم طرفٍ ثالث (يقيسه السكربت الحيّ) |
+| **الأهداف** | ✅ أربعة: `signup_start` · `signup_complete` · `request_demo` · `newsletter_subscribe` — بمفرداتٍ مغلقة في العقد، و**٩ مواضع** `data-goal` على الدعوات، وثلاثة نداءات `trackGoal` في فرح النجاح |
+| **القمع** | ✅ شاشة `/analytics/site` في لوحة المنصّة: نداءٌ واحد يرسم الزوّار والمشاهدات والأهداف والمنحنى والمصادر والمسارات وتجارب أ/ب وبطاقة الخصوصية وجدول التعريفات |
+| **أ/ب** | ✅ من نظام المحتوى بلا كود: `variant_of` + `variant_key` (0084) وكتلة `cta` داخل النسخة، والتوزيع في متصفّح الزائر بـ`pickContentVariant` (FNV-1a حتميّة) |
+| **ميزانية الأداء** | ✅ `apps/marketing/perf-budget.json` + `lib/perf.ts` من مخرج `next build` نفسه، وسطرٌ مستقلّ في `ci.yml` — **٤٠ مساراً · صفر تجاوز** (الأسوأ ٩٠٪ من السقف) |
+| **نقاط نهاية** | ✅ `POST /public/events` (دفعةٌ من ١ إلى ٢٠ حدثاً مجهول الهوية · `202` · دلو `public-events` ١٢٠/دقيقة) + `GET /platform/analytics/site` (رمز `console.analytics.view` القائم) |
+| **الخصوصية** | ✅ لا عمود لعنوان IP ولا بريد ولا وسيط · `visitor` عشوائيّ · صفر تدقيقٍ على الأحداث · احتفاظٌ ١٨٠ يوماً يُنفَّذ بعلامةٍ مائية · و«ما يُجمع/ما لا يُجمع» يُعرض في اللوحة ويُقاس |
+| **ترحيل** | ✅ **`0084_site_analytics.sql`** — جدول `site_events` (ثلاثة فهارس · RLS · `SELECT/INSERT/DELETE` و**`REVOKE UPDATE`**) + عمودا النسخ على `content_pages` |
+| **اختبار** | ✅ `public-analytics.spec.ts` **8** (≥ 6) · `site-analytics.spec.ts` **12** · `tests/analytics.spec.ts` **12** · `tests/perf.spec.ts` **5** |
+| **تحقّق حيّ** | ✅ `scripts/verify-site-analytics.mjs` **67/67 في 8 أقسام** — يقيس الفروق بين قراءتين، ويزرع زوّاراً ومساراتٍ جديدة في كل تشغيل داخل نطاق `/vsa-…` يُمحى في النهاية |
+| **التقرير** | `docs/MARKETING_ANALYTICS_P_M10_IMPLEMENTATION_REPORT.md` |
 
 ---
 
@@ -290,13 +299,13 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | `public-leads.spec.ts` (P-M6 ✅: **16** أُنجزت) | 12 |
 | `platform-campaigns.spec.ts` (P-M7 ✅: **19** أُنجزت) | 12 |
 | `signup-flow.spec.ts` (P-M4 ✅: **16** أُنجزت) + `apps/marketing/tests/signup.spec.ts` (**12**) | 12 |
-| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` (✅ **8** أُنجزت) · `public-analytics.spec.ts` (**مؤجَّل إلى P-M10**) · `apps/marketing/tests/{site,pricing,help}.spec.ts` (✅ **36** أُنجزت) | 30 |
+| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` (✅ **8** أُنجزت) · `public-analytics.spec.ts` (✅ **8** أُنجزت في P-M10) · `apps/marketing/tests/{site,pricing,help}.spec.ts` (✅ **36** أُنجزت) | 30 |
 | **المجموع** | **≈ 82** |
 
 السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (**54** أُنجزت في P-M4) ·
 `verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (✅ **58** أُنجزت في P-M6) · `verify-campaigns.mjs` (✅ **59** أُنجزت في P-M7) ·
-`verify-pricing.mjs` (**53** أُنجزت في P-M3) · `verify-public-verify.mjs` (✅ **75** أُنجزت في P-M8) · `verify-help.mjs` (✅ **68** أُنجزت في P-M9)
-— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **466** نقطة في ثمانية سكربتات.
+`verify-pricing.mjs` (**53** أُنجزت في P-M3) · `verify-public-verify.mjs` (✅ **75** أُنجزت في P-M8) · `verify-help.mjs` (✅ **68** أُنجزت في P-M9) · `verify-site-analytics.mjs` (✅ **67** أُنجزت في P-M10)
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **533** نقطة في تسعة سكربتات.
 
 ---
 
@@ -345,7 +354,9 @@ P-M1 ── P-M2 ── P-M3 ── P-M4 ── P-M6
 الرابعة: **P-M6** ثم **P-M7** (التقاط ورعاية) — **P-M6 ✅**. والخامسة: **P-M7** (الحملات
 البريدية ورعاية من وصل حتى يشترك) — **P-M7 ✅** بتقريره
 `docs/MARKETING_CAMPAIGNS_P_M7_IMPLEMENTATION_REPORT.md`. والسادسة: **P-M8 + P-M9** (الثقة
-وحالة الخدمة) ثم **P-M10** (اللغات) — التالي.
+وحالة الخدمة) — **P-M8 ✅ · P-M9 ✅**. والسابعة: **P-M10** (القياس والتحسين) — **✅ مُنجَز**
+بتقريره `docs/MARKETING_ANALYTICS_P_M10_IMPLEMENTATION_REPORT.md`، وهي آخر مراحل الموقع
+التسويقي في هذه الخطّة.
 
 ---
 

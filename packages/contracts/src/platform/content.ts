@@ -204,6 +204,58 @@ export const contentSeoSchema = z.object({
 });
 export type ContentSeo = z.infer<typeof contentSeoSchema>;
 
+/**
+ * P-M10 — **اختبار أ/ب من نظام المحتوى** (`docs/roadmap/MARKETING_SITE_PLAN.md` §5): نسختان
+ * لنفس الصفحة، والمتصفّح يختار واحدة بمعرّفه العشوائي.
+ *
+ * وثلاثة قرارات في هذه القطعة الصغيرة:
+ *
+ *   1. **النسخة صفحةٌ كاملة لا حقل** (`variant_of` + `variant_key` في P-M10): لها عنوانها
+ *      وملخّصها وكتلها — أي أن «الدعوة» تُكتب في كتلة `cta` داخل النسخة، فلا يحتاج التسويق
+ *      مطوّراً ليغيّر جملة.
+ *   2. **التوزيع في المتصفّح** (`pickContentVariant`): الخادم يعيد النسخ كلها والمتصفّح يختار
+ *      بـ`slug + معرّف الزائر` — فلا يُرسل معرّف الزائر في رابطٍ ليُختار له، ولا يعرف الخادم
+ *      أصلاً من رأى ماذا (وهو ما يقيسه السبيك). والثمن أن الصفحة تُرسم بالنسخة الأساسية ثم
+ *      تُستبدل — مقبولٌ لأن النصّ بديلُه في الصفحة نفسها، و`noindex` لمشكلة الزحف غير قائمة:
+ *      الزاحف لا معرّف له فيرى الأساسية دائماً.
+ *   3. **دالّة توزيعٍ واحدة في العقد**: المتصفّح والسبيك واللوحة يستعملونها نفسها، فلا يوزّع
+ *      أحدهم بالتساوي والآخر بالباقي ثم تختلف النسب بين ما يُقاس وما يُعرض.
+ */
+export const contentVariantKeys = ['a', 'b'] as const;
+export type ContentVariantKey = (typeof contentVariantKeys)[number];
+
+/** نسخةٌ كما تُرسل إلى المتصفّح: ما يلزم للعرض وحده (بلا كتل: الأساسية تُرسم بكتلها). */
+export const publicContentVariantSchema = z.object({
+  key: z.enum(contentVariantKeys),
+  slug: contentSlugSchema,
+  titleAr: z.string(),
+  summaryAr: z.string().nullable(),
+  /** «الدعوة» — من كتلة `cta` في النسخة، وهي التي يقيسها الهدف `signup_start`. */
+  ctaLabelAr: z.string().nullable(),
+  ctaHref: z.string().nullable(),
+});
+export type PublicContentVariant = z.infer<typeof publicContentVariantSchema>;
+
+/**
+ * اختيارٌ حتميّ: نفس الزائر على نفس الصفحة يحصل على نفس النسخة دائماً (٠ أو ١ أو …)،
+ * والتوزيع يقارب التساوي لأن FNV-1a تنثر الحروف. وبلا معرّف ⇒ لا نسخة (الأساسية).
+ */
+export function pickContentVariant(input: {
+  slug: string;
+  visitor: string;
+  keys?: readonly string[];
+}): string | null {
+  const keys = input.keys ?? contentVariantKeys;
+  if (keys.length === 0 || input.visitor.length === 0) return null;
+  let hash = 0x811c9dc5;
+  const seed = `${input.slug}:${input.visitor}`;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return keys[hash % keys.length] ?? null;
+}
+
 export const contentPageSchema = z.object({
   id: uuidSchema,
   slug: contentSlugSchema,
@@ -222,6 +274,10 @@ export const contentPageSchema = z.object({
   /** ما تُرجم فعلاً — الشاشة تقول «العربية فقط» بلا تخمين. */
   translatedLocales: z.array(z.enum(contentLocales)),
   path: z.string(),
+  /** P-M10: الصفحة الأم التي هذه نسخةٌ منها (`null` للأصل). */
+  variantOf: uuidSchema.nullable(),
+  /** `a` أو `b` للنسخة، و`null` للأصل. */
+  variantKey: z.enum(contentVariantKeys).nullable(),
   blockCount: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -233,6 +289,8 @@ export type ContentPage = z.infer<typeof contentPageSchema>;
 /** صفحةٌ بكتلها — ما يُعاد من `GET /public/content/:slug` ومن محرّر اللوحة. */
 export const contentPageDetailSchema = contentPageSchema.extend({
   blocks: z.array(contentBlockSchema),
+  /** P-M10: النسخ المنشورة لهذه الصفحة (فارغة إن لم تكن تجربةً). */
+  variants: z.array(publicContentVariantSchema),
 });
 export type ContentPageDetail = z.infer<typeof contentPageDetailSchema>;
 
@@ -256,6 +314,9 @@ export const contentPageCreateSchema = z.object({
   ogImageUrl: z.string().trim().max(500).nullable().optional(),
   category: textOf(2, 60).nullable().optional(),
   authorName: textOf(2, 120).nullable().optional(),
+  /** P-M10 — جعل الصفحة نسخةً من صفحةٍ أخرى: `variantOf` معرّف الأصل و`variantKey` حرفها. */
+  variantOf: uuidSchema.nullable().optional(),
+  variantKey: z.enum(contentVariantKeys).nullable().optional(),
   blocks: z.array(contentBlockInputSchema).max(80).default([]),
 });
 export type ContentPageCreate = z.infer<typeof contentPageCreateSchema>;
@@ -273,6 +334,8 @@ export const contentPageUpdateSchema = z.object({
   defaultLocale: z.enum(contentLocales).optional(),
   category: textOf(2, 60).nullable().optional(),
   authorName: textOf(2, 120).nullable().optional(),
+  variantOf: uuidSchema.nullable().optional(),
+  variantKey: z.enum(contentVariantKeys).nullable().optional(),
   seoTitleAr: textOf(2, 70).nullable().optional(),
   seoTitleEn: textOf(2, 70).nullable().optional(),
   seoDescAr: textOf(2, 180).nullable().optional(),

@@ -26,6 +26,7 @@ import {
   type ContentSitemapRow,
   type ContentVersion,
   type ListEnvelope,
+  type PublicContentVariant,
   type PublicFaq,
   type PublicHelpArticle,
   type PublicHelpCategory,
@@ -87,6 +88,9 @@ type PageRow = {
   author_name: string | null;
   created_by: string | null;
   updated_by: string | null;
+  /** P-M10 — أصل النسخة وحرفها (`null` للأصل). */
+  variant_of: string | null;
+  variant_key: string | null;
   created_at: string;
   updated_at: string;
   block_count: number;
@@ -137,6 +141,8 @@ export class ContentService {
       },
       category: row.category,
       authorName: row.author_name,
+      variantOf: row.variant_of,
+      variantKey: row.variant_key as ContentPage['variantKey'],
       translatedLocales: this.translatedLocales(row),
       path: contentPathOf(kind, row.slug),
       blockCount: row.block_count,
@@ -144,6 +150,53 @@ export class ContentService {
       updatedAt: row.updated_at,
       createdBy: row.created_by,
       updatedBy: row.updated_by,
+    };
+  }
+
+  /**
+   * P-M10 — **نسخ الصفحة في اختبار أ/ب**، منشورةً وحدها.
+   *
+   * والنسخة صفحةٌ كاملة، و«الدعوة» تُقرأ من **كتلة `cta`** داخلها (أول كتلةٍ من نوعها) لا من
+   * حقلٍ ثانٍ: التسويق يغيّر الزرّ في المحرّر نفسه، ولو كان الحقل منفصلاً لنُسي يوماً.
+   * ولا تُرجع كتل النسخة عمداً: الصفحة الأساسية تُرسم بكتلها ثم **يُستبدل** النصّ والدعوة —
+   * فرقٌ قالبه واحد، والقارئ لا يرى قفزةً في التخطيط.
+   */
+  private async variantsOf(tx: DrizzleTx, pageId: string): Promise<PublicContentVariant[]> {
+    const rows = (
+      await tx.execute(sql`
+        SELECT p.slug, p.variant_key, p.title_ar, p.summary_ar,
+               (SELECT b.content FROM content_blocks b
+                 WHERE b.page_id = p.id AND b.kind = 'cta'
+                 ORDER BY b.position ASC LIMIT 1) AS cta
+          FROM content_pages p
+         WHERE p.variant_of = ${pageId}::uuid AND p.variant_key IS NOT NULL
+           AND ${publishedWhere}
+         ORDER BY p.variant_key ASC
+      `)
+    ).rows as unknown as Array<{
+      slug: string;
+      variant_key: string;
+      title_ar: string;
+      summary_ar: string | null;
+      cta: { ar?: { primaryLabel?: string; primaryHref?: string } } | null;
+    }>;
+    return rows.map((row) => ({
+      key: row.variant_key as PublicContentVariant['key'],
+      slug: row.slug,
+      titleAr: row.title_ar,
+      summaryAr: row.summary_ar,
+      ctaLabelAr: row.cta?.ar?.primaryLabel ?? null,
+      ctaHref: row.cta?.ar?.primaryHref ?? null,
+    }));
+  }
+
+  /** تفصيلٌ كامل للصفحة: النموذج + الترجمات + الكتل + نسخ أ/ب — من موضعٍ واحد. */
+  private async detailOf(tx: DrizzleTx, page: PageRow, blocks: BlockRow[]): Promise<ContentPageDetail> {
+    return {
+      ...this.pageFrom(page),
+      translatedLocales: this.translatedLocales(page, blocks),
+      blocks: blocks.map((block) => this.blockFrom(block)),
+      variants: await this.variantsOf(tx, page.id),
     };
   }
 
@@ -169,6 +222,7 @@ export class ContentService {
     publish_at::text AS publish_at, published_at::text AS published_at,
     seo_title_ar, seo_title_en, seo_desc_ar, seo_desc_en, og_image_url,
     category, author_name, created_by, updated_by,
+    variant_of, variant_key,
     created_at::text AS created_at, updated_at::text AS updated_at,
     (SELECT count(*)::int FROM content_blocks b WHERE b.page_id = content_pages.id) AS block_count
   `;
@@ -395,8 +449,7 @@ export class ContentService {
       // يحتاجها الزائر، وتمييزها يجعل الـ404 أداةَ استكشاف.
       if (!page) throw new DomainError(errorCodes.NOT_FOUND, 'الصفحة غير موجودة', 404);
       const blocks = await this.blocksOf(tx, page.id);
-      const detail = this.pageFrom(page);
-      return { ...detail, translatedLocales: this.translatedLocales(page, blocks), blocks: blocks.map((b) => this.blockFrom(b)) };
+      return this.detailOf(tx, page, blocks);
     });
   }
 
@@ -549,6 +602,7 @@ export class ContentService {
           ...detail,
           translatedLocales: this.translatedLocales(page, blocks),
           blocks: blocks.map((b) => this.blockFrom(b)),
+          variants: await this.variantsOf(tx, page.id),
         },
         category: page.category,
         related: related.map((row) => this.postFrom(row)),
@@ -729,7 +783,7 @@ export class ContentService {
       const page = await this.pageById(tx, id);
       if (!page) throw new DomainError(errorCodes.NOT_FOUND, 'الصفحة غير موجودة', 404);
       const blocks = await this.blocksOf(tx, page.id);
-      return { ...this.pageFrom(page), translatedLocales: this.translatedLocales(page, blocks), blocks: blocks.map((b) => this.blockFrom(b)) };
+      return this.detailOf(tx, page, blocks);
     });
   }
 
@@ -759,13 +813,14 @@ export class ContentService {
         INSERT INTO content_pages (
           id, slug, kind, title_ar, title_en, summary_ar, summary_en, default_locale, status,
           publish_at, published_at, seo_title_ar, seo_title_en, seo_desc_ar, seo_desc_en, og_image_url,
-          category, author_name, created_by, updated_by
+          category, author_name, variant_of, variant_key, created_by, updated_by
         ) VALUES (
           ${id}, ${input.slug}, ${input.kind}, ${input.titleAr}, ${input.titleEn ?? null},
           ${input.summaryAr ?? null}, ${input.summaryEn ?? null}, ${input.defaultLocale}, ${status},
           ${publishAt}::timestamptz, ${publishedAt}::timestamptz,
           ${input.seoTitleAr ?? null}, ${input.seoTitleEn ?? null}, ${input.seoDescAr ?? null}, ${input.seoDescEn ?? null},
           ${input.ogImageUrl ?? null}, ${input.category ?? null}, ${input.authorName ?? null},
+          ${input.variantOf ?? null}::uuid, ${input.variantKey ?? null},
           ${auth.userId ?? null}::uuid, ${auth.userId ?? null}::uuid
         )
       `);
@@ -787,7 +842,7 @@ export class ContentService {
 
       const page = await this.pageById(tx, id);
       const blocks = await this.blocksOf(tx, id);
-      return { ...this.pageFrom(page!), translatedLocales: this.translatedLocales(page!, blocks), blocks: blocks.map((b) => this.blockFrom(b)) };
+      return this.detailOf(tx, page!, blocks);
     });
   }
 
@@ -815,6 +870,9 @@ export class ContentService {
           seo_desc_ar = ${input.seoDescAr === undefined ? current.seo_desc_ar : input.seoDescAr},
           seo_desc_en = ${input.seoDescEn === undefined ? current.seo_desc_en : input.seoDescEn},
           og_image_url = ${input.ogImageUrl === undefined ? current.og_image_url : input.ogImageUrl},
+          -- نسخةٌ تُفصل عن أصلها (variantOf فارغ) أو يُبدَّل حرفها؛ والإغفال يُبقيها كما هي.
+          variant_of = ${input.variantOf === undefined ? current.variant_of : input.variantOf}::uuid,
+          variant_key = ${input.variantKey === undefined ? current.variant_key : input.variantKey},
           updated_at = now(),
           updated_by = ${auth.userId ?? null}::uuid
         WHERE id = ${id}::uuid
@@ -834,7 +892,7 @@ export class ContentService {
 
       const page = await this.pageById(tx, id);
       const blocks = await this.blocksOf(tx, id);
-      return { ...this.pageFrom(page!), translatedLocales: this.translatedLocales(page!, blocks), blocks: blocks.map((b) => this.blockFrom(b)) };
+      return this.detailOf(tx, page!, blocks);
     });
   }
 
@@ -875,7 +933,7 @@ export class ContentService {
 
       const page = await this.pageById(tx, id);
       const blocks = await this.blocksOf(tx, id);
-      return { ...this.pageFrom(page!), translatedLocales: this.translatedLocales(page!, blocks), blocks: blocks.map((b) => this.blockFrom(b)) };
+      return this.detailOf(tx, page!, blocks);
     });
   }
 
@@ -1025,7 +1083,7 @@ export class ContentService {
       });
       const page = await this.pageById(tx, id);
       const blocks = await this.blocksOf(tx, id);
-      return { ...this.pageFrom(page!), translatedLocales: this.translatedLocales(page!, blocks), blocks: blocks.map((b) => this.blockFrom(b)) };
+      return this.detailOf(tx, page!, blocks);
     });
   }
 
@@ -1113,6 +1171,7 @@ export class ContentService {
         ...this.pageFrom(restored!),
         translatedLocales: this.translatedLocales(restored!, blocks),
         blocks: blocks.map((b) => this.blockFrom(b)),
+        variants: await this.variantsOf(tx, restored!.id),
       };
     });
   }

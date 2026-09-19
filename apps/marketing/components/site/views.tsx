@@ -38,6 +38,7 @@ import { hrefFor, SITE_PATHS } from '../../lib/site';
 
 import { ContentBlocks } from './blocks';
 import { HelpfulVote } from './helpful-vote';
+import { HeroExperiment } from './hero-experiment';
 import { Breadcrumbs, EmptyState, FaqList, ModuleCard, PostCard, SectionHeading, StepList } from './pieces';
 
 type ShellLike = { taglineAr: string; taglineEn: string; brandName: string };
@@ -57,26 +58,23 @@ export function HomeView({
   // عنوان البطل من **إعدادات الموقع** (`site.tagline_ar` في `/public/site`) لا من نصٍّ في
   // الكود: تغييره من شاشة الإعدادات في اللوحة يكفي، بلا نشرة.
   const heroTitle = locale === 'en' ? shell.taglineEn : shell.taglineAr;
-  const heroSummary = '';
 
   return (
     <>
-      <section className="hero">
-        <p className="pill">{t(locale, 'home.hero.badge')}</p>
-        <h1>{heroTitle}</h1>
-        {heroSummary ? <p className="hero-lead">{heroSummary}</p> : null}
-        <div className="toolbar">
-          <Link className="btn primary" href="/onboarding">
-            {t(locale, 'cta.start')}
-          </Link>
-          <Link className="btn" href={l(SITE_PATHS.features)}>
-            {t(locale, 'cta.explore')}
-          </Link>
-          <Link className="btn ghost" href={l(SITE_PATHS.help)}>
-            {t(locale, 'nav.help')}
-          </Link>
-        </div>
-      </section>
+      {/* P-M10 — البطل صار مكوّناً عميلياً واحداً: يرسم الأساسية على الخادم (فهي ما يراه
+          الزاحف وما يراه الزائر قبل أي جافاسكربت)، ويستبدلها بنسخة أ/ب إن وُجدت تجربةٌ منشورة
+          لصفحة `home` في نظام المحتوى. والاختيار والتوزيع في المتصفّح (`pickContentVariant`). */}
+      <HeroExperiment
+        slug="home"
+        title={heroTitle}
+        badge={t(locale, 'home.hero.badge')}
+        ctaLabel={t(locale, 'cta.start')}
+        ctaHref="/onboarding"
+        actions={[
+          { href: l(SITE_PATHS.features), label: t(locale, 'cta.explore'), className: 'btn' },
+          { href: l(SITE_PATHS.help), label: t(locale, 'nav.help'), className: 'btn ghost' },
+        ]}
+      />
 
       <section className="section">
         <SectionHeading
@@ -640,7 +638,7 @@ export function TrustView({ locale, page }: { locale: Locale; page: ContentPageD
           <Link className="btn primary" href={hrefFor(SITE_PATHS.verify, locale)}>
             {t(locale, 'nav.verify')}
           </Link>
-          <Link className="btn" href={hrefFor(SITE_PATHS.contact, locale)}>
+          <Link className="btn" href={hrefFor(SITE_PATHS.contact, locale)} data-goal="request_demo">
             {t(locale, 'nav.contact')}
           </Link>
         </div>
@@ -749,7 +747,7 @@ export function IndustryView({ locale, industry }: { locale: Locale; industry: I
         <h2>{t(locale, 'industries.final.title')}</h2>
         <p className="muted">{t(locale, 'industries.final.body')}</p>
         <div className="toolbar">
-          <Link className="btn primary" href={hrefFor(SITE_PATHS.demo, locale)}>
+          <Link className="btn primary" href={hrefFor(SITE_PATHS.demo, locale)} data-goal="request_demo">
             {t(locale, 'nav.demo')}
           </Link>
           <Link className="btn" href={hrefFor(SITE_PATHS.trust, locale)}>

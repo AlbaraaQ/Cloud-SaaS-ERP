@@ -62,8 +62,13 @@ const READ_ONLY_POSTS = new Set(['POST public/verify']);
  * تشغيليّ يُبنى على الصف. والمكتوب الفعلي (الحكم وصاحبه المجهول) محفوظٌ في `content_feedback`
  * للعدّ، والصفحة تقول للزائر عن حقّ: لا يُحفظ ما لصقت. فالمسار مستثنى **بالاسم الكامل**
  * (`METHOD resource/entity`) كي لا يُعفى مسارٌ عامٌّ آخر جاء من الوحدة نفسها.
+ *
+ * **وP-M10 أضاف الثاني: `POST public/events`** (أحداث الموقع). والسبب هو السبب نفسه بحرفيّته:
+ * الحدث مجهولُ الهوية في جدوله (لا عمود لعنوانٍ ولا وسيط)، وتدقيقه كان سيحفظ في `audit_log`
+ * ما رفضنا حفظه في مكانه — **وهو أسوأ من عدم القياس**: القيد في الجدول يصير كذبةً يُكذّبها
+ * صفُّ التدقيق المجاور.
  */
-const ANONYMOUS_POSTS = new Set(['POST public/help']);
+const ANONYMOUS_POSTS = new Set(['POST public/help', 'POST public/events']);
 
 export type RouteDescriptor = {
   resource: string;

@@ -8,6 +8,7 @@ import {
 } from '@erp/contracts';
 
 import { PortalError, portalFetch } from '../lib/api';
+import { trackGoal } from '../lib/track';
 import { orderSetupTasks, setupProgress, signupProblem, type SignupTicket } from '../lib/signup';
 import { surfaceHref } from '../lib/surfaces';
 
@@ -77,6 +78,8 @@ export function OnboardingPanel({
       setStatus(result);
       setVerification(result.verification);
       setCode('');
+      // P-M10 — «إتمام الاشتراك» يُقاس عند التحقّق الناجح: الهدف الأخير في القمع.
+      trackGoal('signup_complete', { source: 'onboarding' });
     } catch (caught) {
       if (caught instanceof PortalError) {
         setError(signupProblem({ status: caught.status, code: caught.code, detail: caught.message }).message);

@@ -1094,3 +1094,65 @@ table.compare tbody tr:last-child td {
   margin: 0;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   P-M10 — القياس والموافقة.
+
+   اللافتة **لا تحجب**: شريطٌ أسفل الشاشة بلا طبقةٍ معتمة ولا تعطيلٍ للتمرير، لأن القياس
+   اختيارٌ لا شرطُ استعمال. والسطر في التذييل يقول الحالة الحالية ويفتح اللافتة من جديد.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.consent-banner {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 40;
+  background: var(--surface, #fff);
+  border-block-start: 1px solid var(--line);
+  box-shadow: 0 -6px 20px rgb(15 23 42 / 8%);
+}
+
+.consent-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-block: 14px;
+  flex-wrap: wrap;
+}
+
+.consent-body {
+  margin: 0;
+  max-inline-size: 68ch;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.consent-body strong {
+  display: block;
+  margin-block-end: 2px;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.consent-line {
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* زرٌّ يبدو رابطاً: تغيير الاختيار فعلٌ صغير لا يستحق زرّاً كاملاً في التذييل. */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

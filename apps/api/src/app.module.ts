@@ -20,6 +20,7 @@ import {
 } from './modules/platform/index.js';
 import { PlatformBackupsModule } from './modules/backups/platform-backups.module.js';
 import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
+import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module.js';
 import { StatusModule } from './modules/status/status.module.js';
 import { ContentModule } from './modules/content/content.module.js';
 import { VerifyModule } from './modules/verify/verify.module.js';
@@ -95,6 +96,7 @@ import { OpsModule } from './ops/ops.module.js';
     ContentModule,
     VerifyModule,
     StatusModule,
+    SiteAnalyticsModule,
     WeeklyReportModule,
     PlatformOperationsModule,
     DomainEventsModule,

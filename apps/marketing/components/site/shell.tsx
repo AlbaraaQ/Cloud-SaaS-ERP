@@ -13,6 +13,7 @@ import { dir, t, type Locale } from '../../lib/i18n';
 import { siteFooterLinks, siteNavLinks } from '../../lib/navigation';
 import { NewsletterForm } from '../newsletter-form';
 
+import { ConsentStatusLine } from './consent-banner';
 import { LocaleSwitch } from './locale-switch';
 
 function menuItems(items: MenuItem[], locale: Locale) {
@@ -159,6 +160,8 @@ export function SiteFooter({ shell, locale }: { shell: SiteShell; locale: Locale
         <span dir={dir(locale)}>
           © {year} {shell.companyLegalName || shell.brandName} — {t(locale, 'footer.rights')}
         </span>
+        {/* P-M10 — حالة القياس وزرّ تغييرها: قرارٌ يمكن التراجع عنه، ونصُّه من `consentCopy`. */}
+        <ConsentStatusLine locale={locale} />
       </div>
     </footer>
   );

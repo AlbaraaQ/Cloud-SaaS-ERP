@@ -55,7 +55,7 @@ export function PricingView({
           {t(locale, 'pricing.empty')}
         </p>
         <section className="cta-block">
-          <Link className="btn primary" href="/contact">
+          <Link className="btn primary" href="/contact" data-goal="request_demo">
             {t(locale, 'cta.talk')}
           </Link>
         </section>
@@ -105,7 +105,7 @@ export function PricingView({
                 {t(locale, 'pricing.equivalent')} {amountText(plan.monthlyAmount, plan.currency, locale)}
               </p>
             ) : null}
-            <Link className="btn primary" href={`/onboarding?plan=${encodeURIComponent(plan.code)}`}>
+            <Link className="btn primary" href={`/onboarding?plan=${encodeURIComponent(plan.code)}`} data-goal="signup_start">
               {t(locale, 'pricing.choose')}
             </Link>
           </article>
@@ -176,10 +176,10 @@ export function PricingView({
         <h2>{t(locale, 'pricing.final.title')}</h2>
         <p className="muted">{t(locale, 'pricing.final.body')}</p>
         <div className="row">
-          <Link className="btn primary" href="/onboarding">
+          <Link className="btn primary" href="/onboarding" data-goal="signup_start">
             {t(locale, 'cta.start')}
           </Link>
-          <Link className="btn ghost" href="/contact">
+          <Link className="btn ghost" href="/contact" data-goal="request_demo">
             {t(locale, 'cta.talk')}
           </Link>
         </div>

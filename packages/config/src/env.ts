@@ -84,6 +84,10 @@ const envSchema = z.object({
   // نفسها (قاعدة · طابور · بريد · تخزين)، فالسقف يمنع تحويل صفحة الحالة إلى حملة استنزاف،
   // وفوقه ذاكرةُ عشر ثوانٍ في الخدمة فالسقف الفعليّ أوسع للزائر العادي.
   RATE_LIMIT_PUBLIC_STATUS_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  // P-M10 — دلوُ أحداث الموقع (`POST /public/events`): الموقع يرسل دفعاتٍ صغيرة، والسقف
+  // يمنع تحويل نقطة القياس إلى قناة كتابةٍ مفتوحة — ودلوٌ مستقلّ عن الاستمارات والتحقّق
+  // لأن سيلَ أحداثٍ لا يجوز أن يُغلق بابَ التعاقد.
+  RATE_LIMIT_PUBLIC_EVENTS_PER_MINUTE: z.coerce.number().int().positive().default(120),
 
   /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
   SIGNUP_ENABLED: booleanish.default(true),

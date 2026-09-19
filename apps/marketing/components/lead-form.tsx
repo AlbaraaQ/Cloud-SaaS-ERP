@@ -20,6 +20,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { LeadAccepted } from '@erp/contracts';
 
 import { PortalError, portalFetch } from '../lib/api';
+import { trackGoal } from '../lib/track';
 import {
   LEAD_HONEYPOT_FIELD,
   emptyLeadDraft,
@@ -74,6 +75,8 @@ export function LeadForm({ kind, presetPlan }: { kind: LeadFormKind; presetPlan?
         body: JSON.stringify(payload),
       });
       setAccepted(data);
+      // P-M10 — «طلب عرض» يُقاس عند قبول الخادم للطلب (بمرجعه) لا عند النقر.
+      trackGoal('request_demo', { source: config.source });
     } catch (failure) {
       const status = failure instanceof PortalError ? failure.status : 0;
       const code = failure instanceof PortalError ? failure.code : undefined;

@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { Suspense } from 'react';
 
+import { ConsentBanner } from '../components/site/consent-banner';
+import { SiteEvents } from '../components/site/site-events';
 import { SiteShellLayout } from '../components/site/shell';
 import { JsonLd } from '../components/site/pieces';
 import { fetchShell } from '../lib/content';
@@ -71,6 +73,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {children}
           </SiteShellLayout>
         </Suspense>
+        {/* P-M10 — القياس: مُلتقِطٌ صامت (يعود `null`) ولافتةُ موافقةٍ لا تحجب شيئاً.
+            الاثنان بعد القشرة فلا يزاحمان الرسم الأول، ولا يعملان قبل موافقة الزائر. */}
+        <SiteEvents />
+        <ConsentBanner locale={locale} />
         <p className="sr-only">{t(locale, 'meta.localeName')}</p>
       </body>
     </html>
