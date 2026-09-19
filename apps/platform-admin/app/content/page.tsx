@@ -62,6 +62,8 @@ const KIND_LABEL: Record<ContentKind, string> = {
   faq: 'سؤال شائع',
   help: 'مقال مساعدة',
   legal: 'صفحة قانونية',
+  // P-M9: سجلّ التغييرات نوعٌ سابع — يُكتب من الشاشة نفسها ويُقرأ في `/changelog`.
+  changelog: 'سجلّ التغييرات',
 };
 
 const STATUS_LABEL: Record<ContentPage['status'], string> = {

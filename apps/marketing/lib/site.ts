@@ -69,6 +69,10 @@ export const SITE_PATHS = {
   // فالترجمة لا تُعلَن قبل أن توجد.
   industries: '/industries',
   trust: '/trust',
+  // P-M9: سجلّ التغييرات وحالة الخدمة — عربيّان وحدهما اليوم، وصفوفُهما في خريطة الموقع.
+  // و`/status` يُفهرَس عن قصد: صفحةُ حالةٍ لا يجدها محرّك البحث تُقرأ كأنها غير موجودة.
+  changelog: '/changelog',
+  status: '/status',
   maintenance: '/maintenance',
 } as const;
 
@@ -287,6 +291,8 @@ export function sitemapEntries(
     // بحسب قطاعه (لا نظير لها بالإنجليزية بعد).
     { path: SITE_PATHS.trust, locales: ['ar'] },
     { path: SITE_PATHS.industries, locales: ['ar'] },
+    { path: SITE_PATHS.changelog, locales: ['ar'] },
+    { path: SITE_PATHS.status, locales: ['ar'] },
     ...industrySlugs.map((slug: string): SitemapRow => ({ path: `${SITE_PATHS.industries}/${slug}`, locales: ['ar'] })),
   ];
 

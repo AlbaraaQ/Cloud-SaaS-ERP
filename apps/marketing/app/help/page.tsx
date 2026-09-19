@@ -10,8 +10,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return staticMetadata({ locale: 'ar', path: '/help', titleKey: 'help.title', descriptionKey: 'help.subtitle' });
 }
 
-export default async function HelpPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
-  const { items } = await fetchHelp({ q, limit: 30 });
-  return <HelpIndexView locale="ar" items={items} query={q} />;
+/**
+ * P-M9 — `/help`: الفئات من نظام المحتوى، والبحث المرشَّح بالفئة.
+ *
+ * والقراءة **خادمية** (`fetchHelp` → `/public/help`) فيصل HTML كاملاً بالمقالات والفئات،
+ * ويبقى `q` و`category` في الرابط فتُشارَك نتيجةُ بحثٍ كما هي (`/help?category=…&q=…`).
+ */
+export default async function HelpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
+  const { q, category } = await searchParams;
+  const { items, meta } = await fetchHelp({ q, category, limit: 50 });
+  return <HelpIndexView locale="ar" items={items} meta={meta} selected={category} query={q} />;
 }

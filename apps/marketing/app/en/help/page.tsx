@@ -10,8 +10,13 @@ export async function generateMetadata(): Promise<Metadata> {
   return staticMetadata({ locale: 'en', path: '/en/help', titleKey: 'help.title', descriptionKey: 'help.subtitle' });
 }
 
-export default async function HelpPageEn({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
-  const { items } = await fetchHelp({ q, limit: 30 });
-  return <HelpIndexView locale="en" items={items} query={q} />;
+export default async function HelpPageEn({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
+  const { q, category } = await searchParams;
+  // P-M9: الفئات تُمرَّر كما تمرّ في `/help` — القائمة واحدة والمكوّن واحد، واللغة تُبدّل النصّ.
+  const { items, meta } = await fetchHelp({ q, category, limit: 50 });
+  return <HelpIndexView locale="en" items={items} meta={meta} selected={category} query={q} />;
 }

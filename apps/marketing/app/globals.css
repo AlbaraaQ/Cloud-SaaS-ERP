@@ -1023,3 +1023,74 @@ table.compare tbody tr:last-child td {
   padding-inline-start: 18px;
   max-width: 760px;
 }
+
+/*
+ * P-M9 — مركز المساعدة وسجلّ التغييرات وحالة الخدمة.
+ *
+ * الشرائح والتصويت والسجلّ: كلها أنماطٌ صغيرة تُبنى على ما هو موجود (`.chip` · `.badge` ·
+ * `.table`)، ولا تُضاف مكتبة. والقاعدة التي تحكم الموقع كلّه: لا صنفَ بلا معنى — كل صنفٍ هنا
+ * يخدم عنصراً حقيقياً في `views.tsx`.
+ */
+.chip-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: 4px;
+}
+
+/* «هل أفادك هذا؟» — بعد المتن، وحدّها الأعلى يفصلها عن المجاورة. */
+.helpful {
+  margin-block: 28px 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  max-width: 620px;
+}
+
+.helpful-question {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.helpful-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* سجلّ التغييرات: خطٌّ زمنيّ بسيط — الشارة ثم العنوان ثم الملخّص. */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 12px;
+  align-items: start;
+  border-inline-start: 2px solid var(--line);
+  padding-inline-start: 14px;
+}
+
+.timeline-item .muted {
+  margin: 4px 0 0;
+}
+
+/* سطر حكم الحالة أعلى الجدول. */
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block: 4px 16px;
+}
+
+.status-line .small {
+  margin: 0;
+}
+

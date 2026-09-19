@@ -187,23 +187,26 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | **اختبار** | ✅ `platform-campaigns.spec.ts` **19** (≥ 12): الشريحة وأعدادها · متغيّرٌ غير معروف يُرفض · رسالة الاختبار لا تُحتسب · التتبّع والتحويل · الإلغاء يمنع الحملة التالية · القفل بعد الإرسال |
 | **تحقّق حيّ** | ✅ `scripts/verify-campaigns.mjs` **59/59 في 7 أقسام** (≈ 30 نقطة) — بلا بريدٍ يخرج من المساحة (`provider = console`) |
 
-### P-M8 — التحقق والثقة والقطاعات 🟢
+### P-M8 — التحقق والثقة والقطاعات 🟢 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | صفحة تُقنع شكّاكاً: الفاتورة صحيحة، والنظام آمن |
-| **الشاشات** | `/verify` محسّنة (لصق QR أو الرمز · نتيجة منسّقة: البائع · الرقم الضريبي · التاريخ · الإجمالي · الضريبة · الحالة لدى زاتكا · شرح الحالة) · `/trust` (الأمان: التشفير، العزل، النسخ، التوافق مع زاتكا) · `/industries` وصفحة لكل قطاع من الوحدات الرأسية القائمة (تفصيل · نظارات · مرسى · مقاولات · سلة) |
-| **نقاط نهاية** | `POST /public/verify` (اختياري، للتحقق بالخادم ببيانات دنيا) — و`qr.ts` يبقى في المتصفح افتراضياً (لا تُرسل بيانات الفاتورة لخادم إن لم يطلب المستخدم) |
-| **اختبار** | `public-verify.spec.ts` (≥ 6) |
+| **الشاشات** | ✅ `/verify` محسّنة (لصق QR أو الرمز · نتيجة منسّقة: البائع · الرقم الضريبي · التاريخ · الإجمالي · الضريبة · الحالة لدى زاتكا · شرح الحالة) · ✅ `/trust` (الأمان: التشفير، العزل، النسخ، التوافق مع زاتكا) · ✅ `/industries` وصفحة لكل قطاع من الوحدات الرأسية القائمة (تفصيل · نظارات · مرسى · مقاولات · سلة — خمسة قطاعات و٢٩ شاشة بتسمياتها الحرفية) |
+| **نقاط نهاية** | ✅ `POST /public/verify` (اختياري، للتحقق بالخادم ببيانات دنيا) — و`qr.ts` يبقى في المتصفح افتراضياً (لا تُرسل بيانات الفاتورة لخادم إن لم يطلب المستخدم) |
+| **اختبار** | ✅ `public-verify.spec.ts` **8** (≥ 6) — وأُضيف في العقود `zatca-qr.spec.ts` (**12**) و`platform/verify.spec.ts` (**5**) |
+| **تحقّق حيّ** | ✅ `scripts/verify-public-verify.mjs` **75/75 في 7 أقسام** |
 
-### P-M9 — مركز المساعدة والوثائق وحالة الخدمة 🟢
+### P-M9 — مركز المساعدة والوثائق وحالة الخدمة 🟢 — ✅ **مُنجَز** (2026-09-19)
 
 | | |
 |---|---|
 | **الهدف** | تقليل تذاكر الدعم، وإظهار المصداقية |
-| **الشاشات** | `/help` (تصنيفات من نظام المحتوى + بحث) · `/help/[slug]` (مقال + «هل أفادك هذا؟») · `/changelog` (من `docs/change-log` أو من نظام المحتوى) · `/status` (مجسات الصحة من P-C9 في اللوحة، بحادث مفتوح ولافتة) |
-| **نقاط نهاية** | `GET /public/help?category=&q=` · `GET /public/help/:slug` · `GET /public/status` |
-| **اختبار** | `public-help.spec.ts` (≥ 6) |
+| **الشاشات** | ✅ `/help` (تصنيفات من نظام المحتوى + بحث — أُعيد بناؤه على الغلاف الجديد) · ✅ `/help/[slug]` (مقال + «هل أفادك هذا؟» بعدّادَي صوت) · ✅ `/changelog` **من نظام المحتوى** (نوعٌ سابع `changelog`) لا من `docs/change-log` + صفحةٌ لكل مدخل · ✅ `/status` (مجسات الصحة من P-C9 نفسها: خمسة مكوّنات علنية ولافتةُ حادثٍ من `platform.maintenance*`) |
+| **نقاط نهاية** | ✅ `GET /public/help?category=&q=` · ✅ `GET /public/help/:slug` · ✅ `POST /public/help/:slug/feedback` (الكتابة الوحيدة — صوتٌ واحد لكل متصفّح) · ✅ `GET /public/status` |
+| **اختبار** | ✅ `public-help.spec.ts` **7** (≥ 6) · `platform/status.spec.ts` **7** · `apps/marketing/tests/help.spec.ts` **11** |
+| **ترحيل** | ✅ **`0083_help_feedback.sql`** — توسيع `content_pages_kind_check` بـ`changelog` + جدول `content_feedback` (فهرسٌ فريد `(page_id, visitor)`، بلا `UPDATE`/`DELETE`) |
+| **تحقّق حيّ** | ✅ `scripts/verify-help.mjs` **68/68 في 7 أقسام** — وينتظر امتلاء دلو المعدّل إن كان شبه فارغٍ من تشغيلٍ سابق |
 
 ### P-M10 — القياس والتحسين 🟢
 
@@ -272,6 +275,7 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | `0074_content.sql` | `content_pages` · `content_blocks` · `content_menus` · `content_banners` · `content_versions` | P-M5 |
 | `0080_leads.sql` (+ `0081_leads_permissions.sql`) | `leads` · `lead_notes` · `lead_events` · `email_subscribers` | P-M6 ✅ |
 | `0082_campaigns.sql` | `email_campaigns` · `campaign_messages` · `campaign_events` (+ `email_messages.html`/`headers`) | P-M7 ✅ |
+| `0083_help_feedback.sql` | نوعُ محتوى `changelog` + `content_feedback` | P-M9 ✅ |
 
 | الرمز الجديد | الجزء |
 |---|---|
@@ -282,16 +286,17 @@ SEO، ولا التقاط عملاء، ولا قياس.
 | الاختبارات | العدد المقدَّر |
 |---|---:|
 | `public-content.spec.ts` + `platform-content.spec.ts` | 16 |
+| `public-help.spec.ts` (P-M9 ✅: **7** أُنجزت) + `packages/contracts/src/platform/status.spec.ts` (**7**) | 6 |
 | `public-leads.spec.ts` (P-M6 ✅: **16** أُنجزت) | 12 |
 | `platform-campaigns.spec.ts` (P-M7 ✅: **19** أُنجزت) | 12 |
 | `signup-flow.spec.ts` (P-M4 ✅: **16** أُنجزت) + `apps/marketing/tests/signup.spec.ts` (**12**) | 12 |
-| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` · `public-help.spec.ts` · `public-analytics.spec.ts` · `apps/marketing/tests/{site,pricing}.spec.ts` (✅ **25** أُنجزت) | 30 |
+| `public-plans.spec.ts` (P-M3 ✅: **9** أُنجزت) · `public-verify.spec.ts` (✅ **8** أُنجزت) · `public-analytics.spec.ts` (**مؤجَّل إلى P-M10**) · `apps/marketing/tests/{site,pricing,help}.spec.ts` (✅ **36** أُنجزت) | 30 |
 | **المجموع** | **≈ 82** |
 
 السكربتات: `verify-marketing-site.mjs` (**37** أُنجزت) · `verify-signup.mjs` (**54** أُنجزت في P-M4) ·
 `verify-content.mjs` (**62** أُنجزت) · `verify-leads.mjs` (✅ **58** أُنجزت في P-M6) · `verify-campaigns.mjs` (✅ **59** أُنجزت في P-M7) ·
-`verify-pricing.mjs` (**53** أُنجزت في P-M3)
-— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **323** نقطة في ستة سكربتات.
+`verify-pricing.mjs` (**53** أُنجزت في P-M3) · `verify-public-verify.mjs` (✅ **75** أُنجزت في P-M8) · `verify-help.mjs` (✅ **68** أُنجزت في P-M9)
+— **≈ 145 نقطة تحقّق حيّة** مُقدَّرة في الخطة، والمُنجَز منها حتى اليوم **466** نقطة في ثمانية سكربتات.
 
 ---
 

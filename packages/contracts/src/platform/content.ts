@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { uuidSchema } from '../ids.js';
-import { paginationQuerySchema } from '../pagination.js';
+import { paginationQuerySchema, type ListMeta } from '../pagination.js';
 
 /**
  * P-M5 — «نظام إدارة المحتوى» (`docs/roadmap/MARKETING_SITE_PLAN.md` §6).
@@ -25,7 +25,8 @@ import { paginationQuerySchema } from '../pagination.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** أنواع المحتوى — ولكلٍّ مساره العام كما في §4 من الخطة. */
-export const contentKinds = ['page', 'post', 'case_study', 'faq', 'help', 'legal'] as const;
+// P-M9: `changelog` نوعٌ سابع — «ما تغيّر في المنصّة» مستندٌ إلى العملاء، ومسارُه `/changelog/<slug>`.
+export const contentKinds = ['page', 'post', 'case_study', 'faq', 'help', 'legal', 'changelog'] as const;
 export type ContentKind = (typeof contentKinds)[number];
 
 export const contentStatuses = ['draft', 'scheduled', 'published'] as const;
@@ -66,6 +67,7 @@ export type ContentBannerAudience = (typeof contentBannerAudiences)[number];
 export function contentPathOf(kind: ContentKind, slug: string): string {
   if (kind === 'post') return `/blog/${slug}`;
   if (kind === 'help') return `/help/${slug}`;
+  if (kind === 'changelog') return `/changelog/${slug}`;
   if (kind === 'case_study') return `/cases/${slug}`;
   if (kind === 'legal') return `/legal/${slug}`;
   return `/${slug}`;
@@ -526,3 +528,70 @@ export type ContentAuditAction = (typeof contentAuditActions)[keyof typeof conte
 
 /** صفُّ خريطة الموقع — اسمٌ صريح لأن `PublicSitemapEntry` يُستعمل في التطبيق أيضاً. */
 export type ContentSitemapRow = PublicSitemapEntry;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P-M9 — مركز المساعدة: الفئات والتصويت والحالة
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * فئةٌ من فئات مركز المساعدة — تُقرأ من `content_pages.category` لمقالات `help` المنشورة.
+ *
+ * **والعدد مقصود**: «التقارير (٤)» تُخبر الزائر قبل أن ينقر أنّ الباب ليس فارغاً؛ وقائمةُ
+ * فئاتٍ بلا عدّاد تجعل الفارغ يبدو ممتلئاً.
+ */
+export const publicHelpCategorySchema = z.object({
+  name: z.string(),
+  count: z.number().int().min(1),
+});
+export type PublicHelpCategory = z.infer<typeof publicHelpCategorySchema>;
+
+/**
+ * غلاف قائمة المساعدة: `ListMeta` **زائد الفئات**.
+ *
+ * ولماذا في الغلاف لا في مسارٍ ثالث (`/public/help/categories`)؟ لأن الشاشة تحتاج القائمة
+ * والفئات في اللحظة نفسها: نداءان يعنيان أن الفئات تصل بعد أول رسم، ولحظةَ فراغٍ لا معنى لها
+ * في صفحةٍ هدفها إجابةُ سؤال. والفئات **غير مرشَّحة** بالفئة المطلوبة عمداً: من دخل على فئةٍ
+ * من رابطٍ مباشر يجب أن يرى بقيّة الفئات ليخرج منها.
+ */
+export type PublicHelpMeta = ListMeta & { categories: PublicHelpCategory[] };
+
+/**
+ * تصويت «هل أفادك هذا؟».
+ *
+ * **و`visitor` ليس هوية**: معرّفٌ عشوائي (UUID) يولّده المتصفّح ويحفظه في `localStorage`،
+ * والغرض منه **منع عدّ الصوت مرّتين** من المتصفّح نفسه لا تتبّع أحد. ولا يُخزَّن عنوان IP
+ * ولا وسيط المتصفّح مع الصوت (والسبيك الحيّ يقيس ذلك في سجلّ التدقيق).
+ */
+export const publicHelpFeedbackSchema = z
+  .object({
+    helpful: z.boolean(),
+    // معرّفٌ عشوائي بطول UUID — لا اسمٌ ولا بريد ولا رقم عميل.
+    visitor: z.string().trim().uuid(),
+  })
+  .strict();
+export type PublicHelpFeedback = z.infer<typeof publicHelpFeedbackSchema>;
+
+/** نتيجة التصويت: العدّادان بعد المحاولة، وهل حُسب الصوت الآن أم كان محسوباً قبل. */
+export const publicHelpFeedbackResultSchema = z.object({
+  yes: z.number().int().min(0),
+  no: z.number().int().min(0),
+  recorded: z.boolean(),
+});
+export type PublicHelpFeedbackResult = z.infer<typeof publicHelpFeedbackResultSchema>;
+
+/** عدّادا التصويت كما يُقرآن مع المقال. */
+export type PublicHelpHelpful = { yes: number; no: number };
+
+/**
+ * مقالُ مساعدةٍ كامل: الصفحة بكتلها + فئتها + مقالاتها المجاورة + العدّادان.
+ *
+ * **والمجاورة من الفئة نفسها** لا «الأحدث عموماً»: من قرأ «كيف أُصدر فاتورة» يهمّه ما بعده في
+ * الإصدار لا مقالٌ عن التسويق. فإن لم تكن للمقال فئة (مسموح في CMS) تعود المجاورة فارغة ولا
+ * تُخترع من عموم المقالات.
+ */
+export type PublicHelpArticle = {
+  page: ContentPageDetail;
+  category: string | null;
+  related: PublicPost[];
+  helpful: PublicHelpHelpful;
+};

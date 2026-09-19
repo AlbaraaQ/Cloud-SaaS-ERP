@@ -20,8 +20,18 @@ const apiBase = (
   `http://127.0.0.1:${process.env.PORT ?? 3000}`
 ).replace(/\/+$/, '');
 
-/** مسارات المحتوى الديناميكية وحدها: `/blog/x` و`/en/help/y` … */
-const CONTENT_DETAIL = /^\/(?:en\/)?(?:blog|help|cases|legal)\/([^/]+)$/;
+/**
+ * مسارات المحتوى الديناميكية وحدها: `/blog/x` و`/en/help/y` … — والمجموعة الأولى هي **النوع
+ * الذي تُسأل عنه نقطة النهاية المناسبة له**:
+ *
+ *   * `help` → `/public/help/:slug` (P-M9): نقطةٌ تحكم النوع والمنشور معاً في الخدمة.
+ *   * `changelog` → `/public/content/:slug` **مع فحص النوع** (P-M9): لا مسارَ خاصٌّ لمدخل
+ *     تغيير، والحكم في الوسيط لأن `notFound()` في الصفحة تُنتج 404 ناعمةً بحالة 200.
+ *   * البقيّة → `/public/content/:slug` (المنشور وحده).
+ *
+ * وثمنُ الفحص على `changelog` نداءٌ آخر على صفحات المدخلات وحدها — والنداء داخليّ بلا شبكة.
+ */
+const CONTENT_DETAIL = /^\/(?:en\/)?(help|changelog|blog|cases|legal)\/([^/]+)$/;
 
 /**
  * P-M8 — `/industries/<slug>`: القطاعات **قائمةٌ في الكود** (`lib/industries.ts`) لا في
@@ -51,13 +61,23 @@ export async function middleware(request: NextRequest) {
 
   const match = CONTENT_DETAIL.exec(request.nextUrl.pathname);
   if (match && (request.method === 'GET' || request.method === 'HEAD')) {
-    const slug = decodeURIComponent(match[1] ?? '');
+    const kind = match[1] ?? '';
+    const slug = decodeURIComponent(match[2] ?? '');
     let published = true;
     try {
-      const response = await fetch(`${apiBase}/api/v1/public/content/${encodeURIComponent(slug)}`, {
-        headers: { accept: 'application/json' },
-      });
+      // المسار المخصّص يسأل نقطته المخصّصة، والباقي يسأل مسار المحتوى — فالحكم واحدٌ في كل باب.
+      const endpoint =
+        kind === 'help'
+          ? `/api/v1/public/help/${encodeURIComponent(slug)}`
+          : `/api/v1/public/content/${encodeURIComponent(slug)}`;
+      const response = await fetch(`${apiBase}${endpoint}`, { headers: { accept: 'application/json' } });
       published = response.ok;
+      // ومدخلُ سجلّ التغييرات يُشترط نوعُه صراحةً: صفحةٌ منشورة من نوعٍ آخر لها رابطها الأصلي،
+      // وفتحُها من `/changelog/<slug>` يجعل لكل مقالٍ رابطين ينافسان بعضهما في نتائج البحث.
+      if (published && kind === 'changelog') {
+        const payload = (await response.json()) as { data?: { kind?: string } };
+        published = payload.data?.kind === 'changelog';
+      }
     } catch {
       // الـAPI لا يجيب: لا نُخفي خطأ خدمةٍ عن الزائر بحالة 404 — الصفحة تُصيَّر وتقول ما عندها.
       published = true;

@@ -3797,7 +3797,67 @@
             "description": ""
           }
         },
-        "summary": "مقالات مركز المساعدة، مع بحثٍ في العنوان والملخّص",
+        "summary": "مقالات مركز المساعدة، مع بحثٍ في العنوان والملخّص، وفئاتُها في الغلاف",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/help/{slug}": {
+      "get": {
+        "operationId": "PublicContentController_helpArticle",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "description": "رابط المقال (غير المنشور وغير الـhelp يُردّان 404)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مقالُ مساعدةٍ منشور بكتله وفئته ومقالاتٍ مجاورة وعدّادَي التصويت",
+        "tags": [
+          "public-content"
+        ]
+      }
+    },
+    "/api/v1/public/help/{slug}/feedback": {
+      "post": {
+        "operationId": "PublicContentController_helpFeedback",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "{ helpful: boolean, visitor: uuid } — و`visitor` معرّف متصفّحٍ عشوائي",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تسجيل صوت «هل أفادك هذا؟» — صوتٌ واحد لكل مقالٍ لكل متصفّح",
         "tags": [
           "public-content"
         ]
@@ -4177,6 +4237,358 @@
         "summary": "التحقّق من فاتورة بحِمل رمز QR أو برمز الفاتورة (بلا جلسة)",
         "tags": [
           "public-verify"
+        ]
+      }
+    },
+    "/api/v1/public/status": {
+      "get": {
+        "operationId": "PublicStatusController_statusPage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Public component states with the declared incident, if any"
+          },
+          "429": {
+            "description": "تجاوز حدّ المعدّل (RATE_LIMITED)"
+          }
+        },
+        "summary": "حالة الخدمة علناً: خمسة مكوّنات، والحادث المفتوح إن وُجد",
+        "tags": [
+          "public-status"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs": {
+      "get": {
+        "operationId": "PlatformOperationsController_jobs",
+        "parameters": [
+          {
+            "name": "filter[tenantId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[type]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[queue]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[status]",
+            "required": false,
+            "in": "query",
+            "description": "pending | published | dead",
+            "schema": {}
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The outbox across every customer, with each job’s payload keys",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs/heartbeat": {
+      "get": {
+        "operationId": "PlatformOperationsController_heartbeat",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Heartbeat"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Worker heartbeat and the age of the oldest pending job",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs/{id}/retry": {
+      "post": {
+        "operationId": "PlatformOperationsController_retryJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job after the retry"
+          },
+          "422": {
+            "description": "Already pending, or already published"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return a pending or dead job to the queue (attempts cleared, run-at now)",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "PlatformOperationsController_cancelJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job after the cancellation"
+          },
+          "422": {
+            "description": "Already published"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark a job dead so the publisher stops consuming it",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/health/detailed": {
+      "get": {
+        "operationId": "PlatformOperationsController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Health with six probes"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Probes, request rates, queue backlog and the incident banner",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/files": {
+      "get": {
+        "operationId": "PlatformOperationsController_files",
+        "parameters": [
+          {
+            "name": "filter[scan]",
+            "required": false,
+            "in": "query",
+            "description": "clean | infected | skipped | none",
+            "schema": {}
+          },
+          {
+            "name": "filter[entity]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[tenantId]",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "filter[status]",
+            "required": false,
+            "in": "query",
+            "description": "pending | ready | deleted",
+            "schema": {}
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "File-name fragment",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File page"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cross-tenant file manager with each file’s last scan verdict",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/files/{id}/scan": {
+      "post": {
+        "operationId": "PlatformOperationsController_scan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The verdict as it came out of the scanner"
+          },
+          "404": {
+            "description": "No such file"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run the configured scanner now and record its verdict",
+        "tags": [
+          "platform-operations"
+        ]
+      }
+    },
+    "/api/v1/platform/files/{id}": {
+      "delete": {
+        "operationId": "PlatformOperationsController_purge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The file after quarantine"
+          },
+          "422": {
+            "description": "Already quarantined"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quarantine a file (metadata is kept; rows are never deleted)",
+        "tags": [
+          "platform-operations"
         ]
       }
     },
@@ -8915,340 +9327,6 @@
         "summary": "End a support session — its token stops working on the next request (the row is closed, never deleted)",
         "tags": [
           "platform"
-        ]
-      }
-    },
-    "/api/v1/platform/jobs": {
-      "get": {
-        "operationId": "PlatformOperationsController_jobs",
-        "parameters": [
-          {
-            "name": "filter[tenantId]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[type]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[queue]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[status]",
-            "required": false,
-            "in": "query",
-            "description": "pending | published | dead",
-            "schema": {}
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Job page"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "The outbox across every customer, with each job’s payload keys",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/jobs/heartbeat": {
-      "get": {
-        "operationId": "PlatformOperationsController_heartbeat",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Heartbeat"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Worker heartbeat and the age of the oldest pending job",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/jobs/{id}/retry": {
-      "post": {
-        "operationId": "PlatformOperationsController_retryJob",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "reason"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The job after the retry"
-          },
-          "422": {
-            "description": "Already pending, or already published"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Return a pending or dead job to the queue (attempts cleared, run-at now)",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/jobs/{id}/cancel": {
-      "post": {
-        "operationId": "PlatformOperationsController_cancelJob",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "reason"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The job after the cancellation"
-          },
-          "422": {
-            "description": "Already published"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Mark a job dead so the publisher stops consuming it",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/health/detailed": {
-      "get": {
-        "operationId": "PlatformOperationsController_health",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Health with six probes"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Probes, request rates, queue backlog and the incident banner",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/files": {
-      "get": {
-        "operationId": "PlatformOperationsController_files",
-        "parameters": [
-          {
-            "name": "filter[scan]",
-            "required": false,
-            "in": "query",
-            "description": "clean | infected | skipped | none",
-            "schema": {}
-          },
-          {
-            "name": "filter[entity]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[tenantId]",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "filter[status]",
-            "required": false,
-            "in": "query",
-            "description": "pending | ready | deleted",
-            "schema": {}
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "File-name fragment",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "File page"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cross-tenant file manager with each file’s last scan verdict",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/files/{id}/scan": {
-      "post": {
-        "operationId": "PlatformOperationsController_scan",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The verdict as it came out of the scanner"
-          },
-          "404": {
-            "description": "No such file"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Run the configured scanner now and record its verdict",
-        "tags": [
-          "platform-operations"
-        ]
-      }
-    },
-    "/api/v1/platform/files/{id}": {
-      "delete": {
-        "operationId": "PlatformOperationsController_purge",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "reason"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The file after quarantine"
-          },
-          "422": {
-            "description": "Already quarantined"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Quarantine a file (metadata is kept; rows are never deleted)",
-        "tags": [
-          "platform-operations"
         ]
       }
     },

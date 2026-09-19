@@ -2,15 +2,17 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ArticleView } from '../../../../components/site/views';
-import { fetchPage } from '../../../../lib/content';
+import { fetchHelpArticle } from '../../../../lib/content';
 import { contentMetadata } from '../../../../lib/meta';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const page = await fetchPage(slug);
-  if (!page || page.kind !== 'help') {
+  // P-M9: النوع يُحكم في المسار المخصّص (`/public/help/:slug`) لا في شرطٍ في الصفحة.
+  const article = await fetchHelpArticle(slug);
+  const page = article?.page;
+  if (!page) {
     return { title: 'Not found', description: 'Article not found', robots: { index: false, follow: false } };
   }
   return contentMetadata({
@@ -24,8 +26,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function HelpArticlePageEn({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const page = await fetchPage(slug);
-  if (!page || page.kind !== 'help') notFound();
+  const article = await fetchHelpArticle(slug);
+  if (!article) notFound();
+  const page = article.page;
   return (
     <ArticleView
       locale="en"

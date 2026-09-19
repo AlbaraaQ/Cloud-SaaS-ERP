@@ -80,6 +80,10 @@ const envSchema = z.object({
   // الاستمارات لأن سيلَ استماراتٍ لا يجوز أن يُغلق بابَ التحقّق (والعكس). والسقف متوسّط
   // لأنه يخدم لصقاً يدوياً يتكرّر فيه الخطأ.
   RATE_LIMIT_PUBLIC_VERIFY_PER_MINUTE: z.coerce.number().int().positive().default(30),
+  // P-M9 — دلوُ حالة الخدمة العامة (`GET /public/status`): كل نداءٍ يقرأ مجسّات المنصّة
+  // نفسها (قاعدة · طابور · بريد · تخزين)، فالسقف يمنع تحويل صفحة الحالة إلى حملة استنزاف،
+  // وفوقه ذاكرةُ عشر ثوانٍ في الخدمة فالسقف الفعليّ أوسع للزائر العادي.
+  RATE_LIMIT_PUBLIC_STATUS_PER_MINUTE: z.coerce.number().int().positive().default(60),
 
   /** Public self-service signup (POST /api/v1/signup). Turn it off for private deployments. */
   SIGNUP_ENABLED: booleanish.default(true),

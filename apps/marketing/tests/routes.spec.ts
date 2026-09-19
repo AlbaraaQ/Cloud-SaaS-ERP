@@ -31,6 +31,11 @@ describe('marketing route groups', () => {
     expect(existsSync(join(appDir, 'trust/page.tsx')), '/trust').toBe(true);
     expect(existsSync(join(appDir, 'industries/page.tsx')), '/industries').toBe(true);
     expect(existsSync(join(appDir, 'industries/[slug]/page.tsx')), '/industries/[slug]').toBe(true);
+    // P-M9: سجلّ التغييرات ومدخله، وصفحة حالة الخدمة — الصفحتان تُعلنان في التذييل وفي خريطة
+    // الموقع، فمسارهما المحقَّق هنا هو نفسه الذي يُفهرَس.
+    expect(existsSync(join(appDir, 'changelog/page.tsx')), '/changelog').toBe(true);
+    expect(existsSync(join(appDir, 'changelog/[slug]/page.tsx')), '/changelog/[slug]').toBe(true);
+    expect(existsSync(join(appDir, 'status/page.tsx')), '/status').toBe(true);
     expect(existsSync(join(appDir, 'login/page.tsx')), '/login').toBe(true);
   });
 

@@ -182,21 +182,79 @@ export async function fetchPosts(
   return { items, meta: payload.meta ?? { total: items.length, limit: options.limit ?? 12, offset: 0 } };
 }
 
-export async function fetchHelp(options: { q?: string; category?: string; limit?: number } = {}): Promise<{
-  items: ContentPageSummary[];
-  meta: ListMeta;
-}> {
+export type HelpMeta = ListMeta & { categories: Array<{ name: string; count: number }> };
+
+/**
+ * `GET /public/help` — القائمة **والفئات معها** (P-M9).
+ *
+ * والاحتياط عند الفشل فارغٌ لا مخترع: صفحةُ مساعدةٍ تعرض فئاتٍ من العدم أسوأ من صفحةٍ تقول
+ * «لا مقالات»، لأن الفئة الكاذبة تقود الزائر إلى نتيجةٍ لا توجد.
+ */
+export async function fetchHelp(
+  options: { q?: string; category?: string; limit?: number } = {},
+): Promise<{ items: ContentPageSummary[]; meta: HelpMeta }> {
   const query = new URLSearchParams();
   if (options.q) query.set('q', options.q);
   if (options.category) query.set('category', options.category);
   query.set('limit', String(options.limit ?? 20));
-  const payload = await getJson<{ data?: ContentPageSummary[]; meta?: ListMeta } | ContentPageSummary[]>(
+  const payload = await getJson<{ data?: ContentPageSummary[]; meta?: HelpMeta } | ContentPageSummary[]>(
     `/public/help?${query.toString()}`,
     [],
   );
-  if (Array.isArray(payload)) return { items: payload, meta: { total: payload.length, limit: 20, offset: 0 } };
+  const fallback: HelpMeta = { total: 0, limit: 20, offset: 0, categories: [] };
+  if (Array.isArray(payload)) return { items: payload, meta: { ...fallback, total: payload.length } };
   const items = payload.data ?? [];
-  return { items, meta: payload.meta ?? { total: items.length, limit: 20, offset: 0 } };
+  return { items, meta: payload.meta ?? { ...fallback, total: items.length } };
+}
+
+/** مقالُ مساعدةٍ كامل كما يردّه `GET /public/help/:slug` (P-M9). */
+export type HelpArticle = {
+  page: ContentPageDetail;
+  category: string | null;
+  related: ContentPageSummary[];
+  helpful: { yes: number; no: number };
+};
+
+export async function fetchHelpArticle(slug: string): Promise<HelpArticle | null> {
+  const payload = await getJson<HelpArticle | null>(`/public/help/${encodeURIComponent(slug)}`, null);
+  return payload && payload.page.status === 'published' ? payload : null;
+}
+
+/** حالة الخدمة كما يردّها `GET /public/status` (P-M9) — و`null` تعني «تعذّر القياس». */
+export type SiteStatus = {
+  status: 'up' | 'degraded' | 'down' | 'not_configured';
+  statusLabelAr: string;
+  statusLabelEn: string;
+  statusTone: 'ready' | 'pending' | 'failed' | 'muted';
+  checkedAt: string;
+  uptimeSeconds: number;
+  incident: { message: string | null; since: string | null } | null;
+  components: Array<{
+    key: string;
+    labelAr: string;
+    labelEn: string;
+    whatAr: string;
+    whatEn: string;
+    status: 'up' | 'degraded' | 'down' | 'not_configured';
+    noteAr: string;
+    noteEn: string;
+    latencyMs: number | null;
+  }>;
+  noteAr: string;
+  noteEn: string;
+};
+
+export async function fetchStatus(): Promise<SiteStatus | null> {
+  return getJson<SiteStatus | null>('/public/status', null, 0);
+}
+
+/** مدخلات سجلّ التغييرات — `kind=changelog` على مسار المقالات نفسه (P-M9). */
+export async function fetchChangelog(limit = 24): Promise<ContentPageSummary[]> {
+  const payload = await getJson<{ data?: ContentPageSummary[] } | ContentPageSummary[]>(
+    `/public/posts?kind=changelog&limit=${limit}`,
+    [],
+  );
+  return Array.isArray(payload) ? payload : (payload.data ?? []);
 }
 
 export type FaqItem = { slug: string; question: string; answer: string };

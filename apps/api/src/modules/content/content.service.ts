@@ -27,6 +27,11 @@ import {
   type ContentVersion,
   type ListEnvelope,
   type PublicFaq,
+  type PublicHelpArticle,
+  type PublicHelpCategory,
+  type PublicHelpFeedback,
+  type PublicHelpFeedbackResult,
+  type PublicHelpMeta,
   type PublicPost,
   type PublicSite,
 } from '@erp/contracts';
@@ -450,8 +455,19 @@ export class ContentService {
     };
   }
 
-  /** `GET /public/help` — مقالات المساعدة، وبحثٌ في العنوان والملخّص والكتل النصية. */
-  async publicHelp(query: { category?: string; q?: string; limit: number }): Promise<ListEnvelope<PublicPost>> {
+  /**
+   * `GET /public/help` — مقالات المساعدة، وبحثٌ في العنوان والملخّص، **ومعها الفئات**.
+   *
+   * **والفئات تأتي مع القائمة لا في نداءٍ ثانٍ** (P-M9): الشاشة تحتاج القائمة والشرائح في
+   * اللحظة نفسها، ونداءان يعنيان رسمةً أولى بلا فئاتٍ ثم قفزة. وهي **غير مرشَّحة** بالطلب
+   * عمداً: من جاء من رابط فئةٍ مباشر يجب أن يرى بقيّة الفئات ليخرج منها؛ وعدّ كل فئةٍ محسوبٌ
+   * من المقالات المنشورة وحدها (فلا فئةٌ بعدّ صفر تظهر).
+   */
+  async publicHelp(query: {
+    category?: string;
+    q?: string;
+    limit: number;
+  }): Promise<ListEnvelope<PublicPost> & { meta: PublicHelpMeta }> {
     await this.publishDue();
     return withPlatformAdminTx(this.database.db, async (tx) => {
       const category = query.category ?? null;
@@ -467,11 +483,122 @@ export class ContentService {
            LIMIT ${query.limit}
         `)
       ).rows as unknown as PageRow[];
-      return listEnvelope(rows.map((row) => this.postFrom(row)), {
-        total: rows.length,
-        limit: query.limit,
-        offset: 0,
-      });
+      const totals = (
+        await tx.execute(sql`
+          SELECT category, count(*)::int AS count FROM content_pages
+           WHERE kind = 'help' AND ${publishedWhere} AND category IS NOT NULL AND btrim(category) <> ''
+           GROUP BY category
+           ORDER BY count(*) DESC, category ASC
+        `)
+      ).rows as unknown as Array<{ category: string; count: number }>;
+      const categories: PublicHelpCategory[] = totals.map((row) => ({ name: row.category, count: row.count }));
+      return {
+        data: rows.map((row) => this.postFrom(row)),
+        meta: { total: rows.length, limit: query.limit, offset: 0, categories },
+      };
+    });
+  }
+
+  /**
+   * `GET /public/help/:slug` — مقالُ مساعدةٍ كامل (P-M9).
+   *
+   * وثلاثة شروط تجعله «مقال مساعدة» لا «صفحةً بأي نوع»: النوع `help` · منشورٌ الآن · وslug
+   * مطابق. ومقالٌ من نوعٍ آخر لا يُخدم من هنا **قبل** أن تُقرأ كتله — فلا يتحوّل المسار إلى
+   * بابٍ خلفي لبقيّة المحتوى.
+   *
+   * والمجاورة من **الفئة نفسها**: من قرأ «كيف أُصدر فاتورة» يهمّه ما بعده في الإصدار لا مقالٌ
+   * عن التسويق. وإن لم تكن للمقال فئة، تعود المجاورة فارغة ولا تُخترع من عموم المقالات.
+   * والعدّادان يُقرآن من `content_feedback` — **مجموعاً** لا صفوفاً: لا يُعاد صوتُ أحد.
+   */
+  async publicHelpArticle(slug: string): Promise<PublicHelpArticle> {
+    await this.publishDue();
+    return withPlatformAdminTx(this.database.db, async (tx) => {
+      const rows = (
+        await tx.execute(sql`
+          SELECT ${this.selectPageColumns} FROM content_pages
+           WHERE slug = ${slug} AND kind = 'help' AND ${publishedWhere}
+        `)
+      ).rows as unknown as PageRow[];
+      const page = rows[0];
+      // الرسالة نفسها للمقال غير المنشور ولغير الموجود — كما في `publicPage`.
+      if (!page) throw new DomainError(errorCodes.NOT_FOUND, 'المقال غير موجود', 404);
+
+      const blocks = await this.blocksOf(tx, page.id);
+      const detail = this.pageFrom(page);
+      const related = page.category
+        ? ((
+            await tx.execute(sql`
+              SELECT ${this.selectPageColumns} FROM content_pages
+               WHERE kind = 'help' AND ${publishedWhere} AND category = ${page.category}
+                 AND slug <> ${page.slug}
+               ORDER BY title_ar ASC
+               LIMIT 4
+            `)
+          ).rows as unknown as PageRow[])
+        : [];
+      const counts = (
+        await tx.execute(sql`
+          SELECT count(*) FILTER (WHERE helpful)::int AS yes,
+                 count(*) FILTER (WHERE NOT helpful)::int AS no
+            FROM content_feedback WHERE page_id = ${page.id}::uuid
+        `)
+      ).rows as unknown as Array<{ yes: number; no: number }>;
+
+      return {
+        page: {
+          ...detail,
+          translatedLocales: this.translatedLocales(page, blocks),
+          blocks: blocks.map((b) => this.blockFrom(b)),
+        },
+        category: page.category,
+        related: related.map((row) => this.postFrom(row)),
+        helpful: { yes: counts[0]?.yes ?? 0, no: counts[0]?.no ?? 0 },
+      };
+    });
+  }
+
+  /**
+   * `POST /public/help/:slug/feedback` — صوتٌ واحد لكل مقالٍ لكل متصفّح (P-M9).
+   *
+   * **والمنع في الفهرس لا في الكود**: `content_feedback_once_key` فريدٌ على
+   * `(page_id, visitor)`، والكتابة `ON CONFLICT DO NOTHING RETURNING id` تقول هل حُسب الصوت
+   * الآن. فطلبٌ مكرّر (نقرةٌ مزدوجة أو إعادة إرسال) لا يزيد العدّاد ولا يُخطئ — و`recorded`
+   * تخبر الواجهة بالحقيقة فتقول «سُجّل صوتك» أو «صوتك محسوبٌ من قبل» بلا كذب.
+   *
+   * والمقال يُتحقَّق أنه **منشور ومن نوع help** قبل الكتابة: الصوت على مسوّدةٍ لا معنى له.
+   */
+  async recordHelpFeedback(slug: string, input: PublicHelpFeedback): Promise<PublicHelpFeedbackResult> {
+    await this.publishDue();
+    return withPlatformAdminTx(this.database.db, async (tx) => {
+      const rows = (
+        await tx.execute(sql`
+          SELECT id FROM content_pages WHERE slug = ${slug} AND kind = 'help' AND ${publishedWhere}
+        `)
+      ).rows as unknown as Array<{ id: string }>;
+      const page = rows[0];
+      if (!page) throw new DomainError(errorCodes.NOT_FOUND, 'المقال غير موجود', 404);
+
+      const inserted = (
+        await tx.execute(sql`
+          INSERT INTO content_feedback (id, page_id, helpful, visitor)
+          VALUES (${newId()}, ${page.id}::uuid, ${input.helpful}, ${input.visitor})
+          ON CONFLICT (page_id, visitor) DO NOTHING
+          RETURNING id
+        `)
+      ).rows as unknown as Array<{ id: string }>;
+      const counts = (
+        await tx.execute(sql`
+          SELECT count(*) FILTER (WHERE helpful)::int AS yes,
+                 count(*) FILTER (WHERE NOT helpful)::int AS no
+            FROM content_feedback WHERE page_id = ${page.id}::uuid
+        `)
+      ).rows as unknown as Array<{ yes: number; no: number }>;
+
+      return {
+        yes: counts[0]?.yes ?? 0,
+        no: counts[0]?.no ?? 0,
+        recorded: inserted.length > 0,
+      };
     });
   }
 

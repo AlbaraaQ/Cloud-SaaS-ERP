@@ -52,6 +52,19 @@ const IGNORED_RESOURCES = new Set(['health', 'audit-log']);
  */
 const READ_ONLY_POSTS = new Set(['POST public/verify']);
 
+/**
+ * **P-M9 — فعلٌ عامّ لا يُنسب إلى فاعل.** `POST public/help/:slug/feedback` هو الكتابة
+ * العامة الوحيدة في الموقع التسويقي: زائرٌ مجهول يقول «أفادني هذا» أو «لم يفدني».
+ *
+ * **ولماذا لا يُدقَّق وهو فعلٌ لا قراءة؟** لأن صفّ التدقيق في هذا المستودع يحمل **عنوان
+ * الزائر ووسيط متصفّحه** (`meta.ip` · `meta.userAgent`) بجانب الفعل — أي أن تدقيق صوتٍ
+ * مجهول يحوّل «رأيٌ مجموع» إلى «ملفٍّ عن قارئ» مقابل فائدةٍ صفر: لا فاعلَ يُسأل، ولا قرارَ
+ * تشغيليّ يُبنى على الصف. والمكتوب الفعلي (الحكم وصاحبه المجهول) محفوظٌ في `content_feedback`
+ * للعدّ، والصفحة تقول للزائر عن حقّ: لا يُحفظ ما لصقت. فالمسار مستثنى **بالاسم الكامل**
+ * (`METHOD resource/entity`) كي لا يُعفى مسارٌ عامٌّ آخر جاء من الوحدة نفسها.
+ */
+const ANONYMOUS_POSTS = new Set(['POST public/help']);
+
 export type RouteDescriptor = {
   resource: string;
   entityId: string | null;
@@ -107,6 +120,7 @@ export class AuditInterceptor implements NestInterceptor {
     const route = describeRoute(request.originalUrl ?? request.url ?? '');
     if (IGNORED_RESOURCES.has(route.resource)) return next.handle();
     if (READ_ONLY_POSTS.has(`${method} ${route.resource}/${route.entityId ?? ''}`)) return next.handle();
+    if (ANONYMOUS_POSTS.has(`${method} ${route.resource}/${route.entityId ?? ''}`)) return next.handle();
 
     const authAction = AUTH_AUDIT_ACTIONS[`${method} ${route.resource}/${route.entityId ?? ''}`];
 

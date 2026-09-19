@@ -70,6 +70,10 @@ export const siteRoutes: SiteRoute[] = [
   },
   { key: 'trust', href: '/trust', labelAr: 'الأمان والثقة', labelEn: 'Trust and security', bilingual: false, nav: true },
   { key: 'verify', href: '/verify', labelAr: 'تحقّق من فاتورة', labelEn: 'Verify invoice', bilingual: false, nav: false },
+  // P-M9: سجلّ التغييرات وحالة الخدمة — في التذييل لا في الرأس: من يبحث عنهما يعرف أنهما
+  // موجودان (وهما في خريطة الموقع)، ولا يزدحم بهما شريطُ أوّل زيارة.
+  { key: 'changelog', href: '/changelog', labelAr: 'سجلّ التغييرات', labelEn: 'Changelog', bilingual: false, nav: false },
+  { key: 'status', href: '/status', labelAr: 'حالة الخدمة', labelEn: 'Service status', bilingual: false, nav: false },
   { key: 'onboarding', href: '/onboarding', labelAr: 'اشترك', labelEn: 'Subscribe', bilingual: false, nav: false },
   { key: 'login', href: '/login', labelAr: 'دخول', labelEn: 'Sign in', bilingual: false, nav: false },
   { key: 'maintenance', href: '/maintenance', labelAr: 'صيانة', labelEn: 'Maintenance', bilingual: false, nav: false },
@@ -110,12 +114,20 @@ export function siteFooterLinks(locale: Locale): Array<{ key: string; label: str
     {
       key: 'product',
       label: t(locale, 'footer.product'),
-      links: [link('features'), link('einvoicing'), link('industries'), link('pricing'), link('verify'), link('trust')],
+      links: [
+        link('features'),
+        link('einvoicing'),
+        link('industries'),
+        link('pricing'),
+        link('verify'),
+        link('trust'),
+        link('status'),
+      ],
     },
     {
       key: 'content',
       label: t(locale, 'footer.content'),
-      links: [link('blog'), link('cases'), link('help')],
+      links: [link('blog'), link('cases'), link('help'), link('changelog')],
     },
     {
       key: 'company',
